@@ -51,66 +51,140 @@ AIRTAG_PREFIXES = ['4C:00']  # Apple continuity
 TILE_PREFIXES = ['C4:E7', 'DC:54', 'E4:B0', 'F8:8A']
 SAMSUNG_TRACKER = ['58:4D', 'A0:75']
 
-# OUI Database for manufacturer lookup (common ones)
+# OUI Database for manufacturer lookup (expanded)
 OUI_DATABASE = {
-    '00:00:0A': 'Omron',
-    '00:1A:7D': 'Cyber-Blue',
-    '00:1E:3D': 'Alps Electric',
-    '00:1F:20': 'Logitech',
-    '00:25:DB': 'Apple',
-    '04:52:F3': 'Apple',
-    '0C:3E:9F': 'Apple',
-    '10:94:BB': 'Apple',
-    '14:99:E2': 'Apple',
-    '20:78:F0': 'Apple',
-    '28:6A:BA': 'Apple',
-    '3C:22:FB': 'Apple',
-    '40:98:AD': 'Apple',
-    '48:D7:05': 'Apple',
-    '4C:57:CA': 'Apple',
-    '54:4E:90': 'Apple',
-    '5C:97:F3': 'Apple',
-    '60:F8:1D': 'Apple',
-    '68:DB:CA': 'Apple',
-    '70:56:81': 'Apple',
-    '78:7B:8A': 'Apple',
-    '7C:D1:C3': 'Apple',
-    '84:FC:FE': 'Apple',
-    '8C:2D:AA': 'Apple',
-    '90:B0:ED': 'Apple',
-    '98:01:A7': 'Apple',
-    '98:D6:BB': 'Apple',
-    'A4:D1:D2': 'Apple',
-    'AC:BC:32': 'Apple',
-    'B0:34:95': 'Apple',
-    'B8:C1:11': 'Apple',
-    'C8:69:CD': 'Apple',
-    'D0:03:4B': 'Apple',
-    'DC:A9:04': 'Apple',
-    'E0:C7:67': 'Apple',
-    'F0:18:98': 'Apple',
-    'F4:5C:89': 'Apple',
-    '00:1B:66': 'Samsung',
-    '00:21:19': 'Samsung',
-    '00:26:37': 'Samsung',
-    '5C:0A:5B': 'Samsung',
-    '8C:71:F8': 'Samsung',
-    'C4:73:1E': 'Samsung',
-    '38:2C:4A': 'Samsung',
-    '00:1E:4C': 'Samsung',
-    '64:B5:C6': 'Liteon/Google',
-    '54:60:09': 'Google',
-    '00:1A:11': 'Google',
-    'F4:F5:D8': 'Google',
-    '94:EB:2C': 'Google',
-    '78:4F:43': 'Apple',
-    'F8:E4:E3': 'Tile',
-    'C4:E7:BE': 'Tile',
-    'E0:E5:CF': 'Raspberry Pi',
-    'B8:27:EB': 'Raspberry Pi',
-    'DC:A6:32': 'Raspberry Pi',
-    '00:0B:57': 'Silicon Wave',  # BT Chips
-    '00:02:72': 'CC&C',  # BT dongles
+    # Apple (extensive list)
+    '00:25:DB': 'Apple', '04:52:F3': 'Apple', '0C:3E:9F': 'Apple', '10:94:BB': 'Apple',
+    '14:99:E2': 'Apple', '20:78:F0': 'Apple', '28:6A:BA': 'Apple', '3C:22:FB': 'Apple',
+    '40:98:AD': 'Apple', '48:D7:05': 'Apple', '4C:57:CA': 'Apple', '54:4E:90': 'Apple',
+    '5C:97:F3': 'Apple', '60:F8:1D': 'Apple', '68:DB:CA': 'Apple', '70:56:81': 'Apple',
+    '78:7B:8A': 'Apple', '7C:D1:C3': 'Apple', '84:FC:FE': 'Apple', '8C:2D:AA': 'Apple',
+    '90:B0:ED': 'Apple', '98:01:A7': 'Apple', '98:D6:BB': 'Apple', 'A4:D1:D2': 'Apple',
+    'AC:BC:32': 'Apple', 'B0:34:95': 'Apple', 'B8:C1:11': 'Apple', 'C8:69:CD': 'Apple',
+    'D0:03:4B': 'Apple', 'DC:A9:04': 'Apple', 'E0:C7:67': 'Apple', 'F0:18:98': 'Apple',
+    'F4:5C:89': 'Apple', '78:4F:43': 'Apple', '00:CD:FE': 'Apple', '04:4B:ED': 'Apple',
+    '04:D3:CF': 'Apple', '08:66:98': 'Apple', '0C:74:C2': 'Apple', '10:DD:B1': 'Apple',
+    '14:10:9F': 'Apple', '18:EE:69': 'Apple', '1C:36:BB': 'Apple', '24:A0:74': 'Apple',
+    '28:37:37': 'Apple', '2C:BE:08': 'Apple', '34:08:BC': 'Apple', '38:C9:86': 'Apple',
+    '3C:06:30': 'Apple', '44:D8:84': 'Apple', '48:A9:1C': 'Apple', '4C:32:75': 'Apple',
+    '50:32:37': 'Apple', '54:26:96': 'Apple', '58:B0:35': 'Apple', '5C:F7:E6': 'Apple',
+    '64:A3:CB': 'Apple', '68:FE:F7': 'Apple', '6C:4D:73': 'Apple', '70:DE:E2': 'Apple',
+    '74:E2:F5': 'Apple', '78:67:D7': 'Apple', '7C:04:D0': 'Apple', '80:E6:50': 'Apple',
+    '84:78:8B': 'Apple', '88:66:A5': 'Apple', '8C:85:90': 'Apple', '94:E9:6A': 'Apple',
+    '9C:F4:8E': 'Apple', 'A0:99:9B': 'Apple', 'A4:83:E7': 'Apple', 'A8:5C:2C': 'Apple',
+    'AC:1F:74': 'Apple', 'B0:19:C6': 'Apple', 'B4:F1:DA': 'Apple', 'BC:52:B7': 'Apple',
+    'C0:A5:3E': 'Apple', 'C4:B3:01': 'Apple', 'CC:20:E8': 'Apple', 'D0:C5:F3': 'Apple',
+    'D4:61:9D': 'Apple', 'D8:1C:79': 'Apple', 'E0:5F:45': 'Apple', 'E4:C6:3D': 'Apple',
+    'F0:B4:79': 'Apple', 'F4:0F:24': 'Apple', 'F8:4D:89': 'Apple', 'FC:D8:48': 'Apple',
+    # Samsung
+    '00:1B:66': 'Samsung', '00:21:19': 'Samsung', '00:26:37': 'Samsung', '5C:0A:5B': 'Samsung',
+    '8C:71:F8': 'Samsung', 'C4:73:1E': 'Samsung', '38:2C:4A': 'Samsung', '00:1E:4C': 'Samsung',
+    '00:12:47': 'Samsung', '00:15:99': 'Samsung', '00:17:D5': 'Samsung', '00:1D:F6': 'Samsung',
+    '00:21:D1': 'Samsung', '00:24:54': 'Samsung', '00:26:5D': 'Samsung', '08:D4:2B': 'Samsung',
+    '10:D5:42': 'Samsung', '14:49:E0': 'Samsung', '18:3A:2D': 'Samsung', '1C:66:AA': 'Samsung',
+    '24:4B:81': 'Samsung', '28:98:7B': 'Samsung', '2C:AE:2B': 'Samsung', '30:96:FB': 'Samsung',
+    '34:C3:AC': 'Samsung', '38:01:95': 'Samsung', '3C:5A:37': 'Samsung', '40:0E:85': 'Samsung',
+    '44:4E:1A': 'Samsung', '4C:BC:A5': 'Samsung', '50:01:BB': 'Samsung', '50:A4:D0': 'Samsung',
+    '54:88:0E': 'Samsung', '58:C3:8B': 'Samsung', '5C:2E:59': 'Samsung', '60:D0:A9': 'Samsung',
+    '64:B3:10': 'Samsung', '68:48:98': 'Samsung', '6C:2F:2C': 'Samsung', '70:F9:27': 'Samsung',
+    '74:45:8A': 'Samsung', '78:47:1D': 'Samsung', '7C:0B:C6': 'Samsung', '84:11:9E': 'Samsung',
+    '88:32:9B': 'Samsung', '8C:77:12': 'Samsung', '90:18:7C': 'Samsung', '94:35:0A': 'Samsung',
+    '98:52:B1': 'Samsung', '9C:02:98': 'Samsung', 'A0:0B:BA': 'Samsung', 'A4:7B:85': 'Samsung',
+    'A8:06:00': 'Samsung', 'AC:5F:3E': 'Samsung', 'B0:72:BF': 'Samsung', 'B4:79:A7': 'Samsung',
+    'BC:44:86': 'Samsung', 'C0:97:27': 'Samsung', 'C4:42:02': 'Samsung', 'CC:07:AB': 'Samsung',
+    'D0:22:BE': 'Samsung', 'D4:87:D8': 'Samsung', 'D8:90:E8': 'Samsung', 'E4:7C:F9': 'Samsung',
+    'E8:50:8B': 'Samsung', 'F0:25:B7': 'Samsung', 'F4:7B:5E': 'Samsung', 'FC:A1:3E': 'Samsung',
+    # Google
+    '54:60:09': 'Google', '00:1A:11': 'Google', 'F4:F5:D8': 'Google', '94:EB:2C': 'Google',
+    '64:B5:C6': 'Google', '3C:5A:B4': 'Google', 'F8:8F:CA': 'Google', '20:DF:B9': 'Google',
+    '54:27:1E': 'Google', '58:CB:52': 'Google', 'A4:77:33': 'Google', 'F4:0E:22': 'Google',
+    # Sony
+    '00:13:A9': 'Sony', '00:1D:28': 'Sony', '00:24:BE': 'Sony', '04:5D:4B': 'Sony',
+    '08:A9:5A': 'Sony', '10:4F:A8': 'Sony', '24:21:AB': 'Sony', '30:52:CB': 'Sony',
+    '40:B8:37': 'Sony', '58:48:22': 'Sony', '70:9E:29': 'Sony', '84:00:D2': 'Sony',
+    'AC:9B:0A': 'Sony', 'B4:52:7D': 'Sony', 'BC:60:A7': 'Sony', 'FC:0F:E6': 'Sony',
+    # Bose
+    '00:0C:8A': 'Bose', '04:52:C7': 'Bose', '08:DF:1F': 'Bose', '2C:41:A1': 'Bose',
+    '4C:87:5D': 'Bose', '60:AB:D2': 'Bose', '88:C9:E8': 'Bose', 'D8:9C:67': 'Bose',
+    # JBL/Harman
+    '00:1D:DF': 'JBL', '08:AE:D6': 'JBL', '20:3C:AE': 'JBL', '44:5E:F3': 'JBL',
+    '50:C9:71': 'JBL', '74:5E:1C': 'JBL', '88:C6:26': 'JBL', 'AC:12:2F': 'JBL',
+    # Beats (Apple subsidiary)
+    '00:61:71': 'Beats', '48:D6:D5': 'Beats', '9C:64:8B': 'Beats', 'A4:E9:75': 'Beats',
+    # Jabra/GN Audio
+    '00:13:17': 'Jabra', '1C:48:F9': 'Jabra', '50:C2:ED': 'Jabra', '70:BF:92': 'Jabra',
+    '74:5C:4B': 'Jabra', '94:16:25': 'Jabra', 'D0:81:7A': 'Jabra', 'E8:EE:CC': 'Jabra',
+    # Sennheiser
+    '00:1B:66': 'Sennheiser', '00:22:27': 'Sennheiser', 'B8:AD:3E': 'Sennheiser',
+    # Xiaomi
+    '04:CF:8C': 'Xiaomi', '0C:1D:AF': 'Xiaomi', '10:2A:B3': 'Xiaomi', '18:59:36': 'Xiaomi',
+    '20:47:DA': 'Xiaomi', '28:6C:07': 'Xiaomi', '34:CE:00': 'Xiaomi', '38:A4:ED': 'Xiaomi',
+    '44:23:7C': 'Xiaomi', '50:64:2B': 'Xiaomi', '58:44:98': 'Xiaomi', '64:09:80': 'Xiaomi',
+    '74:23:44': 'Xiaomi', '78:02:F8': 'Xiaomi', '7C:1C:4E': 'Xiaomi', '84:F3:EB': 'Xiaomi',
+    '8C:BE:BE': 'Xiaomi', '98:FA:E3': 'Xiaomi', 'A4:77:58': 'Xiaomi', 'AC:C1:EE': 'Xiaomi',
+    'B0:E2:35': 'Xiaomi', 'C4:0B:CB': 'Xiaomi', 'C8:47:8C': 'Xiaomi', 'D4:97:0B': 'Xiaomi',
+    'E4:46:DA': 'Xiaomi', 'F0:B4:29': 'Xiaomi', 'FC:64:BA': 'Xiaomi',
+    # Huawei
+    '00:18:82': 'Huawei', '00:1E:10': 'Huawei', '00:25:68': 'Huawei', '04:B0:E7': 'Huawei',
+    '08:63:61': 'Huawei', '10:1B:54': 'Huawei', '18:DE:D7': 'Huawei', '20:A6:80': 'Huawei',
+    '28:31:52': 'Huawei', '34:12:98': 'Huawei', '3C:47:11': 'Huawei', '48:00:31': 'Huawei',
+    '4C:50:77': 'Huawei', '5C:7D:5E': 'Huawei', '60:DE:44': 'Huawei', '70:72:3C': 'Huawei',
+    '78:F5:57': 'Huawei', '80:B6:86': 'Huawei', '88:53:D4': 'Huawei', '94:04:9C': 'Huawei',
+    'A4:99:47': 'Huawei', 'B4:15:13': 'Huawei', 'BC:76:70': 'Huawei', 'C8:D1:5E': 'Huawei',
+    'DC:D2:FC': 'Huawei', 'E4:68:A3': 'Huawei', 'F4:63:1F': 'Huawei',
+    # OnePlus/BBK
+    '64:A2:F9': 'OnePlus', 'C0:EE:FB': 'OnePlus', '94:65:2D': 'OnePlus',
+    # Fitbit
+    '2C:09:4D': 'Fitbit', 'C4:D9:87': 'Fitbit', 'E4:88:6D': 'Fitbit',
+    # Garmin
+    '00:1C:D1': 'Garmin', 'C4:AC:59': 'Garmin', 'E8:0F:C8': 'Garmin',
+    # Microsoft
+    '00:50:F2': 'Microsoft', '28:18:78': 'Microsoft', '60:45:BD': 'Microsoft',
+    '7C:1E:52': 'Microsoft', '98:5F:D3': 'Microsoft', 'B4:0E:DE': 'Microsoft',
+    # Intel
+    '00:1B:21': 'Intel', '00:1C:C0': 'Intel', '00:1E:64': 'Intel', '00:21:5C': 'Intel',
+    '08:D4:0C': 'Intel', '18:1D:EA': 'Intel', '34:02:86': 'Intel', '40:74:E0': 'Intel',
+    '48:51:B7': 'Intel', '58:A0:23': 'Intel', '64:D4:DA': 'Intel', '80:19:34': 'Intel',
+    '8C:8D:28': 'Intel', 'A4:4E:31': 'Intel', 'B4:6B:FC': 'Intel', 'C8:D0:83': 'Intel',
+    # Qualcomm/Atheros
+    '00:03:7F': 'Qualcomm', '00:24:E4': 'Qualcomm', '04:F0:21': 'Qualcomm',
+    '1C:4B:D6': 'Qualcomm', '88:71:B1': 'Qualcomm', 'A0:65:18': 'Qualcomm',
+    # Broadcom
+    '00:10:18': 'Broadcom', '00:1A:2B': 'Broadcom', '20:10:7A': 'Broadcom',
+    # Realtek
+    '00:0A:EB': 'Realtek', '00:E0:4C': 'Realtek', '48:02:2A': 'Realtek',
+    '52:54:00': 'Realtek', '80:EA:96': 'Realtek',
+    # Logitech
+    '00:1F:20': 'Logitech', '34:88:5D': 'Logitech', '6C:B7:49': 'Logitech',
+    # Lenovo
+    '00:09:2D': 'Lenovo', '28:D2:44': 'Lenovo', '54:EE:75': 'Lenovo', '98:FA:9B': 'Lenovo',
+    # Dell
+    '00:14:22': 'Dell', '00:1A:A0': 'Dell', '18:DB:F2': 'Dell', '34:17:EB': 'Dell',
+    '78:2B:CB': 'Dell', 'A4:BA:DB': 'Dell', 'E4:B9:7A': 'Dell',
+    # HP
+    '00:0F:61': 'HP', '00:14:C2': 'HP', '10:1F:74': 'HP', '28:80:23': 'HP',
+    '38:63:BB': 'HP', '5C:B9:01': 'HP', '80:CE:62': 'HP', 'A0:D3:C1': 'HP',
+    # Tile
+    'F8:E4:E3': 'Tile', 'C4:E7:BE': 'Tile', 'DC:54:D7': 'Tile', 'E4:B0:21': 'Tile',
+    # Raspberry Pi
+    'B8:27:EB': 'Raspberry Pi', 'DC:A6:32': 'Raspberry Pi', 'E4:5F:01': 'Raspberry Pi',
+    # Amazon
+    '00:FC:8B': 'Amazon', '10:CE:A9': 'Amazon', '34:D2:70': 'Amazon', '40:B4:CD': 'Amazon',
+    '44:65:0D': 'Amazon', '68:54:FD': 'Amazon', '74:C2:46': 'Amazon', '84:D6:D0': 'Amazon',
+    'A0:02:DC': 'Amazon', 'AC:63:BE': 'Amazon', 'B4:7C:9C': 'Amazon', 'FC:65:DE': 'Amazon',
+    # Skullcandy
+    '00:01:00': 'Skullcandy', '88:E6:03': 'Skullcandy',
+    # Bang & Olufsen
+    '00:21:3E': 'Bang & Olufsen', '78:C5:E5': 'Bang & Olufsen',
+    # Audio-Technica
+    'A0:E9:DB': 'Audio-Technica', 'EC:81:93': 'Audio-Technica',
+    # Plantronics/Poly
+    '00:1D:DF': 'Plantronics', 'B0:B4:48': 'Plantronics', 'E8:FC:AF': 'Plantronics',
+    # Anker
+    'AC:89:95': 'Anker', 'E8:AB:FA': 'Anker',
+    # Misc/Generic
+    '00:00:0A': 'Omron', '00:1A:7D': 'Cyber-Blue', '00:1E:3D': 'Alps Electric',
+    '00:0B:57': 'Silicon Wave', '00:02:72': 'CC&C',
 }
 
 
@@ -5495,23 +5569,91 @@ def get_manufacturer(mac):
     return OUI_DATABASE.get(prefix, 'Unknown')
 
 
-def classify_bt_device(name, device_class, services):
+def classify_bt_device(name, device_class, services, manufacturer=None):
     """Classify Bluetooth device type based on available info."""
     name_lower = (name or '').lower()
+    mfr_lower = (manufacturer or '').lower()
 
-    # Check name for common patterns
-    if any(x in name_lower for x in ['airpod', 'earbud', 'headphone', 'speaker', 'audio', 'beats', 'bose', 'jbl', 'sony wh', 'sony wf']):
+    # Audio devices - extensive patterns
+    audio_patterns = [
+        'airpod', 'earbud', 'headphone', 'headset', 'speaker', 'audio', 'beats', 'bose',
+        'jbl', 'sony wh', 'sony wf', 'sennheiser', 'jabra', 'soundcore', 'anker', 'buds',
+        'earphone', 'pod', 'soundbar', 'subwoofer', 'amp', 'dac', 'hifi', 'stereo',
+        'skullcandy', 'marshall', 'b&o', 'bang', 'olufsen', 'harman', 'akg', 'shure',
+        'audio-technica', 'plantronics', 'poly', 'soundlink', 'soundsport', 'quietcomfort',
+        'freebuds', 'galaxy buds', 'wf-', 'wh-', 'linkbuds', 'momentum', 'px7', 'px8',
+        'liberty', 'life', 'enco', 'oppo enco', 'nothing ear', 'ear (', 'studio buds',
+        'powerbeats', 'solo', 'flex', 'tour', 'tune', 'reflect', 'endurance', 'soundpeats'
+    ]
+    if any(x in name_lower for x in audio_patterns):
         return 'audio'
-    if any(x in name_lower for x in ['watch', 'band', 'fitbit', 'garmin', 'mi band']):
+
+    # Wearables - watches, bands, fitness
+    wearable_patterns = [
+        'watch', 'band', 'fitbit', 'garmin', 'mi band', 'miband', 'amazfit', 'huawei band',
+        'galaxy watch', 'gear', 'versa', 'sense', 'charge', 'inspire', 'vivosmart',
+        'vivoactive', 'venu', 'forerunner', 'fenix', 'instinct', 'polar', 'suunto',
+        'whoop', 'oura', 'ring', 'wristband', 'fitness', 'tracker', 'activity',
+        'apple watch', 'iwatch', 'samsung watch', 'ticwatch', 'fossil', 'withings'
+    ]
+    if any(x in name_lower for x in wearable_patterns):
         return 'wearable'
-    if any(x in name_lower for x in ['iphone', 'galaxy', 'pixel', 'phone', 'android']):
+
+    # Phones - mobile devices
+    phone_patterns = [
+        'iphone', 'galaxy', 'pixel', 'phone', 'android', 'oneplus', 'huawei', 'xiaomi',
+        'redmi', 'poco', 'realme', 'oppo', 'vivo', 'motorola', 'moto', 'nokia', 'lg',
+        'sony xperia', 'xperia', 'asus', 'rog phone', 'zenfone', 'nothing phone',
+        'samsung sm-', 'sm-g', 'sm-a', 'sm-s', 'sm-n', 'sm-f'
+    ]
+    if any(x in name_lower for x in phone_patterns):
         return 'phone'
-    if any(x in name_lower for x in ['airtag', 'tile', 'smarttag', 'tracker', 'chipolo']):
+
+    # Trackers - location devices
+    tracker_patterns = [
+        'airtag', 'tile', 'smarttag', 'chipolo', 'find my', 'findmy', 'locator',
+        'gps', 'pet tracker', 'key finder', 'nut', 'trackr', 'pebblebee', 'cube'
+    ]
+    if any(x in name_lower for x in tracker_patterns):
         return 'tracker'
-    if any(x in name_lower for x in ['keyboard', 'mouse', 'controller', 'gamepad']):
+
+    # Input devices - keyboards, mice, controllers
+    input_patterns = [
+        'keyboard', 'mouse', 'controller', 'gamepad', 'joystick', 'remote', 'trackpad',
+        'magic mouse', 'magic keyboard', 'mx master', 'mx keys', 'logitech', 'razer',
+        'dualshock', 'dualsense', 'xbox', 'switch pro', 'joycon', 'joy-con', '8bitdo',
+        'steelseries', 'corsair', 'hyperx'
+    ]
+    if any(x in name_lower for x in input_patterns):
         return 'input'
-    if any(x in name_lower for x in ['tv', 'roku', 'chromecast', 'firestick']):
+
+    # Media devices - TVs, streaming
+    media_patterns = [
+        'tv', 'roku', 'chromecast', 'firestick', 'fire tv', 'appletv', 'apple tv',
+        'nvidia shield', 'android tv', 'smart tv', 'lg tv', 'samsung tv', 'sony tv',
+        'tcl', 'hisense', 'vizio', 'projector', 'beam', 'soundbase'
+    ]
+    if any(x in name_lower for x in media_patterns):
         return 'media'
+
+    # Computers - laptops, desktops
+    computer_patterns = [
+        'macbook', 'imac', 'mac mini', 'mac pro', 'thinkpad', 'latitude', 'xps',
+        'pavilion', 'envy', 'spectre', 'surface', 'chromebook', 'ideapad', 'legion',
+        'predator', 'rog', 'alienware', 'desktop', 'laptop', 'notebook', 'pc'
+    ]
+    if any(x in name_lower for x in computer_patterns):
+        return 'computer'
+
+    # Use manufacturer to infer type
+    if mfr_lower in ['bose', 'jbl', 'sony', 'sennheiser', 'jabra', 'beats', 'bang & olufsen', 'audio-technica', 'plantronics', 'skullcandy', 'anker']:
+        return 'audio'
+    if mfr_lower in ['fitbit', 'garmin']:
+        return 'wearable'
+    if mfr_lower == 'tile':
+        return 'tracker'
+    if mfr_lower == 'logitech':
+        return 'input'
 
     # Check device class if available
     if device_class:
@@ -5684,11 +5826,12 @@ def stream_bt_scan(process, scan_mode):
                     mac = parts[0]
                     name = ' '.join(parts[1:]) if len(parts) > 1 else ''
 
+                    manufacturer = get_manufacturer(mac)
                     device = {
                         'mac': mac,
                         'name': name or '[Unknown]',
-                        'manufacturer': get_manufacturer(mac),
-                        'type': classify_bt_device(name, None, None),
+                        'manufacturer': manufacturer,
+                        'type': classify_bt_device(name, None, None, manufacturer),
                         'rssi': None,
                         'last_seen': time.time()
                     }
@@ -5755,11 +5898,12 @@ def stream_bt_scan(process, scan_mode):
                                     mac = match.group(1).upper()
                                     name = match.group(2).strip()
 
+                                    manufacturer = get_manufacturer(mac)
                                     device = {
                                         'mac': mac,
                                         'name': name or '[Unknown]',
-                                        'manufacturer': get_manufacturer(mac),
-                                        'type': classify_bt_device(name, None, None),
+                                        'manufacturer': manufacturer,
+                                        'type': classify_bt_device(name, None, None, manufacturer),
                                         'rssi': None,
                                         'last_seen': time.time()
                                     }
