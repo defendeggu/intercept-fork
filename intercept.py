@@ -378,37 +378,57 @@ HTML_TEMPLATE = '''
         }
 
         .section {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .section h3 {
             color: var(--accent-cyan);
-            margin-bottom: 15px;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
             border-bottom: 1px solid var(--border-color);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
         }
 
         .section h3::before {
-            content: '//';
+            content: '▼';
+            font-size: 8px;
             color: var(--text-dim);
+            transition: transform 0.2s ease;
+        }
+
+        .section.collapsed h3::before {
+            transform: rotate(-90deg);
+        }
+
+        .section.collapsed > *:not(h3) {
+            display: none !important;
+        }
+
+        .section h3:hover {
+            color: var(--text-primary);
+        }
+
+        .section h3:hover::before {
+            color: var(--accent-cyan);
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: var(--text-secondary);
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -416,12 +436,12 @@ HTML_TEMPLATE = '''
         .form-group input,
         .form-group select {
             width: 100%;
-            padding: 12px 15px;
+            padding: 10px 12px;
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.2s ease;
         }
 
@@ -467,16 +487,17 @@ HTML_TEMPLATE = '''
         }
 
         .preset-btn {
-            padding: 10px 16px;
+            padding: 8px 14px;
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
             color: var(--text-secondary);
             cursor: pointer;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
             transition: all 0.2s ease;
+            border-radius: 3px;
         }
 
         .preset-btn:hover {
@@ -488,20 +509,21 @@ HTML_TEMPLATE = '''
 
         .run-btn {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             background: transparent;
             border: 2px solid var(--accent-green);
             color: var(--accent-green);
             font-family: 'Rajdhani', sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: 15px;
+            margin-top: 12px;
             position: relative;
             overflow: hidden;
+            border-radius: 4px;
         }
 
         .run-btn::before {
@@ -585,15 +607,29 @@ HTML_TEMPLATE = '''
 
         .stats {
             display: flex;
-            gap: 25px;
-            font-size: 11px;
+            gap: 12px;
+            font-size: 10px;
             color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
         }
 
+        .stats > div {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+        }
+
+        .stats > div:hover {
+            border-color: var(--accent-cyan);
+        }
+
         .stats span {
             color: var(--accent-cyan);
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .output-content {
@@ -872,23 +908,33 @@ HTML_TEMPLATE = '''
         .mode-tabs {
             display: flex;
             gap: 0;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
         }
 
         .mode-tab {
             flex: 1;
-            padding: 12px 16px;
+            padding: 10px 8px;
             background: var(--bg-primary);
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mode-tab .tab-icon {
+            font-size: 16px;
         }
 
         .mode-tab:not(:last-child) {
@@ -1517,10 +1563,10 @@ HTML_TEMPLATE = '''
             <div class="sidebar">
                 <!-- Mode Tabs -->
                 <div class="mode-tabs">
-                    <button class="mode-tab active" onclick="switchMode('pager')">Pager</button>
-                    <button class="mode-tab" onclick="switchMode('sensor')">433MHz</button>
-                    <button class="mode-tab" onclick="switchMode('wifi')">WiFi</button>
-                    <button class="mode-tab" onclick="switchMode('bluetooth')">BT</button>
+                    <button class="mode-tab active" onclick="switchMode('pager')"><span class="tab-icon">📟</span>Pager</button>
+                    <button class="mode-tab" onclick="switchMode('sensor')"><span class="tab-icon">📡</span>433MHz</button>
+                    <button class="mode-tab" onclick="switchMode('wifi')"><span class="tab-icon">📶</span>WiFi</button>
+                    <button class="mode-tab" onclick="switchMode('bluetooth')"><span class="tab-icon">🔵</span>BT</button>
                 </div>
 
                 <div class="section" id="rtlDeviceSection">
@@ -1876,24 +1922,24 @@ HTML_TEMPLATE = '''
                             <div class="signal-bar"></div>
                         </div>
                         <div class="stats" id="pagerStats">
-                            <div>MSG: <span id="msgCount">0</span></div>
-                            <div>POCSAG: <span id="pocsagCount">0</span></div>
-                            <div>FLEX: <span id="flexCount">0</span></div>
+                            <div title="Total Messages">📨 <span id="msgCount">0</span></div>
+                            <div title="POCSAG Messages">📟 <span id="pocsagCount">0</span></div>
+                            <div title="FLEX Messages">📠 <span id="flexCount">0</span></div>
                         </div>
                         <div class="stats" id="sensorStats" style="display: none;">
-                            <div>SENSORS: <span id="sensorCount">0</span></div>
-                            <div>DEVICES: <span id="deviceCount">0</span></div>
+                            <div title="Unique Sensors">🌡️ <span id="sensorCount">0</span></div>
+                            <div title="Device Types">📊 <span id="deviceCount">0</span></div>
                         </div>
                         <div class="stats" id="wifiStats" style="display: none;">
-                            <div>APs: <span id="apCount">0</span></div>
-                            <div>CLIENTS: <span id="clientCount">0</span></div>
-                            <div>HANDSHAKES: <span id="handshakeCount" style="color: var(--accent-green);">0</span></div>
-                            <div style="color: var(--accent-orange);">DRONES: <span id="droneCount">0</span></div>
-                            <div style="color: var(--accent-red); cursor: pointer;" onclick="showRogueApDetails()" title="Click to see rogue AP details">ROGUE: <span id="rogueApCount">0</span></div>
+                            <div title="Access Points">📡 <span id="apCount">0</span></div>
+                            <div title="Connected Clients">👤 <span id="clientCount">0</span></div>
+                            <div title="Captured Handshakes" style="color: var(--accent-green);">🤝 <span id="handshakeCount">0</span></div>
+                            <div style="color: var(--accent-orange); cursor: pointer;" onclick="showDroneDetails()" title="Click: Drone details">🚁 <span id="droneCount">0</span></div>
+                            <div style="color: var(--accent-red); cursor: pointer;" onclick="showRogueApDetails()" title="Click: Rogue AP details">⚠️ <span id="rogueApCount">0</span></div>
                         </div>
                         <div class="stats" id="btStats" style="display: none;">
-                            <div>DEVICES: <span id="btDeviceCount">0</span></div>
-                            <div>BEACONS: <span id="btBeaconCount">0</span></div>
+                            <div title="Bluetooth Devices">🔵 <span id="btDeviceCount">0</span></div>
+                            <div title="BLE Beacons">📍 <span id="btBeaconCount">0</span></div>
                         </div>
                     </div>
                 </div>
@@ -2060,6 +2106,20 @@ HTML_TEMPLATE = '''
         let flexCount = 0;
         let sensorCount = 0;
         let deviceList = {{ devices | tojson | safe }};
+
+        // Make sections collapsible
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.section h3').forEach(h3 => {
+                h3.addEventListener('click', function() {
+                    this.parentElement.classList.toggle('collapsed');
+                });
+            });
+        });
+
+        // Toggle section collapse
+        function toggleSection(el) {
+            el.closest('.section').classList.toggle('collapsed');
+        }
 
         // Mode switching
         function switchMode(mode) {
@@ -3480,6 +3540,79 @@ HTML_TEMPLATE = '''
             popup.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-weight: bold; color: var(--accent-red);">🚨 Rogue AP Details</span>
+                    <button onclick="this.parentElement.parentElement.remove()"
+                            style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px;">✕</button>
+                </div>
+                ${html}
+            `;
+
+            document.body.appendChild(popup);
+        }
+
+        // Show drone details popup
+        function showDroneDetails() {
+            const drones = Object.values(detectedDrones);
+
+            if (drones.length === 0) {
+                showInfo('No drones detected. Drones are identified by SSID patterns and manufacturer OUI.');
+                return;
+            }
+
+            // Remove existing popup if any
+            const existing = document.getElementById('droneDetailsPopup');
+            if (existing) existing.remove();
+
+            // Build details HTML
+            let html = '<div style="max-height: 300px; overflow-y: auto;">';
+            html += `<table style="width: 100%; font-size: 10px; border-collapse: collapse;">
+                <tr style="color: var(--text-dim);">
+                    <th style="text-align: left; padding: 4px 8px;">Brand</th>
+                    <th style="text-align: left; padding: 4px 8px;">SSID</th>
+                    <th style="text-align: left; padding: 4px 8px;">BSSID</th>
+                    <th style="text-align: left; padding: 4px 8px;">CH</th>
+                    <th style="text-align: left; padding: 4px 8px;">Signal</th>
+                    <th style="text-align: left; padding: 4px 8px;">Distance</th>
+                    <th style="text-align: left; padding: 4px 8px;">Detected</th>
+                </tr>`;
+
+            drones.forEach((drone, idx) => {
+                const bgColor = idx % 2 === 0 ? 'rgba(255,165,0,0.1)' : 'transparent';
+                const rssi = parseInt(drone.signal) || -70;
+                const distance = estimateDroneDistance(rssi);
+                const timeStr = new Date(drone.firstSeen).toLocaleTimeString();
+                html += `<tr style="background: ${bgColor};">
+                    <td style="padding: 4px 8px; font-weight: bold; color: var(--accent-orange);">${drone.brand || 'Unknown'}</td>
+                    <td style="padding: 4px 8px;">${drone.ssid || '[Hidden]'}</td>
+                    <td style="padding: 4px 8px; font-family: monospace; font-size: 9px;">${drone.bssid}</td>
+                    <td style="padding: 4px 8px;">${drone.channel || '?'}</td>
+                    <td style="padding: 4px 8px;">${drone.signal || '?'} dBm</td>
+                    <td style="padding: 4px 8px;">~${distance}m</td>
+                    <td style="padding: 4px 8px;">${timeStr}</td>
+                </tr>`;
+            });
+            html += '</table></div>';
+            html += '<div style="margin-top: 8px; font-size: 9px; color: var(--text-dim);">Detection via: SSID pattern matching and manufacturer OUI lookup</div>';
+
+            // Create popup
+            const popup = document.createElement('div');
+            popup.id = 'droneDetailsPopup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: var(--bg-primary);
+                border: 1px solid var(--accent-orange);
+                border-radius: 8px;
+                padding: 16px;
+                z-index: 10000;
+                min-width: 500px;
+                max-width: 700px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            `;
+            popup.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-weight: bold; color: var(--accent-orange);">🚁 Detected Drones (${drones.length})</span>
                     <button onclick="this.parentElement.parentElement.remove()"
                             style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px;">✕</button>
                 </div>
