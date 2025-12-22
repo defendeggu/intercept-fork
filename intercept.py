@@ -11984,19 +11984,17 @@ adsb_using_service = False  # Track if we're using an existing service
 
 
 def check_dump1090_service():
-    """Check if dump1090 JSON endpoint is already available."""
-    import urllib.request
-    json_urls = [
-        'http://localhost:30005/data/aircraft.json',
-        'http://localhost:8080/data/aircraft.json',
-    ]
-    for url in json_urls:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as response:
-                if response.status == 200:
-                    return url
-        except:
-            continue
+    """Check if dump1090 SBS port (30003) is available."""
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex(('localhost', 30003))
+        sock.close()
+        if result == 0:
+            return 'localhost:30003'
+    except:
+        pass
     return None
 
 
@@ -12015,13 +12013,13 @@ def start_adsb():
     gain = data.get('gain', '40')
     device = data.get('device', '0')
 
-    # First check if dump1090 is already running as a service with JSON endpoint
-    service_url = check_dump1090_service()
-    if service_url:
-        print(f"[ADS-B] Using existing dump1090 service at {service_url}")
+    # First check if dump1090 is already running as a service with SBS port
+    service_addr = check_dump1090_service()
+    if service_addr:
+        print(f"[ADS-B] Using existing dump1090 service SBS port at {service_addr}")
         adsb_using_service = True
-        # Start thread to poll JSON endpoint only
-        thread = threading.Thread(target=poll_adsb_json_only, args=(service_url,), daemon=True)
+        # Start thread to parse SBS data
+        thread = threading.Thread(target=parse_sbs_stream, args=(service_addr,), daemon=True)
         thread.start()
         return jsonify({'status': 'started', 'mode': 'service'})
 
@@ -12055,49 +12053,101 @@ def start_adsb():
         return jsonify({'status': 'error', 'message': str(e)})
 
 
-def poll_adsb_json_only(service_url):
-    """Poll an existing dump1090 service for aircraft data."""
+def parse_sbs_stream(service_addr):
+    """Parse SBS format data from dump1090 port 30003."""
     global adsb_aircraft, adsb_using_service
-    import urllib.request
-    import json as json_lib
+    import socket
 
-    print(f"[ADS-B] JSON-only polling started for {service_url}")
+    host, port = service_addr.split(':')
+    port = int(port)
+
+    print(f"[ADS-B] SBS stream parser started, connecting to {host}:{port}")
 
     while adsb_using_service:
         try:
-            with urllib.request.urlopen(service_url, timeout=2) as response:
-                data = json_lib.loads(response.read().decode())
-                aircraft_list = data.get('aircraft', [])
-                if aircraft_list:
-                    print(f"[ADS-B] JSON: Found {len(aircraft_list)} aircraft")
-                for ac in aircraft_list:
-                    icao = ac.get('hex', '').upper()
-                    if not icao:
-                        continue
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect((host, port))
+            print(f"[ADS-B] Connected to SBS stream")
 
-                    aircraft = adsb_aircraft.get(icao, {'icao': icao})
-                    aircraft.update({
-                        'icao': icao,
-                        'callsign': ac.get('flight', '').strip() or aircraft.get('callsign'),
-                        'altitude': ac.get('altitude') or ac.get('alt_baro') or aircraft.get('altitude'),
-                        'speed': ac.get('speed') or ac.get('gs') or aircraft.get('speed'),
-                        'heading': ac.get('track') or aircraft.get('heading'),
-                        'lat': ac.get('lat') or aircraft.get('lat'),
-                        'lon': ac.get('lon') or aircraft.get('lon'),
-                        'squawk': ac.get('squawk') or aircraft.get('squawk'),
-                        'rssi': ac.get('rssi') or aircraft.get('rssi')
-                    })
+            buffer = ""
+            msg_count = 0
+            while adsb_using_service:
+                try:
+                    data = sock.recv(4096).decode('utf-8', errors='ignore')
+                    if not data:
+                        break
+                    buffer += data
 
-                    adsb_aircraft[icao] = aircraft
-                    adsb_queue.put({
-                        'type': 'aircraft',
-                        **aircraft
-                    })
+                    while '\n' in buffer:
+                        line, buffer = buffer.split('\n', 1)
+                        line = line.strip()
+                        if not line:
+                            continue
+
+                        # Parse SBS format: MSG,type,sess,aircraft,hex,flight,dateG,timeG,dateL,timeL,callsign,alt,speed,heading,lat,lon,...
+                        parts = line.split(',')
+                        if len(parts) < 11 or parts[0] != 'MSG':
+                            continue
+
+                        msg_type = parts[1]
+                        icao = parts[4].upper()
+                        if not icao:
+                            continue
+
+                        aircraft = adsb_aircraft.get(icao, {'icao': icao})
+
+                        # MSG,1: callsign
+                        if msg_type == '1' and len(parts) > 10:
+                            callsign = parts[10].strip()
+                            if callsign:
+                                aircraft['callsign'] = callsign
+
+                        # MSG,3: position (alt, speed, heading, lat, lon)
+                        elif msg_type == '3' and len(parts) > 15:
+                            if parts[11]:
+                                aircraft['altitude'] = int(float(parts[11]))
+                            if parts[12]:
+                                aircraft['speed'] = int(float(parts[12]))
+                            if parts[13]:
+                                aircraft['heading'] = int(float(parts[13]))
+                            if parts[14] and parts[15]:
+                                aircraft['lat'] = float(parts[14])
+                                aircraft['lon'] = float(parts[15])
+
+                        # MSG,4: velocity (speed, heading)
+                        elif msg_type == '4' and len(parts) > 13:
+                            if parts[12]:
+                                aircraft['speed'] = int(float(parts[12]))
+                            if parts[13]:
+                                aircraft['heading'] = int(float(parts[13]))
+
+                        # MSG,5/6: altitude and squawk
+                        elif msg_type in ('5', '6') and len(parts) > 17:
+                            if parts[11]:
+                                aircraft['altitude'] = int(float(parts[11]))
+                            if parts[17]:
+                                aircraft['squawk'] = parts[17]
+
+                        adsb_aircraft[icao] = aircraft
+                        adsb_queue.put({
+                            'type': 'aircraft',
+                            **aircraft
+                        })
+
+                        msg_count += 1
+                        if msg_count % 100 == 0:
+                            print(f"[ADS-B] SBS: Processed {msg_count} messages, tracking {len(adsb_aircraft)} aircraft")
+
+                except socket.timeout:
+                    continue
+
+            sock.close()
         except Exception as e:
-            print(f"[ADS-B] JSON poll error: {e}")
-        time.sleep(1)
+            print(f"[ADS-B] SBS connection error: {e}, reconnecting...")
+            time.sleep(2)
 
-    print("[ADS-B] JSON-only polling stopped")
+    print("[ADS-B] SBS stream parser stopped")
 
 
 @app.route('/adsb/stop', methods=['POST'])
