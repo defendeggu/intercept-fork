@@ -11991,10 +11991,11 @@ def check_dump1090_service():
         sock.settimeout(2)
         result = sock.connect_ex(('localhost', 30003))
         sock.close()
+        print(f"[ADS-B] Service check: port 30003 connect result = {result}")
         if result == 0:
             return 'localhost:30003'
-    except:
-        pass
+    except Exception as e:
+        print(f"[ADS-B] Service check error: {e}")
     return None
 
 
