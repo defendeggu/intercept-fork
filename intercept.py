@@ -107,9 +107,15 @@ TLE_SATELLITES = {
     'NOAA-19': ('NOAA 19',
                 '1 33591U 09005A   24001.00000000  .00000-0  00000-0  00000-0 0  0000',
                 '2 33591  99.1900   0.0000 0014000   0.0000   0.0000 14.12000000000000'),
+    'NOAA-20': ('NOAA 20 (JPSS-1)',
+                '1 43013U 17073A   24001.00000000  .00000-0  00000-0  00000-0 0  0000',
+                '2 43013  98.7400   0.0000 0001000   0.0000   0.0000 14.19000000000000'),
     'METEOR-M2': ('METEOR-M 2',
                   '1 40069U 14037A   24001.00000000  .00000-0  00000-0  00000-0 0  0000',
                   '2 40069  98.5400   0.0000 0005000   0.0000   0.0000 14.21000000000000'),
+    'METEOR-M2-3': ('METEOR-M2 3',
+                    '1 57166U 23091A   24001.00000000  .00000-0  00000-0  00000-0 0  0000',
+                    '2 57166  98.7700   0.0000 0002000   0.0000   0.0000 14.23000000000000'),
 }
 
 # Known beacon prefixes for detection
@@ -12471,6 +12477,59 @@ def satellite_dashboard():
             color: var(--accent-cyan);
         }
 
+        /* Satellite selector */
+        .satellite-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+
+        .satellite-selector label {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+        }
+
+        .satellite-selector select {
+            background: rgba(0,212,255,0.1);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 4px;
+            padding: 8px 30px 8px 12px;
+            color: var(--accent-cyan);
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300d4ff' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            min-width: 180px;
+        }
+
+        .satellite-selector select:hover {
+            background-color: rgba(0,212,255,0.2);
+            box-shadow: 0 0 15px rgba(0,212,255,0.3);
+        }
+
+        .satellite-selector select:focus {
+            outline: none;
+            box-shadow: 0 0 20px rgba(0,212,255,0.4);
+        }
+
+        .satellite-selector select option {
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            padding: 10px;
+        }
+
         /* Main dashboard grid */
         .dashboard {
             position: relative;
@@ -12966,10 +13025,22 @@ def satellite_dashboard():
             SATELLITE COMMAND
             <span>// INTERCEPT</span>
         </div>
+        <div class="satellite-selector">
+            <label for="satSelect">TARGET:</label>
+            <select id="satSelect" onchange="onSatelliteChange()">
+                <option value="25544">ISS (ZARYA)</option>
+                <option value="25338">NOAA 15</option>
+                <option value="28654">NOAA 18</option>
+                <option value="33591">NOAA 19</option>
+                <option value="40069">METEOR-M2</option>
+                <option value="43013">NOAA 20</option>
+                <option value="54234">METEOR-M2-3</option>
+            </select>
+        </div>
         <div class="status-bar">
             <div class="status-item">
-                <div class="status-dot"></div>
-                <span>TRACKING ACTIVE</span>
+                <div class="status-dot" id="trackingDot"></div>
+                <span id="trackingStatus">TRACKING ACTIVE</span>
             </div>
             <div class="status-item datetime" id="utcTime">--:--:-- UTC</div>
         </div>
@@ -13144,14 +13215,34 @@ def satellite_dashboard():
         let trackLine = null;
         let observerMarker = null;
         let orbitTrack = null;
+        let selectedSatellite = 25544; // Default to ISS
 
-        const satellites = [
-            { name: 'ISS (ZARYA)', norad: 25544 },
-            { name: 'NOAA 15', norad: 25338 },
-            { name: 'NOAA 18', norad: 28654 },
-            { name: 'NOAA 19', norad: 33591 },
-            { name: 'METEOR-M2', norad: 40069 }
-        ];
+        const satellites = {
+            25544: { name: 'ISS (ZARYA)', color: '#00ffff' },
+            25338: { name: 'NOAA 15', color: '#00ff00' },
+            28654: { name: 'NOAA 18', color: '#ff6600' },
+            33591: { name: 'NOAA 19', color: '#ff3366' },
+            40069: { name: 'METEOR-M2', color: '#9370DB' },
+            43013: { name: 'NOAA 20', color: '#00ffaa' },
+            54234: { name: 'METEOR-M2-3', color: '#ff00ff' }
+        };
+
+        // Handle satellite selection change
+        function onSatelliteChange() {
+            const select = document.getElementById('satSelect');
+            selectedSatellite = parseInt(select.value);
+            const satName = satellites[selectedSatellite]?.name || 'Unknown';
+
+            // Update tracking status
+            document.getElementById('trackingStatus').textContent = 'ACQUIRING ' + satName;
+            document.getElementById('trackingDot').style.background = 'var(--accent-orange)';
+
+            // Recalculate passes for new satellite
+            calculatePasses();
+
+            // Update real-time position immediately
+            updateRealTimePositions();
+        }
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', () => {
@@ -13202,6 +13293,7 @@ def satellite_dashboard():
         async function calculatePasses() {
             const lat = parseFloat(document.getElementById('obsLat').value);
             const lon = parseFloat(document.getElementById('obsLon').value);
+            const satName = satellites[selectedSatellite]?.name || 'Unknown';
 
             try {
                 const response = await fetch('/satellite/predict', {
@@ -13210,9 +13302,9 @@ def satellite_dashboard():
                     body: JSON.stringify({
                         latitude: lat,
                         longitude: lon,
-                        hours: 24,
-                        minEl: 10,
-                        satellites: satellites.map(s => s.norad)
+                        hours: 48,
+                        minEl: 5,
+                        satellites: [selectedSatellite]
                     })
                 });
 
@@ -13221,11 +13313,22 @@ def satellite_dashboard():
                     passes = data.passes;
                     renderPassList();
                     updateStats();
-                    if (passes.length > 0) selectPass(0);
+                    if (passes.length > 0) {
+                        selectPass(0);
+                    }
                     updateObserverMarker(lat, lon);
+
+                    // Update tracking status
+                    document.getElementById('trackingStatus').textContent = 'TRACKING ' + satName;
+                    document.getElementById('trackingDot').style.background = 'var(--accent-green)';
+                } else {
+                    document.getElementById('trackingStatus').textContent = 'ERROR: ' + (data.message || 'Unknown');
+                    document.getElementById('trackingDot').style.background = 'var(--accent-red)';
                 }
             } catch (err) {
                 console.error('Pass calculation error:', err);
+                document.getElementById('trackingStatus').textContent = 'CONNECTION ERROR';
+                document.getElementById('trackingDot').style.background = 'var(--accent-red)';
             }
         }
 
@@ -13612,7 +13715,9 @@ def predict_passes():
         25338: 'NOAA-15',
         28654: 'NOAA-18',
         33591: 'NOAA-19',
-        40069: 'METEOR-M2'
+        43013: 'NOAA-20',
+        40069: 'METEOR-M2',
+        57166: 'METEOR-M2-3'
     }
 
     sat_input = data.get('satellites', ['ISS', 'NOAA-15', 'NOAA-18', 'NOAA-19'])
