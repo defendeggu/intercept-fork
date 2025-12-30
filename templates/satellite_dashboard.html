@@ -1185,7 +1185,7 @@
             }
 
             if (pass && pass.groundTrack) {
-                // Split track at antimeridian crossings to avoid lines across map
+                // Split track only at true antimeridian crossings (±180° line)
                 const segments = [];
                 let currentSegment = [];
 
@@ -1193,9 +1193,10 @@
                     const p = pass.groundTrack[i];
                     if (currentSegment.length > 0) {
                         const prevLon = currentSegment[currentSegment.length - 1][1];
-                        // If longitude jumps more than 180°, start new segment
-                        if (Math.abs(p.lon - prevLon) > 180) {
-                            if (currentSegment.length > 1) {
+                        // Only split when crossing the antimeridian (one side > 90, other < -90)
+                        const crossesAntimeridian = (prevLon > 90 && p.lon < -90) || (prevLon < -90 && p.lon > 90);
+                        if (crossesAntimeridian) {
+                            if (currentSegment.length >= 1) {
                                 segments.push(currentSegment);
                             }
                             currentSegment = [];
@@ -1203,7 +1204,7 @@
                     }
                     currentSegment.push([p.lat, p.lon]);
                 }
-                if (currentSegment.length > 1) {
+                if (currentSegment.length >= 1) {
                     segments.push(currentSegment);
                 }
 
@@ -1426,7 +1427,7 @@
                             groundMap.removeLayer(orbitTrack);
                         }
 
-                        // Split track at antimeridian crossings to avoid lines across map
+                        // Split track only at true antimeridian crossings (±180° line)
                         const segments = [];
                         let currentSegment = [];
 
@@ -1434,9 +1435,10 @@
                             const p = pos.track[i];
                             if (currentSegment.length > 0) {
                                 const prevLon = currentSegment[currentSegment.length - 1][1];
-                                // If longitude jumps more than 180°, start new segment
-                                if (Math.abs(p.lon - prevLon) > 180) {
-                                    if (currentSegment.length >= 2) {
+                                // Only split when crossing the antimeridian (one side > 90, other < -90)
+                                const crossesAntimeridian = (prevLon > 90 && p.lon < -90) || (prevLon < -90 && p.lon > 90);
+                                if (crossesAntimeridian) {
+                                    if (currentSegment.length >= 1) {
                                         segments.push(currentSegment);
                                     }
                                     currentSegment = [];
@@ -1444,7 +1446,7 @@
                             }
                             currentSegment.push([p.lat, p.lon]);
                         }
-                        if (currentSegment.length >= 2) {
+                        if (currentSegment.length >= 1) {
                             segments.push(currentSegment);
                         }
 
