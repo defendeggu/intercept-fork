@@ -17,7 +17,7 @@
 </p>
 
 ## Screenshot
-<img src="screenshot2.png">
+<img src="./templates/images/screenshots/screenshot2.png">
 
 ---
 
@@ -44,7 +44,7 @@ Open `http://localhost:5050` in your browser. See [Installation](#installation) 
 git clone https://github.com/smittix/intercept.git
 cd intercept
 uv venv --python 3.11.12 # Or your Python version
-.venv\Scripts\activate
+source .venv/bin/activate
 uv sync
 
 # Run (sudo recommended for full functionality)

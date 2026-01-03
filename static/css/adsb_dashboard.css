@@ -1,0 +1,643 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-dark: #0a0a0f;
+    --bg-panel: #0d1117;
+    --bg-card: #161b22;
+    --border-glow: #00ff88;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --accent-green: #00ff88;
+    --accent-cyan: #00d4ff;
+    --accent-orange: #ff9500;
+    --accent-red: #ff4444;
+    --accent-yellow: #ffcc00;
+    --grid-line: rgba(0, 255, 136, 0.1);
+    --radar-cyan: #00ffff;
+    --radar-bg: #1a1a2e;
+}
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Animated radar sweep background */
+.radar-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Scan line effect */
+.scanline {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.5;
+}
+
+@keyframes scan {
+    0% {
+        top: -4px;
+    }
+
+    100% {
+        top: 100vh;
+    }
+}
+
+/* Header */
+.header {
+    position: relative;
+    z-index: 10;
+    padding: 12px 20px;
+    background: linear-gradient(180deg, rgba(0, 255, 136, 0.1) 0%, transparent 100%);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--accent-green);
+    text-shadow: 0 0 20px var(--accent-green), 0 0 40px var(--accent-green);
+}
+
+.logo span {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 14px;
+    margin-left: 15px;
+    letter-spacing: 2px;
+}
+
+.status-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 10px var(--accent-green);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.inactive {
+    background: var(--accent-red);
+    box-shadow: 0 0 10px var(--accent-red);
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Stats badges in header */
+.stats-badges {
+    display: flex;
+    gap: 12px;
+}
+
+.stat-badge {
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.stat-badge .value {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+.stat-badge .label {
+    color: var(--text-secondary);
+    margin-left: 4px;
+}
+
+.datetime {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--accent-green);
+}
+
+.back-link {
+    color: var(--accent-green);
+    text-decoration: none;
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid var(--accent-green);
+    border-radius: 4px;
+}
+
+/* Main dashboard grid */
+.dashboard {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: 1fr auto;
+    gap: 0;
+    height: calc(100vh - 60px);
+    min-height: 500px;
+}
+
+/* Panels */
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    overflow: hidden;
+    position: relative;
+}
+
+.panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+}
+
+.panel-header {
+    padding: 10px 15px;
+    background: rgba(0, 255, 136, 0.05);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent-green);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-indicator {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Main display container (map + radar scope) */
+.main-display {
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+}
+
+.display-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+#radarMap {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#radarScope {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    background: var(--radar-bg);
+}
+
+#radarScope.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#radarCanvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Right sidebar */
+.sidebar {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(0, 255, 136, 0.2);
+    overflow: hidden;
+}
+
+/* View toggle */
+.view-toggle {
+    display: flex;
+    padding: 10px;
+    gap: 8px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.view-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.view-btn.active {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    color: var(--bg-dark);
+}
+
+/* Selected aircraft panel */
+.selected-aircraft {
+    flex-shrink: 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.selected-info {
+    padding: 12px;
+}
+
+.selected-callsign {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-green);
+    text-shadow: 0 0 15px var(--accent-green);
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.telemetry-item {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 8px;
+    border-left: 2px solid var(--accent-green);
+}
+
+.telemetry-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.telemetry-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-cyan);
+}
+
+/* Aircraft list */
+.aircraft-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.aircraft-list-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.aircraft-item {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 136, 0.15);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.aircraft-item:hover {
+    border-color: var(--accent-green);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.aircraft-item.selected {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+    background: rgba(0, 255, 136, 0.1);
+}
+
+.aircraft-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.aircraft-callsign {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-green);
+}
+
+.aircraft-icao {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-secondary);
+    background: rgba(0, 255, 136, 0.1);
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+.aircraft-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    font-size: 10px;
+}
+
+.aircraft-detail {
+    text-align: center;
+}
+
+.aircraft-detail-value {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-cyan);
+    font-size: 11px;
+}
+
+.aircraft-detail-label {
+    color: var(--text-secondary);
+    font-size: 8px;
+    text-transform: uppercase;
+}
+
+/* Bottom controls bar */
+.controls-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: var(--bg-panel);
+    border-top: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+.control-group input[type="checkbox"] {
+    accent-color: var(--accent-green);
+}
+
+.control-group select {
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 4px;
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.control-group input[type="text"] {
+    width: 80px;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 4px;
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.control-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+/* Start/stop button */
+.start-btn {
+    padding: 8px 20px;
+    border: 1px solid var(--accent-green);
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--accent-green);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.start-btn:hover {
+    background: var(--accent-green);
+    color: var(--bg-dark);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.start-btn.active {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+    color: #fff;
+}
+
+.start-btn.active:hover {
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+}
+
+/* GPS button */
+.gps-btn {
+    padding: 6px 10px;
+    background: rgba(0, 255, 136, 0.2);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 4px;
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+    background: var(--bg-dark) !important;
+}
+
+.leaflet-control-zoom a {
+    background: var(--bg-panel) !important;
+    color: var(--accent-green) !important;
+    border-color: rgba(0, 255, 136, 0.3) !important;
+}
+
+.leaflet-control-attribution {
+    background: rgba(0, 0, 0, 0.7) !important;
+    color: var(--text-secondary) !important;
+    font-size: 9px !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-green);
+    border-radius: 3px;
+}
+
+/* No aircraft message */
+.no-aircraft {
+    text-align: center;
+    padding: 30px 15px;
+    color: var(--text-secondary);
+}
+
+.no-aircraft-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+    opacity: 0.5;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto auto;
+    }
+
+    .main-display {
+        min-height: 400px;
+    }
+
+    .sidebar {
+        grid-column: 1;
+        grid-row: 2;
+        border-left: none;
+        border-top: 1px solid rgba(0, 255, 136, 0.2);
+        max-height: 300px;
+    }
+
+    .controls-bar {
+        grid-row: 3;
+        flex-wrap: wrap;
+    }
+}
