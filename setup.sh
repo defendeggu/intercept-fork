@@ -50,6 +50,23 @@ check_cmd() {
     command -v "$1" &> /dev/null
 }
 
+# Setup sudo command (empty if running as root)
+setup_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+        SUDO=""
+        echo -e "${BLUE}Running as root${NC}"
+    elif check_cmd sudo; then
+        SUDO="sudo"
+    else
+        echo -e "${RED}Error: Not running as root and sudo is not installed${NC}"
+        echo ""
+        echo "Please either:"
+        echo "  1. Run this script as root: su -c './setup.sh'"
+        echo "  2. Install sudo: apt install sudo"
+        exit 1
+    fi
+}
+
 # Install Python dependencies
 install_python_deps() {
     echo ""
@@ -72,7 +89,11 @@ install_python_deps() {
         echo "You have Python $PYTHON_VERSION"
         echo ""
         echo "Please upgrade Python:"
-        echo "  Ubuntu/Debian: sudo apt install python3.11"
+        if [ -n "$SUDO" ]; then
+            echo "  Ubuntu/Debian: sudo apt install python3.11"
+        else
+            echo "  Ubuntu/Debian: apt install python3.11"
+        fi
         echo "  macOS: brew install python@3.11"
         exit 1
     fi
@@ -108,7 +129,11 @@ install_python_deps() {
             echo -e "${RED}Error: Failed to create virtual environment${NC}"
             echo ""
             echo "On Debian/Ubuntu, install the venv module with:"
-            echo "  sudo apt install python3-venv"
+            if [ -n "$SUDO" ]; then
+                echo "  sudo apt install python3-venv"
+            else
+                echo "  apt install python3-venv"
+            fi
             echo ""
             echo "Then run this setup script again."
             exit 1
@@ -119,7 +144,11 @@ install_python_deps() {
         echo -e "${YELLOW}NOTE: A virtual environment was created.${NC}"
         echo "You must activate it before running INTERCEPT:"
         echo "  source venv/bin/activate"
-        echo "  sudo venv/bin/python intercept.py"
+        if [ -n "$SUDO" ]; then
+            echo "  sudo venv/bin/python intercept.py"
+        else
+            echo "  venv/bin/python intercept.py"
+        fi
     fi
 
     echo -e "${GREEN}Python dependencies installed successfully${NC}"
@@ -206,27 +235,27 @@ install_debian_tools() {
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         echo ""
         echo "Updating package lists..."
-        sudo apt update
+        $SUDO apt update
 
         # Core SDR tools
         if $MISSING_CORE; then
             echo ""
             echo -e "${BLUE}Installing Core SDR tools...${NC}"
-            sudo apt install -y rtl-sdr multimon-ng rtl-433 dump1090-mutability
+            $SUDO apt install -y rtl-sdr multimon-ng rtl-433 dump1090-mutability
         fi
 
         # WiFi tools
         if $MISSING_WIFI; then
             echo ""
             echo -e "${BLUE}Installing WiFi tools...${NC}"
-            sudo apt install -y aircrack-ng
+            $SUDO apt install -y aircrack-ng
         fi
 
         # Bluetooth tools
         if $MISSING_BLUETOOTH; then
             echo ""
             echo -e "${BLUE}Installing Bluetooth tools...${NC}"
-            sudo apt install -y bluez bluetooth
+            $SUDO apt install -y bluez bluetooth
         fi
 
         echo ""
@@ -255,12 +284,12 @@ setup_udev_rules_auto() {
     echo ""
 
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        sudo bash -c 'cat > /etc/udev/rules.d/20-rtlsdr.rules << EOF
+        $SUDO bash -c 'cat > /etc/udev/rules.d/20-rtlsdr.rules << EOF
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0666"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE="0666"
 EOF'
-        sudo udevadm control --reload-rules
-        sudo udevadm trigger
+        $SUDO udevadm control --reload-rules
+        $SUDO udevadm trigger
         echo -e "${GREEN}udev rules installed!${NC}"
         echo "Please unplug and replug your RTL-SDR device."
     fi
@@ -377,6 +406,7 @@ setup_udev_rules() {
 # Main
 main() {
     detect_os
+    setup_sudo
     install_python_deps
     check_tools
     install_or_show_instructions
@@ -393,9 +423,17 @@ main() {
     echo "To start INTERCEPT:"
     if [ -d "venv" ]; then
         echo "  source venv/bin/activate"
-        echo "  sudo venv/bin/python intercept.py"
+        if [ -n "$SUDO" ]; then
+            echo "  sudo venv/bin/python intercept.py"
+        else
+            echo "  venv/bin/python intercept.py"
+        fi
     else
-        echo "  sudo python3 intercept.py"
+        if [ -n "$SUDO" ]; then
+            echo "  sudo python3 intercept.py"
+        else
+            echo "  python3 intercept.py"
+        fi
     fi
     echo ""
     echo "Then open http://localhost:5050 in your browser"
