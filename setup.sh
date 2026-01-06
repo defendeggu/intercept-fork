@@ -306,6 +306,39 @@ show_macos_manual() {
 }
 
 # ============================================
+# BUILD DUMP1090 FROM SOURCE
+# ============================================
+install_dump1090_from_source() {
+    # Install build dependencies
+    echo "    Installing build dependencies..."
+    $SUDO apt-get install -y build-essential librtlsdr-dev libusb-1.0-0-dev pkg-config git
+
+    # Create temp directory
+    local tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+
+    echo "    Cloning dump1090 repository..."
+    if git clone https://github.com/flightaware/dump1090.git; then
+        cd dump1090
+        echo "    Compiling dump1090..."
+        if make; then
+            echo "    Installing dump1090 to /usr/local/bin..."
+            $SUDO cp dump1090 /usr/local/bin/
+            $SUDO chmod +x /usr/local/bin/dump1090
+            echo -e "${GREEN}    dump1090 installed successfully!${NC}"
+        else
+            echo -e "${RED}    Failed to compile dump1090${NC}"
+        fi
+    else
+        echo -e "${RED}    Failed to clone dump1090 repository${NC}"
+    fi
+
+    # Cleanup
+    cd - > /dev/null
+    rm -rf "$tmp_dir"
+}
+
+# ============================================
 # DEBIAN INSTALLATION
 # ============================================
 install_debian_tools() {
@@ -353,16 +386,19 @@ install_debian_tools() {
         fi
 
         # dump1090 (package varies by distribution)
-        echo "  Installing dump1090..."
-        if pkg_available dump1090-fa; then
-            $SUDO apt-get install -y dump1090-fa
-        elif pkg_available dump1090-mutability; then
-            $SUDO apt-get install -y dump1090-mutability
-        elif pkg_available dump1090; then
-            $SUDO apt-get install -y dump1090
-        else
-            echo -e "${YELLOW}  Note: dump1090 not in repositories${NC}"
-            echo "  Install from: https://flightaware.com/adsb/piaware/install"
+        if ! check_cmd dump1090; then
+            echo "  Installing dump1090..."
+            if pkg_available dump1090-fa; then
+                $SUDO apt-get install -y dump1090-fa
+            elif pkg_available dump1090-mutability; then
+                $SUDO apt-get install -y dump1090-mutability
+            elif pkg_available dump1090; then
+                $SUDO apt-get install -y dump1090
+            else
+                # Build from source as fallback
+                echo -e "${YELLOW}  dump1090 not in repositories, building from source...${NC}"
+                install_dump1090_from_source
+            fi
         fi
     fi
 
