@@ -92,128 +92,51 @@
 
         <!-- Controls Bar -->
         <div class="controls-bar">
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="showTrails" onchange="toggleTrails()">
-                    Trails
-                </label>
-            </div>
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="showRangeRings" onchange="drawRangeRings()">
-                    Range Rings
-                </label>
-            </div>
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="alertToggle" checked onchange="toggleAlerts()">
-                    Alerts
-                </label>
-            </div>
-            <div class="control-group">
-                <span class="control-label">Filter:</span>
-                <select id="aircraftFilter" onchange="applyFilter()">
-                    <option value="all">All</option>
-                    <option value="military">Military</option>
-                    <option value="civil">Civil</option>
-                    <option value="emergency">Emergency</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <span class="control-label">Range:</span>
-                <select id="rangeSelect" onchange="updateRange()">
-                    <option value="50">50 nm</option>
-                    <option value="100">100 nm</option>
-                    <option value="200" selected>200 nm</option>
-                    <option value="300">300 nm</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <span class="control-label">Lat:</span>
-                <input type="text" id="obsLat" value="51.5074" onchange="updateObserverLoc()">
-            </div>
-            <div class="control-group">
-                <span class="control-label">Lon:</span>
-                <input type="text" id="obsLon" value="-0.1278" onchange="updateObserverLoc()">
-            </div>
-            <div class="control-group">
-                <select id="gpsSource" onchange="toggleGpsDongleControls()" style="font-size: 10px;">
-                    <option value="manual">Manual</option>
-                    <option value="browser">Browser</option>
-                    <option value="dongle">USB GPS</option>
-                    <option value="gpsd">gpsd</option>
-                </select>
-            </div>
-            <div class="control-group" id="browserGpsGroup">
-                <button class="gps-btn" id="geolocateBtn" onclick="getGeolocation()">Locate</button>
-            </div>
-            <div class="control-group gps-dongle-controls" style="display: none;">
-                <select class="gps-device-select" id="gpsDeviceSelect" style="font-size: 10px; max-width: 120px;">
-                    <option value="">GPS Device...</option>
-                </select>
-                <select id="gpsBaudrateSelect" style="font-size: 10px; width: 65px;">
-                    <option value="4800">4800</option>
-                    <option value="9600" selected>9600</option>
-                    <option value="38400">38400</option>
-                    <option value="115200">115200</option>
-                </select>
-                <button class="gps-btn gps-connect-btn" onclick="startGpsDongle()">Connect</button>
-                <button class="gps-btn gps-disconnect-btn" onclick="stopGpsDongle()" style="display: none; background: rgba(255,0,0,0.2); border-color: #ff4444;">Stop</button>
-            </div>
-            <div class="control-group gps-gpsd-controls" style="display: none;">
-                <input type="text" id="gpsdHost" value="localhost" placeholder="Host" style="width: 80px; font-size: 10px;">
-                <span style="color: #666;">:</span>
-                <input type="number" id="gpsdPort" value="2947" min="1" max="65535" style="width: 50px; font-size: 10px;">
-                <button class="gps-btn gps-connect-btn" onclick="startGpsdClient()">Connect</button>
-                <button class="gps-btn gps-disconnect-btn" onclick="stopGpsDongle()" style="display: none; background: rgba(255,0,0,0.2); border-color: #ff4444;">Stop</button>
-            </div>
-            <div class="control-group">
-                <label style="display: flex; align-items: center; gap: 4px; font-size: 10px; cursor: pointer;">
-                    <input type="checkbox" id="useRemoteDump1090" onchange="toggleRemoteDump1090()">
-                    <span>Remote</span>
-                </label>
-            </div>
-            <div class="control-group remote-dump1090-controls" style="display: none;">
-                <input type="text" id="remoteSbsHost" placeholder="Host" style="width: 90px; font-size: 10px;">
-                <span style="color: #666;">:</span>
-                <input type="number" id="remoteSbsPort" value="30003" min="1" max="65535" style="width: 55px; font-size: 10px;">
-            </div>
+            <label title="Show aircraft trails"><input type="checkbox" id="showTrails" onchange="toggleTrails()"> Trails</label>
+            <label title="Show range rings"><input type="checkbox" id="showRangeRings" checked onchange="drawRangeRings()"> Rings</label>
+            <label title="Audio alerts"><input type="checkbox" id="alertToggle" checked onchange="toggleAlerts()"> Alerts</label>
+            <select id="aircraftFilter" onchange="applyFilter()" title="Filter aircraft">
+                <option value="all">All</option>
+                <option value="military">Military</option>
+                <option value="civil">Civil</option>
+                <option value="emergency">Emergency</option>
+            </select>
+            <select id="rangeSelect" onchange="updateRange()" title="Range rings distance">
+                <option value="50">50nm</option>
+                <option value="100">100nm</option>
+                <option value="200" selected>200nm</option>
+                <option value="300">300nm</option>
+            </select>
+            <input type="text" id="obsLat" value="51.5074" onchange="updateObserverLoc()" style="width: 65px;" title="Latitude">
+            <input type="text" id="obsLon" value="-0.1278" onchange="updateObserverLoc()" style="width: 65px;" title="Longitude">
+            <span id="gpsIndicator" class="gps-indicator" style="display: none;" title="GPS connected via gpsd"><span class="gps-dot"></span> GPS</span>
+            <label title="Use remote dump1090"><input type="checkbox" id="useRemoteDump1090" onchange="toggleRemoteDump1090()"> Remote</label>
+            <span class="remote-dump1090-controls" style="display: none;">
+                <input type="text" id="remoteSbsHost" placeholder="Host" style="width: 70px;">
+                <input type="number" id="remoteSbsPort" value="30003" style="width: 50px;">
+            </span>
             <button class="start-btn" id="startBtn" onclick="toggleTracking()">START</button>
             <div class="airband-divider"></div>
-            <div class="control-group airband-controls">
-                <span class="control-label" style="color: var(--accent-cyan);">AIRBAND:</span>
-                <select id="airbandFreqSelect" onchange="updateAirbandFreq()">
-                    <option value="121.5">121.5 MHz (Guard)</option>
-                    <option value="118.0">118.0 MHz</option>
-                    <option value="119.1">119.1 MHz</option>
-                    <option value="120.5">120.5 MHz</option>
-                    <option value="123.45">123.45 MHz (Air-Air)</option>
-                    <option value="127.85">127.85 MHz</option>
-                    <option value="128.825">128.825 MHz</option>
-                    <option value="132.0">132.0 MHz</option>
-                    <option value="134.725">134.725 MHz</option>
-                    <option value="custom">Custom...</option>
-                </select>
-                <input type="number" id="airbandCustomFreq" step="0.005" placeholder="MHz" style="width: 70px; display: none;">
-            </div>
-            <div class="control-group airband-controls">
-                <span class="control-label">SDR:</span>
-                <select id="airbandDeviceSelect" style="width: 80px;">
-                    <option value="0">Dev 0</option>
-                </select>
-            </div>
-            <div class="control-group airband-controls">
-                <span class="control-label">SQ:</span>
-                <input type="range" id="airbandSquelch" min="0" max="100" value="20" style="width: 60px;">
-            </div>
-            <button class="airband-btn" id="airbandBtn" onclick="toggleAirband()">
-                <span class="airband-icon">▶</span> LISTEN
-            </button>
-            <div class="airband-status">
-                <span id="airbandStatus" style="color: var(--text-muted);">OFF</span>
-            </div>
+            <select id="airbandFreqSelect" onchange="updateAirbandFreq()" class="airband-controls" title="Airband frequency">
+                <option value="121.5">121.5 Guard</option>
+                <option value="118.0">118.0</option>
+                <option value="119.1">119.1</option>
+                <option value="120.5">120.5</option>
+                <option value="123.45">123.45 Air</option>
+                <option value="127.85">127.85</option>
+                <option value="128.825">128.825</option>
+                <option value="132.0">132.0</option>
+                <option value="134.725">134.725</option>
+                <option value="custom">Custom</option>
+            </select>
+            <input type="number" id="airbandCustomFreq" step="0.005" placeholder="MHz" class="airband-controls" style="width: 60px; display: none;">
+            <select id="airbandDeviceSelect" class="airband-controls" style="width: 90px;" title="SDR for airband (use different device than tracking)">
+                <option value="0">Loading...</option>
+            </select>
+            <input type="range" id="airbandSquelch" min="0" max="100" value="20" class="airband-controls" style="width: 50px;" title="Squelch">
+            <button class="airband-btn" id="airbandBtn" onclick="toggleAirband()">▶ LISTEN</button>
+            <span id="airbandStatus" class="airband-controls" style="color: var(--text-muted); font-size: 9px;">OFF</span>
             <audio id="airbandPlayer" style="display: none;" crossorigin="anonymous"></audio>
-            <!-- Airband Visualizer (compact) -->
             <div class="airband-visualizer" id="airbandVisualizerContainer" style="display: none;">
                 <div class="signal-meter">
                     <div class="meter-bar">
@@ -221,7 +144,7 @@
                         <div class="meter-peak" id="airbandSignalPeak"></div>
                     </div>
                 </div>
-                <canvas id="airbandSpectrumCanvas" width="120" height="30"></canvas>
+                <canvas id="airbandSpectrumCanvas" width="100" height="25"></canvas>
             </div>
         </div>
     </main>
@@ -274,8 +197,7 @@
         let rangeRingsLayer = null;
         let observerMarker = null;
 
-        // GPS Dongle state
-        let gpsDevices = [];
+        // GPS state
         let gpsConnected = false;
         let gpsEventSource = null;
 
@@ -944,161 +866,98 @@
         }
 
         // ============================================
-        // GPS DONGLE FUNCTIONS
+        // GPS FUNCTIONS (gpsd auto-connect)
         // ============================================
-        function toggleGpsDongleControls() {
-            const source = document.getElementById('gpsSource').value;
-            const browserGroup = document.getElementById('browserGpsGroup');
-            const dongleControls = document.querySelector('.gps-dongle-controls');
-            const gpsdControls = document.querySelector('.gps-gpsd-controls');
-
-            // Hide all first
-            browserGroup.style.display = 'none';
-            dongleControls.style.display = 'none';
-            gpsdControls.style.display = 'none';
-
-            if (source === 'dongle') {
-                dongleControls.style.display = 'flex';
-                refreshGpsDevices();
-            } else if (source === 'browser') {
-                browserGroup.style.display = 'flex';
-            } else if (source === 'gpsd') {
-                gpsdControls.style.display = 'flex';
-            }
-            // 'manual' keeps everything hidden
-        }
-
-        async function refreshGpsDevices() {
+        async function autoConnectGps() {
             try {
-                const response = await fetch('/gps/devices');
-                const data = await response.json();
-                if (data.status === 'ok') {
-                    gpsDevices = data.devices;
-                    const select = document.getElementById('gpsDeviceSelect');
-                    select.innerHTML = '<option value="">GPS Device...</option>';
-                    gpsDevices.forEach(device => {
-                        const option = document.createElement('option');
-                        option.value = device.path;
-                        option.textContent = device.name;
-                        option.disabled = !device.accessible;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (e) {
-                console.warn('Failed to get GPS devices:', e);
-            }
-        }
-
-        async function startGpsDongle() {
-            const devicePath = document.getElementById('gpsDeviceSelect').value;
-            const baudrate = parseInt(document.getElementById('gpsBaudrateSelect').value) || 9600;
-            if (!devicePath) {
-                alert('Please select a GPS device');
-                return;
-            }
-
-            try {
-                const response = await fetch('/gps/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device: devicePath, baudrate: baudrate })
-                });
+                const response = await fetch('/gps/auto-connect', { method: 'POST' });
                 const data = await response.json();
 
-                if (data.status === 'started') {
+                if (data.status === 'connected') {
                     gpsConnected = true;
                     startGpsStream();
-                    updateGpsButtons(true, '.gps-dongle-controls');
+                    showGpsIndicator(true);
+                    console.log('GPS: Auto-connected to gpsd');
+                    if (data.position) {
+                        updateLocationFromGps(data.position);
+                    }
                 } else {
-                    alert('Failed to start GPS: ' + data.message);
+                    console.log('GPS: gpsd not available -', data.message);
                 }
             } catch (e) {
-                alert('GPS connection error: ' + e.message);
+                console.log('GPS: Auto-connect failed -', e.message);
             }
         }
 
-        async function startGpsdClient() {
-            const host = document.getElementById('gpsdHost').value || 'localhost';
-            const port = parseInt(document.getElementById('gpsdPort').value) || 2947;
-
-            try {
-                const response = await fetch('/gps/gpsd/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ host: host, port: port })
-                });
-                const data = await response.json();
-
-                if (data.status === 'started') {
-                    gpsConnected = true;
-                    startGpsStream();
-                    updateGpsButtons(true, '.gps-gpsd-controls');
-                } else {
-                    alert('Failed to connect to gpsd: ' + data.message);
-                }
-            } catch (e) {
-                alert('gpsd connection error: ' + e.message);
-            }
-        }
-
-        function updateGpsButtons(connected, containerSelector) {
-            // Update buttons in the specified container
-            const container = document.querySelector(containerSelector);
-            if (container) {
-                const connectBtn = container.querySelector('.gps-connect-btn');
-                const disconnectBtn = container.querySelector('.gps-disconnect-btn');
-                if (connectBtn) connectBtn.style.display = connected ? 'none' : 'block';
-                if (disconnectBtn) disconnectBtn.style.display = connected ? 'block' : 'none';
-            }
-        }
-
-        async function stopGpsDongle() {
-            try {
-                if (gpsEventSource) {
-                    gpsEventSource.close();
-                    gpsEventSource = null;
-                }
-                await fetch('/gps/stop', { method: 'POST' });
-                gpsConnected = false;
-                // Reset buttons in both containers
-                updateGpsButtons(false, '.gps-dongle-controls');
-                updateGpsButtons(false, '.gps-gpsd-controls');
-            } catch (e) {
-                console.warn('GPS stop error:', e);
-            }
-        }
+        let gpsReconnectTimeout = null;
 
         function startGpsStream() {
             if (gpsEventSource) {
                 gpsEventSource.close();
+            }
+            if (gpsReconnectTimeout) {
+                clearTimeout(gpsReconnectTimeout);
+                gpsReconnectTimeout = null;
             }
 
             gpsEventSource = new EventSource('/gps/stream');
             gpsEventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('GPS data received:', data);
                     if (data.type === 'position' && data.latitude && data.longitude) {
-                        observerLocation.lat = data.latitude;
-                        observerLocation.lon = data.longitude;
-                        document.getElementById('obsLat').value = data.latitude.toFixed(4);
-                        document.getElementById('obsLon').value = data.longitude.toFixed(4);
-                        if (radarMap) {
-                            console.log('GPS: Updating map to', data.latitude, data.longitude);
-                            radarMap.setView([data.latitude, data.longitude], radarMap.getZoom());
-                        }
-                        drawRangeRings();
+                        updateLocationFromGps(data);
                     }
                 } catch (e) {
                     console.error('GPS parse error:', e);
                 }
             };
             gpsEventSource.onerror = (e) => {
-                console.warn('GPS stream error:', e);
-                gpsConnected = false;
-                document.querySelector('.gps-connect-btn').style.display = 'block';
-                document.querySelector('.gps-disconnect-btn').style.display = 'none';
+                // Don't log every error - connection suspends are normal
+                if (gpsEventSource) {
+                    gpsEventSource.close();
+                    gpsEventSource = null;
+                }
+                // Auto-reconnect after 5 seconds if still connected
+                if (gpsConnected && !gpsReconnectTimeout) {
+                    gpsReconnectTimeout = setTimeout(() => {
+                        gpsReconnectTimeout = null;
+                        if (gpsConnected) {
+                            startGpsStream();
+                        }
+                    }, 5000);
+                }
             };
+        }
+
+        // Reconnect GPS stream when tab becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && gpsConnected && !gpsEventSource) {
+                startGpsStream();
+            }
+        });
+
+        function updateLocationFromGps(position) {
+            observerLocation.lat = position.latitude;
+            observerLocation.lon = position.longitude;
+            document.getElementById('obsLat').value = position.latitude.toFixed(4);
+            document.getElementById('obsLon').value = position.longitude.toFixed(4);
+
+            // Center map on GPS location (on first fix)
+            if (radarMap && !radarMap._gpsInitialized) {
+                radarMap.setView([position.latitude, position.longitude], radarMap.getZoom());
+                radarMap._gpsInitialized = true;
+                // Draw range rings immediately after centering
+                drawRangeRings();
+            } else {
+                drawRangeRings();
+            }
+        }
+
+        function showGpsIndicator(show) {
+            const indicator = document.getElementById('gpsIndicator');
+            if (indicator) {
+                indicator.style.display = show ? 'inline-flex' : 'none';
+            }
         }
 
         // ============================================
@@ -1146,6 +1005,10 @@
             setInterval(updateClock, 1000);
             setInterval(cleanupOldAircraft, 10000);
             checkAdsbTools();
+            checkAircraftDatabase();
+
+            // Auto-connect to gpsd if available
+            autoConnectGps();
         });
 
         function checkAdsbTools() {
@@ -1157,6 +1020,119 @@
                     }
                 })
                 .catch(() => {});
+        }
+
+        // ============================================
+        // AIRCRAFT DATABASE
+        // ============================================
+        let aircraftDbStatus = { installed: false };
+
+        function checkAircraftDatabase() {
+            fetch('/adsb/aircraft-db/status')
+                .then(r => r.json())
+                .then(status => {
+                    aircraftDbStatus = status;
+                    if (!status.installed) {
+                        showAircraftDbBanner('not_installed');
+                    } else {
+                        // Check for updates in background
+                        fetch('/adsb/aircraft-db/check-updates')
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.update_available) {
+                                    showAircraftDbBanner('update_available', data.latest_version);
+                                }
+                            })
+                            .catch(() => {});
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function showAircraftDbBanner(type, version) {
+            // Remove any existing banner
+            const existing = document.getElementById('aircraftDbBanner');
+            if (existing) existing.remove();
+
+            const banner = document.createElement('div');
+            banner.id = 'aircraftDbBanner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 70px;
+                right: 20px;
+                background: ${type === 'not_installed' ? 'rgba(59, 130, 246, 0.95)' : 'rgba(34, 197, 94, 0.95)'};
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 12px;
+                z-index: 10000;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                max-width: 320px;
+                font-family: 'Inter', sans-serif;
+            `;
+
+            if (type === 'not_installed') {
+                banner.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 6px;">Aircraft Database Not Installed</div>
+                    <div style="margin-bottom: 10px; font-size: 11px; opacity: 0.9;">Download to see aircraft types, registrations, and model info.</div>
+                    <button onclick="downloadAircraftDb()" style="background: white; color: #3b82f6; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 11px;">Download Database</button>
+                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 6px; right: 8px; background: none; border: none; color: white; cursor: pointer; font-size: 14px;">×</button>
+                `;
+            } else {
+                banner.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 6px;">Database Update Available</div>
+                    <div style="margin-bottom: 10px; font-size: 11px; opacity: 0.9;">New version: ${version || 'latest'}</div>
+                    <button onclick="downloadAircraftDb()" style="background: white; color: #22c55e; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 11px;">Update Now</button>
+                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 6px; right: 8px; background: none; border: none; color: white; cursor: pointer; font-size: 14px;">×</button>
+                `;
+            }
+
+            document.body.appendChild(banner);
+        }
+
+        function downloadAircraftDb() {
+            const banner = document.getElementById('aircraftDbBanner');
+            if (banner) {
+                banner.innerHTML = `
+                    <div style="font-weight: bold;">Downloading...</div>
+                    <div style="font-size: 11px; opacity: 0.9;">This may take a moment</div>
+                `;
+            }
+
+            fetch('/adsb/aircraft-db/download', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        if (banner) {
+                            banner.style.background = 'rgba(34, 197, 94, 0.95)';
+                            banner.innerHTML = `
+                                <div style="font-weight: bold;">Database Installed</div>
+                                <div style="font-size: 11px; opacity: 0.9;">${data.message}</div>
+                            `;
+                            setTimeout(() => banner.remove(), 3000);
+                        }
+                        aircraftDbStatus.installed = true;
+                    } else {
+                        if (banner) {
+                            banner.style.background = 'rgba(239, 68, 68, 0.95)';
+                            banner.innerHTML = `
+                                <div style="font-weight: bold;">Download Failed</div>
+                                <div style="font-size: 11px;">${data.error || 'Unknown error'}</div>
+                                <button onclick="this.parentElement.remove()" style="position: absolute; top: 6px; right: 8px; background: none; border: none; color: white; cursor: pointer; font-size: 14px;">×</button>
+                            `;
+                        }
+                    }
+                })
+                .catch(err => {
+                    if (banner) {
+                        banner.style.background = 'rgba(239, 68, 68, 0.95)';
+                        banner.innerHTML = `
+                            <div style="font-weight: bold;">Download Failed</div>
+                            <div style="font-size: 11px;">${err.message}</div>
+                            <button onclick="this.parentElement.remove()" style="position: absolute; top: 6px; right: 8px; background: none; border: none; color: white; cursor: pointer; font-size: 14px;">×</button>
+                        `;
+                    }
+                });
         }
 
         function showReadsbWarning(sdrTypes) {
@@ -1205,7 +1181,7 @@ sudo make install</code>
 
         function initMap() {
             radarMap = L.map('radarMap', {
-                center: [51.5, -0.1],
+                center: [observerLocation.lat, observerLocation.lon],
                 zoom: 7,
                 minZoom: 3,
                 maxZoom: 15
@@ -1215,15 +1191,8 @@ sudo make install</code>
                 attribution: '© OpenStreetMap contributors'
             }).addTo(radarMap);
 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    radarMap.setView([pos.coords.latitude, pos.coords.longitude], 8);
-                    observerLocation.lat = pos.coords.latitude;
-                    observerLocation.lon = pos.coords.longitude;
-                    document.getElementById('obsLat').value = observerLocation.lat.toFixed(4);
-                    document.getElementById('obsLon').value = observerLocation.lon.toFixed(4);
-                }, () => {}, { timeout: 5000 });
-            }
+            // Draw range rings after map is ready
+            setTimeout(() => drawRangeRings(), 100);
         }
 
         // ============================================
@@ -1312,16 +1281,36 @@ sudo make install</code>
         function startEventStream() {
             if (eventSource) eventSource.close();
 
+            console.log('Starting ADS-B event stream...');
             eventSource = new EventSource('/adsb/stream');
+
+            eventSource.onopen = () => {
+                console.log('ADS-B stream connected');
+            };
+
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'aircraft') {
                         updateAircraft(data);
+                    } else if (data.type === 'status') {
+                        console.log('ADS-B status:', data.message);
+                    } else if (data.type === 'keepalive') {
+                        // Keepalive received
+                    } else {
+                        console.log('ADS-B data:', data);
                     }
-                } catch (err) {}
+                } catch (err) {
+                    console.error('ADS-B parse error:', err, event.data);
+                }
             };
-            eventSource.onerror = () => {};
+
+            eventSource.onerror = (e) => {
+                console.error('ADS-B stream error:', e);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    console.log('ADS-B stream closed, will not auto-reconnect');
+                }
+            };
         }
 
         function stopEventStream() {
@@ -1521,14 +1510,22 @@ sudo make install</code>
             const alt = ac.altitude ? ac.altitude.toLocaleString() : '---';
             const speed = ac.speed || '---';
             const heading = ac.heading ? ac.heading + '°' : '---';
+            const typeCode = ac.type_code || '';
             const militaryInfo = isMilitaryAircraft(ac.icao, ac.callsign);
             const badge = militaryInfo.military ?
                 `<span style="background:#556b2f;color:#fff;padding:1px 4px;border-radius:2px;font-size:8px;margin-left:4px;">MIL</span>` : '';
+            // Vertical rate indicator: arrow up (climbing), arrow down (descending), or dash (level)
+            let vsIndicator = '-';
+            let vsColor = '';
+            if (ac.vertical_rate !== undefined) {
+                if (ac.vertical_rate > 300) { vsIndicator = '↑'; vsColor = 'color:#00ff88;'; }
+                else if (ac.vertical_rate < -300) { vsIndicator = '↓'; vsColor = 'color:#ff6b6b;'; }
+            }
 
             return `
                 <div class="aircraft-header">
                     <span class="aircraft-callsign">${callsign}${badge}</span>
-                    <span class="aircraft-icao">${ac.icao}</span>
+                    <span class="aircraft-icao">${typeCode ? typeCode + ' • ' : ''}${ac.icao}</span>
                 </div>
                 <div class="aircraft-details">
                     <div class="aircraft-detail">
@@ -1542,6 +1539,10 @@ sudo make install</code>
                     <div class="aircraft-detail">
                         <div class="aircraft-detail-value">${heading}</div>
                         <div class="aircraft-detail-label">HDG</div>
+                    </div>
+                    <div class="aircraft-detail">
+                        <div class="aircraft-detail-value" style="${vsColor}">${vsIndicator}</div>
+                        <div class="aircraft-detail-label">V/S</div>
                     </div>
                 </div>
             `;
@@ -1578,12 +1579,20 @@ sudo make install</code>
             const speed = ac.speed ? ac.speed + ' kts' : 'N/A';
             const heading = ac.heading ? ac.heading + '°' : 'N/A';
             const squawk = ac.squawk || 'N/A';
+            const vrate = ac.vertical_rate !== undefined ? (ac.vertical_rate >= 0 ? '+' : '') + ac.vertical_rate.toLocaleString() + ' ft/min' : 'N/A';
+            const registration = ac.registration || '';
+            const typeCode = ac.type_code || '';
+            const typeDesc = ac.type_desc || '';
             const militaryInfo = isMilitaryAircraft(ac.icao, ac.callsign);
             const badge = militaryInfo.military ?
                 `<div style="background:#556b2f;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;text-align:center;margin-bottom:8px;">MILITARY${militaryInfo.country ? ' (' + militaryInfo.country + ')' : ''}</div>` : '';
+            // Aircraft type info line (shown if available from database)
+            const typeInfo = (typeCode || typeDesc) ?
+                `<div style="color:#00d4ff;font-size:11px;margin-bottom:6px;">${typeDesc || typeCode}${registration ? ' • ' + registration : ''}</div>` : '';
 
             container.innerHTML = `
                 <div class="selected-callsign">${callsign}</div>
+                ${typeInfo}
                 ${badge}
                 <div class="telemetry-grid">
                     <div class="telemetry-item">
@@ -1613,6 +1622,10 @@ sudo make install</code>
                     <div class="telemetry-item">
                         <div class="telemetry-label">Heading</div>
                         <div class="telemetry-value">${heading}</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">V/S</div>
+                        <div class="telemetry-value" style="${ac.vertical_rate > 0 ? 'color: #00ff88;' : ac.vertical_rate < 0 ? 'color: #ff6b6b;' : ''}">${vrate}</div>
                     </div>
                     <div class="telemetry-item">
                         <div class="telemetry-label">Range</div>
@@ -1755,24 +1768,46 @@ sudo make install</code>
         }
 
         function initAirband() {
-            // Populate device selector
+            // Populate device selector with available SDRs
             fetch('/devices')
                 .then(r => r.json())
                 .then(devices => {
                     const select = document.getElementById('airbandDeviceSelect');
                     select.innerHTML = '';
                     if (devices.length === 0) {
-                        select.innerHTML = '<option value="0">No SDR</option>';
+                        select.innerHTML = '<option value="0">No SDR found</option>';
+                        select.disabled = true;
+                    } else if (devices.length === 1) {
+                        // Only one device - warn user they need two
+                        const dev = devices[0];
+                        const name = dev.name || dev.type || `RTL-SDR`;
+                        const opt = document.createElement('option');
+                        opt.value = dev.index || 0;
+                        opt.textContent = `${dev.index || 0}: ${name}`;
+                        select.appendChild(opt);
+                        // Show warning about needing second SDR
+                        document.getElementById('airbandStatus').textContent = '1 SDR (need 2)';
+                        document.getElementById('airbandStatus').style.color = 'var(--accent-orange)';
                     } else {
+                        // Multiple devices - let user choose which for airband
                         devices.forEach((dev, i) => {
                             const opt = document.createElement('option');
-                            opt.value = dev.index || i;
-                            opt.textContent = `Dev ${dev.index || i}`;
+                            const idx = dev.index !== undefined ? dev.index : i;
+                            const name = dev.name || dev.type || `RTL-SDR`;
+                            opt.value = idx;
+                            opt.textContent = `${idx}: ${name}`;
                             select.appendChild(opt);
                         });
+                        // Default to second device (first is likely used for ADS-B)
+                        if (devices.length > 1) {
+                            select.value = devices[1].index !== undefined ? devices[1].index : 1;
+                        }
                     }
                 })
-                .catch(() => {});
+                .catch(() => {
+                    const select = document.getElementById('airbandDeviceSelect');
+                    select.innerHTML = '<option value="0">No SDR</option>';
+                });
 
             // Check if audio tools are available
             fetch('/listening/tools')
@@ -1890,6 +1925,18 @@ sudo make install</code>
             const frequency = getAirbandFrequency();
             const device = parseInt(document.getElementById('airbandDeviceSelect').value);
             const squelch = parseInt(document.getElementById('airbandSquelch').value);
+
+            // Check if ADS-B tracking is using this device (ADS-B uses device 0 by default)
+            if (isTracking && device === 0) {
+                const useAnyway = confirm(
+                    'Warning: ADS-B tracking is using SDR device 0.\n\n' +
+                    'Using the same device for airband will stop ADS-B tracking.\n\n' +
+                    'Select a different SDR device for airband listening, or click OK to stop tracking and listen.'
+                );
+                if (!useAnyway) {
+                    return;
+                }
+            }
 
             document.getElementById('airbandStatus').textContent = 'STARTING...';
             document.getElementById('airbandStatus').style.color = 'var(--accent-orange)';

@@ -743,17 +743,17 @@
                                 Cluster Markers
                             </label>
                             <label>
-                                <input type="checkbox" id="adsbShowRangeRings" onchange="drawRangeRings()">
+                                <input type="checkbox" id="adsbShowRangeRings" checked onchange="drawRangeRings()">
                                 Show Range Rings
                             </label>
                         </div>
                         <div class="form-group" style="margin-top: 10px;">
-                            <label>Observer Location</label>
-                            <select id="adsbLocationSource" onchange="toggleGpsSection(this.value === 'dongle')" style="margin-bottom: 5px;">
-                                <option value="manual">Manual Entry</option>
-                                <option value="browser">Browser GPS</option>
-                                <option value="dongle">USB GPS Dongle</option>
-                            </select>
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                Observer Location
+                                <span id="adsbGpsIndicator" class="gps-indicator" style="display: none;" title="GPS connected via gpsd">
+                                    <span class="gps-dot"></span> GPS
+                                </span>
+                            </label>
                             <div style="display: flex; gap: 5px;">
                                 <input type="text" id="adsbObsLat" value="51.5074" placeholder="Latitude" style="flex: 1;" onchange="updateObserverLocation()">
                                 <input type="text" id="adsbObsLon" value="-0.1278" placeholder="Longitude" style="flex: 1;" onchange="updateObserverLocation()">
@@ -761,47 +761,6 @@
                             <button class="preset-btn" id="adsbGeolocateBtn" onclick="getAdsbGeolocation()" style="width: 100%; margin-top: 5px;">
                                 📍 Use Browser Location
                             </button>
-                            <div class="gps-dongle-section" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,212,255,0.05); border-radius: 4px;">
-                                <div style="margin-bottom: 5px;">
-                                    <select class="gps-source-select" onchange="toggleGpsSourceMode(this)" style="width: 100%; font-size: 11px;">
-                                        <option value="serial">Serial Device</option>
-                                        <option value="gpsd">gpsd (daemon)</option>
-                                    </select>
-                                </div>
-                                <div class="gps-serial-controls">
-                                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                                        <select class="gps-device-select" style="flex: 1; font-size: 11px;">
-                                            <option value="">Select GPS Device...</option>
-                                        </select>
-                                        <button class="preset-btn" onclick="refreshGpsDevices()" style="padding: 2px 6px; font-size: 10px;" title="Refresh">🔄</button>
-                                    </div>
-                                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                                        <select class="gps-baudrate-select" style="flex: 1; font-size: 11px;">
-                                            <option value="4800">4800</option>
-                                            <option value="9600" selected>9600</option>
-                                            <option value="38400">38400</option>
-                                            <option value="115200">115200</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="gps-gpsd-controls" style="display: none;">
-                                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                                        <input type="text" class="gpsd-host-input" value="localhost" placeholder="Host" style="flex: 2; font-size: 11px;">
-                                        <input type="number" class="gpsd-port-input" value="2947" placeholder="Port" style="flex: 1; font-size: 11px;">
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 5px;">
-                                    <button class="preset-btn gps-connect-btn" onclick="startGpsFromSection(this.closest('.gps-dongle-section'))" style="flex: 1; font-size: 10px; padding: 4px;">
-                                        Connect
-                                    </button>
-                                    <button class="preset-btn gps-disconnect-btn" onclick="stopGpsDongle()" style="flex: 1; display: none; font-size: 10px; padding: 4px; background: rgba(255,0,0,0.1); border-color: #ff4444;">
-                                        Disconnect
-                                    </button>
-                                </div>
-                                <div class="gps-status-indicator" style="text-align: center; margin-top: 5px; font-size: 10px; color: var(--text-secondary);">
-                                    ⚪ Disconnected
-                                </div>
-                            </div>
                         </div>
                         <div class="form-group" style="margin-top: 10px;">
                             <label>Aircraft Filter</label>
@@ -864,15 +823,12 @@
                     <!-- Pass Predictor Sub-tab -->
                     <div id="predictorTab" class="satellite-content active">
                         <div class="section">
-                            <h3>Observer Location</h3>
-                            <div class="form-group">
-                                <label>Location Source</label>
-                                <select id="satLocationSource" onchange="toggleGpsSection(this.value === 'dongle')">
-                                    <option value="manual">Manual Entry</option>
-                                    <option value="browser">Browser GPS</option>
-                                    <option value="dongle">USB GPS Dongle</option>
-                                </select>
-                            </div>
+                            <h3 style="display: flex; align-items: center; gap: 8px;">
+                                Observer Location
+                                <span id="satGpsIndicator" class="gps-indicator" style="display: none;" title="GPS connected via gpsd">
+                                    <span class="gps-dot"></span> GPS
+                                </span>
+                            </h3>
                             <div class="form-group">
                                 <label>Latitude</label>
                                 <input type="text" id="obsLat" value="51.5074" placeholder="51.5074">
@@ -884,56 +840,6 @@
                             <button class="preset-btn" onclick="getLocation()" style="width: 100%;">
                                 📍 Use Browser Location
                             </button>
-                            <div class="gps-dongle-section" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,212,255,0.05); border-radius: 4px;">
-                                <div class="form-group" style="margin-bottom: 8px;">
-                                    <label style="font-size: 11px;">GPS Source</label>
-                                    <select class="gps-source-select" onchange="toggleGpsSourceMode(this)" style="width: 100%;">
-                                        <option value="serial">Serial Device</option>
-                                        <option value="gpsd">gpsd (daemon)</option>
-                                    </select>
-                                </div>
-                                <div class="gps-serial-controls">
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 11px;">GPS Device</label>
-                                        <div style="display: flex; gap: 5px;">
-                                            <select class="gps-device-select" style="flex: 1;">
-                                                <option value="">Select GPS Device...</option>
-                                            </select>
-                                            <button class="preset-btn" onclick="refreshGpsDevices()" style="padding: 4px 8px;" title="Refresh">🔄</button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 11px;">Baud Rate</label>
-                                        <select class="gps-baudrate-select" style="width: 100%;">
-                                            <option value="4800">4800</option>
-                                            <option value="9600" selected>9600</option>
-                                            <option value="38400">38400</option>
-                                            <option value="115200">115200</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="gps-gpsd-controls" style="display: none;">
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 11px;">gpsd Host</label>
-                                        <input type="text" class="gpsd-host-input" value="localhost" style="width: 100%;">
-                                    </div>
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 11px;">gpsd Port</label>
-                                        <input type="number" class="gpsd-port-input" value="2947" style="width: 100%;">
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 5px;">
-                                    <button class="preset-btn gps-connect-btn" onclick="startGpsFromSection(this.closest('.gps-dongle-section'))" style="flex: 1;">
-                                        Connect GPS
-                                    </button>
-                                    <button class="preset-btn gps-disconnect-btn" onclick="stopGpsDongle()" style="flex: 1; display: none; background: rgba(255,0,0,0.1); border-color: #ff4444;">
-                                        Disconnect
-                                    </button>
-                                </div>
-                                <div class="gps-status-indicator" style="text-align: center; margin-top: 8px; font-size: 11px; color: var(--text-secondary);">
-                                    ⚪ Disconnected
-                                </div>
-                            </div>
                         </div>
 
                         <div class="section">
@@ -1414,7 +1320,7 @@
 
                 <!-- Aircraft Visualizations - Leaflet Map -->
                 <div class="wifi-visuals" id="aircraftVisuals" style="display: none;">
-                    <div class="wifi-visual-panel" style="grid-column: span 2;">
+                    <div class="wifi-visual-panel" style="grid-column: span 4;">
                         <h5 style="color: var(--accent-cyan); text-shadow: 0 0 10px var(--accent-cyan);">ADS-B AIRCRAFT TRACKING</h5>
                         <div class="aircraft-map-container">
                             <div class="map-header">
@@ -1427,13 +1333,6 @@
                                 <span>CENTER: <span id="mapCenter">--</span></span>
                             </div>
                         </div>
-                    </div>
-                    <div class="wifi-visual-panel signal-graph-panel" style="grid-column: span 2;">
-                        <div class="signal-graph-header">
-                            <h4>📊 Aircraft Count Over Time</h4>
-                            <span class="signal-graph-device" id="adsbStatsLabel">Tracking history</span>
-                        </div>
-                        <canvas id="adsbStatsChart"></canvas>
                     </div>
                 </div>
 
@@ -1891,7 +1790,6 @@
         let observerMarkerAdsb = null;
 
         // GPS Dongle state
-        let gpsDevices = [];
         let gpsConnected = false;
         let gpsEventSource = null;
         let gpsLastPosition = null;
@@ -2235,6 +2133,9 @@
             if (adsbLonInput) adsbLonInput.value = observerLocation.lon.toFixed(4);
             if (obsLatInput) obsLatInput.value = observerLocation.lat.toFixed(4);
             if (obsLonInput) obsLonInput.value = observerLocation.lon.toFixed(4);
+
+            // Auto-connect to gpsd if available
+            autoConnectGps();
         });
 
         // Toggle section collapse
@@ -2278,6 +2179,10 @@
             document.getElementById('satelliteStats').style.display = mode === 'satellite' ? 'flex' : 'none';
             document.getElementById('wifiStats').style.display = mode === 'wifi' ? 'flex' : 'none';
             document.getElementById('btStats').style.display = mode === 'bluetooth' ? 'flex' : 'none';
+
+            // Show signal meter only for modes that use it (pager, sensor, wifi, bluetooth)
+            const signalMeterModes = ['pager', 'sensor', 'wifi', 'bluetooth'];
+            document.getElementById('signalMeter').style.display = signalMeterModes.includes(mode) ? 'flex' : 'none';
 
             // Update header stats groups
             document.getElementById('headerPagerStats').classList.toggle('active', mode === 'pager');
@@ -4283,84 +4188,6 @@
             btSignalChart.data.labels = data.map((_, i) => i);
             btSignalChart.data.datasets[0].data = data.map(p => p.signal);
             btSignalChart.update('none');
-        }
-
-        // ADS-B Aircraft Count Chart
-        let adsbStatsChart = null;
-        let adsbCountHistory = [];
-        const maxAdsbPoints = 60;
-
-        function trackAdsbCount(count) {
-            adsbCountHistory.push({
-                time: Date.now(),
-                count: count
-            });
-            if (adsbCountHistory.length > maxAdsbPoints) {
-                adsbCountHistory.shift();
-            }
-            updateAdsbStatsChart();
-            // Persist to server
-            fetch('/settings/signal-history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'adsb', device_id: 'aircraft_count', signal_strength: count })
-            }).catch(() => {});
-        }
-
-        function initAdsbStatsChart() {
-            const canvas = document.getElementById('adsbStatsChart');
-            if (!canvas || adsbStatsChart) return;
-
-            const ctx = canvas.getContext('2d');
-            adsbStatsChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Aircraft',
-                        data: [],
-                        borderColor: '#00d4ff',
-                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 0 },
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: false },
-                        y: {
-                            min: 0,
-                            suggestedMax: 20,
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: {
-                                color: '#666',
-                                font: { size: 10, family: 'monospace' },
-                                stepSize: 5
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateAdsbStatsChart() {
-            if (!adsbStatsChart) {
-                initAdsbStatsChart();
-            }
-            if (!adsbStatsChart || adsbCountHistory.length === 0) return;
-
-            adsbStatsChart.data.labels = adsbCountHistory.map((_, i) => i);
-            adsbStatsChart.data.datasets[0].data = adsbCountHistory.map(p => p.count);
-            adsbStatsChart.update('none');
-
-            const lastCount = adsbCountHistory[adsbCountHistory.length - 1].count;
-            document.getElementById('adsbStatsLabel').textContent = `${lastCount} aircraft tracked`;
         }
 
         // Network Topology Graph
@@ -6993,8 +6820,6 @@
             document.getElementById('aircraftCount').textContent = count;
             document.getElementById('adsbMsgCount').textContent = adsbMsgCount;
             document.getElementById('icaoCount').textContent = count;
-            // Track aircraft count for chart
-            trackAdsbCount(count);
         }
 
         function addAircraftToOutput(aircraft) {
@@ -7054,199 +6879,83 @@
         }
 
         // ============================================
-        // GPS DONGLE FUNCTIONS
+        // GPS FUNCTIONS (gpsd auto-connect)
         // ============================================
 
-        async function checkGpsDongleAvailable() {
+        async function autoConnectGps() {
+            // Automatically try to connect to gpsd on page load
             try {
-                const response = await fetch('/gps/available');
-                const data = await response.json();
-                return data.available;
-            } catch (e) {
-                console.warn('GPS dongle check failed:', e);
-                return false;
-            }
-        }
-
-        async function refreshGpsDevices() {
-            try {
-                const response = await fetch('/gps/devices');
-                const data = await response.json();
-                if (data.status === 'ok') {
-                    gpsDevices = data.devices;
-                    updateGpsDeviceSelectors();
-                    return data.devices;
-                }
-            } catch (e) {
-                console.warn('Failed to get GPS devices:', e);
-            }
-            return [];
-        }
-
-        function updateGpsDeviceSelectors() {
-            // Update all GPS device selectors in the UI
-            const selectors = document.querySelectorAll('.gps-device-select');
-            selectors.forEach(select => {
-                const currentValue = select.value;
-                select.innerHTML = '<option value="">Select GPS Device...</option>';
-                gpsDevices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.path;
-                    option.textContent = device.name + (device.accessible ? '' : ' (no access)');
-                    option.disabled = !device.accessible;
-                    select.appendChild(option);
-                });
-                if (currentValue && gpsDevices.some(d => d.path === currentValue)) {
-                    select.value = currentValue;
-                }
-            });
-        }
-
-        function toggleGpsSourceMode(selectElement) {
-            // Toggle between serial and gpsd controls
-            const section = selectElement.closest('.gps-dongle-section');
-            const serialControls = section.querySelector('.gps-serial-controls');
-            const gpsdControls = section.querySelector('.gps-gpsd-controls');
-            const source = selectElement.value;
-
-            if (source === 'gpsd') {
-                serialControls.style.display = 'none';
-                gpsdControls.style.display = 'block';
-            } else {
-                serialControls.style.display = 'block';
-                gpsdControls.style.display = 'none';
-            }
-        }
-
-        async function startGpsFromSection(section) {
-            // Start GPS based on the selected source in the section
-            const sourceSelect = section.querySelector('.gps-source-select');
-            const source = sourceSelect ? sourceSelect.value : 'serial';
-
-            if (source === 'gpsd') {
-                const host = section.querySelector('.gpsd-host-input').value || 'localhost';
-                const port = parseInt(section.querySelector('.gpsd-port-input').value) || 2947;
-                return await startGpsd(host, port);
-            } else {
-                const devicePath = section.querySelector('.gps-device-select').value;
-                const baudrate = parseInt(section.querySelector('.gps-baudrate-select').value) || 9600;
-                return await startGpsDongle(devicePath, baudrate);
-            }
-        }
-
-        async function startGpsd(host = 'localhost', port = 2947) {
-            try {
-                const response = await fetch('/gps/gpsd/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ host: host, port: port })
-                });
+                const response = await fetch('/gps/auto-connect', { method: 'POST' });
                 const data = await response.json();
 
-                if (data.status === 'started') {
+                if (data.status === 'connected') {
                     gpsConnected = true;
                     startGpsStream();
-                    updateGpsStatus(true);
-                    showInfo(`Connected to gpsd at ${host}:${port}`);
-                    return true;
+                    showGpsIndicator(true);
+                    console.log('GPS: Auto-connected to gpsd');
+                    if (data.position) {
+                        updateLocationFromGps(data.position);
+                    }
                 } else {
-                    showError('Failed to connect to gpsd: ' + data.message);
-                    return false;
+                    console.log('GPS: gpsd not available -', data.message);
                 }
             } catch (e) {
-                showError('gpsd connection error: ' + e.message);
-                return false;
+                console.log('GPS: Auto-connect failed -', e.message);
             }
         }
 
-        async function startGpsDongle(devicePath, baudrate = 9600) {
-            if (!devicePath) {
-                showError('Please select a GPS device');
-                return false;
-            }
-
-            try {
-                const response = await fetch('/gps/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device: devicePath, baudrate: baudrate })
-                });
-                const data = await response.json();
-
-                if (data.status === 'started') {
-                    gpsConnected = true;
-                    startGpsStream();
-                    updateGpsStatus(true);
-                    showInfo('GPS dongle connected: ' + devicePath);
-                    return true;
-                } else {
-                    showError('Failed to start GPS: ' + data.message);
-                    return false;
-                }
-            } catch (e) {
-                showError('GPS connection error: ' + e.message);
-                return false;
-            }
-        }
-
-        async function stopGpsDongle() {
-            try {
-                if (gpsEventSource) {
-                    gpsEventSource.close();
-                    gpsEventSource = null;
-                }
-                await fetch('/gps/stop', { method: 'POST' });
-                gpsConnected = false;
-                gpsLastPosition = null;
-                updateGpsStatus(false);
-                showInfo('GPS dongle disconnected');
-            } catch (e) {
-                console.warn('GPS stop error:', e);
-            }
-        }
+        let gpsReconnectTimeout = null;
 
         function startGpsStream() {
             if (gpsEventSource) {
                 gpsEventSource.close();
+            }
+            if (gpsReconnectTimeout) {
+                clearTimeout(gpsReconnectTimeout);
+                gpsReconnectTimeout = null;
             }
 
             gpsEventSource = new EventSource('/gps/stream');
             gpsEventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('GPS data received:', data);
                     if (data.type === 'position') {
                         gpsLastPosition = data;
                         updateLocationFromGps(data);
-                        // Update status indicator with coordinates
-                        const statusIndicators = document.querySelectorAll('.gps-status-indicator');
-                        statusIndicators.forEach(indicator => {
-                            if (data.latitude && data.longitude) {
-                                indicator.textContent = `🟢 ${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
-                                indicator.style.color = 'var(--accent-green)';
-                            }
-                        });
-                    } else if (data.type === 'keepalive') {
-                        console.log('GPS keepalive');
                     }
                 } catch (e) {
                     console.error('GPS parse error:', e);
                 }
             };
             gpsEventSource.onerror = (e) => {
-                console.warn('GPS stream error:', e);
-                gpsConnected = false;
-                updateGpsStatus(false);
+                // Don't log every error - connection suspends are normal
+                if (gpsEventSource) {
+                    gpsEventSource.close();
+                    gpsEventSource = null;
+                }
+                // Auto-reconnect after 5 seconds if still connected
+                if (gpsConnected && !gpsReconnectTimeout) {
+                    gpsReconnectTimeout = setTimeout(() => {
+                        gpsReconnectTimeout = null;
+                        if (gpsConnected) {
+                            startGpsStream();
+                        }
+                    }, 5000);
+                }
             };
         }
 
+        // Reconnect GPS stream when tab becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && gpsConnected && !gpsEventSource) {
+                startGpsStream();
+            }
+        });
+
         function updateLocationFromGps(position) {
             if (!position || !position.latitude || !position.longitude) {
-                console.warn('GPS: Invalid position data', position);
                 return;
             }
-
-            console.log('GPS: Updating location to', position.latitude, position.longitude);
 
             // Update satellite observer location
             const satLatInput = document.getElementById('obsLat');
@@ -7264,51 +6973,28 @@
             observerLocation.lat = position.latitude;
             observerLocation.lon = position.longitude;
 
-            // Center ADS-B map on new location (only on first fix or significant movement)
-            if (typeof aircraftMap !== 'undefined' && aircraftMap) {
-                const currentCenter = aircraftMap.getCenter();
-                const distance = Math.sqrt(
-                    Math.pow(currentCenter.lat - position.latitude, 2) +
-                    Math.pow(currentCenter.lng - position.longitude, 2)
-                );
-                console.log('GPS: Map exists, distance from current center:', distance);
-                // Only recenter if moved more than ~1km (0.01 degrees)
-                if (distance > 0.01 || !aircraftMap._gpsInitialized) {
-                    console.log('GPS: Centering map on', position.latitude, position.longitude);
-                    aircraftMap.setView([position.latitude, position.longitude], aircraftMap.getZoom());
-                    aircraftMap._gpsInitialized = true;
-                }
-            } else {
-                console.log('GPS: aircraftMap not available yet');
+            // Center ADS-B map on GPS location (on first fix)
+            if (typeof aircraftMap !== 'undefined' && aircraftMap && !aircraftMap._gpsInitialized) {
+                aircraftMap.setView([position.latitude, position.longitude], aircraftMap.getZoom());
+                aircraftMap._gpsInitialized = true;
             }
 
-            // Trigger map updates
+            // Trigger range rings update
             if (typeof drawRangeRings === 'function') {
                 drawRangeRings();
             }
         }
 
-        function updateGpsStatus(connected) {
-            const statusIndicators = document.querySelectorAll('.gps-status-indicator');
-            statusIndicators.forEach(indicator => {
-                indicator.textContent = connected ? '🟢 Connected' : '⚪ Disconnected';
-                indicator.style.color = connected ? 'var(--accent-green)' : 'var(--text-secondary)';
+        function showGpsIndicator(show) {
+            // Show/hide all GPS indicators (by class and by ID)
+            document.querySelectorAll('.gps-indicator').forEach(el => {
+                el.style.display = show ? 'inline-flex' : 'none';
             });
-
-            const connectBtns = document.querySelectorAll('.gps-connect-btn');
-            const disconnectBtns = document.querySelectorAll('.gps-disconnect-btn');
-            connectBtns.forEach(btn => btn.style.display = connected ? 'none' : 'block');
-            disconnectBtns.forEach(btn => btn.style.display = connected ? 'block' : 'none');
-        }
-
-        function toggleGpsSection(show) {
-            const gpsSections = document.querySelectorAll('.gps-dongle-section');
-            gpsSections.forEach(section => {
-                section.style.display = show ? 'block' : 'none';
+            // Also target specific IDs in case class selector doesn't work
+            ['adsbGpsIndicator', 'satGpsIndicator'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = show ? 'inline-flex' : 'none';
             });
-            if (show) {
-                refreshGpsDevices();
-            }
         }
 
         function initPolarPlot() {

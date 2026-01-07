@@ -3293,3 +3293,32 @@ body::before {
     border-radius: 3px;
     background: rgba(0, 0, 0, 0.4);
 }
+
+/* GPS Indicator */
+.gps-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--accent-green-dim);
+    border: 1px solid var(--accent-green);
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-green);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gps-indicator .gps-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    animation: gps-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gps-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
