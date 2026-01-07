@@ -29,64 +29,17 @@
 
 ---
 
-## Installation
+## Installation / Debian / Ubuntu / MacOS
 
-### macOS
-
-**1. Install Homebrew** (if not already installed):
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-**2. Install dependencies:**
-```bash
-# Required
-brew install python@3.11 librtlsdr multimon-ng rtl_433 ffmpeg
-
-# For ADS-B aircraft tracking
-brew install dump1090-mutability
-
-# For WiFi scanning (optional)
-brew install aircrack-ng
-```
-
-**3. Clone and run:**
+**1. Clone and run:**
 ```bash
 git clone https://github.com/smittix/intercept.git
 cd intercept
 ./setup.sh
 sudo python3 intercept.py
 ```
-
-### Debian / Ubuntu / Raspberry Pi OS
-
-**1. Install dependencies:**
-```bash
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv git
-
-# Required SDR tools
-sudo apt install -y rtl-sdr multimon-ng rtl-433 ffmpeg
-
-# For ADS-B aircraft tracking (package name varies)
-sudo apt install -y dump1090-mutability  # or dump1090-fa
-
-# For WiFi scanning (optional)
-sudo apt install -y aircrack-ng
-
-# For Bluetooth scanning (optional)
-sudo apt install -y bluez bluetooth
-```
-
-**2. Clone and run:**
-```bash
-git clone https://github.com/smittix/intercept.git
-cd intercept
-./setup.sh
-sudo python3 intercept.py
-```
-
-> **Note:** On Raspberry Pi or headless systems, you may need to run `sudo venv/bin/python intercept.py` if a virtual environment was created.
 
 ### Docker (Alternative)
 
@@ -109,7 +62,7 @@ After starting, open **http://localhost:5050** in your browser.
 | Hardware | Purpose | Price |
 |----------|---------|-------|
 | **RTL-SDR** | Required for all SDR features | ~$25-35 |
-| **WiFi adapter** | Monitor mode scanning (optional) | ~$20-40 |
+| **WiFi adapter** | Must support promiscuous (monitor) mode | ~$20-40 |
 | **Bluetooth adapter** | Device scanning (usually built-in) | - |
 
 Most features work with a basic RTL-SDR dongle (RTL2832U + R820T2).
@@ -141,18 +94,12 @@ sudo venv/bin/python intercept.py
 
 ### dump1090 not available (Debian Trixie)
 
-On newer Debian versions, dump1090 may not be in repositories. Install from FlightAware:
-- https://flightaware.com/adsb/piaware/install
+On newer Debian versions, dump1090 may not be in repositories. The recommended action is to build from source or use the setup.sh script which will do it for you.
 
-### Verify installation
-
-```bash
-python3 intercept.py --check-deps
-```
 
 ---
 
-## Community
+## Discord Server
 
 <p align="center">
   <a href="https://discord.gg/z3g3NJMe">Join our Discord</a>
@@ -169,6 +116,8 @@ python3 intercept.py --check-deps
 ---
 
 ## Disclaimer
+
+This project was developed using AI as a coding partner, combining human direction with AI-assisted implementation. The goal: make Software Defined Radio more accessible by providing a clean, unified interface for common SDR tools.
 
 **This software is for educational and authorized testing purposes only.**
 
@@ -195,3 +144,4 @@ Created by **smittix** - [GitHub](https://github.com/smittix)
 [aircrack-ng](https://www.aircrack-ng.org/) |
 [Leaflet.js](https://leafletjs.com/) |
 [Celestrak](https://celestrak.org/)
+
