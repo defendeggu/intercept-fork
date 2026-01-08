@@ -2,7 +2,7 @@
 
 All notable changes to INTERCEPT will be documented in this file.
 
-## [2.0.0] - 2025-01-06
+## [2.0.0] - 2026-01-06
 
 ### Added
 - **Listening Post Mode** - New frequency scanner with automatic signal detection
@@ -50,7 +50,7 @@ All notable changes to INTERCEPT will be documented in this file.
 
 ---
 
-## [1.2.0] - 2024-12-XX
+## [1.2.0] - 2026-12-29
 
 ### Added
 - Airspy SDR support
@@ -62,7 +62,7 @@ All notable changes to INTERCEPT will be documented in this file.
 
 ---
 
-## [1.1.0] - 2024-XX-XX
+## [1.1.0] - 2026-12-18
 
 ### Added
 - Satellite tracking with TLE data
@@ -71,7 +71,7 @@ All notable changes to INTERCEPT will be documented in this file.
 
 ---
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2026-12-15
 
 ### Initial Release
 - Pager decoding (POCSAG/FLEX)
@@ -80,3 +80,4 @@ All notable changes to INTERCEPT will be documented in this file.
 - WiFi reconnaissance
 - Bluetooth scanning
 - Multi-SDR support (RTL-SDR, LimeSDR, HackRF)
+
