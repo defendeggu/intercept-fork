@@ -359,6 +359,20 @@ def stream_airodump_output(process, csv_path):
                                 'action': 'new',
                                 **client
                             })
+                        else:
+                            # Send update if probes changed or signal changed significantly
+                            old_client = app_module.wifi_clients[mac]
+                            old_probes = old_client.get('probes', '')
+                            new_probes = client.get('probes', '')
+                            old_power = int(old_client.get('power', -100) or -100)
+                            new_power = int(client.get('power', -100) or -100)
+
+                            if new_probes != old_probes or abs(new_power - old_power) >= 5:
+                                app_module.wifi_queue.put({
+                                    'type': 'client',
+                                    'action': 'update',
+                                    **client
+                                })
 
                     app_module.wifi_networks = networks
                     app_module.wifi_clients = clients

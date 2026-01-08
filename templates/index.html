@@ -3922,6 +3922,12 @@
         }
 
         // Check for rogue APs (same SSID, different BSSID)
+        // Extract OUI (manufacturer ID) from MAC address
+        function getOui(mac) {
+            if (!mac) return '';
+            return mac.toUpperCase().substring(0, 8);  // First 3 octets: "AA:BB:CC"
+        }
+
         function checkRogueAP(ssid, bssid, channel, signal) {
             if (!ssid || ssid === 'Hidden' || ssid === '[Hidden]') return false;
 
@@ -3941,6 +3947,7 @@
                     bssid: bssid,
                     channel: channel || '?',
                     signal: signal || '?',
+                    oui: getOui(bssid),
                     firstSeen: new Date().toLocaleTimeString()
                 });
             }
@@ -3948,8 +3955,19 @@
             const isNewBssid = !ssidToBssids[ssid].has(bssid);
             ssidToBssids[ssid].add(bssid);
 
-            // If we have more than one BSSID for this SSID, it could be rogue (or just multiple APs)
+            // Only flag as rogue if multiple BSSIDs AND different manufacturers (OUIs)
+            // This prevents false positives from mesh WiFi systems and enterprise networks
             if (ssidToBssids[ssid].size > 1 && isNewBssid) {
+                // Check if all BSSIDs have the same OUI (manufacturer)
+                const ouis = new Set(rogueApDetails[ssid].map(e => e.oui));
+
+                // If all BSSIDs have the same OUI, it's likely a mesh system - not rogue
+                if (ouis.size === 1) {
+                    // Same manufacturer - probably mesh system, not rogue
+                    return false;
+                }
+
+                // Different manufacturers detected - this is suspicious!
                 rogueApCount++;
                 document.getElementById('rogueApCount').textContent = rogueApCount;
                 playAlert();
@@ -3959,8 +3977,8 @@
 
                 // Get the BSSIDs to show in alert
                 const bssidList = rogueApDetails[ssid].map(e => e.bssid).join(', ');
-                showInfo(`⚠ Rogue AP: "${ssid}" has ${ssidToBssids[ssid].size} BSSIDs: ${bssidList}`);
-                showNotification('⚠️ Rogue AP Detected!', `"${ssid}" on multiple BSSIDs`);
+                showInfo(`⚠ Rogue AP: "${ssid}" has ${ouis.size} different vendors: ${bssidList}`);
+                showNotification('⚠️ Rogue AP Detected!', `"${ssid}" has different vendor BSSIDs`);
 
                 // Update all network cards with this SSID to show rogue indicator
                 ssidToBssids[ssid].forEach(rogueBssid => {
@@ -4246,13 +4264,18 @@
                 }
             });
 
-            // Find best 2.4 GHz channel (1, 6, or 11 preferred)
+            // Count total networks for context
+            const totalNetworks = Object.keys(wifiNetworks).length;
+
+            // Find best 2.4 GHz channel (1, 6, or 11 preferred - non-overlapping)
             const preferred24 = [1, 6, 11];
             let best24 = 1;
             let minCount24 = Infinity;
+            let channelUsage24 = [];
             preferred24.forEach(ch => {
-                if (channelCounts24[ch] < minCount24) {
-                    minCount24 = channelCounts24[ch];
+                channelUsage24.push({ channel: ch, count: channelCounts24[ch] || 0 });
+                if ((channelCounts24[ch] || 0) < minCount24) {
+                    minCount24 = channelCounts24[ch] || 0;
                     best24 = ch;
                 }
             });
@@ -4260,21 +4283,33 @@
             // Find best 5 GHz channel
             let best5 = '36';
             let minCount5 = Infinity;
+            let used5g = 0;
             channels5g.forEach(ch => {
-                if (channelCounts5[ch] < minCount5) {
-                    minCount5 = channelCounts5[ch];
+                const count = channelCounts5[ch] || 0;
+                if (count > 0) used5g++;
+                if (count < minCount5) {
+                    minCount5 = count;
                     best5 = ch;
                 }
             });
 
-            // Update UI
+            // Update UI with more context
             document.getElementById('rec24Channel').textContent = best24;
-            document.getElementById('rec24Reason').textContent =
-                minCount24 === 0 ? '(unused)' : `(${Math.round(minCount24)} networks nearby)`;
+            if (totalNetworks === 0) {
+                document.getElementById('rec24Reason').textContent = '(no networks detected)';
+            } else {
+                const usage = channelUsage24.map(c => `CH${c.channel}:${Math.round(c.count)}`).join(', ');
+                document.getElementById('rec24Reason').textContent =
+                    minCount24 === 0 ? '(clear)' : `(${Math.round(minCount24)} interference) [${usage}]`;
+            }
 
             document.getElementById('rec5Channel').textContent = best5;
-            document.getElementById('rec5Reason').textContent =
-                minCount5 === 0 ? '(unused)' : `(${minCount5} networks)`;
+            if (totalNetworks === 0) {
+                document.getElementById('rec5Reason').textContent = '(no networks detected)';
+            } else {
+                document.getElementById('rec5Reason').textContent =
+                    minCount5 === 0 ? `(clear, ${channels5g.length - used5g} unused)` : `(${minCount5} networks)`;
+            }
         }
 
         // Device Correlation (WiFi <-> Bluetooth)
@@ -4864,6 +4899,9 @@
             if (client.probes && client.probes.trim()) {
                 scheduleProbeAnalysisUpdate();
             }
+
+            // Add client card to device list
+            addWifiClientCard(client, isNew);
         }
 
         // Throttled probe analysis (called less frequently)
@@ -5154,6 +5192,76 @@
             `;
 
             if (autoScroll) output.scrollTop = 0;
+        }
+
+        // Add WiFi client card to device list
+        function addWifiClientCard(client, isNew) {
+            const deviceList = document.getElementById('wifiDeviceListContent');
+            if (!deviceList) return;
+
+            // Remove placeholder if present
+            const placeholder = deviceList.querySelector('div[style*="text-align: center"]');
+            if (placeholder && placeholder.textContent.includes('Start scanning')) {
+                placeholder.remove();
+            }
+
+            // Check if card already exists
+            let card = document.getElementById('client_' + client.mac.replace(/:/g, ''));
+
+            if (!card) {
+                card = document.createElement('div');
+                card.id = 'client_' + client.mac.replace(/:/g, '');
+                card.className = 'sensor-card wifi-client-card';
+                card.style.borderLeftColor = 'var(--accent-purple)';
+                card.style.cursor = 'pointer';
+                card.onclick = () => selectWifiDevice(client.mac, 'client');
+                deviceList.appendChild(card);  // Clients go after networks
+
+                // Update device count
+                const countEl = document.getElementById('wifiDeviceListCount');
+                if (countEl) countEl.textContent = Object.keys(wifiNetworks).length + Object.keys(wifiClients).length;
+            }
+
+            // Handle signal strength
+            let signalStrength = parseInt(client.power);
+            if (isNaN(signalStrength) || signalStrength === -1) {
+                signalStrength = null;
+            }
+            const signalBars = signalStrength !== null ? Math.max(0, Math.min(5, Math.floor((signalStrength + 100) / 15))) : 0;
+            const signalDisplay = signalStrength !== null ? `${signalStrength} dBm` : 'N/A';
+
+            // Get connected AP info
+            const connectedAP = client.bssid && wifiNetworks[client.bssid];
+            const apName = connectedAP ? (connectedAP.essid || '[Hidden]') : (client.bssid || 'Not Associated');
+
+            // Format probes
+            const probes = client.probes ? client.probes.split(',').map(p => p.trim()).filter(p => p) : [];
+            const probesDisplay = probes.length > 0 ? probes.slice(0, 3).join(', ') + (probes.length > 3 ? ` +${probes.length - 3}` : '') : 'None';
+
+            card.innerHTML = `
+                <div class="header" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span class="device-name" style="color: var(--accent-purple);">📱 ${escapeHtml(client.vendor || 'Client')}</span>
+                    <span style="font-size: 10px; color: var(--text-dim);">CLIENT</span>
+                </div>
+                <div class="sensor-data">
+                    <div class="data-item">
+                        <div class="data-label">MAC</div>
+                        <div class="data-value" style="font-size: 11px;">${escapeHtml(client.mac)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Connected To</div>
+                        <div class="data-value" style="color: var(--accent-cyan);">${escapeHtml(apName)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Signal</div>
+                        <div class="data-value">${signalDisplay} ${'█'.repeat(signalBars)}${'░'.repeat(5-signalBars)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Probes</div>
+                        <div class="data-value" style="font-size: 10px;">${escapeHtml(probesDisplay)}</div>
+                    </div>
+                </div>
+            `;
         }
 
         // Target a network for attack
