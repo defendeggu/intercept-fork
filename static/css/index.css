@@ -269,6 +269,19 @@ header p {
     margin: 4px 0 8px 0;
 }
 
+header p.subtitle {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+}
+
+header h1 .tagline {
+    font-weight: 400;
+    color: var(--accent-cyan, #00d4ff);
+    font-size: 0.6em;
+    opacity: 0.9;
+}
+
 /* Header stat badges */
 .header-stats {
     display: flex;
