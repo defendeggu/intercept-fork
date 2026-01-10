@@ -439,8 +439,14 @@ install_debian_packages() {
   $SUDO apt-get install -y python3-skyfield >/dev/null 2>&1 || true
 
   progress "Installing dump1090"
-  if ! cmd_exists dump1090; then
+  if ! cmd_exists dump1090 && ! cmd_exists dump1090-mutability; then
+    #export DEBIAN_FRONTEND=noninteractive
     apt_try_install_any dump1090-fa dump1090-mutability dump1090 || true
+  fi
+  if ! cmd_exists dump1090; then
+	  if cmd_exists dump1090-mutability; then
+		  $SUDO ln -s $(which dump1090-mutability) /usr/local/sbin/dump1090
+	  fi
   fi
   cmd_exists dump1090 || install_dump1090_from_source_debian
 
