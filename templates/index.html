@@ -3651,7 +3651,7 @@
             document.getElementById('pagerWaterfallPanel').style.display = (mode === 'pager') ? 'block' : 'none';
             // Sensor waterfall: show only for sensor (433MHz) mode
             document.getElementById('sensorWaterfallPanel').style.display = (mode === 'sensor') ? 'block' : 'none';
-            document.getElementById('output').style.display = (mode === 'satellite' || mode === 'aircraft' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening') ? 'none' : 'block';
+            document.getElementById('output').style.display = (mode === 'satellite' || mode === 'aircraft' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm') ? 'none' : 'block';
             document.querySelector('.status-bar').style.display = (mode === 'satellite') ? 'none' : 'flex';
 
             // Load interfaces and initialize visualizations when switching modes
