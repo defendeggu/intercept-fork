@@ -1058,28 +1058,38 @@ body {
     50% { opacity: 0.5; transform: scale(0.8); }
 }
 
-/* ============== MOBILE FIXES ============== */
-@media (max-width: 767px) {
+/* ============== MOBILE/TABLET FIXES ============== */
+@media (max-width: 1023px) {
     /* Dashboard - allow scrolling */
     .dashboard {
-        height: auto;
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
         min-height: calc(100dvh - 60px);
-        overflow-y: auto;
+        overflow-y: auto !important;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
     }
 
     /* Main display - explicit height for map */
     .main-display {
-        flex: none;
+        flex: none !important;
         height: 50vh;
         min-height: 300px;
+        width: 100%;
     }
 
-    /* Sidebar - stack below map */
+    /* Sidebar - stack below map, allow content to show */
     .sidebar {
-        max-height: none;
+        max-height: none !important;
+        overflow: visible !important;
         flex-shrink: 0;
+        width: 100%;
+    }
+
+    /* Panels need to show content */
+    .panel {
+        overflow: visible !important;
     }
 
     /* Hide ACARS sidebar on mobile */
@@ -1089,18 +1099,23 @@ body {
 
     /* Selected aircraft panel - allow full content */
     .selected-aircraft {
-        max-height: none;
-        overflow-y: visible;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .selected-info {
+        overflow: visible !important;
     }
 
     /* Aircraft list - scrollable with reasonable height */
     .aircraft-list {
-        max-height: 250px;
+        max-height: 300px;
+        overflow: hidden !important;
     }
 
     .aircraft-list-content {
-        max-height: 200px;
-        overflow-y: auto;
+        max-height: 250px;
+        overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
     }
 
@@ -1109,6 +1124,7 @@ body {
         flex-wrap: wrap;
         gap: 8px;
         padding: 10px;
+        width: 100%;
     }
 
     /* Back link - prevent text wrapping */
@@ -1124,7 +1140,7 @@ body {
         gap: 6px;
     }
 
-    /* Hide some status items on very small screens */
+    /* DateTime smaller */
     .datetime {
         font-size: 10px;
     }
@@ -1201,9 +1217,4 @@ body {
     min-height: 44px !important;
     line-height: 44px !important;
     font-size: 18px !important;
-}
-
-/* Ensure panels don't overflow */
-.panel {
-    overflow: hidden;
 }
