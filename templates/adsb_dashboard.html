@@ -540,7 +540,7 @@
             const squawkInfo = checkSquawkCode(ac);
             const onWatchlist = isOnWatchlist(ac);
 
-            if (squawkInfo) {
+            if (squawkInfo && squawkInfo.type === 'emergency') {
                 alertedAircraft[icao] = 'emergency';
                 playAlertSound('emergency');
                 showAlertBanner(`EMERGENCY: ${squawkInfo.name} - ${ac.callsign || icao}`, '#ff0000');
@@ -1905,7 +1905,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             const squawkInfo = checkSquawkCode(ac);
             if (currentFilter === 'military') return militaryInfo.military;
             if (currentFilter === 'civil') return !militaryInfo.military;
-            if (currentFilter === 'emergency') return !!squawkInfo;
+            if (currentFilter === 'emergency') return squawkInfo && squawkInfo.type === 'emergency';
             if (currentFilter === 'watchlist') return isOnWatchlist(ac);
             return true;
         }

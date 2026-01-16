@@ -49,6 +49,28 @@ def find_acarsdec():
     return shutil.which('acarsdec')
 
 
+def get_acarsdec_json_flag(acarsdec_path: str) -> str:
+    """Detect which JSON output flag acarsdec supports.
+
+    Newer forks (TLeconte) use -j, older versions use -o 4.
+    """
+    try:
+        result = subprocess.run(
+            [acarsdec_path, '-h'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        help_text = result.stdout + result.stderr
+        # Check if -j flag is documented in help
+        if ' -j' in help_text or '\n-j' in help_text:
+            return '-j'
+    except Exception:
+        pass
+    # Default to older -o 4 syntax
+    return '-o'
+
+
 def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -> None:
     """Stream acarsdec JSON output to queue."""
     global acars_message_count, acars_last_message_time
@@ -179,10 +201,12 @@ def start_acars() -> Response:
     # acarsdec -j -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
     # Note: -j is JSON stdout (newer forks), -o 4 was the old syntax
     # gain/ppm must come BEFORE -r
-    cmd = [
-        acarsdec_path,
-        '-j',                    # JSON output to stdout
-    ]
+    json_flag = get_acarsdec_json_flag(acarsdec_path)
+    cmd = [acarsdec_path]
+    if json_flag == '-j':
+        cmd.append('-j')         # JSON output (newer TLeconte fork)
+    else:
+        cmd.extend(['-o', '4'])  # JSON output (older versions)
 
     # Add gain if not auto (must be before -r)
     if gain and str(gain) != '0':
