@@ -862,11 +862,13 @@ def start_gsm_scan():
 
         # Check for grgsm_scanner
         if not get_grgsm_scanner_path():
+            gsm_running = False
             return jsonify({
                 'status': 'error',
                 'message': 'grgsm_scanner not found. Install gr-gsm package.',
-                'install_hint': 'See setup.sh or install gr-gsm from https://github.com/ptrkrysik/gr-gsm'
-            }), 500
+                'install_hint': 'See setup.sh or install gr-gsm from https://github.com/ptrkrysik/gr-gsm',
+                'grgsm_available': False
+            }), 503
 
         # Get configuration from request
         data = request.get_json() or {}

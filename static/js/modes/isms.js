@@ -798,7 +798,18 @@ async function ismsStartGsmScan() {
 
             ismsNotify('ISMS', `GSM scan started on ${band}`);
         } else {
-            ismsNotify('ISMS Error', data.message || 'Failed to start GSM scan');
+            // Update status display with error
+            const statusText = document.getElementById('ismsGsmStatusText');
+            if (statusText) {
+                statusText.textContent = 'Not Available';
+                statusText.style.color = 'var(--accent-red)';
+            }
+
+            if (data.grgsm_available === false) {
+                ismsNotify('ISMS', 'gr-gsm not installed. GSM scanning requires grgsm_scanner.');
+            } else {
+                ismsNotify('ISMS Error', data.message || 'Failed to start GSM scan');
+            }
         }
     } catch (e) {
         ismsNotify('ISMS Error', 'Failed to start GSM scan: ' + e.message);
