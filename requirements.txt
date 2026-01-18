@@ -2,6 +2,9 @@
 flask>=2.0.0
 requests>=2.28.0
 
+# BLE scanning with manufacturer data detection (optional - for TSCM)
+bleak>=0.21.0
+
 # Satellite tracking (optional - only needed for satellite features)
 skyfield>=1.45
 

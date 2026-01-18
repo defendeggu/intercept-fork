@@ -139,6 +139,7 @@ check_tools() {
   check_required "multimon-ng" "Pager decoder" multimon-ng
   check_required "rtl_433"     "433MHz sensor decoder" rtl_433 rtl433
   check_required "dump1090"    "ADS-B decoder" dump1090
+  check_required "acarsdec"    "ACARS decoder" acarsdec
 
   echo
   info "GPS:"
@@ -265,12 +266,47 @@ brew_install() {
     return 0
   fi
   info "brew: installing ${pkg}..."
-  brew install "$pkg"
-  ok "brew: installed ${pkg}"
+  if brew install "$pkg" 2>&1; then
+    ok "brew: installed ${pkg}"
+    return 0
+  else
+    return 1
+  fi
+}
+
+install_multimon_ng_from_source_macos() {
+  info "multimon-ng not available via Homebrew. Building from source..."
+
+  # Ensure build dependencies are installed
+  brew_install cmake
+  brew_install libsndfile
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning multimon-ng..."
+    git clone --depth 1 https://github.com/EliasOenal/multimon-ng.git "$tmp_dir/multimon-ng" >/dev/null 2>&1 \
+      || { fail "Failed to clone multimon-ng"; exit 1; }
+
+    cd "$tmp_dir/multimon-ng"
+    info "Compiling multimon-ng..."
+    mkdir -p build && cd build
+    cmake .. >/dev/null 2>&1 || { fail "cmake failed for multimon-ng"; exit 1; }
+    make >/dev/null 2>&1 || { fail "make failed for multimon-ng"; exit 1; }
+
+    # Install to /usr/local/bin (no sudo needed on Homebrew systems typically)
+    if [[ -w /usr/local/bin ]]; then
+      install -m 0755 multimon-ng /usr/local/bin/multimon-ng
+    else
+      sudo install -m 0755 multimon-ng /usr/local/bin/multimon-ng
+    fi
+    ok "multimon-ng installed successfully from source"
+  )
 }
 
 install_macos_packages() {
-  TOTAL_STEPS=12
+  TOTAL_STEPS=13
   CURRENT_STEP=0
 
   progress "Checking Homebrew"
@@ -280,7 +316,15 @@ install_macos_packages() {
   brew_install librtlsdr
 
   progress "Installing multimon-ng"
-  brew_install multimon-ng
+  # multimon-ng is not in Homebrew core, so build from source
+  if ! cmd_exists multimon-ng; then
+    install_multimon_ng_from_source_macos
+  else
+    ok "multimon-ng already installed"
+  fi
+
+  progress "Installing direwolf (APRS decoder)"
+  (brew_install direwolf) || warn "direwolf not available via Homebrew"
 
   progress "Installing ffmpeg"
   brew_install ffmpeg
@@ -290,6 +334,9 @@ install_macos_packages() {
 
   progress "Installing dump1090"
   (brew_install dump1090-mutability) || warn "dump1090 not available via Homebrew"
+
+  progress "Installing acarsdec"
+  (brew_install acarsdec) || warn "acarsdec not available via Homebrew"
 
   progress "Installing aircrack-ng"
   brew_install aircrack-ng
@@ -304,6 +351,7 @@ install_macos_packages() {
   brew_install gpsd
 
   warn "macOS note: hcitool/hciconfig are Linux (BlueZ) utilities and often unavailable on macOS."
+  info "TSCM BLE scanning uses bleak library (installed via pip) for manufacturer data detection."
   echo
 }
 
@@ -372,6 +420,81 @@ install_dump1090_from_source_debian() {
   )
 }
 
+install_acarsdec_from_source_debian() {
+  info "acarsdec not available via APT. Building from source..."
+
+  apt_install build-essential git cmake \
+    librtlsdr-dev libusb-1.0-0-dev libsndfile1-dev
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning acarsdec..."
+    git clone --depth 1 https://github.com/TLeconte/acarsdec.git "$tmp_dir/acarsdec" >/dev/null 2>&1 \
+      || { warn "Failed to clone acarsdec"; exit 1; }
+
+    cd "$tmp_dir/acarsdec"
+    mkdir -p build && cd build
+
+    info "Compiling acarsdec..."
+    if cmake .. -Drtl=ON >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO install -m 0755 acarsdec /usr/local/bin/acarsdec
+      ok "acarsdec installed successfully."
+    else
+      warn "Failed to build acarsdec from source. ACARS decoding will not be available."
+    fi
+  )
+}
+
+install_rtlsdr_blog_drivers_debian() {
+  # The RTL-SDR Blog drivers provide better support for:
+  # - RTL-SDR Blog V4 (R828D tuner)
+  # - RTL-SDR Blog V3 with bias-t improvements
+  # - Better overall compatibility with all RTL-SDR devices
+  # These drivers are backward compatible with standard RTL-SDR devices.
+
+  info "Installing RTL-SDR Blog drivers (improved V4 support)..."
+
+  # Install build dependencies
+  apt_install build-essential git cmake libusb-1.0-0-dev pkg-config
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning RTL-SDR Blog driver fork..."
+    git clone https://github.com/rtlsdrblog/rtl-sdr-blog.git "$tmp_dir/rtl-sdr-blog" >/dev/null 2>&1 \
+      || { warn "Failed to clone RTL-SDR Blog drivers"; exit 1; }
+
+    cd "$tmp_dir/rtl-sdr-blog"
+    mkdir -p build && cd build
+
+    info "Compiling RTL-SDR Blog drivers..."
+    if cmake .. -DINSTALL_UDEV_RULES=ON -DDETACH_KERNEL_DRIVER=ON >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO make install >/dev/null 2>&1
+      $SUDO ldconfig
+
+      # Copy udev rules if they exist
+      if [[ -f ../rtl-sdr.rules ]]; then
+        $SUDO cp ../rtl-sdr.rules /etc/udev/rules.d/20-rtlsdr-blog.rules
+        $SUDO udevadm control --reload-rules || true
+        $SUDO udevadm trigger || true
+      fi
+
+      ok "RTL-SDR Blog drivers installed successfully."
+      info "These drivers provide improved support for RTL-SDR Blog V4 and other devices."
+      warn "Unplug and replug your RTL-SDR devices for the new drivers to take effect."
+    else
+      warn "Failed to build RTL-SDR Blog drivers. Using stock drivers."
+      warn "If you have an RTL-SDR Blog V4, you may need to install drivers manually."
+      warn "See: https://github.com/rtlsdrblog/rtl-sdr-blog"
+    fi
+  )
+}
+
 setup_udev_rules_debian() {
   [[ -d /etc/udev/rules.d ]] || { warn "udev not found; skipping RTL-SDR udev rules."; return 0; }
 
@@ -389,6 +512,34 @@ EOF
   echo
 }
 
+blacklist_kernel_drivers_debian() {
+  local blacklist_file="/etc/modprobe.d/blacklist-rtlsdr.conf"
+
+  if [[ -f "$blacklist_file" ]]; then
+    ok "RTL-SDR kernel driver blacklist already present"
+    return 0
+  fi
+
+  info "Blacklisting conflicting DVB kernel drivers..."
+  $SUDO tee "$blacklist_file" >/dev/null <<'EOF'
+# Blacklist DVB-T drivers to allow rtl-sdr to access RTL2832U devices
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+blacklist r820t
+EOF
+
+  # Unload modules if currently loaded
+  for mod in dvb_usb_rtl28xxu rtl2832 rtl2830 r820t; do
+    if lsmod | grep -q "^$mod"; then
+      $SUDO modprobe -r "$mod" 2>/dev/null || true
+    fi
+  done
+
+  ok "Kernel drivers blacklisted. Unplug/replug your RTL-SDR if connected."
+  echo
+}
+
 install_debian_packages() {
   need_sudo
 
@@ -396,17 +547,54 @@ install_debian_packages() {
   export DEBIAN_FRONTEND=noninteractive
   export NEEDRESTART_MODE=a
 
-  TOTAL_STEPS=15
+  TOTAL_STEPS=18
   CURRENT_STEP=0
 
   progress "Updating APT package lists"
   $SUDO apt-get update -y >/dev/null
 
   progress "Installing RTL-SDR"
+  # Handle package conflict between librtlsdr0 and librtlsdr2
+  # The newer librtlsdr0 (2.0.2) conflicts with older librtlsdr2 (2.0.1)
+  if dpkg -l | grep -q "librtlsdr2"; then
+    info "Detected librtlsdr2 conflict - upgrading to librtlsdr0..."
+
+    # Remove packages that depend on librtlsdr2, then remove librtlsdr2
+    # These will be reinstalled with librtlsdr0 support
+    $SUDO apt-get remove -y dump1090-mutability libgnuradio-osmosdr0.2.0t64 rtl-433 librtlsdr2 rtl-sdr 2>/dev/null || true
+    $SUDO apt-get autoremove -y 2>/dev/null || true
+
+    ok "Removed conflicting librtlsdr2 packages"
+  fi
+
+  # If rtl-sdr is in broken state, remove it completely first
+  if dpkg -l | grep -q "^.[^i].*rtl-sdr" || ! dpkg -l rtl-sdr 2>/dev/null | grep -q "^ii"; then
+    info "Removing broken rtl-sdr package..."
+    $SUDO dpkg --remove --force-remove-reinstreq rtl-sdr 2>/dev/null || true
+    $SUDO dpkg --purge --force-remove-reinstreq rtl-sdr 2>/dev/null || true
+  fi
+
+  # Force remove librtlsdr2 if it still exists
+  if dpkg -l | grep -q "librtlsdr2"; then
+    info "Force removing librtlsdr2..."
+    $SUDO dpkg --remove --force-all librtlsdr2 2>/dev/null || true
+    $SUDO dpkg --purge --force-all librtlsdr2 2>/dev/null || true
+  fi
+
+  # Clean up any partial installations
+  $SUDO dpkg --configure -a 2>/dev/null || true
+  $SUDO apt-get --fix-broken install -y 2>/dev/null || true
+
   apt_install rtl-sdr
+
+  progress "Installing RTL-SDR Blog drivers (V4 support)"
+  install_rtlsdr_blog_drivers_debian
 
   progress "Installing multimon-ng"
   apt_install multimon-ng
+
+  progress "Installing direwolf (APRS decoder)"
+  apt_install direwolf || true
 
   progress "Installing ffmpeg"
   apt_install ffmpeg
@@ -427,7 +615,9 @@ install_debian_packages() {
   apt_install bluez bluetooth || true
 
   progress "Installing SoapySDR"
-  apt_install soapysdr-tools || true
+  # Exclude xtrx-dkms - its kernel module fails to build on newer kernels (6.14+)
+  # and causes apt to hang. Most users don't have XTRX hardware anyway.
+  apt_install soapysdr-tools xtrx-dkms- || true
 
   progress "Installing gpsd"
   apt_install gpsd gpsd-clients || true
@@ -437,6 +627,8 @@ install_debian_packages() {
   # Install Python packages via apt (more reliable than pip on modern Debian/Ubuntu)
   $SUDO apt-get install -y python3-flask python3-requests python3-serial >/dev/null 2>&1 || true
   $SUDO apt-get install -y python3-skyfield >/dev/null 2>&1 || true
+  # bleak for BLE scanning with manufacturer data (TSCM mode)
+  $SUDO apt-get install -y python3-bleak >/dev/null 2>&1 || true
 
   progress "Installing dump1090"
   if ! cmd_exists dump1090 && ! cmd_exists dump1090-mutability; then
@@ -450,8 +642,17 @@ install_debian_packages() {
   fi
   cmd_exists dump1090 || install_dump1090_from_source_debian
 
+  progress "Installing acarsdec"
+  if ! cmd_exists acarsdec; then
+    apt_install acarsdec || true
+  fi
+  cmd_exists acarsdec || install_acarsdec_from_source_debian
+
   progress "Configuring udev rules"
   setup_udev_rules_debian
+
+  progress "Blacklisting conflicting kernel drivers"
+  blacklist_kernel_drivers_debian
 }
 
 # ----------------------------
@@ -461,26 +662,28 @@ final_summary_and_hard_fail() {
   check_tools
 
   echo "============================================"
+  echo
+  echo "To start INTERCEPT:"
+  echo "  sudo -E venv/bin/python intercept.py"
+  echo
+  echo "Then open http://localhost:5050 in your browser"
+  echo
+  echo "============================================"
+
   if [[ "${#missing_required[@]}" -eq 0 ]]; then
     ok "All REQUIRED tools are installed."
   else
     fail "Missing REQUIRED tools:"
     for t in "${missing_required[@]}"; do echo "  - $t"; done
     echo
-    fail "Exiting because required tools are missing."
-    echo
-    warn "If you are on macOS: hcitool/hciconfig are Linux (BlueZ) tools and may not be installable."
-    warn "If you truly require them everywhere, you must restrict supported platforms or provide alternatives."
-    exit 1
+    if [[ "$OS" == "macos" ]]; then
+      warn "macOS note: bluetoothctl/hcitool/hciconfig are Linux (BlueZ) tools and unavailable on macOS."
+      warn "Bluetooth functionality will be limited. Other features should work."
+    else
+      fail "Exiting because required tools are missing."
+      exit 1
+    fi
   fi
-
-  echo
-  echo "To start INTERCEPT:"
-  echo "  source venv/bin/activate"
-  echo "  sudo python intercept.py"
-  echo
-  echo "Then open http://localhost:5050 in your browser"
-  echo
 }
 
 # ----------------------------

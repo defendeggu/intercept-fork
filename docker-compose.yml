@@ -13,9 +13,9 @@ services:
     # USB device mapping (alternative to privileged mode)
     # devices:
     #   - /dev/bus/usb:/dev/bus/usb
-    volumes:
+    # volumes:
       # Persist data directory
-      - ./data:/app/data
+      # - ./data:/app/data
       # Optional: mount logs directory
       # - ./logs:/app/logs
     environment:

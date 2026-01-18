@@ -1,0 +1,48 @@
+<!-- 433MHz SENSOR MODE -->
+<div id="sensorMode" class="mode-content">
+    <div class="section">
+        <h3>Frequency</h3>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="text" id="sensorFrequency" value="433.92" placeholder="e.g., 433.92">
+        </div>
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="setSensorFreq('433.92')">433.92</button>
+            <button class="preset-btn" onclick="setSensorFreq('315.00')">315.00</button>
+            <button class="preset-btn" onclick="setSensorFreq('868.00')">868.00</button>
+            <button class="preset-btn" onclick="setSensorFreq('915.00')">915.00</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Settings</h3>
+        <div class="form-group">
+            <label>Gain (dB, 0 = auto)</label>
+            <input type="text" id="sensorGain" value="0" placeholder="0-49 or 0 for auto">
+        </div>
+        <div class="form-group">
+            <label>PPM Correction</label>
+            <input type="text" id="sensorPpm" value="0" placeholder="Frequency correction">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Protocols</h3>
+        <div class="info-text" style="margin-bottom: 10px;">
+            rtl_433 auto-detects 200+ device protocols including weather stations, TPMS, doorbells, and more.
+        </div>
+        <div class="checkbox-group">
+            <label>
+                <input type="checkbox" id="sensorLogging" onchange="toggleSensorLogging()">
+                Enable Logging
+            </label>
+        </div>
+    </div>
+
+    <button class="run-btn" id="startSensorBtn" onclick="startSensorDecoding()">
+        Start Listening
+    </button>
+    <button class="stop-btn" id="stopSensorBtn" onclick="stopSensorDecoding()" style="display: none;">
+        Stop Listening
+    </button>
+</div>

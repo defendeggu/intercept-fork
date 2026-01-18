@@ -134,8 +134,14 @@ class HackRFCommandBuilder(CommandBuilder):
         Build rtl_433 command with SoapySDR support for ISM band decoding.
 
         rtl_433 has native SoapySDR support via -d flag.
+
+        Note: rtl_433's -T flag is for timeout, NOT bias-t.
+        For SoapySDR devices, bias-t is passed as a device setting.
         """
+        # Build device string with optional bias-t setting
         device_str = self._build_device_string(device)
+        if bias_t:
+            device_str = f'{device_str},bias_t=1'
 
         cmd = [
             'rtl_433',
@@ -146,9 +152,6 @@ class HackRFCommandBuilder(CommandBuilder):
 
         if gain is not None and gain > 0:
             cmd.extend(['-g', str(int(gain))])
-
-        if bias_t:
-            cmd.extend(['-T'])
 
         return cmd
 

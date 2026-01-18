@@ -175,9 +175,19 @@ function switchMode(mode) {
         'satellite': 'SATELLITE',
         'wifi': 'WIFI',
         'bluetooth': 'BLUETOOTH',
-        'listening': 'LISTENING POST'
+        'listening': 'LISTENING POST',
+        'tscm': 'TSCM',
+        'aprs': 'APRS'
     };
     document.getElementById('activeModeIndicator').innerHTML = '<span class="pulse-dot"></span>' + modeNames[mode];
+
+    // Update mobile nav buttons
+    updateMobileNavButtons(mode);
+
+    // Close mobile drawer when mode is switched (on mobile)
+    if (window.innerWidth < 1024 && typeof window.closeMobileDrawer === 'function') {
+        window.closeMobileDrawer();
+    }
 
     // Toggle layout containers
     document.getElementById('wifiLayoutContainer').style.display = mode === 'wifi' ? 'flex' : 'none';
@@ -498,6 +508,66 @@ function exportJSON() {
 
 // ============== INITIALIZATION ==============
 
+// ============== MOBILE NAVIGATION ==============
+
+function initMobileNav() {
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('drawerOverlay');
+
+    if (!hamburgerBtn || !sidebar || !overlay) return;
+
+    function openDrawer() {
+        sidebar.classList.add('open');
+        overlay.classList.add('visible');
+        hamburgerBtn.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDrawer() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('visible');
+        hamburgerBtn.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function toggleDrawer() {
+        if (sidebar.classList.contains('open')) {
+            closeDrawer();
+        } else {
+            openDrawer();
+        }
+    }
+
+    hamburgerBtn.addEventListener('click', toggleDrawer);
+    overlay.addEventListener('click', closeDrawer);
+
+    // Close drawer when resizing to desktop
+    window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+            closeDrawer();
+        }
+    });
+
+    // Expose for external use
+    window.toggleMobileDrawer = toggleDrawer;
+    window.closeMobileDrawer = closeDrawer;
+}
+
+function setViewportHeight() {
+    // Fix for iOS Safari address bar height
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+function updateMobileNavButtons(mode) {
+    // Update mobile nav bar buttons
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        const btnMode = btn.getAttribute('data-mode');
+        btn.classList.toggle('active', btnMode === mode);
+    });
+}
+
 function initApp() {
     // Check disclaimer
     checkDisclaimer();
@@ -541,6 +611,13 @@ function initApp() {
             section.classList.add('collapsed');
         }
     });
+
+    // Initialize mobile navigation
+    initMobileNav();
+
+    // Set viewport height for mobile browsers
+    setViewportHeight();
+    window.addEventListener('resize', setViewportHeight);
 }
 
 // Run initialization when DOM is ready

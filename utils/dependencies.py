@@ -52,7 +52,7 @@ TOOL_DEPENDENCIES = {
                 'install': {
                     'apt': 'sudo apt install multimon-ng',
                     'brew': 'brew install multimon-ng',
-                    'manual': 'https://github.com/EliasOewornal/multimon-ng'
+                    'manual': 'https://github.com/EliasOenal/multimon-ng'
                 }
             },
             'rtl_test': {
@@ -195,6 +195,43 @@ TOOL_DEPENDENCIES = {
             }
         }
     },
+    'acars': {
+        'name': 'Aircraft Messaging (ACARS)',
+        'tools': {
+            'acarsdec': {
+                'required': True,
+                'description': 'ACARS VHF decoder',
+                'install': {
+                    'apt': 'Run ./setup.sh (builds from source)',
+                    'brew': 'Run ./setup.sh (builds from source)',
+                    'manual': 'https://github.com/TLeconte/acarsdec'
+                }
+            }
+        }
+    },
+    'aprs': {
+        'name': 'APRS Tracking',
+        'tools': {
+            'direwolf': {
+                'required': False,
+                'description': 'APRS/packet radio decoder (preferred)',
+                'install': {
+                    'apt': 'sudo apt install direwolf',
+                    'brew': 'brew install direwolf',
+                    'manual': 'https://github.com/wb2osz/direwolf'
+                }
+            },
+            'multimon-ng': {
+                'required': False,
+                'description': 'Alternative AFSK1200 decoder',
+                'install': {
+                    'apt': 'sudo apt install multimon-ng',
+                    'brew': 'brew install multimon-ng',
+                    'manual': 'https://github.com/EliasOenal/multimon-ng'
+                }
+            }
+        }
+    },
     'satellite': {
         'name': 'Satellite Tracking',
         'tools': {
@@ -271,6 +308,56 @@ TOOL_DEPENDENCIES = {
                     'apt': 'Build from source with SoapySDR support',
                     'brew': 'Build from source with SoapySDR support',
                     'manual': 'https://github.com/wiedehopf/readsb'
+                }
+            }
+        }
+    },
+    'tscm': {
+        'name': 'TSCM Counter-Surveillance',
+        'tools': {
+            'rtl_power': {
+                'required': False,
+                'description': 'Wideband spectrum sweep for RF analysis',
+                'install': {
+                    'apt': 'sudo apt install rtl-sdr',
+                    'brew': 'brew install librtlsdr',
+                    'manual': 'https://osmocom.org/projects/rtl-sdr/wiki'
+                }
+            },
+            'rtl_fm': {
+                'required': True,
+                'description': 'RF signal demodulation',
+                'install': {
+                    'apt': 'sudo apt install rtl-sdr',
+                    'brew': 'brew install librtlsdr',
+                    'manual': 'https://osmocom.org/projects/rtl-sdr/wiki'
+                }
+            },
+            'rtl_433': {
+                'required': False,
+                'description': 'ISM band device decoding',
+                'install': {
+                    'apt': 'sudo apt install rtl-433',
+                    'brew': 'brew install rtl_433',
+                    'manual': 'https://github.com/merbanan/rtl_433'
+                }
+            },
+            'airmon-ng': {
+                'required': False,
+                'description': 'WiFi monitor mode for network scanning',
+                'install': {
+                    'apt': 'sudo apt install aircrack-ng',
+                    'brew': 'Not available on macOS',
+                    'manual': 'https://aircrack-ng.org'
+                }
+            },
+            'bluetoothctl': {
+                'required': False,
+                'description': 'Bluetooth device scanning',
+                'install': {
+                    'apt': 'sudo apt install bluez',
+                    'brew': 'Not available on macOS (use native)',
+                    'manual': 'http://www.bluez.org'
                 }
             }
         }

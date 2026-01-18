@@ -110,7 +110,7 @@ INTERCEPT can be configured via environment variables:
 | `INTERCEPT_LOG_LEVEL` | `WARNING` | Log level (DEBUG, INFO, WARNING, ERROR) |
 | `INTERCEPT_DEFAULT_GAIN` | `40` | Default RTL-SDR gain |
 
-Example: `INTERCEPT_PORT=8080 sudo python3 intercept.py`
+Example: `INTERCEPT_PORT=8080 sudo -E venv/bin/python intercept.py`
 
 ## Command-line Options
 

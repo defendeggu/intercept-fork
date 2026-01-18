@@ -16,6 +16,7 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(logging.Formatter(LOG_FORMAT))
         logger.addHandler(handler)
         logger.setLevel(LOG_LEVEL)
+        logger.propagate = False  # Prevent duplicate logs from parent handlers
     return logger
 
 

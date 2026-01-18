@@ -27,7 +27,7 @@ from typing import Any
 
 from flask import Flask, render_template, jsonify, send_file, Response, request,redirect, url_for, flash, session
 from werkzeug.security import check_password_hash
-from config import VERSION
+from config import VERSION, CHANGELOG
 from utils.dependencies import check_tool, check_all_dependencies, TOOL_DEPENDENCIES
 from utils.process import cleanup_stale_processes
 from utils.sdr import SDRFactory
@@ -105,6 +105,21 @@ adsb_lock = threading.Lock()
 satellite_process = None
 satellite_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 satellite_lock = threading.Lock()
+
+# ACARS aircraft messaging
+acars_process = None
+acars_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+acars_lock = threading.Lock()
+
+# APRS amateur radio tracking
+aprs_process = None
+aprs_rtl_process = None
+aprs_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+aprs_lock = threading.Lock()
+
+# TSCM (Technical Surveillance Countermeasures)
+tscm_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+tscm_lock = threading.Lock()
 
 # ============================================
 # GLOBAL STATE DICTIONARIES
@@ -195,7 +210,7 @@ def index() -> str:
         'rtl_433': check_tool('rtl_433')
     }
     devices = [d.to_dict() for d in SDRFactory.detect_devices()]
-    return render_template('index.html', tools=tools, devices=devices, version=VERSION)
+    return render_template('index.html', tools=tools, devices=devices, version=VERSION, changelog=CHANGELOG)
 
 
 @app.route('/favicon.svg')
@@ -208,6 +223,120 @@ def get_devices() -> Response:
     """Get all detected SDR devices with hardware type info."""
     devices = SDRFactory.detect_devices()
     return jsonify([d.to_dict() for d in devices])
+
+
+@app.route('/devices/debug')
+def get_devices_debug() -> Response:
+    """Get detailed SDR device detection diagnostics."""
+    import shutil
+
+    diagnostics = {
+        'tools': {},
+        'rtl_test': {},
+        'soapy': {},
+        'usb': {},
+        'kernel_modules': {},
+        'detected_devices': [],
+        'suggestions': []
+    }
+
+    # Check for required tools
+    diagnostics['tools']['rtl_test'] = shutil.which('rtl_test') is not None
+    diagnostics['tools']['SoapySDRUtil'] = shutil.which('SoapySDRUtil') is not None
+    diagnostics['tools']['lsusb'] = shutil.which('lsusb') is not None
+
+    # Run rtl_test and capture full output
+    if diagnostics['tools']['rtl_test']:
+        try:
+            result = subprocess.run(
+                ['rtl_test', '-t'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            diagnostics['rtl_test'] = {
+                'returncode': result.returncode,
+                'stdout': result.stdout[:2000] if result.stdout else '',
+                'stderr': result.stderr[:2000] if result.stderr else ''
+            }
+
+            # Check for common errors
+            combined = (result.stdout or '') + (result.stderr or '')
+            if 'No supported devices found' in combined:
+                diagnostics['suggestions'].append('No RTL-SDR device detected. Check USB connection.')
+            if 'usb_claim_interface error' in combined:
+                diagnostics['suggestions'].append('Device busy - kernel DVB driver may have claimed it. Run: sudo modprobe -r dvb_usb_rtl28xxu')
+            if 'Permission denied' in combined.lower():
+                diagnostics['suggestions'].append('USB permission denied. Add udev rules or run as root.')
+
+        except subprocess.TimeoutExpired:
+            diagnostics['rtl_test'] = {'error': 'Timeout after 5 seconds'}
+        except Exception as e:
+            diagnostics['rtl_test'] = {'error': str(e)}
+    else:
+        diagnostics['suggestions'].append('rtl_test not found. Install rtl-sdr package.')
+
+    # Run SoapySDRUtil
+    if diagnostics['tools']['SoapySDRUtil']:
+        try:
+            result = subprocess.run(
+                ['SoapySDRUtil', '--find'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            diagnostics['soapy'] = {
+                'returncode': result.returncode,
+                'stdout': result.stdout[:2000] if result.stdout else '',
+                'stderr': result.stderr[:2000] if result.stderr else ''
+            }
+        except subprocess.TimeoutExpired:
+            diagnostics['soapy'] = {'error': 'Timeout after 10 seconds'}
+        except Exception as e:
+            diagnostics['soapy'] = {'error': str(e)}
+
+    # Check USB devices (Linux)
+    if diagnostics['tools']['lsusb']:
+        try:
+            result = subprocess.run(
+                ['lsusb'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            # Filter for common SDR vendor IDs
+            sdr_vendors = ['0bda', '1d50', '1df7', '0403']  # Realtek, OpenMoko/HackRF, SDRplay, FTDI
+            usb_lines = [l for l in result.stdout.split('\n')
+                        if any(v in l.lower() for v in sdr_vendors) or 'rtl' in l.lower() or 'sdr' in l.lower()]
+            diagnostics['usb']['devices'] = usb_lines if usb_lines else ['No SDR-related USB devices found']
+        except Exception as e:
+            diagnostics['usb'] = {'error': str(e)}
+
+    # Check for loaded kernel modules that conflict (Linux)
+    if platform.system() == 'Linux':
+        try:
+            result = subprocess.run(
+                ['lsmod'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            conflicting = ['dvb_usb_rtl28xxu', 'rtl2832', 'rtl2830']
+            loaded = [m for m in conflicting if m in result.stdout]
+            diagnostics['kernel_modules']['conflicting_loaded'] = loaded
+            if loaded:
+                diagnostics['suggestions'].append(f"Conflicting kernel modules loaded: {', '.join(loaded)}. Run: sudo modprobe -r {' '.join(loaded)}")
+        except Exception as e:
+            diagnostics['kernel_modules'] = {'error': str(e)}
+
+    # Get detected devices
+    devices = SDRFactory.detect_devices()
+    diagnostics['detected_devices'] = [d.to_dict() for d in devices]
+
+    if not devices and not diagnostics['suggestions']:
+        diagnostics['suggestions'].append('No devices detected. Check USB connection and driver installation.')
+
+    return jsonify(diagnostics)
 
 
 @app.route('/dependencies')
@@ -348,6 +477,8 @@ def health_check() -> Response:
             'pager': current_process is not None and (current_process.poll() is None if current_process else False),
             'sensor': sensor_process is not None and (sensor_process.poll() is None if sensor_process else False),
             'adsb': adsb_process is not None and (adsb_process.poll() is None if adsb_process else False),
+            'acars': acars_process is not None and (acars_process.poll() is None if acars_process else False),
+            'aprs': aprs_process is not None and (aprs_process.poll() is None if aprs_process else False),
             'wifi': wifi_process is not None and (wifi_process.poll() is None if wifi_process else False),
             'bluetooth': bt_process is not None and (bt_process.poll() is None if bt_process else False),
         },
@@ -363,7 +494,8 @@ def health_check() -> Response:
 @app.route('/killall', methods=['POST'])
 def kill_all() -> Response:
     """Kill all decoder and WiFi processes."""
-    global current_process, sensor_process, wifi_process, adsb_process
+    global current_process, sensor_process, wifi_process, adsb_process, acars_process
+    global aprs_process, aprs_rtl_process
 
     # Import adsb module to reset its state
     from routes import adsb as adsb_module
@@ -372,7 +504,7 @@ def kill_all() -> Response:
     processes_to_kill = [
         'rtl_fm', 'multimon-ng', 'rtl_433',
         'airodump-ng', 'aireplay-ng', 'airmon-ng',
-        'dump1090'
+        'dump1090', 'acarsdec', 'direwolf'
     ]
 
     for proc in processes_to_kill:
@@ -396,6 +528,15 @@ def kill_all() -> Response:
     with adsb_lock:
         adsb_process = None
         adsb_module.adsb_using_service = False
+
+    # Reset ACARS state
+    with acars_lock:
+        acars_process = None
+
+    # Reset APRS state
+    with aprs_lock:
+        aprs_process = None
+        aprs_rtl_process = None
 
     return jsonify({'status': 'killed', 'processes': killed})
 
@@ -449,9 +590,31 @@ def main() -> None:
 
     print("=" * 50)
     print("  INTERCEPT // Signal Intelligence")
-    print("  Pager / 433MHz / Aircraft / Satellite / WiFi / BT")
+    print("  Pager / 433MHz / Aircraft / ACARS / Satellite / WiFi / BT")
     print("=" * 50)
     print()
+
+    # Check if running as root (required for WiFi monitor mode, some BT operations)
+    import os
+    if os.geteuid() != 0:
+        print("\033[93m" + "=" * 50)
+        print("  ⚠️  WARNING: Not running as root/sudo")
+        print("=" * 50)
+        print("  Some features require root privileges:")
+        print("    - WiFi monitor mode and scanning")
+        print("    - Bluetooth low-level operations")
+        print("    - RTL-SDR access (on some systems)")
+        print()
+        print("  To run with full capabilities:")
+        print("    sudo -E venv/bin/python intercept.py")
+        print("=" * 50 + "\033[0m")
+        print()
+        # Store for API access
+        app.config['RUNNING_AS_ROOT'] = False
+    else:
+        app.config['RUNNING_AS_ROOT'] = True
+        print("Running as root - full capabilities enabled")
+        print()
 
     # Clean up any stale processes from previous runs
     cleanup_stale_processes()

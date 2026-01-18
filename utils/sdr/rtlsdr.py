@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .base import CommandBuilder, SDRCapabilities, SDRDevice, SDRType
+from utils.dependencies import get_tool_path
 
 
 class RTLSDRCommandBuilder(CommandBuilder):
@@ -53,8 +54,9 @@ class RTLSDRCommandBuilder(CommandBuilder):
 
         Used for pager decoding. Supports local devices and rtl_tcp connections.
         """
+        rtl_fm_path = get_tool_path('rtl_fm') or 'rtl_fm'
         cmd = [
-            'rtl_fm',
+            rtl_fm_path,
             '-d', self._get_device_arg(device),
             '-f', f'{frequency_mhz}M',
             '-M', modulation,
@@ -99,8 +101,9 @@ class RTLSDRCommandBuilder(CommandBuilder):
                 "connect to its SBS output (port 30003)."
             )
 
+        dump1090_path = get_tool_path('dump1090') or 'dump1090'
         cmd = [
-            'dump1090',
+            dump1090_path,
             '--net',
             '--device-index', str(device.index),
             '--quiet'
@@ -126,10 +129,22 @@ class RTLSDRCommandBuilder(CommandBuilder):
         Build rtl_433 command for ISM band sensor decoding.
 
         Outputs JSON for easy parsing. Supports local devices and rtl_tcp connections.
+
+        Note: rtl_433's -T flag is for timeout, NOT bias-t.
+        Bias-t is enabled via the device string suffix :biast=1
         """
+        rtl_433_path = get_tool_path('rtl_433') or 'rtl_433'
+
+        # Build device argument with optional bias-t suffix
+        # rtl_433 uses :biast=1 suffix on device string, not -T flag
+        # (-T is timeout in rtl_433)
+        device_arg = self._get_device_arg(device)
+        if bias_t:
+            device_arg = f'{device_arg}:biast=1'
+
         cmd = [
-            'rtl_433',
-            '-d', self._get_device_arg(device),
+            rtl_433_path,
+            '-d', device_arg,
             '-f', f'{frequency_mhz}M',
             '-F', 'json'
         ]
@@ -139,9 +154,6 @@ class RTLSDRCommandBuilder(CommandBuilder):
 
         if ppm is not None and ppm != 0:
             cmd.extend(['-p', str(ppm)])
-
-        if bias_t:
-            cmd.extend(['-T'])
 
         return cmd
 

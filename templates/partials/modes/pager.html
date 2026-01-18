@@ -1,0 +1,84 @@
+<!-- PAGER MODE -->
+<div id="pagerMode" class="mode-content active">
+    <div class="section">
+        <h3>Frequency</h3>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="text" id="frequency" value="153.350" placeholder="e.g., 153.350">
+        </div>
+        <div class="preset-buttons" id="presetButtons">
+            <!-- Populated by JavaScript -->
+        </div>
+        <div style="margin-top: 8px; display: flex; gap: 5px;">
+            <input type="text" id="newPresetFreq" placeholder="New freq (MHz)" style="flex: 1; padding: 6px; background: #0f3460; border: 1px solid #1a1a2e; color: #fff; border-radius: 4px; font-size: 12px;">
+            <button class="preset-btn" onclick="addPreset()" style="background: #2ecc71;">Add</button>
+        </div>
+        <div style="margin-top: 5px;">
+            <button class="preset-btn" onclick="resetPresets()" style="font-size: 11px;">Reset to Defaults</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Protocols</h3>
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="proto_pocsag512" checked> POCSAG-512</label>
+            <label><input type="checkbox" id="proto_pocsag1200" checked> POCSAG-1200</label>
+            <label><input type="checkbox" id="proto_pocsag2400" checked> POCSAG-2400</label>
+            <label><input type="checkbox" id="proto_flex" checked> FLEX</label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Settings</h3>
+        <div class="form-group">
+            <label>Gain (dB, 0 = auto)</label>
+            <input type="text" id="gain" value="0" placeholder="0-49 or 0 for auto">
+        </div>
+        <div class="form-group">
+            <label>Squelch Level</label>
+            <input type="text" id="squelch" value="0" placeholder="0 = off">
+        </div>
+        <div class="form-group">
+            <label>PPM Correction</label>
+            <input type="text" id="ppm" value="0" placeholder="Frequency correction">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Logging</h3>
+        <div class="checkbox-group" style="margin-bottom: 15px;">
+            <label>
+                <input type="checkbox" id="loggingEnabled" onchange="toggleLogging()">
+                Enable Logging
+            </label>
+        </div>
+        <div class="form-group">
+            <label>Log file path</label>
+            <input type="text" id="logFilePath" value="pager_messages.log" placeholder="pager_messages.log">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Message Filters</h3>
+        <div class="checkbox-group" style="margin-bottom: 10px;">
+            <label>
+                <input type="checkbox" id="filterToneOnly" checked onchange="savePagerFilters()">
+                Hide "Tone Only" messages
+            </label>
+        </div>
+        <div class="form-group">
+            <label>Hide messages containing (comma-separated)</label>
+            <input type="text" id="filterKeywords" placeholder="e.g. test, spam, alert" onchange="savePagerFilters()">
+        </div>
+        <div class="info-text" style="font-size: 10px; color: #666; margin-top: 5px;">
+            Messages matching these keywords will be hidden from display but still logged.
+        </div>
+    </div>
+
+    <button class="run-btn" id="startBtn" onclick="startDecoding()">
+        Start Decoding
+    </button>
+    <button class="stop-btn" id="stopBtn" onclick="stopDecoding()" style="display: none;">
+        Stop Decoding
+    </button>
+</div>

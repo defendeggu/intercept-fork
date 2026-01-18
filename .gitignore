@@ -34,3 +34,4 @@ build/
 uv.lock
 *.db
 *.sqlite3
+intercept.db

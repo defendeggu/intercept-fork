@@ -1,0 +1,49 @@
+<!-- LISTENING POST MODE -->
+                <div id="listeningPostMode" class="mode-content">
+                    <div class="section">
+                        <h3>Status</h3>
+
+                        <!-- Dependency Warning -->
+                        <div id="scannerToolsWarning" style="display: none; background: rgba(255, 100, 100, 0.1); border: 1px solid var(--accent-red); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                            <p style="color: var(--accent-red); margin: 0; font-size: 0.85em;">
+                                <strong>Missing:</strong><br>
+                                <span id="scannerToolsWarningText"></span>
+                            </p>
+                        </div>
+
+                        <!-- Quick Status -->
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Status</span>
+                                <span id="lpQuickStatus" style="font-size: 11px; color: var(--accent-cyan);">IDLE</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Frequency</span>
+                                <span id="lpQuickFreq" style="font-size: 14px; font-family: 'JetBrains Mono', monospace; color: var(--text-primary);">---.--- MHz</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Signals</span>
+                                <span id="lpQuickSignals" style="font-size: 14px; font-weight: bold; color: var(--accent-green);">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Bookmarks</h3>
+                        <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                            <input type="text" id="bookmarkFreqInput" placeholder="Freq (MHz)" style="flex: 1; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-size: 11px;">
+                            <button class="preset-btn" onclick="addFrequencyBookmark()" style="background: var(--accent-green); color: #000; padding: 6px 10px;">+</button>
+                        </div>
+                        <div id="bookmarksList" style="max-height: 150px; overflow-y: auto; font-size: 11px;">
+                            <div style="color: var(--text-muted); text-align: center; padding: 10px;">No bookmarks saved</div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Recent Signals</h3>
+                        <div id="sidebarRecentSignals" style="max-height: 150px; overflow-y: auto; font-size: 11px;">
+                            <div style="color: var(--text-muted); text-align: center; padding: 10px;">No signals yet</div>
+                        </div>
+                    </div>
+
+                </div>

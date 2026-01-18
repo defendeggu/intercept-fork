@@ -1,0 +1,142 @@
+<!-- WiFi MODE -->
+                <div id="wifiMode" class="mode-content">
+                    <div class="section">
+                        <h3>WiFi Adapter</h3>
+                        <div class="form-group">
+                            <label>Select Device</label>
+                            <select id="wifiInterfaceSelect" style="font-size: 12px;">
+                                <option value="">Detecting interfaces...</option>
+                            </select>
+                        </div>
+                        <button class="preset-btn" onclick="refreshWifiInterfaces()" style="width: 100%;">
+                            🔄 Refresh Devices
+                        </button>
+                        <div class="info-text" style="margin-top: 8px; display: grid; grid-template-columns: auto auto; gap: 4px 8px; align-items: center;" id="wifiToolStatus">
+                            <span>airmon-ng:</span><span class="tool-status missing">Checking...</span>
+                            <span>airodump-ng:</span><span class="tool-status missing">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Monitor Mode</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="preset-btn" id="monitorStartBtn" onclick="enableMonitorMode()" style="flex: 1; background: var(--accent-green); color: #000;">
+                                Enable Monitor
+                            </button>
+                            <button class="preset-btn" id="monitorStopBtn" onclick="disableMonitorMode()" style="flex: 1; display: none;">
+                                Disable Monitor
+                            </button>
+                        </div>
+                        <div class="checkbox-group" style="margin-top: 8px;">
+                            <label style="font-size: 10px;">
+                                <input type="checkbox" id="killProcesses">
+                                Kill interfering processes (may drop other connections)
+                            </label>
+                        </div>
+                        <div id="monitorStatus" class="info-text" style="margin-top: 8px;">
+                            Monitor mode: <span style="color: var(--accent-red);">Inactive</span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Scan Settings</h3>
+                        <div class="form-group">
+                            <label>Band</label>
+                            <select id="wifiBand">
+                                <option value="abg">All (2.4 + 5 GHz)</option>
+                                <option value="bg">2.4 GHz only</option>
+                                <option value="a">5 GHz only</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Channel (empty = hop)</label>
+                            <input type="text" id="wifiChannel" placeholder="e.g., 6 or 36">
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Proximity Alerts</h3>
+                        <div class="info-text" style="margin-bottom: 8px;">
+                            Alert when specific MAC addresses appear
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="watchMacInput" placeholder="AA:BB:CC:DD:EE:FF">
+                        </div>
+                        <button class="preset-btn" onclick="addWatchMac()" style="width: 100%; margin-bottom: 8px;">
+                            Add to Watch List
+                        </button>
+                        <div id="watchList" style="max-height: 80px; overflow-y: auto; font-size: 10px; color: var(--text-dim);"></div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Attack Options</h3>
+                        <div class="info-text" style="color: var(--accent-red); margin-bottom: 10px;">
+                            ⚠ Only use on authorized networks
+                        </div>
+                        <div class="form-group">
+                            <label>Target BSSID</label>
+                            <input type="text" id="targetBssid" placeholder="AA:BB:CC:DD:EE:FF">
+                        </div>
+                        <div class="form-group">
+                            <label>Target Client (optional)</label>
+                            <input type="text" id="targetClient" placeholder="FF:FF:FF:FF:FF:FF (broadcast)">
+                        </div>
+                        <div class="form-group">
+                            <label>Deauth Count</label>
+                            <input type="text" id="deauthCount" value="5" placeholder="5">
+                        </div>
+                        <button class="preset-btn" onclick="sendDeauth()" style="width: 100%; border-color: var(--accent-red); color: var(--accent-red);">
+                            Send Deauth
+                        </button>
+                    </div>
+
+                    <!-- Handshake Capture Status Panel -->
+                    <div class="section" id="captureStatusPanel" style="display: none; border: 1px solid var(--accent-orange); border-radius: 4px; padding: 10px; background: rgba(255, 165, 0, 0.1);">
+                        <h3 style="color: var(--accent-orange); margin: 0 0 8px 0;">🎯 Handshake Capture</h3>
+                        <div style="font-size: 11px;">
+                            <div style="margin-bottom: 4px;">
+                                <span style="color: var(--text-dim);">Target:</span>
+                                <span id="captureTargetBssid" style="font-family: monospace;">--</span>
+                            </div>
+                            <div style="margin-bottom: 4px;">
+                                <span style="color: var(--text-dim);">Channel:</span>
+                                <span id="captureTargetChannel">--</span>
+                            </div>
+                            <div style="margin-bottom: 4px;">
+                                <span style="color: var(--text-dim);">File:</span>
+                                <span id="captureFilePath" style="font-size: 9px; word-break: break-all;">--</span>
+                            </div>
+                            <div style="margin-bottom: 8px;">
+                                <span style="color: var(--text-dim);">Status:</span>
+                                <span id="captureStatus" style="font-weight: bold;">--</span>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="preset-btn" onclick="checkCaptureStatus()" style="flex: 1; font-size: 10px; padding: 4px;">
+                                    Check Status
+                                </button>
+                                <button class="preset-btn" onclick="stopHandshakeCapture()" style="flex: 1; font-size: 10px; padding: 4px; background: var(--accent-red); border: none; color: #fff;">
+                                    Stop Capture
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Beacon Flood Alert Panel -->
+                    <div id="beaconFloodAlert" class="beacon-flood-alert" style="display: none;">
+                        <h4 style="color: #ff4444; margin: 0 0 8px 0;">⚠️ BEACON FLOOD DETECTED</h4>
+                        <div style="font-size: 11px;">
+                            <div id="beaconFloodDetails">Multiple beacon frames detected from same channel</div>
+                            <div style="margin-top: 8px;">
+                                <span style="color: var(--text-dim);">Networks/sec:</span>
+                                <span id="beaconFloodRate" style="font-weight: bold; color: #ff4444;">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="run-btn" id="startWifiBtn" onclick="startWifiScan()">
+                        Start Scanning
+                    </button>
+                    <button class="stop-btn" id="stopWifiBtn" onclick="stopWifiScan()" style="display: none;">
+                        Stop Scanning
+                    </button>
+                </div>

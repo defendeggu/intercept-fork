@@ -7,12 +7,19 @@
 </p>
 
 <p align="center">
+Support the developer of this open-source project 
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/smittix" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+</p>
+<p align="center">
   <strong>Signal Intelligence Platform</strong><br>
   A web-based interface for software-defined radio tools.
 </p>
 
 <p align="center">
-  <img src="static/images/screenshots/logo-banner.png" alt="Screenshot">
+  <img src="static/images/screenshots/intercept-main.png" alt="Screenshot">
 </p>
 
 ---
@@ -22,6 +29,7 @@
 - **Pager Decoding** - POCSAG/FLEX via rtl_fm + multimon-ng
 - **433MHz Sensors** - Weather stations, TPMS, IoT devices via rtl_433
 - **Aircraft Tracking** - ADS-B via dump1090 with real-time map and radar
+- **ACARS Messaging** - Aircraft datalink messages via acarsdec
 - **Listening Post** - Frequency scanner with audio monitoring
 - **Satellite Tracking** - Pass prediction using TLE data
 - **WiFi Scanning** - Monitor mode reconnaissance via aircrack-ng
@@ -38,7 +46,7 @@
 git clone https://github.com/smittix/intercept.git
 cd intercept
 ./setup.sh
-sudo python3 intercept.py
+sudo -E venv/bin/python intercept.py
 ```
 
 ### Docker (Alternative)
@@ -46,7 +54,7 @@ sudo python3 intercept.py
 ```bash
 git clone https://github.com/smittix/intercept.git
 cd intercept
-docker-compose up -d
+docker compose up -d
 ```
 
 > **Note:** Docker requires privileged mode for USB SDR access. See `docker-compose.yml` for configuration options.
@@ -81,8 +89,9 @@ Most features work with a basic RTL-SDR dongle (RTL2832U + R820T2).
 ## Discord Server
 
 <p align="center">
-  <a href="https://discord.gg/z3g3NJMe">Join our Discord</a>
+  <a href="https://discord.gg/EyeksEJmWE">Join our Discord</a>
 </p>
+
 
 ---
 
@@ -121,9 +130,14 @@ Created by **smittix** - [GitHub](https://github.com/smittix)
 [multimon-ng](https://github.com/EliasOenal/multimon-ng) |
 [rtl_433](https://github.com/merbanan/rtl_433) |
 [dump1090](https://github.com/flightaware/dump1090) |
+[acarsdec](https://github.com/TLeconte/acarsdec) |
 [aircrack-ng](https://www.aircrack-ng.org/) |
 [Leaflet.js](https://leafletjs.com/) |
 [Celestrak](https://celestrak.org/)
+
+
+
+
 
 
 

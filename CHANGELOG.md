@@ -2,6 +2,30 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.9.5] - 2026-01-14
+
+### Added
+- **MAC-Randomization Resistant Detection** - TSCM now identifies devices using randomized MAC addresses
+- **Clickable Score Cards** - Click on threat scores to see detailed findings
+- **Device Detail Expansion** - Click-to-expand device details in TSCM results
+- **Root Privilege Check** - Warning display when running without required privileges
+- **Real-time Device Streaming** - Devices stream to dashboard during TSCM sweep
+
+### Changed
+- **TSCM Correlation Engine** - Improved device correlation with comprehensive reporting
+- **Device Classification System** - Enhanced threat classification and scoring
+- **WiFi Scanning** - Improved scanning reliability and device naming
+
+### Fixed
+- **RF Scanning** - Fixed scanning issues with improved status feedback
+- **TSCM Modal Readability** - Improved modal styling and close button visibility
+- **Linux Device Detection** - Added more fallback methods for device detection
+- **macOS Device Detection** - Fixed TSCM device detection on macOS
+- **Bluetooth Event Type** - Fixed device type being overwritten
+- **rtl_433 Bias-T Flag** - Corrected bias-t flag handling
+
+---
+
 ## [2.9.0] - 2026-01-10
 
 ### Added

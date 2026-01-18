@@ -139,14 +139,10 @@ pip install -r requirements.txt
 After installation:
 
 ```bash
-# Standard
-sudo python3 intercept.py
-
-# With virtual environment
-sudo venv/bin/python intercept.py
+sudo -E venv/bin/python intercept.py
 
 # Custom port
-INTERCEPT_PORT=8080 sudo python3 intercept.py
+INTERCEPT_PORT=8080 sudo -E venv/bin/python intercept.py
 ```
 
 Open **http://localhost:5050** in your browser.
@@ -183,6 +179,7 @@ Open **http://localhost:5050** in your browser.
 |---------|---------|
 | `flask` | Web server |
 | `skyfield` | Satellite tracking |
+| `bleak` | BLE scanning with manufacturer data (TSCM) |
 
 ---
 
@@ -203,9 +200,57 @@ https://github.com/flightaware/dump1090
 
 ---
 
+## TSCM Mode Requirements
+
+TSCM (Technical Surveillance Countermeasures) mode requires specific hardware for full functionality:
+
+### BLE Scanning (Tracker Detection)
+- Any Bluetooth adapter supported by your OS
+- `bleak` Python library for manufacturer data detection
+- Detects: AirTags, Tile, SmartTags, ESP32/ESP8266 devices
+
+```bash
+# Install bleak
+pip install bleak>=0.21.0
+
+# Or via apt (Debian/Ubuntu)
+sudo apt install python3-bleak
+```
+
+### RF Spectrum Analysis
+- **RTL-SDR dongle** (required for RF sweeps)
+- `rtl_power` command from `rtl-sdr` package
+
+Frequency bands scanned:
+| Band | Frequency | Purpose |
+|------|-----------|---------|
+| FM Broadcast | 88-108 MHz | FM bugs |
+| 315 MHz ISM | 315 MHz | US wireless devices |
+| 433 MHz ISM | 433-434 MHz | EU wireless devices |
+| 868 MHz ISM | 868-869 MHz | EU IoT devices |
+| 915 MHz ISM | 902-928 MHz | US IoT devices |
+| 1.2 GHz | 1200-1300 MHz | Video transmitters |
+| 2.4 GHz ISM | 2400-2500 MHz | WiFi/BT/Video |
+
+```bash
+# Linux
+sudo apt install rtl-sdr
+
+# macOS
+brew install librtlsdr
+```
+
+### WiFi Scanning
+- Standard WiFi adapter (managed mode for basic scanning)
+- Monitor mode capable adapter for advanced features
+- `aircrack-ng` suite for monitor mode management
+
+---
+
 ## Notes
 
-- **Bluetooth on macOS**: Uses native CoreBluetooth, bluez tools not needed
+- **Bluetooth on macOS**: Uses bleak library (CoreBluetooth backend), bluez tools not needed
 - **WiFi on macOS**: Monitor mode has limited support, full functionality on Linux
 - **System tools**: `iw`, `iwconfig`, `rfkill`, `ip` are pre-installed on most Linux systems
+- **TSCM on macOS**: BLE and WiFi scanning work; RF spectrum requires RTL-SDR
 

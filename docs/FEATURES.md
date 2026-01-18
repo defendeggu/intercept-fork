@@ -75,12 +75,46 @@ Complete feature list for all modules.
 ## Bluetooth Scanning
 
 - **BLE and Classic** Bluetooth device scanning
-- **Multiple scan modes** - hcitool, bluetoothctl
+- **Multiple scan modes** - hcitool, bluetoothctl, bleak
 - **Tracker detection** - AirTag, Tile, Samsung SmartTag, Chipolo
 - **Device classification** - phones, audio, wearables, computers
-- **Manufacturer lookup** via OUI database
+- **Manufacturer lookup** via OUI database and Bluetooth Company IDs
 - **Proximity radar** visualization
 - **Device type breakdown** chart
+
+## TSCM Counter-Surveillance Mode
+
+Technical Surveillance Countermeasures (TSCM) screening for detecting wireless surveillance indicators.
+
+### Wireless Sweep Features
+- **BLE scanning** with manufacturer data detection (AirTags, Tile, SmartTags, ESP32)
+- **WiFi scanning** for rogue APs, hidden SSIDs, camera devices
+- **RF spectrum analysis** (requires RTL-SDR) - FM bugs, ISM bands, video transmitters
+- **Cross-protocol correlation** - links devices across BLE/WiFi/RF
+- **Baseline comparison** - detect new/unknown devices vs known environment
+
+### MAC-Randomization Resistant Detection
+- **Device fingerprinting** based on advertisement payloads, not MAC addresses
+- **Behavioral clustering** - groups observations into probable physical devices
+- **Session tracking** - monitors device presence windows
+- **Timing pattern analysis** - detects characteristic advertising intervals
+- **RSSI trajectory correlation** - identifies co-located devices
+
+### Risk Assessment
+- **Three-tier scoring model**:
+  - Informational (0-2): Known or expected devices
+  - Needs Review (3-5): Unusual devices requiring assessment
+  - High Interest (6+): Multiple indicators warrant investigation
+- **Risk indicators**: Stable RSSI, audio-capable, ESP32 chipsets, hidden identity, MAC rotation
+- **Audit trail** - full evidence chain for each link/flag
+- **Client-safe disclaimers** - findings are indicators, not confirmed surveillance
+
+### Limitations (Documented)
+- Cannot detect non-transmitting devices
+- False positives/negatives expected
+- Results require professional verification
+- No cryptographic de-randomization
+- Passive screening only (no active probing by default)
 
 ## User Interface
 

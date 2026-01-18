@@ -46,6 +46,8 @@ adsb_messages_received = 0
 adsb_last_message_time = None
 adsb_bytes_received = 0
 adsb_lines_received = 0
+adsb_active_device = None  # Track which device index is being used
+_sbs_error_logged = False  # Suppress repeated connection error logs
 
 # Track ICAOs already looked up in aircraft database (avoid repeated lookups)
 _looked_up_icaos: set[str] = set()
@@ -100,7 +102,7 @@ def check_dump1090_service():
 
 def parse_sbs_stream(service_addr):
     """Parse SBS format data from dump1090 SBS port."""
-    global adsb_using_service, adsb_connected, adsb_messages_received, adsb_last_message_time, adsb_bytes_received, adsb_lines_received
+    global adsb_using_service, adsb_connected, adsb_messages_received, adsb_last_message_time, adsb_bytes_received, adsb_lines_received, _sbs_error_logged
 
     host, port = service_addr.split(':')
     port = int(port)
@@ -108,6 +110,7 @@ def parse_sbs_stream(service_addr):
     logger.info(f"SBS stream parser started, connecting to {host}:{port}")
     adsb_connected = False
     adsb_messages_received = 0
+    _sbs_error_logged = False
 
     while adsb_using_service:
         try:
@@ -115,6 +118,7 @@ def parse_sbs_stream(service_addr):
             sock.settimeout(SBS_SOCKET_TIMEOUT)
             sock.connect((host, port))
             adsb_connected = True
+            _sbs_error_logged = False  # Reset so we log next error
             logger.info("Connected to SBS stream")
 
             buffer = ""
@@ -241,7 +245,9 @@ def parse_sbs_stream(service_addr):
             adsb_connected = False
         except OSError as e:
             adsb_connected = False
-            logger.warning(f"SBS connection error: {e}, reconnecting...")
+            if not _sbs_error_logged:
+                logger.warning(f"SBS connection error: {e}, reconnecting...")
+                _sbs_error_logged = True
             time.sleep(SBS_RECONNECT_DELAY)
 
     adsb_connected = False
@@ -286,6 +292,7 @@ def adsb_status():
 
     return jsonify({
         'tracking_active': adsb_using_service,
+        'active_device': adsb_active_device,
         'connected_to_sbs': adsb_connected,
         'messages_received': adsb_messages_received,
         'bytes_received': adsb_bytes_received,
@@ -303,7 +310,7 @@ def adsb_status():
 @adsb_bp.route('/start', methods=['POST'])
 def start_adsb():
     """Start ADS-B tracking."""
-    global adsb_using_service
+    global adsb_using_service, adsb_active_device
 
     with app_module.adsb_lock:
         if adsb_using_service:
@@ -364,17 +371,20 @@ def start_adsb():
         if not dump1090_path:
             return jsonify({'status': 'error', 'message': f'readsb or dump1090 not found for {sdr_type.value}. Install readsb with SoapySDR support.'})
 
-    # Kill any stale app-started process
+    # Kill any stale app-started process (use process group to ensure full cleanup)
     if app_module.adsb_process:
         try:
-            app_module.adsb_process.terminate()
+            pgid = os.getpgid(app_module.adsb_process.pid)
+            os.killpg(pgid, 15)  # SIGTERM
             app_module.adsb_process.wait(timeout=PROCESS_TERMINATE_TIMEOUT)
-        except (subprocess.TimeoutExpired, OSError):
+        except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
             try:
-                app_module.adsb_process.kill()
-            except OSError:
+                pgid = os.getpgid(app_module.adsb_process.pid)
+                os.killpg(pgid, 9)  # SIGKILL
+            except (ProcessLookupError, OSError):
                 pass
         app_module.adsb_process = None
+        logger.info("Killed stale ADS-B process")
 
     # Create device object and build command via abstraction layer
     sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
@@ -393,10 +403,12 @@ def start_adsb():
         cmd[0] = dump1090_path
 
     try:
+        logger.info(f"Starting dump1090 with device index {device}: {' '.join(cmd)}")
         app_module.adsb_process = subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            start_new_session=True  # Create new process group for clean shutdown
         )
 
         time.sleep(DUMP1090_START_WAIT)
@@ -421,10 +433,11 @@ def start_adsb():
                 return jsonify({'status': 'error', 'message': error_msg})
 
         adsb_using_service = True
+        adsb_active_device = device  # Track which device is being used
         thread = threading.Thread(target=parse_sbs_stream, args=(f'localhost:{ADSB_SBS_PORT}',), daemon=True)
         thread.start()
 
-        return jsonify({'status': 'started', 'message': 'ADS-B tracking started'})
+        return jsonify({'status': 'started', 'message': 'ADS-B tracking started', 'device': device})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
@@ -432,17 +445,26 @@ def start_adsb():
 @adsb_bp.route('/stop', methods=['POST'])
 def stop_adsb():
     """Stop ADS-B tracking."""
-    global adsb_using_service
+    global adsb_using_service, adsb_active_device
 
     with app_module.adsb_lock:
         if app_module.adsb_process:
-            app_module.adsb_process.terminate()
             try:
+                # Kill the entire process group to ensure all child processes are terminated
+                pgid = os.getpgid(app_module.adsb_process.pid)
+                os.killpg(pgid, 15)  # SIGTERM
                 app_module.adsb_process.wait(timeout=ADSB_TERMINATE_TIMEOUT)
-            except subprocess.TimeoutExpired:
-                app_module.adsb_process.kill()
+            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
+                try:
+                    # Force kill if terminate didn't work
+                    pgid = os.getpgid(app_module.adsb_process.pid)
+                    os.killpg(pgid, 9)  # SIGKILL
+                except (ProcessLookupError, OSError):
+                    pass
             app_module.adsb_process = None
+            logger.info("ADS-B process stopped")
         adsb_using_service = False
+        adsb_active_device = None
 
     app_module.adsb_aircraft.clear()
     _looked_up_icaos.clear()

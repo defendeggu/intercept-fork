@@ -115,6 +115,28 @@ body {
     gap: 12px;
 }
 
+/* Mobile header adjustments */
+@media (max-width: 800px) {
+    .header {
+        padding: 10px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .logo {
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+
+    .logo span {
+        display: none;
+    }
+
+    .stats-badges {
+        display: none;
+    }
+}
+
 .stat-badge {
     background: var(--bg-card);
     border: 1px solid rgba(0, 212, 255, 0.3);
@@ -589,13 +611,14 @@ body {
 }
 
 .btn.primary {
-    background: var(--accent-cyan);
-    color: var(--bg-dark);
+    background: var(--accent-green);
+    color: #fff;
     margin-left: auto;
 }
 
 .btn.primary:hover {
-    box-shadow: 0 0 25px rgba(0, 212, 255, 0.5);
+    background: #1db954;
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.5);
 }
 
 /* Leaflet dark theme overrides */
@@ -673,24 +696,28 @@ body {
 
 @media (max-width: 800px) {
     .dashboard {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto auto;
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - 60px);
     }
 
     .polar-container,
     .map-container {
-        grid-column: 1;
-        min-height: 300px;
+        min-height: 250px;
+        flex: 1;
     }
 
     .sidebar {
-        grid-column: 1;
         flex-direction: column;
         max-height: none;
+        border-left: none;
+        border-top: 1px solid rgba(0, 212, 255, 0.2);
     }
 
     .controls-bar {
-        grid-row: 4;
+        flex-wrap: wrap;
+        padding: 8px 12px;
     }
 }
 

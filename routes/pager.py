@@ -25,6 +25,7 @@ from utils.validation import (
 from utils.sse import format_sse
 from utils.process import safe_terminate, register_process
 from utils.sdr import SDRFactory, SDRType, SDRValidationError
+from utils.dependencies import get_tool_path
 
 pager_bp = Blueprint('pager', __name__)
 
@@ -245,7 +246,10 @@ def start_decoding() -> Response:
             bias_t=bias_t
         )
 
-        multimon_cmd = ['multimon-ng', '-t', 'raw'] + decoders + ['-f', 'alpha', '-']
+        multimon_path = get_tool_path('multimon-ng')
+        if not multimon_path:
+            return jsonify({'status': 'error', 'message': 'multimon-ng not found'}), 400
+        multimon_cmd = [multimon_path, '-t', 'raw'] + decoders + ['-f', 'alpha', '-']
 
         full_cmd = ' '.join(rtl_cmd) + ' | ' + ' '.join(multimon_cmd)
         logger.info(f"Running: {full_cmd}")

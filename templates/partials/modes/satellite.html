@@ -1,0 +1,50 @@
+<!-- SATELLITE MODE -->
+                <div id="satelliteMode" class="mode-content">
+                    <div class="section">
+                        <h3>Satellite Command</h3>
+                        <p style="color: var(--text-secondary); font-size: 11px; line-height: 1.5; margin-bottom: 15px;">
+                            Full satellite tracking dashboard with polar plot, ground track map, pass predictions, and live telemetry.
+                        </p>
+                        <a href="/satellite/dashboard" target="_blank" class="preset-btn" style="display: block; text-align: center; text-decoration: none; width: 100%; margin-bottom: 10px;">
+                            Open in New Window
+                        </a>
+                    </div>
+
+                    <div class="section">
+                        <h3>Satellite Database</h3>
+                        <p style="color: var(--text-secondary); font-size: 11px; margin-bottom: 10px;">
+                            Add satellites via TLE data or fetch from Celestrak.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button class="preset-btn" onclick="showAddSatelliteModal()" style="width: 100%;">
+                                Add Satellite (TLE)
+                            </button>
+                            <button class="preset-btn" onclick="fetchCelestrak()" style="width: 100%;">
+                                Update from Celestrak
+                            </button>
+                        </div>
+                        <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                            <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 6px;">TRACKED SATELLITES</div>
+                            <div id="satTrackingList" style="font-size: 11px; color: var(--text-secondary); max-height: 120px; overflow-y: auto;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                                    <span>ISS (ZARYA)</span>
+                                    <span>NOAA 15</span>
+                                    <span>NOAA 18</span>
+                                    <span>NOAA 19</span>
+                                    <span>NOAA 20</span>
+                                    <span>METEOR-M2</span>
+                                    <span>METEOR-M2-3</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Quick Info</h3>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
+                            <p><strong>Polar Plot:</strong> Shows satellite path across the sky. Center = overhead, edge = horizon.</p>
+                            <p style="margin-top: 8px;"><strong>Ground Track:</strong> Real-time satellite position and orbital path on world map.</p>
+                            <p style="margin-top: 8px;"><strong>Pass Quality:</strong> Excellent (60°+), Good (30°+), Fair (below 30°).</p>
+                        </div>
+                    </div>
+                </div>

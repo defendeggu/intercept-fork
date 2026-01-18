@@ -516,6 +516,14 @@ function handleSignalFound(data) {
             const streamUrl = getStreamUrl(data.frequency, data.modulation);
             console.log('[SCANNER] Starting audio for signal:', data.frequency, 'MHz');
             scannerAudio.src = streamUrl;
+            // Apply current volume from knob
+            const volumeKnob = document.getElementById('radioVolumeKnob');
+            if (volumeKnob && volumeKnob._knob) {
+                scannerAudio.volume = volumeKnob._knob.getValue() / 100;
+            } else if (volumeKnob) {
+                const knobValue = parseFloat(volumeKnob.dataset.value) || 80;
+                scannerAudio.volume = knobValue / 100;
+            }
             scannerAudio.play().catch(e => console.warn('[SCANNER] Audio autoplay blocked:', e));
         }
     }
@@ -991,7 +999,7 @@ async function tuneToFrequency(freq, mod) {
 // ============== AUDIO VISUALIZER ==============
 
 function initAudioVisualizer() {
-    const audioPlayer = document.getElementById('audioPlayer');
+    const audioPlayer = document.getElementById('scannerAudioPlayer');
     if (!audioPlayer) return;
 
     if (!visualizerContext) {
@@ -1163,10 +1171,7 @@ function initRadioKnobControls() {
             const audioPlayer = document.getElementById('scannerAudioPlayer');
             if (audioPlayer) {
                 audioPlayer.volume = e.detail.value / 100;
-            }
-            const manualPlayer = document.getElementById('audioPlayer');
-            if (manualPlayer) {
-                manualPlayer.volume = e.detail.value / 100;
+                console.log('[VOLUME] Set to', Math.round(e.detail.value) + '%');
             }
             // Update knob value display
             const valueDisplay = document.getElementById('radioVolumeValue');
@@ -1786,6 +1791,15 @@ async function _startDirectListenInternal() {
         const streamUrl = `/listening/audio/stream?t=${Date.now()}`;
         console.log('[LISTEN] Connecting to stream:', streamUrl);
         audioPlayer.src = streamUrl;
+
+        // Apply current volume from knob
+        const volumeKnob = document.getElementById('radioVolumeKnob');
+        if (volumeKnob && volumeKnob._knob) {
+            audioPlayer.volume = volumeKnob._knob.getValue() / 100;
+        } else if (volumeKnob) {
+            const knobValue = parseFloat(volumeKnob.dataset.value) || 80;
+            audioPlayer.volume = knobValue / 100;
+        }
 
         // Wait for audio to be ready then play
         audioPlayer.oncanplay = () => {

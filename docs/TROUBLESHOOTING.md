@@ -336,9 +336,7 @@ rtl_fm -M am -f 118000000 -s 24000 -r 24000 -g 40 2>/dev/null | \
 
 Run INTERCEPT with sudo:
 ```bash
-sudo python3 intercept.py
-# Or with venv:
-sudo venv/bin/python intercept.py
+sudo -E venv/bin/python intercept.py
 ```
 
 ### Interface not found after enabling monitor mode

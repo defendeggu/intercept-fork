@@ -7,7 +7,51 @@ import os
 import sys
 
 # Application version
-VERSION = "2.9.0"
+VERSION = "2.9.5"
+
+# Changelog - latest release notes (shown on welcome screen)
+CHANGELOG = [
+    {
+        "version": "2.9.5",
+        "date": "January 2026",
+        "highlights": [
+            "Enhanced TSCM with MAC-randomization resistant detection",
+            "Clickable score cards and device detail expansion",
+            "RF scanning improvements with status feedback",
+            "Root privilege check and warning display",
+        ]
+    },
+    {
+        "version": "2.9.0",
+        "date": "January 2026",
+        "highlights": [
+            "New dropdown navigation menus for cleaner UI",
+            "TSCM baseline recording now captures device data",
+            "Device identity engine integration for threat detection",
+            "Welcome screen with mode selection",
+        ]
+    },
+    {
+        "version": "2.8.0",
+        "date": "December 2025",
+        "highlights": [
+            "Added TSCM counter-surveillance mode",
+            "WiFi/Bluetooth device correlation engine",
+            "Tracker detection (AirTag, Tile, SmartTag)",
+            "Risk scoring and threat classification",
+        ]
+    },
+    {
+        "version": "2.7.0",
+        "date": "November 2025",
+        "highlights": [
+            "Multi-SDR hardware support via SoapySDR",
+            "LimeSDR, HackRF, Airspy, SDRplay support",
+            "Improved aircraft database with photo lookup",
+            "GPS auto-detection and integration",
+        ]
+    },
+]
 
 
 def _get_env(key: str, default: str) -> str:

@@ -398,6 +398,8 @@ def _start_audio_stream(frequency: float, modulation: str):
             ]
             if scanner_config.get('bias_t', False):
                 sdr_cmd.append('-T')
+            # Explicitly output to stdout (some rtl_fm versions need this)
+            sdr_cmd.append('-')
         else:
             # Use SDR abstraction layer for HackRF, Airspy, LimeSDR, SDRPlay
             rx_fm_path = find_rx_fm()
@@ -438,9 +440,12 @@ def _start_audio_stream(frequency: float, modulation: str):
         ]
 
         try:
-            # Use shell pipe for reliable streaming (Python subprocess piping can be unreliable)
-            shell_cmd = f"{' '.join(sdr_cmd)} 2>/dev/null | {' '.join(encoder_cmd)}"
-            logger.info(f"Starting audio pipeline: {shell_cmd}")
+            # Use shell pipe for reliable streaming
+            # Log stderr to temp files for error diagnosis
+            rtl_stderr_log = '/tmp/rtl_fm_stderr.log'
+            ffmpeg_stderr_log = '/tmp/ffmpeg_stderr.log'
+            shell_cmd = f"{' '.join(sdr_cmd)} 2>{rtl_stderr_log} | {' '.join(encoder_cmd)} 2>{ffmpeg_stderr_log}"
+            logger.info(f"Starting audio: {frequency} MHz, mod={modulation}, device={scanner_config['device']}")
 
             audio_rtl_process = None  # Not used in shell mode
             audio_process = subprocess.Popen(
@@ -456,8 +461,20 @@ def _start_audio_stream(frequency: float, modulation: str):
             time.sleep(0.3)
 
             if audio_process.poll() is not None:
-                stderr = audio_process.stderr.read().decode() if audio_process.stderr else ''
-                logger.error(f"Audio pipeline exited immediately: {stderr}")
+                # Read stderr from temp files
+                rtl_stderr = ''
+                ffmpeg_stderr = ''
+                try:
+                    with open(rtl_stderr_log, 'r') as f:
+                        rtl_stderr = f.read().strip()
+                except:
+                    pass
+                try:
+                    with open(ffmpeg_stderr_log, 'r') as f:
+                        ffmpeg_stderr = f.read().strip()
+                except:
+                    pass
+                logger.error(f"Audio pipeline exited immediately. rtl_fm stderr: {rtl_stderr}, ffmpeg stderr: {ffmpeg_stderr}")
                 return
 
             audio_running = True
@@ -775,8 +792,6 @@ def start_audio() -> Response:
     """Start audio at specific frequency (manual mode)."""
     global scanner_running
 
-    logger.info("Audio start request received")
-
     # Stop scanner if running
     if scanner_running:
         scanner_running = False
@@ -868,20 +883,28 @@ def stream_audio() -> Response:
         return Response(b'', mimetype='audio/mpeg', status=204)
 
     def generate():
+        # Capture local reference to avoid race condition with stop
+        proc = audio_process
+        if not proc or not proc.stdout:
+            return
         try:
-            while audio_running and audio_process and audio_process.poll() is None:
+            while audio_running and proc.poll() is None:
                 # Use select to avoid blocking forever
-                ready, _, _ = select.select([audio_process.stdout], [], [], 2.0)
+                ready, _, _ = select.select([proc.stdout], [], [], 2.0)
                 if ready:
-                    chunk = audio_process.stdout.read(4096)
+                    chunk = proc.stdout.read(4096)
                     if chunk:
                         yield chunk
                     else:
                         break
+                else:
+                    # Timeout - check if process died
+                    if proc.poll() is not None:
+                        break
         except GeneratorExit:
             pass
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Audio stream error: {e}")
 
     return Response(
         generate(),
