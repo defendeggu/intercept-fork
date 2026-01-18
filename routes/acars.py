@@ -52,23 +52,36 @@ def find_acarsdec():
 def get_acarsdec_json_flag(acarsdec_path: str) -> str:
     """Detect which JSON output flag acarsdec supports.
 
-    Newer forks (TLeconte) use -j, older versions use -o 4.
+    Modern versions (TLeconte) use -j, very old versions used -o 4.
+    Default to -j as it's the standard for current acarsdec builds.
     """
     try:
-        result = subprocess.run(
-            [acarsdec_path, '-h'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        help_text = result.stdout + result.stderr
-        # Check if -j flag is documented in help
-        if ' -j' in help_text or '\n-j' in help_text:
-            return '-j'
+        # Try both -h and --help
+        for help_flag in ['-h', '--help']:
+            try:
+                result = subprocess.run(
+                    [acarsdec_path, help_flag],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                help_text = result.stdout + result.stderr
+
+                # Check if -j flag is documented in help
+                if ' -j' in help_text or '\n-j' in help_text or '-j ' in help_text:
+                    return '-j'
+
+                # Only return -o if we explicitly see it supports output modes
+                if '-o' in help_text and 'output' in help_text.lower():
+                    return '-o'
+            except Exception:
+                continue
     except Exception:
         pass
-    # Default to older -o 4 syntax
-    return '-o'
+
+    # Default to -j (modern standard for TLeconte acarsdec)
+    # Most builds from source use this format
+    return '-j'
 
 
 def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -> None:
