@@ -783,13 +783,14 @@ header h1 {
 .nav-tools {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     flex-shrink: 0;
 }
 
 .nav-tool-btn {
     width: 28px;
     height: 28px;
+    min-width: 28px;
     border-radius: 4px;
     background: transparent;
     border: 1px solid transparent;
@@ -802,6 +803,7 @@ header h1 {
     align-items: center;
     justify-content: center;
     position: relative;
+    overflow: hidden;
 }
 
 .nav-tool-btn:hover {
