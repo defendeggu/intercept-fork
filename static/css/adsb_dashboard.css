@@ -268,7 +268,7 @@ body {
 }
 
 .acars-sidebar-content {
-    width: 250px;
+    width: 300px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -295,6 +295,23 @@ body {
 
 .acars-sidebar .panel::before {
     display: none;
+}
+
+.acars-sidebar .panel-header {
+    flex-shrink: 0;
+}
+
+.acars-sidebar #acarsPanelContent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.acars-sidebar .acars-info,
+.acars-sidebar .acars-controls {
+    flex-shrink: 0;
 }
 
 .acars-sidebar .acars-messages {
