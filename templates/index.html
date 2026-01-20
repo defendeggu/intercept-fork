@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/acars.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/aprs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/tscm.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/signal-cards.css') }}">
 </head>
 
 <body>
@@ -1522,9 +1523,12 @@
                     </div>
                 </div>
 
-                <div class="output-content" id="output">
-                    <div class="placeholder" style="color: #888; text-align: center; padding: 50px;">
-                        Configure settings and click "Start Decoding" to begin.
+                <div class="output-content signal-feed" id="output">
+                    <div class="placeholder signal-empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+                        </svg>
+                        <p>Configure settings and click "Start Decoding" to begin.</p>
                     </div>
                 </div>
 
@@ -1579,6 +1583,7 @@
     <script src="{{ url_for('static', filename='js/core/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/audio.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/radio-knob.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/signal-cards.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/listening-post.js') }}"></script>
 
     <script>
@@ -1725,6 +1730,14 @@
         }
         // Sync stats periodically
         setInterval(syncHeaderStats, 500);
+
+        // Update relative timestamps on signal cards every 30 seconds
+        setInterval(function() {
+            const output = document.getElementById('output');
+            if (output && typeof SignalCards !== 'undefined') {
+                SignalCards.updateTimestamps(output);
+            }
+        }, 30000);
 
         // Observer location for distance calculations (load from localStorage or default to London)
         let observerLocation = (function () {
@@ -3094,6 +3107,9 @@
             // Check if message should be filtered from display
             const isFiltered = shouldFilterMessage(msg);
 
+            // Check if address is muted
+            const isMuted = SignalCards.isAddressMuted(msg.address);
+
             // Update counts (always, even if filtered)
             msgCount++;
             document.getElementById('msgCount').textContent = msgCount;
@@ -3109,8 +3125,8 @@
                 document.getElementById('flexCount').textContent = flexCount;
             }
 
-            // If filtered, skip display but update filtered count
-            if (isFiltered) {
+            // If filtered or muted, skip display but update filtered count
+            if (isFiltered || isMuted) {
                 filteredCount++;
                 return;
             }
@@ -3124,19 +3140,10 @@
             // Add to waterfall
             addWaterfallPoint(Date.now(), 0.8);
 
-            const isNumeric = /^[0-9\s\-\*\#U]+$/.test(msg.message);
-            const relativeTime = getRelativeTime(msg.timestamp);
-
-            const msgEl = document.createElement('div');
-            msgEl.className = 'message ' + protoClass;
-            msgEl.innerHTML = `
-                <div class="header">
-                    <span class="protocol">${escapeHtml(msg.protocol)}</span>
-                    <span class="msg-time" data-timestamp="${escapeAttr(msg.timestamp)}" title="${escapeAttr(msg.timestamp)}">${escapeHtml(relativeTime)}</span>
-                </div>
-                <div class="address">Address: ${escapeHtml(msg.address)}${msg.function ? ' | Func: ' + escapeHtml(msg.function) : ''}</div>
-                <div class="content ${isNumeric ? 'numeric' : ''}">${escapeHtml(msg.message)}</div>
-            `;
+            // Use SignalCards component to create the message card
+            const msgEl = SignalCards.createPagerCard(msg, {
+                status: 'baseline' // Default status, can be enhanced with detection logic
+            });
 
             output.insertBefore(msgEl, output.firstChild);
 

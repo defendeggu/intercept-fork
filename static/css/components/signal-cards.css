@@ -1,0 +1,853 @@
+/**
+ * Signal Cards Component System
+ * Reusable card components for displaying RF signals and decoded messages
+ * Used across: Pager, APRS, Sensors, and other signal-based modes
+ */
+
+/* ============================================
+   STATUS COLORS & VARIABLES
+   ============================================ */
+:root {
+    /* Signal status colors */
+    --signal-new: #3b82f6;
+    --signal-new-bg: rgba(59, 130, 246, 0.12);
+    --signal-baseline: #6b7280;
+    --signal-baseline-bg: rgba(107, 114, 128, 0.08);
+    --signal-burst: #f59e0b;
+    --signal-burst-bg: rgba(245, 158, 11, 0.12);
+    --signal-repeated: #eab308;
+    --signal-repeated-bg: rgba(234, 179, 8, 0.10);
+    --signal-emergency: #ef4444;
+    --signal-emergency-bg: rgba(239, 68, 68, 0.15);
+
+    /* Protocol colors */
+    --proto-pocsag: var(--accent-cyan, #4a9eff);
+    --proto-flex: var(--accent-amber, #f59e0b);
+    --proto-aprs: #06b6d4;
+    --proto-ais: #8b5cf6;
+    --proto-acars: #ec4899;
+}
+
+/* ============================================
+   SIGNAL FEED CONTAINER
+   ============================================ */
+.signal-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.signal-feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+}
+
+.signal-feed-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.signal-feed-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-green);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.signal-feed-live .live-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    animation: signalPulse 2s ease-in-out infinite;
+}
+
+@keyframes signalPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ============================================
+   FILTER BAR
+   ============================================ */
+.signal-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.signal-filter-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-right: 6px;
+}
+
+.signal-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.signal-filter-btn:hover {
+    border-color: var(--border-light);
+    background: var(--bg-elevated);
+}
+
+.signal-filter-btn.active {
+    border-color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+}
+
+.signal-filter-btn .filter-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.signal-filter-btn[data-filter="all"] .filter-dot { background: var(--text-secondary); }
+.signal-filter-btn[data-filter="emergency"] .filter-dot { background: var(--signal-emergency); }
+.signal-filter-btn[data-filter="new"] .filter-dot { background: var(--signal-new); }
+.signal-filter-btn[data-filter="burst"] .filter-dot { background: var(--signal-burst); }
+.signal-filter-btn[data-filter="repeated"] .filter-dot { background: var(--signal-repeated); }
+.signal-filter-btn[data-filter="baseline"] .filter-dot { background: var(--signal-baseline); }
+
+.signal-filter-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--bg-secondary);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text-dim);
+}
+
+.signal-filter-btn.active .signal-filter-count {
+    background: rgba(74, 158, 255, 0.2);
+    color: var(--accent-cyan);
+}
+
+.signal-filter-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 6px;
+}
+
+/* ============================================
+   BASE SIGNAL CARD
+   ============================================ */
+.signal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    animation: cardSlideIn 0.25s ease;
+}
+
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.signal-card:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-light);
+}
+
+.signal-card.hidden {
+    display: none;
+}
+
+/* Left accent border for status */
+.signal-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--card-accent, transparent);
+}
+
+/* ============================================
+   SIGNAL CARD STATUS VARIANTS
+   ============================================ */
+.signal-card[data-status="new"] {
+    --card-accent: var(--signal-new);
+    background: linear-gradient(90deg, var(--signal-new-bg) 0%, var(--bg-card) 35%);
+}
+
+.signal-card[data-status="burst"] {
+    --card-accent: var(--signal-burst);
+    background: linear-gradient(90deg, var(--signal-burst-bg) 0%, var(--bg-card) 35%);
+}
+
+.signal-card[data-status="repeated"] {
+    --card-accent: var(--signal-repeated);
+}
+
+.signal-card[data-status="baseline"] {
+    --card-accent: var(--signal-baseline);
+}
+
+.signal-card[data-status="emergency"] {
+    --card-accent: var(--signal-emergency);
+    background: linear-gradient(90deg, var(--signal-emergency-bg) 0%, var(--bg-card) 35%);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================
+   CARD HEADER
+   ============================================ */
+.signal-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.signal-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Protocol badge */
+.signal-proto-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+}
+
+.signal-proto-badge.pocsag {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+    border-color: rgba(74, 158, 255, 0.25);
+}
+
+.signal-proto-badge.flex {
+    background: var(--accent-amber-dim);
+    color: var(--accent-amber);
+    border-color: rgba(212, 168, 83, 0.25);
+}
+
+.signal-proto-badge.aprs {
+    background: rgba(6, 182, 212, 0.15);
+    color: #06b6d4;
+    border-color: rgba(6, 182, 212, 0.25);
+}
+
+.signal-proto-badge.ais {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border-color: rgba(139, 92, 246, 0.25);
+}
+
+.signal-proto-badge.acars {
+    background: rgba(236, 72, 153, 0.15);
+    color: #ec4899;
+    border-color: rgba(236, 72, 153, 0.25);
+}
+
+/* Frequency/Address badge */
+.signal-freq-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+}
+
+/* Status pill */
+.signal-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+
+.signal-status-pill .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.signal-status-pill[data-status="new"] {
+    background: var(--signal-new-bg);
+    color: var(--signal-new);
+}
+
+.signal-status-pill[data-status="baseline"] {
+    background: var(--signal-baseline-bg);
+    color: var(--signal-baseline);
+}
+
+.signal-status-pill[data-status="burst"] {
+    background: var(--signal-burst-bg);
+    color: var(--signal-burst);
+}
+
+.signal-status-pill[data-status="repeated"] {
+    background: var(--signal-repeated-bg);
+    color: var(--signal-repeated);
+}
+
+.signal-status-pill[data-status="emergency"] {
+    background: var(--signal-emergency-bg);
+    color: var(--signal-emergency);
+}
+
+.signal-status-pill[data-status="new"] .status-dot,
+.signal-status-pill[data-status="burst"] .status-dot,
+.signal-status-pill[data-status="emergency"] .status-dot {
+    animation: signalPulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   CARD BODY
+   ============================================ */
+.signal-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Message metadata row */
+.signal-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.signal-sender {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-green);
+}
+
+.signal-msg-type {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.signal-timestamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-left: auto;
+}
+
+/* Message content preview */
+.signal-message {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 2px solid var(--border-color);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.signal-message.numeric {
+    font-size: 14px;
+    letter-spacing: 1.5px;
+}
+
+.signal-message.emergency {
+    border-left-color: var(--signal-emergency);
+    background: var(--signal-emergency-bg);
+}
+
+.signal-message.truncated::after {
+    content: '...';
+    color: var(--text-dim);
+}
+
+/* Signal strength indicator */
+.signal-strength-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.signal-strength-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 16px;
+}
+
+.signal-strength-bars .bar {
+    width: 3px;
+    background: var(--border-light);
+    border-radius: 1px;
+    transition: background 0.2s;
+}
+
+.signal-strength-bars .bar:nth-child(1) { height: 5px; }
+.signal-strength-bars .bar:nth-child(2) { height: 8px; }
+.signal-strength-bars .bar:nth-child(3) { height: 11px; }
+.signal-strength-bars .bar:nth-child(4) { height: 14px; }
+.signal-strength-bars .bar:nth-child(5) { height: 16px; }
+
+.signal-strength-bars .bar.active {
+    background: var(--accent-green);
+}
+
+.signal-strength-bars .bar.active.weak {
+    background: var(--accent-orange);
+}
+
+.signal-activity {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Behavior tag */
+.signal-behavior {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg-secondary);
+    padding: 5px 8px;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+.signal-behavior svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.7;
+}
+
+/* ============================================
+   CARD FOOTER & ACTIONS
+   ============================================ */
+.signal-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.signal-advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.signal-advanced-toggle:hover {
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+}
+
+.signal-advanced-toggle svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s;
+}
+
+.signal-advanced-toggle.open svg {
+    transform: rotate(180deg);
+}
+
+.signal-advanced-toggle.open {
+    color: var(--accent-cyan);
+}
+
+.signal-card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.signal-action-btn {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.signal-action-btn:hover {
+    color: var(--text-secondary);
+    border-color: var(--border-light);
+}
+
+.signal-action-btn.primary {
+    background: var(--accent-cyan-dim);
+    border-color: rgba(74, 158, 255, 0.25);
+    color: var(--accent-cyan);
+}
+
+.signal-action-btn.primary:hover {
+    background: rgba(74, 158, 255, 0.2);
+}
+
+.signal-action-btn.danger {
+    background: var(--accent-red-dim);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: var(--accent-red);
+}
+
+.signal-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================
+   ADVANCED PANEL
+   ============================================ */
+.signal-advanced-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.2s ease;
+    margin-top: 0;
+}
+
+.signal-advanced-panel.open {
+    grid-template-rows: 1fr;
+    margin-top: 10px;
+}
+
+.signal-advanced-inner {
+    overflow: hidden;
+}
+
+.signal-advanced-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.signal-advanced-section {
+    margin-bottom: 10px;
+}
+
+.signal-advanced-section:last-child {
+    margin-bottom: 0;
+}
+
+.signal-advanced-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.signal-advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.signal-advanced-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.signal-advanced-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.signal-advanced-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+.signal-raw-data {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    padding: 8px;
+    border-radius: 3px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.signal-advanced-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ============================================
+   MINI MAP (for APRS/position data)
+   ============================================ */
+.signal-mini-map {
+    width: 100%;
+    height: 70px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.signal-mini-map:hover {
+    border-color: var(--accent-cyan);
+}
+
+.signal-mini-map::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(74, 158, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74, 158, 255, 0.08) 1px, transparent 1px);
+    background-size: 14px 14px;
+}
+
+.signal-map-pin {
+    width: 10px;
+    height: 10px;
+    background: var(--signal-emergency);
+    border-radius: 50%;
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+    animation: mapPing 1.5s ease-out infinite;
+    z-index: 1;
+}
+
+@keyframes mapPing {
+    0% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4); }
+    100% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+}
+
+.signal-map-coords {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    padding: 2px 5px;
+    border-radius: 2px;
+}
+
+/* ============================================
+   SPARKLINE CHART
+   ============================================ */
+.signal-sparkline-container {
+    margin-top: 6px;
+}
+
+.signal-sparkline-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+}
+
+.signal-sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 28px;
+    padding: 3px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.signal-sparkline .spark-bar {
+    flex: 1;
+    background: var(--accent-cyan);
+    border-radius: 1px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.signal-sparkline .spark-bar:hover {
+    opacity: 1;
+}
+
+.signal-sparkline .spark-bar.spike {
+    background: var(--signal-burst);
+    opacity: 0.9;
+}
+
+/* ============================================
+   TOAST NOTIFICATION
+   ============================================ */
+.signal-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-primary);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    opacity: 0;
+    transition: all 0.25s ease;
+}
+
+.signal-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.signal-toast.success {
+    border-color: var(--accent-green);
+    background: linear-gradient(90deg, var(--accent-green-dim) 0%, var(--bg-card) 40%);
+}
+
+.signal-toast.error {
+    border-color: var(--accent-red);
+    background: linear-gradient(90deg, var(--accent-red-dim) 0%, var(--bg-card) 40%);
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.signal-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+}
+
+.signal-empty-state svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.signal-empty-state p {
+    font-size: 13px;
+}
+
+/* ============================================
+   COMPACT MODE (for high-density display)
+   ============================================ */
+.signal-feed.compact .signal-card {
+    padding: 8px 10px;
+}
+
+.signal-feed.compact .signal-card-header {
+    margin-bottom: 6px;
+}
+
+.signal-feed.compact .signal-proto-badge {
+    font-size: 9px;
+    padding: 2px 5px;
+}
+
+.signal-feed.compact .signal-freq-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+.signal-feed.compact .signal-message {
+    font-size: 11px;
+    padding: 8px;
+}
+
+.signal-feed.compact .signal-card-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+}
