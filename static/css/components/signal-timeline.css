@@ -11,17 +11,63 @@
     background: var(--bg-card, #1a1a1a);
     border: 1px solid var(--border-color, #333);
     border-radius: 6px;
-    padding: 12px;
     font-family: 'JetBrains Mono', monospace;
+}
+
+.signal-timeline.collapsed .signal-timeline-body {
+    display: none;
+}
+
+.signal-timeline.collapsed .signal-timeline-header {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 .signal-timeline-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border-color, #333);
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.signal-timeline-header:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.signal-timeline-body {
+    padding: 0 12px 12px 12px;
+    border-top: 1px solid var(--border-color, #333);
+}
+
+.signal-timeline-collapse-icon {
+    margin-right: 8px;
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+.signal-timeline.collapsed .signal-timeline-collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.signal-timeline-header-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--text-dim, #666);
+}
+
+.signal-timeline-header-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.signal-timeline-header-stat .stat-value {
+    color: var(--text-primary, #fff);
+    font-weight: 500;
 }
 
 .signal-timeline-title {
@@ -113,8 +159,27 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    max-height: 300px;
+    max-height: 180px;
     overflow-y: auto;
+    margin-top: 8px;
+}
+
+.signal-timeline-lanes::-webkit-scrollbar {
+    width: 6px;
+}
+
+.signal-timeline-lanes::-webkit-scrollbar-track {
+    background: var(--bg-secondary, #252525);
+    border-radius: 3px;
+}
+
+.signal-timeline-lanes::-webkit-scrollbar-thumb {
+    background: var(--border-color, #444);
+    border-radius: 3px;
+}
+
+.signal-timeline-lanes::-webkit-scrollbar-thumb:hover {
+    background: var(--text-dim, #666);
 }
 
 .signal-timeline-lane {
@@ -315,6 +380,8 @@
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--border-color, #333);
+    max-height: 80px;
+    overflow-y: auto;
 }
 
 .signal-timeline-annotation {

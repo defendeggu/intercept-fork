@@ -17,7 +17,8 @@ const SignalTimeline = (function() {
             '2h': 2 * 60 * 60 * 1000
         },
         defaultWindow: '30m',
-        maxSignals: 50,
+        maxSignals: 100,          // max signals to track in memory
+        maxDisplayedLanes: 15,    // max lanes to show at once (scroll for more)
         burstThreshold: 5,        // messages in burst window = burst
         burstWindow: 60 * 1000,   // 1 minute
         updateInterval: 5000,     // refresh every 5 seconds
@@ -108,7 +109,33 @@ const SignalTimeline = (function() {
         const windowMs = config.timeWindows['2h'];
         signal.events = signal.events.filter(e => now - e.timestamp < windowMs);
 
+        // Prune old signals if we exceed max
+        if (state.signals.size > config.maxSignals) {
+            pruneOldSignals();
+        }
+
         return signal;
+    }
+
+    /**
+     * Remove oldest/least active signals to stay under limit
+     */
+    function pruneOldSignals() {
+        const signals = Array.from(state.signals.entries());
+        // Sort by last seen (oldest first), but keep flagged signals
+        signals.sort((a, b) => {
+            if (a[1].flagged && !b[1].flagged) return 1;
+            if (!a[1].flagged && b[1].flagged) return -1;
+            return a[1].lastSeen - b[1].lastSeen;
+        });
+
+        // Remove oldest signals until under limit
+        const toRemove = signals.length - config.maxSignals;
+        for (let i = 0; i < toRemove; i++) {
+            if (!signals[i][1].flagged) {
+                state.signals.delete(signals[i][0]);
+            }
+        }
     }
 
     /**
@@ -229,18 +256,39 @@ const SignalTimeline = (function() {
     /**
      * Create the timeline DOM element
      */
-    function createTimeline(containerId) {
+    function createTimeline(containerId, options = {}) {
         const container = document.getElementById(containerId);
         if (!container) return null;
 
+        const startCollapsed = options.collapsed !== false;
+
         const timeline = document.createElement('div');
-        timeline.className = 'signal-timeline';
+        timeline.className = 'signal-timeline' + (startCollapsed ? ' collapsed' : '');
         timeline.id = 'signalTimeline';
 
         timeline.innerHTML = `
-            <div class="signal-timeline-header">
-                <span class="signal-timeline-title">Signal Activity Timeline</span>
-                <div class="signal-timeline-controls">
+            <div class="signal-timeline-header" id="timelineHeader">
+                <div style="display: flex; align-items: center;">
+                    <span class="signal-timeline-collapse-icon">▼</span>
+                    <span class="signal-timeline-title">Signal Activity Timeline</span>
+                </div>
+                <div class="signal-timeline-header-stats" id="timelineHeaderStats">
+                    <div class="signal-timeline-header-stat">
+                        <span class="stat-value" id="timelineStatTotal">0</span>
+                        <span>signals</span>
+                    </div>
+                    <div class="signal-timeline-header-stat">
+                        <span class="stat-value" id="timelineStatNew">0</span>
+                        <span>new</span>
+                    </div>
+                    <div class="signal-timeline-header-stat">
+                        <span class="stat-value" id="timelineStatBurst">0</span>
+                        <span>burst</span>
+                    </div>
+                </div>
+            </div>
+            <div class="signal-timeline-body">
+                <div class="signal-timeline-controls" style="display: flex; align-items: center; gap: 6px; padding: 8px 0; flex-wrap: wrap;">
                     <button class="signal-timeline-btn" data-filter="hideBaseline" title="Hide baseline signals">
                         Hide Known
                     </button>
@@ -250,7 +298,7 @@ const SignalTimeline = (function() {
                     <button class="signal-timeline-btn" data-filter="showOnlyBurst" title="Show only burst activity">
                         Bursts
                     </button>
-                    <div class="signal-timeline-window">
+                    <div class="signal-timeline-window" style="margin-left: auto;">
                         <span>Window:</span>
                         <select id="timelineWindowSelect">
                             <option value="5m">5 min</option>
@@ -261,32 +309,32 @@ const SignalTimeline = (function() {
                         </select>
                     </div>
                 </div>
-            </div>
-            <div class="signal-timeline-axis" id="timelineAxis"></div>
-            <div class="signal-timeline-lanes" id="timelineLanes">
-                <div class="signal-timeline-empty">
-                    <div class="signal-timeline-empty-icon">📡</div>
-                    <div>No signals recorded yet</div>
-                    <div style="margin-top: 4px; font-size: 9px;">Signals will appear as they are detected</div>
+                <div class="signal-timeline-axis" id="timelineAxis"></div>
+                <div class="signal-timeline-lanes" id="timelineLanes">
+                    <div class="signal-timeline-empty">
+                        <div class="signal-timeline-empty-icon">📡</div>
+                        <div>No signals recorded yet</div>
+                        <div style="margin-top: 4px; font-size: 9px;">Signals will appear as they are detected</div>
+                    </div>
                 </div>
-            </div>
-            <div class="signal-timeline-annotations" id="timelineAnnotations" style="display: none;"></div>
-            <div class="signal-timeline-legend">
-                <div class="signal-timeline-legend-item">
-                    <div class="signal-timeline-legend-dot new"></div>
-                    <span>New</span>
-                </div>
-                <div class="signal-timeline-legend-item">
-                    <div class="signal-timeline-legend-dot baseline"></div>
-                    <span>Baseline</span>
-                </div>
-                <div class="signal-timeline-legend-item">
-                    <div class="signal-timeline-legend-dot burst"></div>
-                    <span>Burst</span>
-                </div>
-                <div class="signal-timeline-legend-item">
-                    <div class="signal-timeline-legend-dot flagged"></div>
-                    <span>Flagged</span>
+                <div class="signal-timeline-annotations" id="timelineAnnotations" style="display: none;"></div>
+                <div class="signal-timeline-legend">
+                    <div class="signal-timeline-legend-item">
+                        <div class="signal-timeline-legend-dot new"></div>
+                        <span>New</span>
+                    </div>
+                    <div class="signal-timeline-legend-item">
+                        <div class="signal-timeline-legend-dot baseline"></div>
+                        <span>Baseline</span>
+                    </div>
+                    <div class="signal-timeline-legend-item">
+                        <div class="signal-timeline-legend-dot burst"></div>
+                        <span>Burst</span>
+                    </div>
+                    <div class="signal-timeline-legend-item">
+                        <div class="signal-timeline-legend-dot flagged"></div>
+                        <span>Flagged</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -312,9 +360,20 @@ const SignalTimeline = (function() {
      * Set up event listeners
      */
     function setupEventListeners(timeline) {
+        // Collapse toggle
+        const header = timeline.querySelector('#timelineHeader');
+        if (header) {
+            header.addEventListener('click', (e) => {
+                // Don't toggle if clicking on controls inside header
+                if (e.target.closest('button') || e.target.closest('select')) return;
+                timeline.classList.toggle('collapsed');
+            });
+        }
+
         // Filter buttons
         timeline.querySelectorAll('.signal-timeline-btn[data-filter]').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent collapse toggle
                 const filter = btn.dataset.filter;
                 state.filters[filter] = !state.filters[filter];
                 btn.classList.toggle('active', state.filters[filter]);
@@ -325,6 +384,7 @@ const SignalTimeline = (function() {
         // Time window selector
         const windowSelect = timeline.querySelector('#timelineWindowSelect');
         if (windowSelect) {
+            windowSelect.addEventListener('click', (e) => e.stopPropagation());
             windowSelect.addEventListener('change', (e) => {
                 state.timeWindow = e.target.value;
                 render();
@@ -479,7 +539,11 @@ const SignalTimeline = (function() {
             return b.lastSeen - a.lastSeen;
         });
 
-        // Render lanes
+        // Render lanes (limit displayed for performance)
+        const totalSignals = signals.length;
+        const displayedSignals = signals.slice(0, config.maxDisplayedLanes);
+        const hiddenCount = totalSignals - displayedSignals.length;
+
         if (signals.length === 0) {
             lanesContainer.innerHTML = `
                 <div class="signal-timeline-empty">
@@ -489,9 +553,20 @@ const SignalTimeline = (function() {
                 </div>
             `;
         } else {
-            lanesContainer.innerHTML = signals.map(signal =>
+            let html = displayedSignals.map(signal =>
                 renderLane(signal, startTime, now, windowMs)
             ).join('');
+
+            // Show indicator if there are more signals
+            if (hiddenCount > 0) {
+                html += `
+                    <div class="signal-timeline-more" style="text-align: center; padding: 8px; font-size: 10px; color: var(--text-dim, #666);">
+                        +${hiddenCount} more signals (scroll or adjust filters)
+                    </div>
+                `;
+            }
+
+            lanesContainer.innerHTML = html;
 
             // Add event listeners to new lanes
             lanesContainer.querySelectorAll('.signal-timeline-lane').forEach(lane => {
@@ -503,6 +578,15 @@ const SignalTimeline = (function() {
                 lane.addEventListener('mouseleave', hideTooltip);
             });
         }
+
+        // Update header stats
+        const allSignals = Array.from(state.signals.values());
+        const statTotal = document.getElementById('timelineStatTotal');
+        const statNew = document.getElementById('timelineStatNew');
+        const statBurst = document.getElementById('timelineStatBurst');
+        if (statTotal) statTotal.textContent = allSignals.length;
+        if (statNew) statNew.textContent = allSignals.filter(s => s.status === 'new').length;
+        if (statBurst) statBurst.textContent = allSignals.filter(s => s.status === 'burst').length;
 
         // Render annotations
         renderAnnotations(annotationsContainer);
