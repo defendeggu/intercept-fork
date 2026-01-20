@@ -61,6 +61,16 @@ docker compose up -d
 
 > **Note:** Docker requires privileged mode for USB SDR access. See `docker-compose.yml` for configuration options.
 
+### Local Fixes Branch (Optional)
+
+If you keep local changes (e.g., custom health checks), use a separate branch and rebase it after updates:
+
+```bash
+git fetch origin
+git checkout local-fixes
+git rebase origin/main
+```
+
 ### Open the Interface
 
 After starting, open **http://localhost:5050** in your browser. The username and password is <b>admin</b>:<b>admin</b> 
