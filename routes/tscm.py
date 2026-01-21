@@ -642,6 +642,9 @@ def _scan_wifi_networks(interface: str) -> list[dict]:
     This is a facade that maintains backwards compatibility with TSCM
     while using the new unified scanner module.
 
+    Automatically detects monitor mode interfaces and uses deep scan
+    (airodump-ng) when appropriate.
+
     Args:
         interface: WiFi interface name (optional).
 
@@ -652,18 +655,51 @@ def _scan_wifi_networks(interface: str) -> list[dict]:
         from utils.wifi import get_wifi_scanner
 
         scanner = get_wifi_scanner()
-        result = scanner.quick_scan(interface=interface, timeout=15)
 
-        if result.error:
-            logger.warning(f"WiFi scan error: {result.error}")
+        # Check if interface is in monitor mode
+        is_monitor = False
+        if interface:
+            is_monitor = scanner._is_monitor_mode_interface(interface)
 
-        # Convert to legacy format for TSCM
-        networks = []
-        for ap in result.access_points:
-            networks.append(ap.to_legacy_dict())
+        if is_monitor:
+            # Use deep scan for monitor mode interfaces
+            logger.info(f"Interface {interface} is in monitor mode, using deep scan")
 
-        logger.info(f"WiFi scan found {len(networks)} networks")
-        return networks
+            # Check if airodump-ng is available
+            caps = scanner.check_capabilities()
+            if not caps.has_airodump_ng:
+                logger.warning("airodump-ng not available for monitor mode scanning")
+                return []
+
+            # Start a short deep scan
+            if not scanner.is_scanning:
+                scanner.start_deep_scan(interface=interface, band='all')
+
+            # Wait briefly for some results
+            import time
+            time.sleep(5)
+
+            # Get current access points
+            networks = []
+            for ap in scanner.access_points:
+                networks.append(ap.to_legacy_dict())
+
+            logger.info(f"WiFi deep scan found {len(networks)} networks")
+            return networks
+        else:
+            # Use quick scan for managed mode interfaces
+            result = scanner.quick_scan(interface=interface, timeout=15)
+
+            if result.error:
+                logger.warning(f"WiFi scan error: {result.error}")
+
+            # Convert to legacy format for TSCM
+            networks = []
+            for ap in result.access_points:
+                networks.append(ap.to_legacy_dict())
+
+            logger.info(f"WiFi scan found {len(networks)} networks")
+            return networks
 
     except ImportError as e:
         logger.error(f"Failed to import wifi scanner: {e}")
