@@ -503,10 +503,34 @@ def stream_events():
     """
     scanner = get_bluetooth_scanner()
 
+    def map_event_type(event: dict) -> tuple[str, dict]:
+        """Map internal event types to SSE event names."""
+        event_type = event.get('type', 'unknown')
+
+        if event_type == 'device':
+            # Device update - send the device data
+            return 'device_update', event.get('device', event)
+        elif event_type == 'status':
+            status = event.get('status', '')
+            if status == 'started':
+                return 'scan_started', event
+            elif status == 'stopped':
+                return 'scan_stopped', event
+            return 'status', event
+        elif event_type == 'error':
+            return 'error', event
+        elif event_type == 'baseline':
+            return 'baseline', event
+        elif event_type == 'ping':
+            return 'ping', {}
+        else:
+            return event_type, event
+
     def event_generator() -> Generator[str, None, None]:
         """Generate SSE events from scanner."""
         for event in scanner.stream_events(timeout=1.0):
-            yield format_sse(event)
+            event_name, event_data = map_event_type(event)
+            yield format_sse(event_data, event=event_name)
 
     return Response(
         event_generator(),
