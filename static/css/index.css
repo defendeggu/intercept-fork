@@ -3377,6 +3377,209 @@ header h1 .tagline {
     background: rgba(0, 122, 255, 0.05);
 }
 
+/* Bluetooth Device Modal */
+.bt-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.bt-modal {
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #333);
+    background: var(--bg-tertiary, #141428);
+}
+
+.bt-modal-header h4 {
+    margin: 0;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.bt-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim, #666);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.bt-modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.bt-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: calc(85vh - 60px);
+}
+
+.bt-modal-section {
+    margin-bottom: 16px;
+}
+
+.bt-modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.bt-modal-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim, #666);
+    margin-bottom: 8px;
+}
+
+.bt-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.bt-modal-stat {
+    background: var(--bg-tertiary, #141428);
+    padding: 10px 12px;
+    border-radius: 6px;
+}
+
+.bt-modal-stat-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-dim, #666);
+    margin-bottom: 4px;
+}
+
+.bt-modal-stat-value {
+    font-size: 13px;
+    color: var(--text-primary, #e0e0e0);
+    font-family: monospace;
+}
+
+.bt-modal-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+.bt-modal-badge.ble {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.bt-modal-badge.classic {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.bt-modal-badge.new {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.bt-modal-badge.baseline {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.bt-modal-badge.flag {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+}
+
+.bt-modal-rssi {
+    text-align: center;
+    padding: 16px;
+    background: var(--bg-tertiary, #141428);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.bt-modal-rssi-value {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: monospace;
+}
+
+.bt-modal-rssi-label {
+    font-size: 11px;
+    color: var(--text-dim, #666);
+    margin-top: 4px;
+}
+
+.bt-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.bt-modal-actions button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bt-modal-btn-primary {
+    background: var(--accent-cyan, #00d4ff);
+    border: none;
+    color: #000;
+    font-weight: 600;
+}
+
+.bt-modal-btn-primary:hover {
+    background: #00b8e6;
+}
+
+.bt-modal-btn-secondary {
+    background: var(--bg-tertiary, #141428);
+    border: 1px solid var(--border-color, #333);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.bt-modal-btn-secondary:hover {
+    background: var(--bg-secondary, #1a1a2e);
+}
+
 @media (max-width: 1200px) {
     .bt-layout-container {
         flex-direction: column;

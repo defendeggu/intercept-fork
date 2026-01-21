@@ -706,19 +706,30 @@
                 <div class="bt-layout-container" id="btLayoutContainer" style="display: none;">
                     <!-- Left: Bluetooth Visualizations -->
                     <div class="wifi-visuals" id="btVisuals">
-                        <!-- Selected Bluetooth Device Info - at top for visibility -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <h5>Selected Device</h5>
-                            <div id="btSelectedDevice" style="font-size: 11px; min-height: 100px;">
-                                <div style="color: var(--text-dim); padding: 20px; text-align: center;">Click a device
-                                    to view details</div>
-                            </div>
-                        </div>
-                        <!-- Row 1: Bluetooth Radar + Device Types -->
+                        <!-- Row 1: Proximity Zones + Device Types -->
                         <div class="wifi-visual-panel">
-                            <h5>Proximity Radar</h5>
-                            <div class="radar-container">
-                                <canvas id="btRadarCanvas" width="150" height="150"></canvas>
+                            <h5>Proximity Zones</h5>
+                            <div id="btProximityZones" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e;"></div>
+                                    <span style="flex: 1; font-size: 11px; color: #888;">Very Close</span>
+                                    <span id="btZoneVeryClose" style="font-size: 14px; font-weight: 600; color: #22c55e;">0</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #84cc16;"></div>
+                                    <span style="flex: 1; font-size: 11px; color: #888;">Close</span>
+                                    <span id="btZoneClose" style="font-size: 14px; font-weight: 600; color: #84cc16;">0</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #eab308;"></div>
+                                    <span style="flex: 1; font-size: 11px; color: #888;">Nearby</span>
+                                    <span id="btZoneNearby" style="font-size: 14px; font-weight: 600; color: #eab308;">0</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444;"></div>
+                                    <span style="flex: 1; font-size: 11px; color: #888;">Far</span>
+                                    <span id="btZoneFar" style="font-size: 14px; font-weight: 600; color: #ef4444;">0</span>
+                                </div>
                             </div>
                         </div>
                         <div class="wifi-visual-panel">
@@ -782,6 +793,19 @@
                             <div style="color: var(--text-dim); text-align: center; padding: 30px;">
                                 Start scanning to discover Bluetooth devices
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bluetooth Device Detail Modal -->
+                <div id="btDeviceModal" class="bt-modal-overlay" style="display: none;">
+                    <div class="bt-modal">
+                        <div class="bt-modal-header">
+                            <h4 id="btModalTitle">Device Details</h4>
+                            <button class="bt-modal-close" onclick="BluetoothMode.closeModal()">&times;</button>
+                        </div>
+                        <div class="bt-modal-body" id="btModalBody">
+                            <!-- Populated by JavaScript -->
                         </div>
                     </div>
                 </div>

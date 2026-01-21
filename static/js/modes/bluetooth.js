@@ -12,7 +12,6 @@ const BluetoothMode = (function() {
     let devices = new Map();
     let baselineSet = false;
     let baselineCount = 0;
-    let selectedDeviceId = null;
 
     // DOM elements (cached)
     let startBtn, stopBtn, messageContainer, deviceContainer;
@@ -33,9 +32,8 @@ const BluetoothMode = (function() {
         findmy: []
     };
 
-    // Proximity visualization state
-    let deviceAngles = new Map(); // Store assigned angles for each device
-    let pendingVisualizationUpdate = false;
+    // Zone counts for proximity display
+    let zoneCounts = { veryClose: 0, close: 0, nearby: 0, far: 0 };
 
     /**
      * Initialize the Bluetooth mode
@@ -73,163 +71,192 @@ const BluetoothMode = (function() {
     }
 
     /**
-     * Initialize the proximity visualization
+     * Initialize proximity zones display
      */
     function initHeatmap() {
-        const canvas = document.getElementById('btRadarCanvas');
-        if (!canvas) return;
-
-        canvas.width = 180;
-        canvas.height = 180;
-        drawProximityVisualization();
+        updateProximityZones();
     }
 
     /**
-     * Draw clean zone-based proximity visualization
+     * Update proximity zone counts (simple HTML, no canvas)
      */
-    function drawProximityVisualization() {
-        const canvas = document.getElementById('btRadarCanvas');
-        if (!canvas) return;
+    function updateProximityZones() {
+        zoneCounts = { veryClose: 0, close: 0, nearby: 0, far: 0 };
 
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const maxRadius = Math.min(width, height) / 2 - 10;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
-
-        // Define zones
-        const zones = [
-            { radius: 1.0, color: 'rgba(239, 68, 68, 0.04)', border: 'rgba(239, 68, 68, 0.2)' },
-            { radius: 0.75, color: 'rgba(234, 179, 8, 0.05)', border: 'rgba(234, 179, 8, 0.25)' },
-            { radius: 0.5, color: 'rgba(132, 204, 22, 0.06)', border: 'rgba(132, 204, 22, 0.3)' },
-            { radius: 0.25, color: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.4)' }
-        ];
-
-        // Draw zones
-        zones.forEach(zone => {
-            const r = maxRadius * zone.radius;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-            ctx.fillStyle = zone.color;
-            ctx.fill();
-            ctx.strokeStyle = zone.border;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        });
-
-        // Count devices per zone and draw dots
-        const zoneCounts = [0, 0, 0, 0];
-
-        devices.forEach((device, deviceId) => {
+        devices.forEach(device => {
             const rssi = device.rssi_current;
             if (rssi == null) return;
 
-            // Count zone
-            if (rssi >= -40) zoneCounts[0]++;
-            else if (rssi >= -55) zoneCounts[1]++;
-            else if (rssi >= -70) zoneCounts[2]++;
-            else zoneCounts[3]++;
-
-            // Get or assign angle for this device
-            let angle = deviceAngles.get(deviceId);
-            if (angle === undefined) {
-                angle = Math.random() * Math.PI * 2;
-                deviceAngles.set(deviceId, angle);
-            }
-
-            // Calculate position based on RSSI
-            const normalizedRssi = Math.max(0, Math.min(1, (rssi + 100) / 70));
-            const radius = maxRadius * (1 - normalizedRssi * 0.85 + 0.1);
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-
-            // Get color
-            const color = getRssiColorRgb(rssi);
-
-            // Draw glow
-            const gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
-            gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.5)`);
-            gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(x, y, 10, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Draw dot
-            ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, Math.PI * 2);
-            ctx.fill();
+            if (rssi >= -40) zoneCounts.veryClose++;
+            else if (rssi >= -55) zoneCounts.close++;
+            else if (rssi >= -70) zoneCounts.nearby++;
+            else zoneCounts.far++;
         });
 
-        // Draw center point
-        ctx.fillStyle = '#00d4ff';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
-        ctx.fill();
+        // Update DOM elements
+        const veryCloseEl = document.getElementById('btZoneVeryClose');
+        const closeEl = document.getElementById('btZoneClose');
+        const nearbyEl = document.getElementById('btZoneNearby');
+        const farEl = document.getElementById('btZoneFar');
 
-        // Draw "YOU" label
-        ctx.fillStyle = 'rgba(0, 212, 255, 0.8)';
-        ctx.font = '8px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('YOU', centerX, centerY + 14);
-
-        // Draw zone counts
-        ctx.textAlign = 'right';
-        ctx.font = '9px monospace';
-        const countX = width - 6;
-        const colors = ['#22c55e', '#84cc16', '#eab308', '#ef4444'];
-        const yPositions = [centerY - 45, centerY - 15, centerY + 15, centerY + 45];
-
-        zoneCounts.forEach((count, i) => {
-            if (count > 0) {
-                ctx.fillStyle = colors[i];
-                ctx.fillText(count.toString(), countX, yPositions[i]);
-            }
-        });
-
-        // Total count
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${devices.size} devices`, centerX, height - 4);
-
-        // Empty state message
-        if (devices.size === 0 && !isScanning) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.font = '11px sans-serif';
-            ctx.fillText('Start scan to', centerX, centerY - 8);
-            ctx.fillText('detect devices', centerX, centerY + 8);
-        }
+        if (veryCloseEl) veryCloseEl.textContent = zoneCounts.veryClose;
+        if (closeEl) closeEl.textContent = zoneCounts.close;
+        if (nearbyEl) nearbyEl.textContent = zoneCounts.nearby;
+        if (farEl) farEl.textContent = zoneCounts.far;
     }
 
     /**
-     * Schedule visualization update using requestAnimationFrame
+     * Show device detail modal
      */
-    function scheduleVisualizationUpdate() {
-        if (!pendingVisualizationUpdate) {
-            pendingVisualizationUpdate = true;
-            requestAnimationFrame(() => {
-                pendingVisualizationUpdate = false;
-                drawProximityVisualization();
-            });
-        }
+    function showModal(deviceId) {
+        const device = devices.get(deviceId);
+        if (!device) return;
+
+        const modal = document.getElementById('btDeviceModal');
+        const title = document.getElementById('btModalTitle');
+        const body = document.getElementById('btModalBody');
+
+        if (!modal || !body) return;
+
+        const rssi = device.rssi_current;
+        const rssiColor = getRssiColor(rssi);
+        const flags = device.heuristic_flags || [];
+        const protocol = device.protocol || 'ble';
+
+        title.textContent = device.name || formatDeviceId(device.address);
+
+        body.innerHTML = `
+            <!-- RSSI Display -->
+            <div class="bt-modal-rssi">
+                <div class="bt-modal-rssi-value" style="color: ${rssiColor};">
+                    ${rssi != null ? rssi : '--'} <span style="font-size: 14px; color: #666;">dBm</span>
+                </div>
+                <div class="bt-modal-rssi-label">${device.range_band || 'Unknown'} Range</div>
+            </div>
+
+            <!-- Badges -->
+            <div class="bt-modal-section">
+                <span class="bt-modal-badge ${protocol}">${protocol.toUpperCase()}</span>
+                <span class="bt-modal-badge ${device.in_baseline ? 'baseline' : 'new'}">${device.in_baseline ? '✓ BASELINE' : '● NEW'}</span>
+                ${flags.map(f => `<span class="bt-modal-badge flag">${f.replace('_', ' ').toUpperCase()}</span>`).join('')}
+            </div>
+
+            <!-- Address Info -->
+            <div class="bt-modal-section">
+                <div class="bt-modal-section-title">Address</div>
+                <div style="font-family: monospace; font-size: 14px; color: #00d4ff; margin-bottom: 4px;">
+                    ${escapeHtml(device.address)}
+                </div>
+                <div style="font-size: 11px; color: #666;">Type: ${device.address_type || 'unknown'}</div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="bt-modal-section">
+                <div class="bt-modal-section-title">Device Information</div>
+                <div class="bt-modal-grid">
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Manufacturer</div>
+                        <div class="bt-modal-stat-value">${escapeHtml(device.manufacturer_name || 'Unknown')}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Manufacturer ID</div>
+                        <div class="bt-modal-stat-value">${device.manufacturer_id != null ? '0x' + device.manufacturer_id.toString(16).toUpperCase().padStart(4, '0') : '--'}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Seen Count</div>
+                        <div class="bt-modal-stat-value">${device.seen_count || 0} times</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Confidence</div>
+                        <div class="bt-modal-stat-value">${device.rssi_confidence ? Math.round(device.rssi_confidence * 100) + '%' : '--'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Stats -->
+            <div class="bt-modal-section">
+                <div class="bt-modal-section-title">Signal Statistics</div>
+                <div class="bt-modal-grid">
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Minimum</div>
+                        <div class="bt-modal-stat-value" style="color: #ef4444;">${device.rssi_min != null ? device.rssi_min + ' dBm' : '--'}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Maximum</div>
+                        <div class="bt-modal-stat-value" style="color: #22c55e;">${device.rssi_max != null ? device.rssi_max + ' dBm' : '--'}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Median</div>
+                        <div class="bt-modal-stat-value" style="color: #eab308;">${device.rssi_median != null ? Math.round(device.rssi_median) + ' dBm' : '--'}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Current</div>
+                        <div class="bt-modal-stat-value" style="color: ${rssiColor};">${rssi != null ? rssi + ' dBm' : '--'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service UUIDs -->
+            ${device.service_uuids && device.service_uuids.length > 0 ? `
+            <div class="bt-modal-section">
+                <div class="bt-modal-section-title">Service UUIDs (${device.service_uuids.length})</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    ${device.service_uuids.map(uuid => `<span style="font-family: monospace; font-size: 10px; background: var(--bg-tertiary); padding: 4px 8px; border-radius: 4px; color: #888;">${uuid}</span>`).join('')}
+                </div>
+            </div>
+            ` : ''}
+
+            <!-- Timestamps -->
+            <div class="bt-modal-section">
+                <div class="bt-modal-section-title">Timestamps</div>
+                <div class="bt-modal-grid">
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">First Seen</div>
+                        <div class="bt-modal-stat-value">${device.first_seen ? new Date(device.first_seen).toLocaleTimeString() : '--'}</div>
+                    </div>
+                    <div class="bt-modal-stat">
+                        <div class="bt-modal-stat-label">Last Seen</div>
+                        <div class="bt-modal-stat-value">${device.last_seen ? new Date(device.last_seen).toLocaleTimeString() : '--'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="bt-modal-actions">
+                <button class="bt-modal-btn-primary" onclick="BluetoothMode.copyAddress('${device.address}')">
+                    Copy Address
+                </button>
+                <button class="bt-modal-btn-secondary" onclick="BluetoothMode.closeModal()">
+                    Close
+                </button>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+
+        // Close on overlay click
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        // Close on Escape key
+        document.addEventListener('keydown', handleModalKeydown);
     }
 
     /**
-     * Get RSSI color as RGB object
+     * Close device detail modal
      */
-    function getRssiColorRgb(rssi) {
-        if (rssi == null) return { r: 102, g: 102, b: 102 };
-        if (rssi >= -40) return { r: 34, g: 197, b: 94 };
-        if (rssi >= -55) return { r: 132, g: 204, b: 22 };
-        if (rssi >= -70) return { r: 234, g: 179, b: 8 };
-        if (rssi >= -85) return { r: 249, g: 115, b: 22 };
-        return { r: 239, g: 68, b: 68 };
+    function closeModal() {
+        const modal = document.getElementById('btDeviceModal');
+        if (modal) modal.style.display = 'none';
+        document.removeEventListener('keydown', handleModalKeydown);
+    }
+
+    /**
+     * Handle keydown for modal
+     */
+    function handleModalKeydown(e) {
+        if (e.key === 'Escape') closeModal();
     }
 
     /**
@@ -268,137 +295,10 @@ const BluetoothMode = (function() {
     }
 
     /**
-     * Select a device and show in Selected Device panel
+     * Select a device - opens modal with details
      */
     function selectDevice(deviceId) {
-        const device = devices.get(deviceId);
-        if (!device) return;
-
-        selectedDeviceId = deviceId;
-
-        // Update selected device panel
-        const panel = document.getElementById('btSelectedDevice');
-        if (!panel) return;
-
-        const rssi = device.rssi_current;
-        const rssiColor = getRssiColor(rssi);
-        const flags = device.heuristic_flags || [];
-
-        panel.innerHTML = `
-            <div style="padding: 10px;">
-                <!-- Device header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                    <div>
-                        <div style="font-size: 16px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px;">
-                            ${escapeHtml(device.name || formatDeviceId(device.address))}
-                        </div>
-                        <div style="font-family: monospace; font-size: 12px; color: #00d4ff;">
-                            ${escapeHtml(device.address)}
-                            <span style="color: #666; font-size: 10px;">(${device.address_type || 'unknown'})</span>
-                        </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-family: monospace; font-size: 24px; font-weight: 700; color: ${rssiColor};">
-                            ${rssi != null ? rssi : '--'}
-                            <span style="font-size: 11px; color: #666;">dBm</span>
-                        </div>
-                        <div style="font-size: 10px; color: #888; text-transform: uppercase;">${device.range_band || 'unknown'}</div>
-                    </div>
-                </div>
-
-                <!-- Badges -->
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;">
-                    <span style="background: ${device.protocol === 'ble' ? 'rgba(59,130,246,0.15)' : 'rgba(139,92,246,0.15)'}; color: ${device.protocol === 'ble' ? '#3b82f6' : '#8b5cf6'}; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">
-                        ${(device.protocol || 'BLE').toUpperCase()}
-                    </span>
-                    ${flags.map(f => `<span style="background: rgba(107,114,128,0.15); color: #9ca3af; padding: 3px 8px; border-radius: 4px; font-size: 10px;">${f.replace('_', ' ').toUpperCase()}</span>`).join('')}
-                    <span style="background: ${device.in_baseline ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)'}; color: ${device.in_baseline ? '#22c55e' : '#3b82f6'}; padding: 3px 8px; border-radius: 4px; font-size: 10px;">
-                        ${device.in_baseline ? '✓ BASELINE' : '● NEW'}
-                    </span>
-                </div>
-
-                <!-- Info grid -->
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
-                    <div style="background: #141428; padding: 8px 10px; border-radius: 4px;">
-                        <div style="font-size: 9px; color: #666; text-transform: uppercase;">Manufacturer</div>
-                        <div style="font-size: 11px; color: #e0e0e0; margin-top: 2px;">${device.manufacturer_name || 'Unknown'}</div>
-                    </div>
-                    <div style="background: #141428; padding: 8px 10px; border-radius: 4px;">
-                        <div style="font-size: 9px; color: #666; text-transform: uppercase;">Mfr ID</div>
-                        <div style="font-family: monospace; font-size: 11px; color: #e0e0e0; margin-top: 2px;">
-                            ${device.manufacturer_id != null ? '0x' + device.manufacturer_id.toString(16).toUpperCase().padStart(4, '0') : '--'}
-                        </div>
-                    </div>
-                    <div style="background: #141428; padding: 8px 10px; border-radius: 4px;">
-                        <div style="font-size: 9px; color: #666; text-transform: uppercase;">Seen</div>
-                        <div style="font-size: 11px; color: #e0e0e0; margin-top: 2px;">${device.seen_count || 0} times</div>
-                    </div>
-                    <div style="background: #141428; padding: 8px 10px; border-radius: 4px;">
-                        <div style="font-size: 9px; color: #666; text-transform: uppercase;">Confidence</div>
-                        <div style="font-size: 11px; color: #e0e0e0; margin-top: 2px;">${device.rssi_confidence ? Math.round(device.rssi_confidence * 100) + '%' : '--'}</div>
-                    </div>
-                </div>
-
-                <!-- Signal stats -->
-                <div style="background: #141428; padding: 10px; border-radius: 4px; margin-bottom: 12px;">
-                    <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 8px;">Signal Statistics</div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 9px; color: #666;">MIN</div>
-                            <div style="font-family: monospace; font-size: 12px; color: #ef4444;">${device.rssi_min != null ? device.rssi_min : '--'}</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 9px; color: #666;">MEDIAN</div>
-                            <div style="font-family: monospace; font-size: 12px; color: #eab308;">${device.rssi_median != null ? Math.round(device.rssi_median) : '--'}</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 9px; color: #666;">MAX</div>
-                            <div style="font-family: monospace; font-size: 12px; color: #22c55e;">${device.rssi_max != null ? device.rssi_max : '--'}</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 9px; color: #666;">CURRENT</div>
-                            <div style="font-family: monospace; font-size: 12px; color: ${rssiColor};">${rssi != null ? rssi : '--'}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Service UUIDs -->
-                ${device.service_uuids && device.service_uuids.length > 0 ? `
-                <div style="background: #141428; padding: 10px; border-radius: 4px; margin-bottom: 12px;">
-                    <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 8px;">Service UUIDs (${device.service_uuids.length})</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                        ${device.service_uuids.slice(0, 6).map(uuid => `<span style="font-family: monospace; font-size: 9px; background: #1a1a2e; padding: 3px 6px; border-radius: 3px; color: #888;">${uuid.substring(0, 8)}...</span>`).join('')}
-                        ${device.service_uuids.length > 6 ? `<span style="font-size: 9px; color: #666;">+${device.service_uuids.length - 6} more</span>` : ''}
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- Timestamps -->
-                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666;">
-                    <span>First: ${device.first_seen ? new Date(device.first_seen).toLocaleTimeString() : '--'}</span>
-                    <span>Last: ${device.last_seen ? new Date(device.last_seen).toLocaleTimeString() : '--'}</span>
-                </div>
-
-                <!-- Action buttons -->
-                <div style="display: flex; gap: 8px; margin-top: 12px;">
-                    <button onclick="BluetoothMode.copyAddress('${device.address}')" style="flex: 1; background: #252538; border: 1px solid #444; color: #e0e0e0; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                        Copy Address
-                    </button>
-                </div>
-            </div>
-        `;
-
-        // Highlight selected card
-        const cards = deviceContainer?.querySelectorAll('[data-bt-device-id]');
-        cards?.forEach(card => {
-            if (card.dataset.btDeviceId === deviceId) {
-                card.style.borderColor = '#00d4ff';
-                card.style.boxShadow = '0 0 0 1px rgba(0, 212, 255, 0.3)';
-            } else {
-                card.style.borderColor = '#444';
-                card.style.boxShadow = 'none';
-            }
-        });
+        showModal(deviceId);
     }
 
     /**
@@ -562,12 +462,6 @@ const BluetoothMode = (function() {
             deviceContainer.innerHTML = '';
             devices.clear();
             resetStats();
-
-            // Reset selected device panel
-            const selectedPanel = document.getElementById('btSelectedDevice');
-            if (selectedPanel) {
-                selectedPanel.innerHTML = '<div style="color: var(--text-dim); padding: 20px; text-align: center;">Click a device to view details</div>';
-            }
         }
 
         const statusDot = document.getElementById('statusDot');
@@ -589,9 +483,8 @@ const BluetoothMode = (function() {
             trackers: [],
             findmy: []
         };
-        deviceAngles.clear();
         updateVisualizationPanels();
-        drawProximityVisualization();
+        updateProximityZones();
     }
 
     function startEventStream() {
@@ -634,12 +527,7 @@ const BluetoothMode = (function() {
         updateDeviceCount();
         updateStatsFromDevices();
         updateVisualizationPanels();
-        scheduleVisualizationUpdate(); // Throttled visualization update
-
-        // Update selected device panel if this device is selected
-        if (selectedDeviceId === device.device_id) {
-            selectDevice(device.device_id);
-        }
+        updateProximityZones();
 
         // Feed to activity timeline
         addToTimeline(device);
@@ -909,9 +797,8 @@ const BluetoothMode = (function() {
         const seenCount = device.seen_count || 0;
         const rangeBand = device.range_band || 'unknown';
         const inBaseline = device.in_baseline || false;
-        const isSelected = selectedDeviceId === device.device_id;
 
-        const cardStyle = 'display:block;background:#1a1a2e;border:1px solid ' + (isSelected ? '#00d4ff' : '#444') + ';border-radius:8px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s;' + (isSelected ? 'box-shadow:0 0 0 1px rgba(0,212,255,0.3);' : '');
+        const cardStyle = 'display:block;background:#1a1a2e;border:1px solid #444;border-radius:8px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s;';
         const headerStyle = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
         const nameStyle = 'font-size:14px;font-weight:600;color:#e0e0e0;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
         const addrStyle = 'font-family:monospace;font-size:11px;color:#00d4ff;';
@@ -924,7 +811,7 @@ const BluetoothMode = (function() {
 
         const deviceIdEscaped = escapeHtml(device.device_id).replace(/'/g, "\\'");
 
-        return '<div data-bt-device-id="' + escapeHtml(device.device_id) + '" style="' + cardStyle + '" onclick="BluetoothMode.selectDevice(\'' + deviceIdEscaped + '\')" onmouseover="this.style.borderColor=\'#00d4ff\'" onmouseout="this.style.borderColor=\'' + (isSelected ? '#00d4ff' : '#444') + '\'">' +
+        return '<div data-bt-device-id="' + escapeHtml(device.device_id) + '" style="' + cardStyle + '" onclick="BluetoothMode.selectDevice(\'' + deviceIdEscaped + '\')" onmouseover="this.style.borderColor=\'#00d4ff\'" onmouseout="this.style.borderColor=\'#444\'">' +
             '<div style="' + headerStyle + '">' +
                 '<div>' + protoBadge + badgesHtml + '</div>' +
                 '<span style="' + statusPillStyle + '">' + (inBaseline ? '✓ Known' : '● New') + '</span>' +
@@ -1021,6 +908,8 @@ const BluetoothMode = (function() {
         clearBaseline,
         exportData,
         selectDevice,
+        showModal,
+        closeModal,
         copyAddress,
         getDevices: () => Array.from(devices.values()),
         isScanning: () => isScanning
