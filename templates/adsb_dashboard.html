@@ -2001,6 +2001,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                             adsbOpt.value = idx;
                             adsbOpt.textContent = displayName;
                             adsbOpt.title = tooltip;
+                            adsbOpt.dataset.sdrType = dev.sdr_type || 'rtlsdr';
                             adsbSelect.appendChild(adsbOpt);
 
                             // Add to Airband selector
@@ -2370,11 +2371,15 @@ sudo make install</code>
                 const remoteConfig = getRemoteDump1090Config();
                 if (remoteConfig === false) return;
 
-                // Get selected ADS-B device
-                const adsbDevice = parseInt(document.getElementById('adsbDeviceSelect').value) || 0;
+                // Get selected ADS-B device and its SDR type
+                const adsbSelect = document.getElementById('adsbDeviceSelect');
+                const adsbDevice = parseInt(adsbSelect.value) || 0;
+                const selectedOption = adsbSelect.options[adsbSelect.selectedIndex];
+                const sdrType = selectedOption?.dataset?.sdrType || 'rtlsdr';
 
                 const requestBody = {
-                    device: adsbDevice
+                    device: adsbDevice,
+                    sdr_type: sdrType
                 };
                 if (remoteConfig) {
                     requestBody.remote_sbs_host = remoteConfig.host;

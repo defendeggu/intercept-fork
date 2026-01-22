@@ -100,25 +100,26 @@ class HackRFCommandBuilder(CommandBuilder):
         bias_t: bool = False
     ) -> list[str]:
         """
-        Build dump1090/readsb command with SoapySDR support for ADS-B decoding.
+        Build readsb command with native HackRF support for ADS-B decoding.
 
-        Uses readsb which has better SoapySDR support.
+        Uses readsb's native HackRF support (--device-type hackrf) which is
+        more reliable than SoapySDR for HackRF devices.
         """
-        device_str = self._build_device_string(device)
-
         cmd = [
             'readsb',
             '--net',
-            '--device-type', 'soapysdr',
-            '--device', device_str,
+            '--net-sbs-port', '30003',
+            '--device-type', 'hackrf',
             '--quiet'
         ]
 
         if gain is not None:
-            cmd.extend(['--gain', str(int(gain))])
+            # HackRF uses VGA gain (0-62 dB) for readsb
+            vga_gain = min(62, max(0, int(gain)))
+            cmd.extend(['--hackrf-vgagain', str(vga_gain)])
 
         if bias_t:
-            cmd.extend(['--enable-bias-t'])
+            cmd.extend(['--hackrf-enable-ampgain'])
 
         return cmd
 
