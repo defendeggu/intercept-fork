@@ -700,3 +700,7 @@ def main() -> None:
         threaded=True,
         load_dotenv=False,
     )
+
+
+if __name__ == '__main__':
+    main()
