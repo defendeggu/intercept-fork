@@ -314,6 +314,7 @@
                 </button>
                 <button class="nav-tool-btn" onclick="showDependencies()" title="Check Tool Dependencies"
                     id="depsBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
+                <button class="nav-tool-btn" onclick="showMqttSettings()" title="MQTT Settings" id="mqttBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span></button>
                 <button class="nav-tool-btn" onclick="showHelp()" title="Help & Documentation">?</button>
                 <button class="nav-tool-btn" onclick="logout(event)" title="Logout">
                     <span class="power-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -10675,7 +10676,270 @@
         </div>
     </div>
 
+    <!-- MQTT Settings Modal -->
+    <div id="mqttModal" class="help-modal" onclick="if(event.target === this) hideMqttSettings()">
+        <div class="help-content" style="max-width: 600px;">
+            <button class="help-close" onclick="hideMqttSettings()">×</button>
+            <h2>MQTT Settings</h2>
+            <p style="color: var(--text-dim); margin-bottom: 15px;">Configure MQTT broker connection for publishing decoded data to Elasticsearch/Kibana.</p>
+
+            <!-- Connection Status -->
+            <div id="mqttStatus" style="background: var(--bg-tertiary); padding: 10px; border-radius: 6px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-weight: bold;">Status:</span>
+                    <span id="mqttStatusText" style="margin-left: 8px;">Checking...</span>
+                </div>
+                <div id="mqttStatusIndicator" style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-dim);"></div>
+            </div>
+
+            <!-- Enable/Disable Toggle -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="mqttEnabled" onchange="toggleMqttEnabled()">
+                    <span>Enable MQTT Publishing</span>
+                </label>
+            </div>
+
+            <!-- Broker Settings -->
+            <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px;">Broker Connection</h3>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 11px; color: var(--text-dim);">Host</label>
+                        <input type="text" id="mqttHost" placeholder="localhost" style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 11px; color: var(--text-dim);">Port</label>
+                        <input type="number" id="mqttPort" placeholder="1883" style="width: 100%;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 11px; color: var(--text-dim);">Username (optional)</label>
+                        <input type="text" id="mqttUsername" placeholder="username" style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 11px; color: var(--text-dim);">Password (optional)</label>
+                        <input type="password" id="mqttPassword" placeholder="password" style="width: 100%;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="font-size: 11px; color: var(--text-dim);">Topic Prefix</label>
+                    <input type="text" id="mqttTopicPrefix" placeholder="intercept" style="width: 100%;">
+                </div>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px;">
+                    <input type="checkbox" id="mqttUseTls">
+                    <span>Use TLS/SSL</span>
+                </label>
+            </div>
+
+            <!-- Topic Settings -->
+            <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px;">Topics (per decoder)</h3>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicPocsag" checked>
+                        <span>Pager</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicAdsb" checked>
+                        <span>ADS-B</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicAcars" checked>
+                        <span>ACARS</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicAprs" checked>
+                        <span>APRS</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicSensor" checked>
+                        <span>433MHz</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+                        <input type="checkbox" id="mqttTopicRtlamr" checked>
+                        <span>Meters</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; gap: 10px;">
+                <button class="preset-btn" onclick="testMqttConnection()" style="flex: 1;">Test Connection</button>
+                <button class="preset-btn" onclick="saveMqttSettings()" style="flex: 1; background: var(--accent-green); color: #000;">Save Settings</button>
+            </div>
+
+            <!-- Test Result -->
+            <div id="mqttTestResult" style="margin-top: 10px; padding: 10px; border-radius: 4px; font-size: 12px; display: none;"></div>
+
+            <!-- Help Text -->
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-dim);">
+                <strong>Setup Mosquitto:</strong>
+                <code style="display: block; background: var(--bg-tertiary); padding: 8px; border-radius: 4px; margin-top: 5px;">
+                    sudo apt install mosquitto mosquitto-clients
+                </code>
+                <p style="margin-top: 10px;">Topics published: <code>{prefix}/pocsag</code>, <code>{prefix}/adsb</code>, <code>{prefix}/acars</code>, <code>{prefix}/aprs</code>, <code>{prefix}/sensor</code>, <code>{prefix}/rtlamr</code></p>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // MQTT Settings Functions
+        function showMqttSettings() {
+            document.getElementById('mqttModal').classList.add('active');
+            loadMqttSettings();
+        }
+
+        function hideMqttSettings() {
+            document.getElementById('mqttModal').classList.remove('active');
+        }
+
+        function loadMqttSettings() {
+            fetch('/mqtt/status')
+                .then(r => r.json())
+                .then(data => {
+                    // Update status indicator
+                    const statusText = document.getElementById('mqttStatusText');
+                    const statusIndicator = document.getElementById('mqttStatusIndicator');
+
+                    if (!data.available) {
+                        statusText.textContent = 'paho-mqtt not installed';
+                        statusIndicator.style.background = 'var(--accent-orange)';
+                    } else if (data.connected) {
+                        statusText.textContent = 'Connected';
+                        statusIndicator.style.background = 'var(--accent-green)';
+                    } else if (data.enabled) {
+                        statusText.textContent = 'Disconnected';
+                        statusIndicator.style.background = 'var(--accent-red)';
+                    } else {
+                        statusText.textContent = 'Disabled';
+                        statusIndicator.style.background = 'var(--text-dim)';
+                    }
+
+                    // Load config
+                    const config = data.config || {};
+                    document.getElementById('mqttEnabled').checked = config.enabled || false;
+                    document.getElementById('mqttHost').value = config.broker_host || 'localhost';
+                    document.getElementById('mqttPort').value = config.broker_port || 1883;
+                    document.getElementById('mqttUsername').value = config.username || '';
+                    document.getElementById('mqttPassword').value = '';
+                    document.getElementById('mqttTopicPrefix').value = config.topic_prefix || 'intercept';
+                    document.getElementById('mqttUseTls').checked = config.use_tls || false;
+
+                    // Load topic settings
+                    const topics = config.topics || {};
+                    document.getElementById('mqttTopicPocsag').checked = topics.pocsag !== false;
+                    document.getElementById('mqttTopicAdsb').checked = topics.adsb !== false;
+                    document.getElementById('mqttTopicAcars').checked = topics.acars !== false;
+                    document.getElementById('mqttTopicAprs').checked = topics.aprs !== false;
+                    document.getElementById('mqttTopicSensor').checked = topics.sensor !== false;
+                    document.getElementById('mqttTopicRtlamr').checked = topics.rtlamr !== false;
+                })
+                .catch(err => {
+                    console.error('Failed to load MQTT settings:', err);
+                    document.getElementById('mqttStatusText').textContent = 'Error loading settings';
+                    document.getElementById('mqttStatusIndicator').style.background = 'var(--accent-red)';
+                });
+        }
+
+        function toggleMqttEnabled() {
+            const enabled = document.getElementById('mqttEnabled').checked;
+            fetch('/mqtt/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled })
+            })
+            .then(r => r.json())
+            .then(data => {
+                loadMqttSettings();
+            })
+            .catch(err => console.error('Failed to toggle MQTT:', err));
+        }
+
+        function saveMqttSettings() {
+            const config = {
+                enabled: document.getElementById('mqttEnabled').checked,
+                broker_host: document.getElementById('mqttHost').value,
+                broker_port: parseInt(document.getElementById('mqttPort').value) || 1883,
+                username: document.getElementById('mqttUsername').value,
+                topic_prefix: document.getElementById('mqttTopicPrefix').value || 'intercept',
+                use_tls: document.getElementById('mqttUseTls').checked,
+                topics: {
+                    pocsag: document.getElementById('mqttTopicPocsag').checked,
+                    adsb: document.getElementById('mqttTopicAdsb').checked,
+                    acars: document.getElementById('mqttTopicAcars').checked,
+                    aprs: document.getElementById('mqttTopicAprs').checked,
+                    sensor: document.getElementById('mqttTopicSensor').checked,
+                    rtlamr: document.getElementById('mqttTopicRtlamr').checked
+                }
+            };
+
+            // Only include password if it was entered
+            const password = document.getElementById('mqttPassword').value;
+            if (password) {
+                config.password = password;
+            }
+
+            fetch('/mqtt/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+            .then(r => r.json())
+            .then(data => {
+                const resultDiv = document.getElementById('mqttTestResult');
+                if (data.status === 'success') {
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = 'var(--accent-green)';
+                    resultDiv.style.color = '#000';
+                    resultDiv.textContent = 'Settings saved successfully!';
+                    loadMqttSettings();
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = 'var(--accent-red)';
+                    resultDiv.style.color = '#fff';
+                    resultDiv.textContent = 'Error: ' + (data.message || 'Unknown error');
+                }
+                setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
+            })
+            .catch(err => {
+                const resultDiv = document.getElementById('mqttTestResult');
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = 'var(--accent-red)';
+                resultDiv.style.color = '#fff';
+                resultDiv.textContent = 'Error: ' + err.message;
+                setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
+            });
+        }
+
+        function testMqttConnection() {
+            const resultDiv = document.getElementById('mqttTestResult');
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'var(--bg-tertiary)';
+            resultDiv.style.color = 'var(--text-primary)';
+            resultDiv.textContent = 'Testing connection...';
+
+            fetch('/mqtt/test', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.style.background = 'var(--accent-green)';
+                        resultDiv.style.color = '#000';
+                        resultDiv.textContent = 'Connection successful!';
+                    } else {
+                        resultDiv.style.background = 'var(--accent-red)';
+                        resultDiv.style.color = '#fff';
+                        resultDiv.textContent = 'Connection failed: ' + (data.message || 'Unknown error');
+                    }
+                })
+                .catch(err => {
+                    resultDiv.style.background = 'var(--accent-red)';
+                    resultDiv.style.color = '#fff';
+                    resultDiv.textContent = 'Test failed: ' + err.message;
+                });
+        }
+
         function showDependencies() {
             document.getElementById('depsModal').classList.add('active');
             loadDependencies();

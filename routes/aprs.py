@@ -28,6 +28,7 @@ from utils.constants import (
     SSE_QUEUE_TIMEOUT,
     PROCESS_START_WAIT,
 )
+from utils.mqtt import mqtt_publish
 
 aprs_bp = Blueprint('aprs', __name__, url_prefix='/aprs')
 
@@ -1369,6 +1370,9 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
                     }
 
                 app_module.aprs_queue.put(packet)
+
+                # Publish to MQTT
+                mqtt_publish('aprs', packet)
 
                 # Log if enabled
                 if app_module.logging_enabled:

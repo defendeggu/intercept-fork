@@ -26,6 +26,7 @@ from utils.sse import format_sse
 from utils.process import safe_terminate, register_process
 from utils.sdr import SDRFactory, SDRType, SDRValidationError
 from utils.dependencies import get_tool_path
+from utils.mqtt import mqtt_publish
 
 pager_bp = Blueprint('pager', __name__)
 
@@ -132,6 +133,8 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
                             parsed['timestamp'] = datetime.now().strftime('%H:%M:%S')
                             app_module.output_queue.put({'type': 'message', **parsed})
                             log_message(parsed)
+                            # Publish to MQTT
+                            mqtt_publish('pocsag', parsed)
                         else:
                             app_module.output_queue.put({'type': 'raw', 'text': line})
                 except OSError:

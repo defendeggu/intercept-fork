@@ -36,6 +36,7 @@ from utils.constants import (
     DUMP1090_START_WAIT,
 )
 from utils import aircraft_db
+from utils.mqtt import mqtt_publish
 
 adsb_bp = Blueprint('adsb', __name__, url_prefix='/adsb')
 
@@ -231,10 +232,13 @@ def parse_sbs_stream(service_addr):
                         if now - last_update >= ADSB_UPDATE_INTERVAL:
                             for update_icao in pending_updates:
                                 if update_icao in app_module.adsb_aircraft:
+                                    aircraft_data = app_module.adsb_aircraft[update_icao]
                                     app_module.adsb_queue.put({
                                         'type': 'aircraft',
-                                        **app_module.adsb_aircraft[update_icao]
+                                        **aircraft_data
                                     })
+                                    # Publish to MQTT
+                                    mqtt_publish('adsb', aircraft_data)
                             pending_updates.clear()
                             last_update = now
 

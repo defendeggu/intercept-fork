@@ -1,0 +1,230 @@
+{
+  "_comment": "Elasticsearch Index Templates for INTERCEPT",
+  "_usage": "PUT _index_template/intercept with this template content",
+
+  "index_patterns": ["intercept-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "intercept-ilm-policy",
+      "index.lifecycle.rollover_alias": "intercept"
+    },
+    "mappings": {
+      "dynamic": "true",
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "decoder": {
+          "type": "keyword"
+        },
+        "type": {
+          "type": "keyword"
+        },
+
+        "_comment_pager": "=== PAGER (POCSAG/FLEX) FIELDS ===",
+        "protocol": {
+          "type": "keyword"
+        },
+        "address": {
+          "type": "keyword"
+        },
+        "function": {
+          "type": "keyword"
+        },
+        "msg_type": {
+          "type": "keyword"
+        },
+        "message": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+
+        "_comment_adsb": "=== ADS-B FIELDS ===",
+        "icao": {
+          "type": "keyword"
+        },
+        "callsign": {
+          "type": "keyword"
+        },
+        "registration": {
+          "type": "keyword"
+        },
+        "type_code": {
+          "type": "keyword"
+        },
+        "altitude": {
+          "type": "integer"
+        },
+        "speed": {
+          "type": "integer"
+        },
+        "heading": {
+          "type": "integer"
+        },
+        "vertical_rate": {
+          "type": "integer"
+        },
+        "squawk": {
+          "type": "keyword"
+        },
+        "emergency": {
+          "type": "keyword"
+        },
+        "lat": {
+          "type": "float"
+        },
+        "lon": {
+          "type": "float"
+        },
+        "location": {
+          "type": "geo_point"
+        },
+
+        "_comment_acars": "=== ACARS FIELDS ===",
+        "tail": {
+          "type": "keyword"
+        },
+        "flight": {
+          "type": "keyword"
+        },
+        "msg_label": {
+          "type": "keyword"
+        },
+        "msg_text": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 512
+            }
+          }
+        },
+        "freq": {
+          "type": "float"
+        },
+        "level": {
+          "type": "float"
+        },
+        "mode": {
+          "type": "keyword"
+        },
+        "ack": {
+          "type": "keyword"
+        },
+
+        "_comment_aprs": "=== APRS FIELDS ===",
+        "path": {
+          "type": "keyword"
+        },
+        "raw": {
+          "type": "text"
+        },
+        "packet_type": {
+          "type": "keyword"
+        },
+        "symbol": {
+          "type": "keyword"
+        },
+        "course": {
+          "type": "integer"
+        },
+        "comment": {
+          "type": "text"
+        },
+        "status": {
+          "type": "text"
+        },
+        "weather": {
+          "type": "object",
+          "properties": {
+            "temperature": { "type": "integer" },
+            "humidity": { "type": "integer" },
+            "pressure": { "type": "float" },
+            "wind_direction": { "type": "integer" },
+            "wind_speed": { "type": "integer" },
+            "wind_gust": { "type": "integer" },
+            "rain_1h": { "type": "float" },
+            "rain_24h": { "type": "float" }
+          }
+        },
+
+        "_comment_sensor": "=== 433MHz SENSOR FIELDS ===",
+        "model": {
+          "type": "keyword"
+        },
+        "id": {
+          "type": "keyword"
+        },
+        "channel": {
+          "type": "integer"
+        },
+        "battery_ok": {
+          "type": "boolean"
+        },
+        "temperature_C": {
+          "type": "float"
+        },
+        "temperature_F": {
+          "type": "float"
+        },
+        "humidity": {
+          "type": "integer"
+        },
+        "pressure_hPa": {
+          "type": "float"
+        },
+        "wind_avg_km_h": {
+          "type": "float"
+        },
+        "wind_max_km_h": {
+          "type": "float"
+        },
+        "wind_dir_deg": {
+          "type": "integer"
+        },
+        "rain_mm": {
+          "type": "float"
+        },
+        "mic": {
+          "type": "keyword"
+        },
+
+        "_comment_rtlamr": "=== RTLAMR METER FIELDS ===",
+        "meter_id": {
+          "type": "keyword"
+        },
+        "meter_type": {
+          "type": "keyword"
+        },
+        "endpoint_type": {
+          "type": "keyword"
+        },
+        "endpoint_id": {
+          "type": "keyword"
+        },
+        "consumption": {
+          "type": "long"
+        },
+        "tamper": {
+          "type": "keyword"
+        },
+
+        "_comment_common": "=== COMMON FIELDS ===",
+        "timestamp": {
+          "type": "date"
+        },
+        "time": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

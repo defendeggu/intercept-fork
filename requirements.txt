@@ -13,6 +13,9 @@ skyfield>=1.45
 # GPS dongle support (optional - only needed for USB GPS receivers)
 pyserial>=3.5
 
+# MQTT support (optional - for publishing decoded data to MQTT broker)
+paho-mqtt>=1.6.0
+
 # Development dependencies (install with: pip install -r requirements-dev.txt)
 # pytest>=7.0.0
 # pytest-cov>=4.0.0

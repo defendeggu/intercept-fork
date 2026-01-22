@@ -27,6 +27,7 @@ from utils.constants import (
     SSE_QUEUE_TIMEOUT,
     PROCESS_START_WAIT,
 )
+from utils.mqtt import mqtt_publish
 
 acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
@@ -113,6 +114,9 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
                 acars_last_message_time = time.time()
 
                 app_module.acars_queue.put(data)
+
+                # Publish to MQTT
+                mqtt_publish('acars', data)
 
                 # Log if enabled
                 if app_module.logging_enabled:

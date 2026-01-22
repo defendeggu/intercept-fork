@@ -21,6 +21,7 @@ from utils.validation import (
 from utils.sse import format_sse
 from utils.process import safe_terminate, register_process
 from utils.sdr import SDRFactory, SDRType
+from utils.mqtt import mqtt_publish
 
 sensor_bp = Blueprint('sensor', __name__)
 
@@ -40,6 +41,9 @@ def stream_sensor_output(process: subprocess.Popen[bytes]) -> None:
                 data = json.loads(line)
                 data['type'] = 'sensor'
                 app_module.sensor_queue.put(data)
+
+                # Publish to MQTT
+                mqtt_publish('sensor', data)
 
                 # Log if enabled
                 if app_module.logging_enabled:

@@ -32,6 +32,7 @@ from utils.dependencies import check_tool, check_all_dependencies, TOOL_DEPENDEN
 from utils.process import cleanup_stale_processes
 from utils.sdr import SDRFactory
 from utils.cleanup import DataStore, cleanup_manager
+from utils.mqtt import get_mqtt_manager, MQTT_AVAILABLE
 from utils.constants import (
     MAX_AIRCRAFT_AGE_SECONDS,
     MAX_WIFI_NETWORK_AGE_SECONDS,
@@ -493,6 +494,16 @@ def export_bluetooth() -> Response:
 def health_check() -> Response:
     """Health check endpoint for monitoring."""
     import time
+
+    # Get MQTT status
+    mqtt_manager = get_mqtt_manager()
+    mqtt_status = {
+        'available': MQTT_AVAILABLE,
+        'enabled': mqtt_manager.is_enabled,
+        'connected': mqtt_manager.is_connected,
+        'stats': mqtt_manager.stats
+    }
+
     return jsonify({
         'status': 'healthy',
         'version': VERSION,
@@ -511,7 +522,8 @@ def health_check() -> Response:
             'wifi_networks_count': len(wifi_networks),
             'wifi_clients_count': len(wifi_clients),
             'bt_devices_count': len(bt_devices),
-        }
+        },
+        'mqtt': mqtt_status
     })
 
 
@@ -649,6 +661,19 @@ def main() -> None:
 
     # Start automatic cleanup of stale data entries
     cleanup_manager.start()
+
+    # Initialize MQTT if enabled
+    mqtt_manager = get_mqtt_manager()
+    if MQTT_AVAILABLE and mqtt_manager.is_enabled:
+        print("MQTT publishing enabled - connecting to broker...")
+        if mqtt_manager.connect():
+            print("MQTT connection initiated")
+        else:
+            print(f"MQTT connection failed: {mqtt_manager.last_error}")
+    elif not MQTT_AVAILABLE:
+        print("MQTT disabled (paho-mqtt not installed)")
+    else:
+        print("MQTT disabled (enable in settings)")
 
     # Register blueprints
     from routes import register_blueprints

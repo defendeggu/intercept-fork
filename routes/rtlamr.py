@@ -19,6 +19,7 @@ from utils.validation import (
 )
 from utils.sse import format_sse
 from utils.process import safe_terminate, register_process
+from utils.mqtt import mqtt_publish
 
 rtlamr_bp = Blueprint('rtlamr', __name__)
 
@@ -42,6 +43,9 @@ def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
                 data = json.loads(line)
                 data['type'] = 'rtlamr'
                 app_module.rtlamr_queue.put(data)
+
+                # Publish to MQTT
+                mqtt_publish('rtlamr', data)
 
                 # Log if enabled
                 if app_module.logging_enabled:
