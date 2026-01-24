@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import subprocess
 from typing import Any
 
 logger = logging.getLogger('intercept.dependencies')
@@ -30,6 +31,28 @@ def get_tool_path(name: str) -> str | None:
             return full_path
 
     return None
+
+
+def check_soapy_factory(factory_name: str) -> bool:
+    """Check if a SoapySDR factory/module is available using SoapySDRUtil."""
+    try:
+        # Run SoapySDRUtil --info and look for the factory in 'Available factories'
+        result = subprocess.run(['SoapySDRUtil', '--info'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return False
+            
+        # Parse output for available factories
+        # Format usually: "Available factories... hackrf, lime, rtlsdr"
+        for line in result.stdout.splitlines():
+            if "Available factories" in line:
+                factories = line.split("...")[-1].strip().split(",")
+                factories = [f.strip() for f in factories]
+                if factory_name in factories:
+                    return True
+        return False
+    except Exception as e:
+        logger.debug(f"Failed to check SoapySDR factory {factory_name}: {e}")
+        return False
 
 
 # Comprehensive tool dependency definitions
@@ -291,6 +314,7 @@ TOOL_DEPENDENCIES = {
             'SoapyLMS7': {
                 'required': False,
                 'description': 'SoapySDR plugin for LimeSDR',
+                'soapy_factory': 'lime',
                 'install': {
                     'apt': 'sudo apt install soapysdr-module-lms7',
                     'brew': 'brew install soapylms7',
@@ -309,6 +333,7 @@ TOOL_DEPENDENCIES = {
             'SoapyHackRF': {
                 'required': False,
                 'description': 'SoapySDR plugin for HackRF',
+                'soapy_factory': 'hackrf',
                 'install': {
                     'apt': 'sudo apt install soapysdr-module-hackrf',
                     'brew': 'brew install soapyhackrf',
@@ -400,6 +425,9 @@ def check_all_dependencies() -> dict[str, dict[str, Any]]:
                 except Exception as e:
                     logger.debug(f"Failed to import {tool}: {type(e).__name__}: {e}")
                     installed = False
+            # Check using SoapySDRUtil if specified
+            elif tool_config.get('soapy_factory'):
+                installed = check_soapy_factory(tool_config['soapy_factory'])
             else:
                 # Check for alternatives
                 alternatives = tool_config.get('alternatives', [])

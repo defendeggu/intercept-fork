@@ -35,3 +35,6 @@ uv.lock
 *.db
 *.sqlite3
 intercept.db
+
+# Agent Files
+.agent
