@@ -179,8 +179,7 @@ class RTLSDRCommandBuilder(CommandBuilder):
         cmd = [
             'AIS-catcher',
             f'-d:{device.index}',  # Device index (colon format required)
-            '-S', str(tcp_port),  # TCP server with JSON output
-            '-o', '5',  # JSON output format
+            '-S', str(tcp_port), 'JSON',  # TCP server with JSON output
             '-q',  # Quiet mode (less console output)
         ]
 
@@ -200,3 +199,4 @@ class RTLSDRCommandBuilder(CommandBuilder):
     def get_sdr_type(cls) -> SDRType:
         """Return SDR type."""
         return SDRType.RTL_SDR
+
