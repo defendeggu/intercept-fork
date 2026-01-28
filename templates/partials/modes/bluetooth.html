@@ -1,70 +1,75 @@
 <!-- BLUETOOTH MODE -->
                 <div id="bluetoothMode" class="mode-content">
+                    <!-- Capability Status -->
+                    <div id="btCapabilityStatus" class="section" style="display: none;">
+                        <!-- Populated by JavaScript with capability warnings -->
+                    </div>
+
+                    <!-- Show All Agents option (visible when agents are available) -->
+                    <div id="btShowAllAgentsContainer" class="section" style="display: none; padding: 8px;">
+                        <label class="inline-checkbox" style="font-size: 10px;">
+                            <input type="checkbox" id="btShowAllAgents" onchange="if(typeof BluetoothMode !== 'undefined') BluetoothMode.toggleShowAllAgents(this.checked)">
+                            Show devices from all agents
+                        </label>
+                    </div>
+
                     <div class="section">
-                        <h3>Bluetooth Interface</h3>
+                        <h3>Scanner Configuration</h3>
                         <div class="form-group">
-                            <select id="btInterfaceSelect">
-                                <option value="">Detecting interfaces...</option>
+                            <label>Adapter</label>
+                            <select id="btAdapterSelect">
+                                <option value="">Detecting adapters...</option>
                             </select>
                         </div>
-                        <button class="preset-btn" onclick="refreshBtInterfaces()" style="width: 100%;">
-                            Refresh Interfaces
-                        </button>
-                        <div class="info-text" style="margin-top: 8px; display: grid; grid-template-columns: auto auto; gap: 4px 8px; align-items: center;" id="btToolStatus">
-                            <span>hcitool:</span><span class="tool-status missing">Checking...</span>
-                            <span>bluetoothctl:</span><span class="tool-status missing">Checking...</span>
-                        </div>
-                    </div>
-
-                    <div class="section">
-                        <h3>Scan Mode</h3>
-                        <div class="checkbox-group" style="margin-bottom: 10px;">
-                            <label><input type="radio" name="btScanMode" value="bluetoothctl" checked> bluetoothctl (Recommended)</label>
-                            <label><input type="radio" name="btScanMode" value="hcitool"> hcitool (Legacy)</label>
+                        <div class="form-group">
+                            <label>Scan Mode</label>
+                            <select id="btScanMode">
+                                <option value="auto">Auto (Recommended)</option>
+                                <option value="bleak">Bleak Library</option>
+                                <option value="hcitool">hcitool (Linux)</option>
+                                <option value="bluetoothctl">bluetoothctl (Linux)</option>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label>Scan Duration (sec)</label>
-                            <input type="text" id="btScanDuration" value="30" placeholder="30">
+                            <label>Transport</label>
+                            <select id="btTransport">
+                                <option value="auto">Auto (BLE + Classic)</option>
+                                <option value="le">BLE Only</option>
+                                <option value="br_edr">Classic Only</option>
+                            </select>
                         </div>
-                        <div class="checkbox-group">
-                            <label>
-                                <input type="checkbox" id="btScanBLE" checked>
-                                Scan BLE Devices
-                            </label>
-                            <label>
-                                <input type="checkbox" id="btScanClassic" checked>
-                                Scan Classic BT
-                            </label>
-                            <label>
-                                <input type="checkbox" id="btDetectBeacons" checked>
-                                Detect Trackers (AirTag/Tile)
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="section">
-                        <h3>Device Actions</h3>
                         <div class="form-group">
-                            <label>Target MAC</label>
-                            <input type="text" id="btTargetMac" placeholder="AA:BB:CC:DD:EE:FF">
+                            <label>Duration (seconds, 0 = continuous)</label>
+                            <input type="number" id="btScanDuration" value="0" min="0" max="300" placeholder="0">
                         </div>
-                        <button class="preset-btn" onclick="btEnumServices()" style="width: 100%;">
-                            Enumerate Services
+                        <div class="form-group">
+                            <label>Min RSSI Filter (dBm)</label>
+                            <input type="number" id="btMinRssi" value="-100" min="-100" max="-20" placeholder="-100">
+                        </div>
+                        <button class="preset-btn" onclick="btCheckCapabilities()" style="width: 100%;">
+                            Check Capabilities
                         </button>
                     </div>
 
-                    <!-- Tracker Following Alert -->
-                    <div id="trackerFollowingAlert" class="tracker-following-alert" style="display: none;">
-                        <!-- Populated by JavaScript -->
-                    </div>
+                    <!-- Message Container for status cards -->
+                    <div id="btMessageContainer"></div>
 
-                    <button class="run-btn" id="startBtBtn" onclick="startBtScan()">
+                    <button class="run-btn" id="startBtBtn" onclick="btStartScan()">
                         Start Scanning
                     </button>
-                    <button class="stop-btn" id="stopBtBtn" onclick="stopBtScan()" style="display: none;">
+                    <button class="stop-btn" id="stopBtBtn" onclick="btStopScan()" style="display: none;">
                         Stop Scanning
                     </button>
-                    <button class="preset-btn" onclick="resetBtAdapter()" style="margin-top: 5px; width: 100%;">
-                        Reset Adapter
-                    </button>
+
+                    <div class="section" style="margin-top: 10px;">
+                        <h3>Export</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="preset-btn" onclick="btExport('csv')" style="flex: 1;">
+                                Export CSV
+                            </button>
+                            <button class="preset-btn" onclick="btExport('json')" style="flex: 1;">
+                                Export JSON
+                            </button>
+                        </div>
+                    </div>
                 </div>

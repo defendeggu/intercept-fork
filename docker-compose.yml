@@ -1,5 +1,11 @@
 # INTERCEPT - Signal Intelligence Platform
 # Docker Compose configuration for easy deployment
+#
+# Basic usage:
+#   docker compose up -d
+#
+# With ADS-B history (Postgres):
+#   docker compose --profile history up -d
 
 services:
   intercept:
@@ -22,6 +28,14 @@ services:
       - INTERCEPT_HOST=0.0.0.0
       - INTERCEPT_PORT=5050
       - INTERCEPT_LOG_LEVEL=INFO
+      # ADS-B history is disabled by default
+      # To enable, use: docker compose --profile history up -d
+      # - INTERCEPT_ADSB_HISTORY_ENABLED=true
+      # - INTERCEPT_ADSB_DB_HOST=adsb_db
+      # - INTERCEPT_ADSB_DB_PORT=5432
+      # - INTERCEPT_ADSB_DB_NAME=intercept_adsb
+      # - INTERCEPT_ADSB_DB_USER=intercept
+      # - INTERCEPT_ADSB_DB_PASSWORD=intercept
     # Network mode for WiFi scanning (requires host network)
     # network_mode: host
     restart: unless-stopped
@@ -31,6 +45,54 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # ADS-B history with Postgres persistence
+  # Enable with: docker compose --profile history up -d
+  intercept-history:
+    build: .
+    container_name: intercept
+    profiles:
+      - history
+    depends_on:
+      - adsb_db
+    ports:
+      - "5050:5050"
+    privileged: true
+    environment:
+      - INTERCEPT_HOST=0.0.0.0
+      - INTERCEPT_PORT=5050
+      - INTERCEPT_LOG_LEVEL=INFO
+      - INTERCEPT_ADSB_HISTORY_ENABLED=true
+      - INTERCEPT_ADSB_DB_HOST=adsb_db
+      - INTERCEPT_ADSB_DB_PORT=5432
+      - INTERCEPT_ADSB_DB_NAME=intercept_adsb
+      - INTERCEPT_ADSB_DB_USER=intercept
+      - INTERCEPT_ADSB_DB_PASSWORD=intercept
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5050/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  adsb_db:
+    image: postgres:16-alpine
+    container_name: intercept-adsb-db
+    profiles:
+      - history
+    environment:
+      - POSTGRES_DB=intercept_adsb
+      - POSTGRES_USER=intercept
+      - POSTGRES_PASSWORD=intercept
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intercept -d intercept_adsb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 # Optional: Add volume for persistent SQLite database
 # volumes:

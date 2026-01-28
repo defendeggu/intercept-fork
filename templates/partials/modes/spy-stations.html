@@ -1,0 +1,83 @@
+<!-- SPY STATIONS MODE -->
+<div id="spystationsMode" class="mode-content">
+    <div class="section">
+        <h3>Spy Stations</h3>
+        <p style="color: var(--text-secondary); font-size: 11px; line-height: 1.5; margin-bottom: 15px;">
+            Active number stations and diplomatic HF radio networks. Data sourced from priyom.org.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Filter by Type</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label class="inline-checkbox">
+                <input type="checkbox" id="filterTypeNumber" checked onchange="SpyStations.applyFilters()">
+                <span style="color: var(--accent-cyan);">Number Stations</span>
+            </label>
+            <label class="inline-checkbox">
+                <input type="checkbox" id="filterTypeDiplomatic" checked onchange="SpyStations.applyFilters()">
+                <span style="color: var(--accent-green);">Diplomatic Networks</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Filter by Country</h3>
+        <div id="countryFilters" style="display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto;">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Filter by Mode</h3>
+        <div id="modeFilters" style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto;">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Quick Stats</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold; color: var(--accent-cyan);" id="spyStatsNumber">0</div>
+                <div style="font-size: 9px; color: var(--text-muted);">NUMBER</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold; color: var(--accent-green);" id="spyStatsDiplomatic">0</div>
+                <div style="font-size: 9px; color: var(--text-muted);">DIPLOMATIC</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold; color: var(--accent-orange);" id="spyStatsCountries">0</div>
+                <div style="font-size: 9px; color: var(--text-muted);">COUNTRIES</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold; color: var(--accent-purple);" id="spyStatsFreqs">0</div>
+                <div style="font-size: 9px; color: var(--text-muted);">FREQUENCIES</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Help</h3>
+        <button class="preset-btn" onclick="SpyStations.showHelp()" style="width: 100%;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            About Spy Stations
+        </button>
+    </div>
+
+    <div class="section">
+        <h3>Resources</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <a href="https://priyom.org" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                Priyom.org
+            </a>
+            <a href="https://www.numbers-stations.com" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                Numbers-Stations.com
+            </a>
+        </div>
+    </div>
+</div>

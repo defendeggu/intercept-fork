@@ -1,0 +1,466 @@
+/**
+ * Spy Stations Mode Styles
+ * Number stations and diplomatic HF networks
+ */
+
+/* ============================================
+   MAIN LAYOUT
+   ============================================ */
+.spy-stations-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.spy-stations-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.spy-stations-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.spy-stations-title svg {
+    color: var(--accent-cyan);
+}
+
+.spy-stations-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+/* ============================================
+   STATION GRID
+   ============================================ */
+.spy-stations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+    padding: 4px;
+    padding-bottom: 20px;
+}
+
+/* ============================================
+   STATION CARD
+   ============================================ */
+.spy-station-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.spy-station-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Card Header */
+.spy-station-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.spy-station-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.spy-station-flag {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.spy-station-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.spy-station-nickname {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Type Badge */
+.spy-station-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.spy-badge-number {
+    background: rgba(74, 158, 255, 0.15);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+}
+
+.spy-badge-diplomatic {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Card Body */
+.spy-station-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.spy-station-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.spy-station-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.spy-meta-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+}
+
+.spy-meta-value {
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.spy-meta-mode {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent-orange);
+}
+
+/* Frequencies */
+.spy-station-freqs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.spy-freq-list {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-cyan);
+    line-height: 1.6;
+}
+
+.spy-freq-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.spy-freq-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-cyan);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+/* Description */
+.spy-station-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Card Footer */
+.spy-station-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.1);
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+    margin-top: auto;
+}
+
+/* Frequency Selector Group */
+.spy-tune-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.spy-freq-select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    min-width: 120px;
+    cursor: pointer;
+}
+
+.spy-freq-select:hover {
+    border-color: var(--border-light);
+}
+
+.spy-freq-select:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+/* Clickable frequency items in details modal */
+.spy-freq-clickable {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.spy-freq-clickable:hover {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+/* Tune Button */
+.spy-tune-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #000;
+    background: var(--accent-green);
+    border: none;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.spy-tune-btn:hover {
+    background: var(--accent-cyan);
+    transform: scale(1.02);
+}
+
+.spy-tune-btn svg {
+    stroke-width: 2.5;
+}
+
+/* Details Button */
+.spy-details-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.spy-details-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-light);
+    background: var(--bg-secondary);
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.spy-station-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.spy-station-empty p {
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+/* ============================================
+   MODE VISIBILITY - Ensure sidebar shows when active
+   ============================================ */
+#spystationsMode.active {
+    display: block !important;
+}
+
+/* ============================================
+   FILTER CHECKBOX STYLING
+   ============================================ */
+#spystationsMode .inline-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+#spystationsMode .inline-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent-cyan);
+}
+
+#spystationsMode .inline-checkbox:hover {
+    color: var(--text-primary);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+/* Large desktop (1200px+) */
+@media (min-width: 1200px) {
+    .spy-stations-grid {
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
+}
+
+/* Desktop/Tablet landscape (1024px) */
+@media (max-width: 1024px) {
+    .spy-stations-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+}
+
+/* Tablet portrait (768px) */
+@media (max-width: 768px) {
+    .spy-stations-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .spy-station-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .spy-station-badge {
+        align-self: flex-start;
+    }
+
+    .spy-station-meta {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Small tablet / large phone (640px) */
+@media (max-width: 640px) {
+    .spy-station-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .spy-tune-btn,
+    .spy-details-btn {
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    .spy-tune-group {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .spy-freq-select {
+        width: 100%;
+        min-height: 44px;
+    }
+}
+
+/* Mobile (480px) */
+@media (max-width: 480px) {
+    .spy-stations-container {
+        padding: 8px;
+    }
+
+    .spy-station-body {
+        padding: 10px;
+    }
+
+    .spy-stations-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    .spy-station-desc {
+        -webkit-line-clamp: 2;
+    }
+}
+
+/* Touch device compliance */
+@media (pointer: coarse) {
+    .spy-tune-btn,
+    .spy-details-btn,
+    .spy-freq-select {
+        min-height: 44px;
+    }
+
+    .spy-freq-clickable {
+        padding: 8px 12px;
+    }
+}

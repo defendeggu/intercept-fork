@@ -160,6 +160,28 @@ class CommandBuilder(ABC):
         pass
 
     @abstractmethod
+    def build_ais_command(
+        self,
+        device: SDRDevice,
+        gain: Optional[float] = None,
+        bias_t: bool = False,
+        tcp_port: int = 10110
+    ) -> list[str]:
+        """
+        Build AIS decoder command for vessel tracking.
+
+        Args:
+            device: The SDR device to use
+            gain: Gain in dB (None for auto)
+            bias_t: Enable bias-T power (for active antennas)
+            tcp_port: TCP port for JSON output server
+
+        Returns:
+            Command as list of strings for subprocess
+        """
+        pass
+
+    @abstractmethod
     def get_capabilities(self) -> SDRCapabilities:
         """Return hardware capabilities for this SDR type."""
         pass

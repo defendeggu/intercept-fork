@@ -1,0 +1,879 @@
+/**
+ * Device Cards Component CSS
+ * Styling for Bluetooth device cards, heuristic badges, range bands, and sparklines
+ */
+
+/* ============================================
+   CSS VARIABLES
+   ============================================ */
+:root {
+    /* Protocol colors */
+    --proto-ble: #3b82f6;
+    --proto-ble-bg: rgba(59, 130, 246, 0.15);
+    --proto-classic: #8b5cf6;
+    --proto-classic-bg: rgba(139, 92, 246, 0.15);
+
+    /* Range band colors */
+    --range-very-close: #ef4444;
+    --range-close: #f97316;
+    --range-nearby: #eab308;
+    --range-far: #6b7280;
+    --range-unknown: #374151;
+
+    /* Heuristic badge colors */
+    --heuristic-new: #3b82f6;
+    --heuristic-persistent: #22c55e;
+    --heuristic-beacon: #f59e0b;
+    --heuristic-strong: #ef4444;
+    --heuristic-random: #6b7280;
+}
+
+/* ============================================
+   DEVICE CARD BASE
+   ============================================ */
+.device-card {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.device-card:hover {
+    border-color: var(--accent-cyan, #00d4ff);
+    box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.2);
+}
+
+.device-card:active {
+    transform: scale(0.995);
+}
+
+/* ============================================
+   DEVICE IDENTITY
+   ============================================ */
+.device-identity {
+    margin-bottom: 10px;
+}
+
+.device-name {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.device-address {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.device-address .address-value {
+    color: var(--accent-cyan, #00d4ff);
+}
+
+.device-address .address-type {
+    color: var(--text-dim, #666);
+    font-size: 10px;
+}
+
+/* ============================================
+   PROTOCOL BADGES
+   ============================================ */
+.signal-proto-badge.device-protocol {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid;
+}
+
+/* ============================================
+   HEURISTIC BADGES
+   ============================================ */
+.device-heuristic-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--badge-color) 15%, transparent);
+    color: var(--badge-color);
+    border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
+}
+
+.device-heuristic-badge.new {
+    --badge-color: var(--heuristic-new);
+    animation: heuristicPulse 2s ease-in-out infinite;
+}
+
+.device-heuristic-badge.persistent {
+    --badge-color: var(--heuristic-persistent);
+}
+
+.device-heuristic-badge.beacon_like {
+    --badge-color: var(--heuristic-beacon);
+}
+
+.device-heuristic-badge.strong_stable {
+    --badge-color: var(--heuristic-strong);
+}
+
+.device-heuristic-badge.random_address {
+    --badge-color: var(--heuristic-random);
+}
+
+@keyframes heuristicPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* ============================================
+   SIGNAL ROW & RSSI DISPLAY
+   ============================================ */
+.device-signal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px;
+    background: var(--bg-secondary, #1a1a1a);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.rssi-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rssi-current {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    min-width: 70px;
+}
+
+/* ============================================
+   RSSI SPARKLINE
+   ============================================ */
+.rssi-sparkline,
+.rssi-sparkline-svg {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.rssi-sparkline-empty {
+    opacity: 0.5;
+}
+
+.rssi-sparkline-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rssi-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.rssi-current-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    margin-left: 6px;
+}
+
+.sparkline-dot {
+    animation: sparklinePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sparklinePulse {
+    0%, 100% { r: 2; opacity: 1; }
+    50% { r: 3; opacity: 0.8; }
+}
+
+/* ============================================
+   RANGE BAND INDICATOR
+   ============================================ */
+.device-range-band {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: color-mix(in srgb, var(--range-color) 15%, transparent);
+    border-radius: 4px;
+    border-left: 3px solid var(--range-color);
+}
+
+.device-range-band .range-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--range-color);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.device-range-band .range-estimate {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim, #666);
+}
+
+.device-range-band .range-confidence {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim, #666);
+    padding: 1px 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+/* ============================================
+   MANUFACTURER INFO
+   ============================================ */
+.device-manufacturer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+    margin-bottom: 6px;
+}
+
+.device-manufacturer .mfr-icon {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.device-manufacturer .mfr-name {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ============================================
+   META ROW
+   ============================================ */
+.device-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dim, #666);
+}
+
+.device-seen-count {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.device-seen-count .seen-icon {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.device-timestamp {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ============================================
+   SERVICE UUIDS
+   ============================================ */
+.device-uuids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.device-uuid {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    background: var(--bg-tertiary, #1a1a1a);
+    border-radius: 3px;
+    color: var(--text-secondary, #888);
+    border: 1px solid var(--border-color, #333);
+}
+
+/* ============================================
+   HEURISTICS DETAIL VIEW
+   ============================================ */
+.device-heuristics-detail {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
+}
+
+.heuristic-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--bg-tertiary, #1a1a1a);
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #333);
+}
+
+.heuristic-item.active {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.heuristic-item .heuristic-name {
+    font-size: 10px;
+    text-transform: capitalize;
+    color: var(--text-secondary, #888);
+}
+
+.heuristic-item .heuristic-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.heuristic-item.active .heuristic-status {
+    color: var(--accent-green, #22c55e);
+}
+
+.heuristic-item:not(.active) .heuristic-status {
+    color: var(--text-dim, #666);
+}
+
+/* ============================================
+   MESSAGE CARDS
+   ============================================ */
+.message-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--message-bg);
+    border: 1px solid color-mix(in srgb, var(--message-color) 30%, transparent);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    animation: messageSlideIn 0.25s ease;
+    position: relative;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-card.message-card-hiding {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: all 0.2s ease;
+}
+
+.message-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--message-color);
+    border-radius: 8px 0 0 8px;
+}
+
+.message-card-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--message-color);
+}
+
+.message-card-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.message-card-icon svg.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.message-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.message-card-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    margin-bottom: 2px;
+}
+
+.message-card-text {
+    font-size: 12px;
+    color: var(--text-secondary, #888);
+    line-height: 1.4;
+}
+
+.message-card-details {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim, #666);
+    margin-top: 4px;
+}
+
+.message-card-dismiss {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-dim, #666);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.message-card-dismiss:hover {
+    opacity: 1;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.message-card-dismiss svg {
+    width: 100%;
+    height: 100%;
+}
+
+.message-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.message-action-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary, #1a1a1a);
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.message-action-btn:hover {
+    background: var(--bg-tertiary, #252525);
+    border-color: var(--border-light, #444);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.message-action-btn.primary {
+    background: color-mix(in srgb, var(--message-color) 20%, transparent);
+    border-color: color-mix(in srgb, var(--message-color) 40%, transparent);
+    color: var(--message-color);
+}
+
+.message-action-btn.primary:hover {
+    background: color-mix(in srgb, var(--message-color) 30%, transparent);
+}
+
+/* ============================================
+   DEVICE FILTER BAR
+   ============================================ */
+.device-filter-bar {
+    flex-wrap: wrap;
+}
+
+.device-filter-bar .signal-filter-btn .filter-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 600px) {
+    .device-signal-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .rssi-display {
+        justify-content: center;
+    }
+
+    .device-range-band {
+        justify-content: center;
+    }
+
+    .device-heuristics-detail {
+        grid-template-columns: 1fr;
+    }
+
+    .message-card {
+        padding: 10px 12px;
+    }
+
+    .message-card-title {
+        font-size: 12px;
+    }
+
+    .message-card-text {
+        font-size: 11px;
+    }
+}
+
+/* ============================================
+   BLUETOOTH DEVICE LIST CONTAINER
+   ============================================ */
+#btDeviceListContent {
+    display: block !important;
+    padding: 10px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Pure inline-styled cards - ensure no interference */
+#btDeviceListContent > div[data-bt-device-id] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+}
+
+/* Legacy card support */
+#btDeviceListContent .device-card,
+#btDeviceListContent .signal-card {
+    margin: 0 0 10px 0;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+}
+
+/* Ensure card body is visible */
+.device-card .signal-card-body,
+.signal-card .signal-card-body {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.device-card .device-identity,
+.signal-card .device-identity {
+    display: block !important;
+    visibility: visible !important;
+}
+
+.device-card .device-signal-row,
+.signal-card .device-signal-row {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+.device-card .device-meta-row,
+.signal-card .device-meta-row {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+/* ============================================
+   ENHANCED MODAL STYLES
+   ============================================ */
+.signal-details-modal-header .modal-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.signal-details-modal-subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim, #666);
+}
+
+.signal-details-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.signal-details-copy-addr-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px 16px;
+    background: var(--bg-secondary, #252525);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.signal-details-copy-addr-btn:hover {
+    background: var(--bg-tertiary, #1a1a1a);
+    color: var(--text-primary, #e0e0e0);
+}
+
+/* Modal Header Section */
+.modal-device-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.modal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Modal Sections */
+.modal-section {
+    margin-bottom: 20px;
+}
+
+.modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.modal-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim, #666);
+    margin-bottom: 12px;
+}
+
+/* Signal Display */
+.modal-signal-display {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 16px;
+    background: var(--bg-secondary, #1a1a1a);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.modal-rssi-large {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--accent-cyan, #00d4ff);
+    line-height: 1;
+}
+
+.modal-rssi-large .rssi-unit {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-dim, #666);
+    margin-left: 4px;
+}
+
+.modal-sparkline {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Signal Stats Grid */
+.modal-signal-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.modal-signal-stats .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-secondary, #1a1a1a);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.modal-signal-stats .stat-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim, #666);
+    margin-bottom: 4px;
+}
+
+.modal-signal-stats .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+}
+
+/* Info Grid */
+.modal-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.modal-info-grid .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-secondary, #1a1a1a);
+    border-radius: 6px;
+}
+
+.modal-info-grid .info-label {
+    font-size: 11px;
+    color: var(--text-dim, #666);
+}
+
+.modal-info-grid .info-value {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.modal-info-grid .info-value.mono {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-cyan, #00d4ff);
+}
+
+/* UUID List */
+.modal-uuid-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.modal-uuid {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    background: var(--bg-secondary, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-secondary, #888);
+}
+
+/* Heuristics Grid */
+.modal-heuristics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.heuristic-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary, #1a1a1a);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #333);
+}
+
+.heuristic-check.active {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.heuristic-indicator {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim, #666);
+}
+
+.heuristic-check.active .heuristic-indicator {
+    color: var(--accent-green, #22c55e);
+}
+
+.heuristic-label {
+    font-size: 11px;
+    text-transform: capitalize;
+    color: var(--text-secondary, #888);
+}
+
+/* ============================================
+   RESPONSIVE MODAL
+   ============================================ */
+@media (max-width: 600px) {
+    .modal-signal-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .modal-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-signal-display {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .modal-sparkline {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .modal-device-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
+
+/* ============================================
+   DARK MODE OVERRIDES (if needed)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .device-card {
+        --bg-secondary: #1a1a1a;
+        --bg-tertiary: #141414;
+    }
+}

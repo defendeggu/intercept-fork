@@ -33,6 +33,9 @@ htmlcov/
 # Logs
 *.log
 
+# Local Postgres data
+pgdata/
+
 # Captured files (don't include in image)
 *.cap
 *.pcap

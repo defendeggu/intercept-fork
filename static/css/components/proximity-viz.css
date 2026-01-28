@@ -1,0 +1,287 @@
+/**
+ * Proximity Visualization Components
+ * Styles for radar and timeline heatmap
+ */
+
+/* ============================================
+   PROXIMITY RADAR
+   ============================================ */
+
+.proximity-radar-svg {
+    display: block;
+    margin: 0 auto;
+}
+
+.radar-device {
+    transition: transform 0.2s ease;
+}
+
+.radar-device:hover {
+    transform: scale(1.3);
+}
+
+.radar-dot-pulse circle:first-child {
+    animation: radar-pulse 1.5s ease-out infinite;
+}
+
+@keyframes radar-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+.radar-sweep {
+    transform-origin: 50% 50%;
+}
+
+/* Radar filter buttons */
+.bt-radar-filter-btn {
+    transition: all 0.2s ease;
+}
+
+.bt-radar-filter-btn:hover {
+    background: var(--bg-hover, #333) !important;
+    color: #fff !important;
+}
+
+.bt-radar-filter-btn.active {
+    background: #00d4ff !important;
+    color: #000 !important;
+    border-color: #00d4ff !important;
+}
+
+#btRadarPauseBtn.active {
+    background: #f97316 !important;
+    color: #000 !important;
+    border-color: #f97316 !important;
+}
+
+/* ============================================
+   TIMELINE HEATMAP
+   ============================================ */
+
+.timeline-heatmap-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.heatmap-control-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim, #888);
+}
+
+.heatmap-select {
+    background: var(--bg-tertiary, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.heatmap-select:hover {
+    border-color: var(--accent-color, #00d4ff);
+}
+
+.heatmap-btn {
+    background: var(--bg-tertiary, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-dim, #888);
+    font-size: 10px;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.heatmap-btn:hover {
+    background: var(--bg-hover, #252525);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.heatmap-btn.active {
+    background: #f97316;
+    color: #000;
+    border-color: #f97316;
+}
+
+.timeline-heatmap-content {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.heatmap-loading,
+.heatmap-empty,
+.heatmap-error {
+    color: var(--text-dim, #666);
+    text-align: center;
+    padding: 30px;
+    font-size: 12px;
+}
+
+.heatmap-error {
+    color: #ef4444;
+}
+
+.heatmap-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: max-content;
+}
+
+.heatmap-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.heatmap-row:hover:not(.heatmap-header) {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.heatmap-row.selected {
+    background: rgba(0, 212, 255, 0.1);
+    outline: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.heatmap-header {
+    cursor: default;
+    border-bottom: 1px solid var(--border-color, #333);
+    margin-bottom: 4px;
+}
+
+.heatmap-label {
+    width: 120px;
+    min-width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 8px;
+    overflow: hidden;
+}
+
+.heatmap-label .device-name {
+    font-size: 10px;
+    color: var(--text-primary, #e0e0e0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.heatmap-label .device-rssi {
+    font-size: 9px;
+    color: var(--text-dim, #666);
+    font-family: monospace;
+}
+
+.heatmap-cells {
+    display: flex;
+    gap: 1px;
+}
+
+.heatmap-cell {
+    border-radius: 2px;
+    transition: transform 0.1s ease;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.5);
+    z-index: 10;
+    position: relative;
+}
+
+.heatmap-time-label {
+    font-size: 8px;
+    color: var(--text-dim, #666);
+    text-align: center;
+    transform: rotate(-45deg);
+    white-space: nowrap;
+}
+
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border-color, #333);
+    font-size: 10px;
+    color: var(--text-dim, #666);
+}
+
+.legend-label {
+    font-weight: 500;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+/* ============================================
+   ZONE SUMMARY
+   ============================================ */
+
+#btZoneSummary {
+    padding: 8px 0;
+}
+
+#btZoneSummary > div {
+    min-width: 60px;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .timeline-heatmap-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .heatmap-control-group {
+        justify-content: space-between;
+    }
+
+    .proximity-radar-svg {
+        max-width: 100%;
+        height: auto;
+    }
+
+    #btRadarControls {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    #btZoneSummary {
+        flex-wrap: wrap;
+    }
+}

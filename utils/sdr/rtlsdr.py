@@ -157,6 +157,40 @@ class RTLSDRCommandBuilder(CommandBuilder):
 
         return cmd
 
+    def build_ais_command(
+        self,
+        device: SDRDevice,
+        gain: Optional[float] = None,
+        bias_t: bool = False,
+        tcp_port: int = 10110
+    ) -> list[str]:
+        """
+        Build AIS-catcher command for AIS vessel tracking.
+
+        Uses AIS-catcher with TCP JSON output for real-time vessel data.
+        AIS operates on 161.975 MHz and 162.025 MHz (handled automatically).
+        """
+        if device.is_network:
+            raise ValueError(
+                "AIS-catcher does not support rtl_tcp. "
+                "For remote AIS, run AIS-catcher on the remote machine."
+            )
+
+        cmd = [
+            'AIS-catcher',
+            f'-d:{device.index}',  # Device index (colon format required)
+            '-S', str(tcp_port), 'JSON_FULL', 'on',  # TCP server with full JSON output
+            '-q',  # Quiet mode (less console output)
+        ]
+
+        if gain is not None and gain > 0:
+            cmd.extend(['-gr', 'TUNER', str(int(gain))])
+
+        if bias_t:
+            cmd.extend(['-gr', 'BIASTEE', 'on'])
+
+        return cmd
+
     def get_capabilities(self) -> SDRCapabilities:
         """Return RTL-SDR capabilities."""
         return self.CAPABILITIES
@@ -165,3 +199,4 @@ class RTLSDRCommandBuilder(CommandBuilder):
     def get_sdr_type(cls) -> SDRType:
         """Return SDR type."""
         return SDRType.RTL_SDR
+

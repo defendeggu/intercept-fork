@@ -19,11 +19,39 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/signal-cards.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/signal-timeline.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/activity-timeline.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/device-cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/proximity-viz.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/spy-stations.css') }}">
 </head>
 
 <body>
     <!-- Welcome Page -->
     <div class="welcome-overlay" id="welcomePage">
+        <!-- Spinning Globe Background -->
+        <div class="globe-background">
+            <svg class="globe-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <!-- Outer circle -->
+                <circle cx="200" cy="200" r="180" fill="none" stroke="currentColor" stroke-width="0.5"/>
+                <!-- Equator -->
+                <ellipse cx="200" cy="200" rx="180" ry="40" fill="none" stroke="currentColor" stroke-width="0.5"/>
+                <!-- Latitude lines -->
+                <ellipse cx="200" cy="140" rx="145" ry="30" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                <ellipse cx="200" cy="260" rx="145" ry="30" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                <ellipse cx="200" cy="90" rx="85" ry="15" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                <ellipse cx="200" cy="310" rx="85" ry="15" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                <!-- Prime meridian -->
+                <ellipse cx="200" cy="200" rx="40" ry="180" fill="none" stroke="currentColor" stroke-width="0.5" class="meridian meridian-1"/>
+                <!-- Additional meridians -->
+                <ellipse cx="200" cy="200" rx="100" ry="180" fill="none" stroke="currentColor" stroke-width="0.3" class="meridian meridian-2"/>
+                <ellipse cx="200" cy="200" rx="150" ry="180" fill="none" stroke="currentColor" stroke-width="0.3" class="meridian meridian-3"/>
+                <!-- Rotating meridian group -->
+                <g class="rotating-meridians">
+                    <ellipse cx="200" cy="200" rx="70" ry="180" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                    <ellipse cx="200" cy="200" rx="130" ry="180" fill="none" stroke="currentColor" stroke-width="0.3"/>
+                    <ellipse cx="200" cy="200" rx="170" ry="180" fill="none" stroke="currentColor" stroke-width="0.2"/>
+                </g>
+            </svg>
+        </div>
         <div class="welcome-container">
             <!-- Header Section -->
             <div class="welcome-header">
@@ -93,6 +121,11 @@
                             <span class="mode-name">Aircraft</span>
                             <span class="mode-desc">ADS-B tracking</span>
                         </a>
+                        <a href="/ais/dashboard" class="mode-card" style="text-decoration: none;">
+                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span>
+                            <span class="mode-name">Vessels</span>
+                            <span class="mode-desc">AIS ship tracking</span>
+                        </a>
                         <button class="mode-card" onclick="selectMode('wifi')">
                             <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
                             <span class="mode-name">WiFi</span>
@@ -115,7 +148,7 @@
                         </button>
                         <button class="mode-card" onclick="selectMode('listening')">
                             <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
-                            <span class="mode-name">Scanner</span>
+                            <span class="mode-name">Listening Post</span>
                             <span class="mode-desc">Frequency scanning</span>
                         </button>
                         <button class="mode-card" onclick="selectMode('aprs')">
@@ -125,8 +158,13 @@
                         </button>
                         <button class="mode-card" onclick="selectMode('rtlamr')">
                             <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/><circle cx="12" cy="12" r="4"/></svg></span>
-                            <span class="mode-name">RTLAMR</span>
+                            <span class="mode-name">Meters</span>
                             <span class="mode-desc">Utility meters</span>
+                        </button>
+                        <button class="mode-card" onclick="selectMode('spystations')">
+                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span>
+                            <span class="mode-name">Spy Stations</span>
+                            <span class="mode-desc">Number stations & diplomatic</span>
                         </button>
                     </div>
                 </div>
@@ -269,9 +307,11 @@
                 <button class="mode-nav-btn" onclick="switchMode('sensor')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span><span class="nav-label">433MHz</span></button>
                 <button class="mode-nav-btn" onclick="switchMode('rtlamr')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="nav-label">Meters</span></button>
                 <a href="/adsb/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span><span class="nav-label">Aircraft</span></a>
+                <a href="/ais/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span><span class="nav-label">Vessels</span></a>
                 <button class="mode-nav-btn" onclick="switchMode('aprs')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="nav-label">APRS</span></button>
                 <button class="mode-nav-btn" onclick="switchMode('satellite')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span><span class="nav-label">Satellite</span></button>
                 <button class="mode-nav-btn" onclick="switchMode('listening')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span><span class="nav-label">Listening Post</span></button>
+                <button class="mode-nav-btn" onclick="switchMode('spystations')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span><span class="nav-label">Spy Stations</span></button>
             </div>
         </div>
         <div class="mode-nav-dropdown" data-group="wireless">
@@ -315,6 +355,8 @@
                 <button class="nav-tool-btn" onclick="showDependencies()" title="Check Tool Dependencies"
                     id="depsBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
                 <button class="nav-tool-btn" onclick="showMqttSettings()" title="MQTT Settings" id="mqttBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span></button>
+                <a href="/controller/monitor" class="nav-tool-btn" title="Network Monitor - Multi-Agent View" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span></a>
+                <a href="/controller/manage" class="nav-tool-btn" title="Manage Remote Agents" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></a>
                 <button class="nav-tool-btn" onclick="showHelp()" title="Help & Documentation">?</button>
                 <button class="nav-tool-btn" onclick="logout(event)" title="Logout">
                     <span class="power-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -329,12 +371,14 @@
         <button class="mobile-nav-btn" data-mode="sensor" onclick="switchMode('sensor')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg></span> 433MHz</button>
         <button class="mobile-nav-btn" data-mode="rtlamr" onclick="switchMode('rtlamr')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span> Meters</button>
         <a href="/adsb/dashboard" class="mobile-nav-btn" style="text-decoration: none;"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span> Aircraft</a>
+        <a href="/ais/dashboard" class="mobile-nav-btn" style="text-decoration: none;"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span> Vessels</a>
         <button class="mobile-nav-btn" data-mode="aprs" onclick="switchMode('aprs')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span> APRS</button>
         <button class="mobile-nav-btn" data-mode="wifi" onclick="switchMode('wifi')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span> WiFi</button>
         <button class="mobile-nav-btn" data-mode="bluetooth" onclick="switchMode('bluetooth')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span> BT</button>
         <button class="mobile-nav-btn" data-mode="tscm" onclick="switchMode('tscm')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span> TSCM</button>
         <button class="mobile-nav-btn" data-mode="satellite" onclick="switchMode('satellite')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/></svg></span> Sat</button>
         <button class="mobile-nav-btn" data-mode="listening" onclick="switchMode('listening')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span> Scanner</button>
+        <button class="mobile-nav-btn" data-mode="spystations" onclick="switchMode('spystations')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span> Spy</button>
     </nav>
 
     <!-- Mobile Drawer Overlay -->
@@ -343,6 +387,41 @@
     <div class="container">
         <div class="main-content">
             <div class="sidebar mobile-drawer" id="mainSidebar">
+                <!-- Agent Selector -->
+                <div class="section" id="agentSection">
+                    <h3>Signal Source</h3>
+                    <div class="form-group">
+                        <label style="font-size: 11px; color: #888; margin-bottom: 4px;">Agent</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <select id="agentSelect" style="flex: 1;">
+                                <option value="local">Local (This Device)</option>
+                            </select>
+                            <span id="agentStatusDot" class="agent-status-dot online" title="Agent status"></span>
+                        </div>
+                    </div>
+                    <div id="agentInfo" class="info-text" style="font-size: 10px; color: #666; margin-top: 4px;">
+                        <span id="agentStatusText">Local</span>
+                        <span id="agentLatencyText" style="margin-left: 6px; color: var(--accent-cyan);"></span>
+                    </div>
+                    <!-- Agent health panel (shows all agents when expanded) -->
+                    <details style="margin-top: 8px;">
+                        <summary style="font-size: 10px; color: #888; cursor: pointer;">All Agents Health</summary>
+                        <div id="agentHealthPanel" style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px; max-height: 120px; overflow-y: auto;">
+                            <div style="color: var(--text-muted); font-size: 11px;">Loading...</div>
+                        </div>
+                    </details>
+                    <!-- Multi-agent mode toggle -->
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label class="inline-checkbox" style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="showAllAgents" onchange="toggleMultiAgentMode()">
+                            <span style="font-size: 11px;">Show All Agents Combined</span>
+                        </label>
+                    </div>
+                    <a href="/controller/manage" class="preset-btn" style="display: block; text-align: center; text-decoration: none; margin-top: 8px; font-size: 11px;">
+                        Manage Agents
+                    </a>
+                </div>
+
                 <div class="section" id="rtlDeviceSection">
                     <h3>SDR Device</h3>
                     <div class="form-group">
@@ -445,6 +524,10 @@
 
                 {% include 'partials/modes/tscm.html' %}
 
+                {% include 'partials/modes/ais.html' %}
+
+                {% include 'partials/modes/spy-stations.html' %}
+
                 <button class="preset-btn" onclick="killAll()"
                     style="width: 100%; margin-top: 10px; border-color: #ff3366; color: #ff3366;">
                     Kill All Processes
@@ -473,230 +556,177 @@
                             <div style="color: var(--accent-red); cursor: pointer;" onclick="showRogueApDetails()"
                                 title="Click: Rogue AP details"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> <span id="rogueApCount">0</span></div>
                         </div>
-                        <div class="stats" id="btStats" style="display: none;">
-                            <div title="Bluetooth Devices"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span> <span id="btDeviceCount">0</span></div>
-                            <div title="BLE Beacons"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span> <span id="btBeaconCount">0</span></div>
-                        </div>
                         <div class="stats" id="satelliteStats" style="display: none;">
                             <div title="Upcoming Passes"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/></svg></span> <span id="passCount">0</span></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- WiFi Layout Container (visualizations left, device cards right) -->
+                <!-- WiFi Layout Container -->
                 <div class="wifi-layout-container" id="wifiLayoutContainer" style="display: none;">
-                    <!-- Left: WiFi Visualizations -->
-                    <div class="wifi-visuals" id="wifiVisuals">
-                        <!-- Selected WiFi Device Info - at top for visibility -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <h5>Selected Device</h5>
-                            <div id="wifiSelectedDevice" style="font-size: 11px; min-height: 100px;">
-                                <div style="color: var(--text-dim); padding: 20px; text-align: center;">Click a network
-                                    or client to view details</div>
-                            </div>
+                    <!-- Status Bar -->
+                    <div class="wifi-status-bar">
+                        <div class="wifi-status-item">
+                            <span class="wifi-status-label">Networks:</span>
+                            <span class="wifi-status-value" id="wifiNetworkCount">0</span>
                         </div>
-                        <!-- Row 1: Network Radar + Security Overview -->
-                        <div class="wifi-visual-panel">
-                            <h5>Network Radar</h5>
-                            <div class="radar-container">
-                                <canvas id="radarCanvas" width="150" height="150"></canvas>
-                            </div>
+                        <div class="wifi-status-item">
+                            <span class="wifi-status-label">Clients:</span>
+                            <span class="wifi-status-value" id="wifiClientCount">0</span>
                         </div>
-                        <div class="wifi-visual-panel">
-                            <h5>Security Overview</h5>
-                            <div class="security-container">
-                                <div class="security-donut">
-                                    <canvas id="securityCanvas" width="80" height="80"></canvas>
-                                </div>
-                                <div class="security-legend">
-                                    <div class="security-legend-item">
-                                        <div class="security-legend-dot wpa3"></div>WPA3: <span id="wpa3Count">0</span>
-                                    </div>
-                                    <div class="security-legend-item">
-                                        <div class="security-legend-dot wpa2"></div>WPA2: <span id="wpa2Count">0</span>
-                                    </div>
-                                    <div class="security-legend-item">
-                                        <div class="security-legend-dot wep"></div>WEP: <span id="wepCount">0</span>
-                                    </div>
-                                    <div class="security-legend-item">
-                                        <div class="security-legend-dot open"></div>Open: <span id="openCount">0</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="wifi-status-item">
+                            <span class="wifi-status-label">Hidden:</span>
+                            <span class="wifi-status-value" id="wifiHiddenCount">0</span>
                         </div>
-                        <!-- Row 2: Channel Utilization (2.4 GHz + 5 GHz side by side) -->
-                        <div class="wifi-visual-panel">
-                            <h5>Channel Utilization (2.4 GHz)</h5>
-                            <div class="channel-graph" id="channelGraph">
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">1</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">2</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">3</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">4</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">5</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">6</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">7</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">8</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">9</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">10</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">11</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">12</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">13</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="wifi-visual-panel">
-                            <h5>Channel Utilization (5 GHz)</h5>
-                            <div class="channel-graph" id="channelGraph5g" style="font-size: 7px;">
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">36</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">40</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">44</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">48</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">52</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">56</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">60</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">64</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">100</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">149</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">153</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">157</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">161</span>
-                                </div>
-                                <div class="channel-bar-wrapper">
-                                    <div class="channel-bar" style="height: 2px;"></div><span
-                                        class="channel-label">165</span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Row 3: Channel Recommendation -->
-                        <div class="wifi-visual-panel channel-recommendation" id="channelRecommendation">
-                            <h4>Channel Recommendation</h4>
-                            <div class="rec-text">
-                                <strong>2.4 GHz:</strong> Use channel <span class="rec-channel"
-                                    id="rec24Channel">--</span>
-                                <span id="rec24Reason" style="font-size: 10px; color: var(--text-dim);"></span>
-                            </div>
-                            <div class="rec-text" style="margin-top: 5px;">
-                                <strong>5 GHz:</strong> Use channel <span class="rec-channel" id="rec5Channel">--</span>
-                                <span id="rec5Reason" style="font-size: 10px; color: var(--text-dim);"></span>
-                            </div>
-                        </div>
-                        <!-- Device Correlation -->
-                        <div class="wifi-visual-panel" id="correlationPanel">
-                            <h5>Device Correlation</h5>
-                            <div id="correlationList" style="font-size: 11px; max-height: 100px; overflow-y: auto;">
-                                <div style="color: var(--text-dim);">Analyzing WiFi/BT device patterns...</div>
-                            </div>
-                        </div>
-                        <!-- Hidden SSID Revealer -->
-                        <div class="wifi-visual-panel" id="hiddenSsidPanel">
-                            <h5>Hidden SSIDs Revealed</h5>
-                            <div id="hiddenSsidList" style="font-size: 11px; max-height: 100px; overflow-y: auto;">
-                                <div style="color: var(--text-dim);">Monitoring probe requests...</div>
-                            </div>
-                        </div>
-                        <!-- Client Probe Analysis -->
-                        <div class="wifi-visual-panel" id="probeAnalysisPanel" style="grid-column: span 2;">
-                            <h5>Client Probe Analysis</h5>
-                            <div style="display: flex; gap: 10px; margin-bottom: 8px; font-size: 10px;">
-                                <span>Clients: <strong id="probeClientCount">0</strong></span>
-                                <span>Unique SSIDs: <strong id="probeSSIDCount">0</strong></span>
-                                <span>Privacy Leaks: <strong id="probePrivacyCount"
-                                        style="color: var(--accent-orange);">0</strong></span>
-                            </div>
-                            <div id="probeAnalysisList" style="font-size: 11px; max-height: 200px; overflow-y: auto;">
-                                <div style="color: var(--text-dim);">Waiting for client probe requests...</div>
-                            </div>
-                        </div>
-                        <!-- Network Activity Timeline -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <div id="wifiTimelineContainer"></div>
+                        <div class="wifi-status-item" id="wifiScanStatus">
+                            <span class="wifi-status-indicator idle"></span>
+                            <span>Ready</span>
                         </div>
                     </div>
-                    <!-- Right: WiFi Device Cards -->
-                    <div class="wifi-device-list" id="wifiDeviceList">
-                        <div class="wifi-device-list-header">
-                            <h5>Discovered Networks</h5>
-                            <span class="device-count">(<span id="wifiDeviceListCount">0</span>)</span>
+
+                    <!-- Main Content: 3-column layout -->
+                    <div class="wifi-main-content">
+                        <!-- LEFT: Networks Table -->
+                        <div class="wifi-networks-panel">
+                            <div class="wifi-networks-header">
+                                <h5>Discovered Networks</h5>
+                                <div class="wifi-network-filters" id="wifiNetworkFilters">
+                                    <button class="wifi-filter-btn active" data-filter="all">All</button>
+                                    <button class="wifi-filter-btn" data-filter="2.4">2.4G</button>
+                                    <button class="wifi-filter-btn" data-filter="5">5G</button>
+                                    <button class="wifi-filter-btn" data-filter="open">Open</button>
+                                    <button class="wifi-filter-btn" data-filter="hidden">Hidden</button>
+                                </div>
+                            </div>
+                            <div class="wifi-networks-table-wrapper">
+                                <table class="wifi-networks-table" id="wifiNetworkTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" data-sort="essid">SSID</th>
+                                            <th class="sortable" data-sort="bssid">BSSID</th>
+                                            <th class="sortable" data-sort="channel">Ch</th>
+                                            <th class="sortable" data-sort="rssi">Signal</th>
+                                            <th class="sortable" data-sort="security">Security</th>
+                                            <th class="sortable" data-sort="clients">Clients</th>
+                                            <th class="col-agent sortable" data-sort="agent">Source</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wifiNetworkTableBody">
+                                        <tr class="wifi-network-placeholder">
+                                            <td colspan="7">
+                                                <div class="placeholder-text">Start scanning to discover networks</div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div class="wifi-device-list-content" id="wifiDeviceListContent">
-                            <div style="color: var(--text-dim); text-align: center; padding: 30px;">
-                                Start scanning to discover WiFi networks
+
+                        <!-- CENTER: Proximity Radar -->
+                        <div class="wifi-radar-panel">
+                            <h5>Proximity Radar</h5>
+                            <div id="wifiProximityRadar" class="wifi-radar-container"></div>
+                            <div class="wifi-zone-summary">
+                                <div class="wifi-zone near">
+                                    <span class="wifi-zone-count" id="wifiZoneImmediate">0</span>
+                                    <span class="wifi-zone-label">Near</span>
+                                </div>
+                                <div class="wifi-zone mid">
+                                    <span class="wifi-zone-count" id="wifiZoneNear">0</span>
+                                    <span class="wifi-zone-label">Mid</span>
+                                </div>
+                                <div class="wifi-zone far">
+                                    <span class="wifi-zone-count" id="wifiZoneFar">0</span>
+                                    <span class="wifi-zone-label">Far</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Channel Analysis + Security -->
+                        <div class="wifi-analysis-panel">
+                            <div class="wifi-channel-section">
+                                <h5>Channel Analysis</h5>
+                                <div class="wifi-channel-tabs" id="wifiChannelBandTabs">
+                                    <button class="channel-band-tab active" data-band="2.4">2.4 GHz</button>
+                                    <button class="channel-band-tab" data-band="5">5 GHz</button>
+                                </div>
+                                <div id="wifiChannelChart" class="wifi-channel-chart"></div>
+                            </div>
+                            <div class="wifi-security-section">
+                                <h5>Security Overview</h5>
+                                <div class="wifi-security-stats">
+                                    <div class="wifi-security-item wpa3">
+                                        <span class="wifi-security-dot"></span>
+                                        <span>WPA3</span>
+                                        <span class="wifi-security-count" id="wpa3Count">0</span>
+                                    </div>
+                                    <div class="wifi-security-item wpa2">
+                                        <span class="wifi-security-dot"></span>
+                                        <span>WPA2</span>
+                                        <span class="wifi-security-count" id="wpa2Count">0</span>
+                                    </div>
+                                    <div class="wifi-security-item wep">
+                                        <span class="wifi-security-dot"></span>
+                                        <span>WEP</span>
+                                        <span class="wifi-security-count" id="wepCount">0</span>
+                                    </div>
+                                    <div class="wifi-security-item open">
+                                        <span class="wifi-security-dot"></span>
+                                        <span>Open</span>
+                                        <span class="wifi-security-count" id="openCount">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detail Drawer (slides up on network selection) -->
+                    <div class="wifi-detail-drawer" id="wifiDetailDrawer">
+                        <div class="wifi-detail-header">
+                            <div class="wifi-detail-title">
+                                <span class="wifi-detail-essid" id="wifiDetailEssid">Network Name</span>
+                                <span class="wifi-detail-bssid" id="wifiDetailBssid">00:00:00:00:00:00</span>
+                            </div>
+                            <button class="wifi-detail-close" onclick="WiFiMode.closeDetail()">&times;</button>
+                        </div>
+                        <div class="wifi-detail-content" id="wifiDetailContent">
+                            <div class="wifi-detail-grid">
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Signal</span>
+                                    <span class="value" id="wifiDetailRssi">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Channel</span>
+                                    <span class="value" id="wifiDetailChannel">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Band</span>
+                                    <span class="value" id="wifiDetailBand">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Security</span>
+                                    <span class="value" id="wifiDetailSecurity">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Cipher</span>
+                                    <span class="value" id="wifiDetailCipher">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Vendor</span>
+                                    <span class="value" id="wifiDetailVendor">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">Clients</span>
+                                    <span class="value" id="wifiDetailClients">--</span>
+                                </div>
+                                <div class="wifi-detail-stat">
+                                    <span class="label">First Seen</span>
+                                    <span class="value" id="wifiDetailFirstSeen">--</span>
+                                </div>
+                            </div>
+                            <div class="wifi-detail-clients" id="wifiDetailClientList" style="display: none;">
+                                <h6>Connected Clients</h6>
+                                <div class="wifi-client-list"></div>
                             </div>
                         </div>
                     </div>
@@ -705,71 +735,129 @@
                 <!-- Bluetooth Layout Container (visualizations left, device cards right) -->
                 <div class="bt-layout-container" id="btLayoutContainer" style="display: none;">
                     <!-- Left: Bluetooth Visualizations -->
-                    <div class="wifi-visuals" id="btVisuals">
-                        <!-- Selected Bluetooth Device Info - at top for visibility -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <h5>Selected Device</h5>
-                            <div id="btSelectedDevice" style="font-size: 11px; min-height: 100px;">
-                                <div style="color: var(--text-dim); padding: 20px; text-align: center;">Click a device
-                                    to view details</div>
+                    <div class="bt-visuals-column" id="btVisuals">
+                        <!-- Device Detail Panel (always visible) -->
+                        <div class="bt-detail-panel" id="btDetailPanel">
+                            <div class="bt-detail-header">
+                                <h5>Device Details</h5>
                             </div>
-                        </div>
-                        <!-- Row 1: Bluetooth Radar + Device Types -->
-                        <div class="wifi-visual-panel">
-                            <h5>Proximity Radar</h5>
-                            <div class="radar-container">
-                                <canvas id="btRadarCanvas" width="150" height="150"></canvas>
-                            </div>
-                        </div>
-                        <div class="wifi-visual-panel">
-                            <h5>Device Types</h5>
-                            <div class="bt-type-overview" id="btTypeOverview">
-                                <div class="bt-type-item">Phones: <strong id="btPhoneCount">0</strong></div>
-                                <div class="bt-type-item">Computers: <strong id="btComputerCount">0</strong></div>
-                                <div class="bt-type-item">Audio: <strong id="btAudioCount">0</strong></div>
-                                <div class="bt-type-item">Wearables: <strong id="btWearableCount">0</strong></div>
-                                <div class="bt-type-item">Other: <strong id="btOtherCount">0</strong></div>
-                            </div>
-                        </div>
-                        <!-- Row 2: Tracker Detection + Signal Analysis -->
-                        <div class="wifi-visual-panel">
-                            <h5>Tracker Detection</h5>
-                            <div id="btTrackerList" style="max-height: 120px; overflow-y: auto; font-size: 11px;">
-                                <div style="color: var(--text-dim); padding: 10px; text-align: center;">Monitoring for
-                                    AirTags, Tiles...</div>
-                            </div>
-                        </div>
-                        <div class="wifi-visual-panel">
-                            <h5>Signal Distribution</h5>
-                            <div class="bt-signal-dist" id="btSignalDist">
-                                <div class="signal-range"><span>Strong (-50+)</span>
-                                    <div class="signal-bar-bg">
-                                        <div class="signal-bar strong" id="btSignalStrong" style="width: 0%;"></div>
-                                    </div><span id="btSignalStrongCount">0</span>
+                            <div class="bt-detail-body">
+                                <!-- Placeholder shown when no device selected -->
+                                <div class="bt-detail-placeholder" id="btDetailPlaceholder">
+                                    <span>Select a device to view details</span>
                                 </div>
-                                <div class="signal-range"><span>Medium (-70)</span>
-                                    <div class="signal-bar-bg">
-                                        <div class="signal-bar medium" id="btSignalMedium" style="width: 0%;"></div>
-                                    </div><span id="btSignalMediumCount">0</span>
-                                </div>
-                                <div class="signal-range"><span>Weak (-90)</span>
-                                    <div class="signal-bar-bg">
-                                        <div class="signal-bar weak" id="btSignalWeak" style="width: 0%;"></div>
-                                    </div><span id="btSignalWeakCount">0</span>
+                                <!-- Content shown when device is selected -->
+                                <div class="bt-detail-content" id="btDetailContent" style="display: none;">
+                                    <div class="bt-detail-top-row">
+                                        <div class="bt-detail-identity">
+                                            <div class="bt-detail-name" id="btDetailName">Device Name</div>
+                                            <div class="bt-detail-address" id="btDetailAddress">00:00:00:00:00:00</div>
+                                        </div>
+                                        <div class="bt-detail-rssi-display">
+                                            <span class="bt-detail-rssi-value" id="btDetailRssi">--</span>
+                                            <span class="bt-detail-rssi-unit">dBm</span>
+                                        </div>
+                                    </div>
+                                    <div class="bt-detail-badges" id="btDetailBadges"></div>
+                                    <div class="bt-detail-grid">
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Manufacturer</span>
+                                            <span class="bt-detail-stat-value" id="btDetailMfr">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Type</span>
+                                            <span class="bt-detail-stat-value" id="btDetailAddrType">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Seen</span>
+                                            <span class="bt-detail-stat-value" id="btDetailSeen">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Range</span>
+                                            <span class="bt-detail-stat-value" id="btDetailRange">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Min/Max</span>
+                                            <span class="bt-detail-stat-value" id="btDetailRssiRange">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">First Seen</span>
+                                            <span class="bt-detail-stat-value" id="btDetailFirstSeen">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Last Seen</span>
+                                            <span class="bt-detail-stat-value" id="btDetailLastSeen">--</span>
+                                        </div>
+                                        <div class="bt-detail-stat">
+                                            <span class="bt-detail-stat-label">Mfr ID</span>
+                                            <span class="bt-detail-stat-value" id="btDetailMfrId">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="bt-detail-bottom-row">
+                                        <div class="bt-detail-services" id="btDetailServices" style="display: none;">
+                                            <span class="bt-detail-services-list" id="btDetailServicesList"></span>
+                                        </div>
+                                        <button class="bt-detail-btn" onclick="BluetoothMode.copyAddress()">Copy</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <!-- Row 3: FindMy Detection -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <h5>Apple FindMy Network</h5>
-                            <div id="btFindMyList" style="max-height: 100px; overflow-y: auto; font-size: 11px;">
-                                <div style="color: var(--text-dim); padding: 10px; text-align: center;">Scanning for
-                                    FindMy-compatible devices...</div>
+                        <!-- Main area: Side panels + Radar -->
+                        <div class="bt-main-area">
+                            <!-- Left side panels -->
+                            <div class="bt-side-panels">
+                                <div class="wifi-visual-panel bt-side-panel">
+                                    <h5>Tracker Detection</h5>
+                                    <div id="btTrackerList" style="font-size: 11px; max-height: 200px; overflow-y: auto;">
+                                        <div style="color: var(--text-dim); padding: 10px; text-align: center;">Monitoring for AirTags, Tiles...</div>
+                                    </div>
+                                </div>
+                                <div class="wifi-visual-panel bt-side-panel">
+                                    <h5>Signal Distribution</h5>
+                                    <div class="bt-signal-dist" id="btSignalDist">
+                                        <div class="signal-range"><span>Strong (-50+)</span>
+                                            <div class="signal-bar-bg">
+                                                <div class="signal-bar strong" id="btSignalStrong" style="width: 0%;"></div>
+                                            </div><span id="btSignalStrongCount">0</span>
+                                        </div>
+                                        <div class="signal-range"><span>Medium (-70)</span>
+                                            <div class="signal-bar-bg">
+                                                <div class="signal-bar medium" id="btSignalMedium" style="width: 0%;"></div>
+                                            </div><span id="btSignalMediumCount">0</span>
+                                        </div>
+                                        <div class="signal-range"><span>Weak (-90)</span>
+                                            <div class="signal-bar-bg">
+                                                <div class="signal-bar weak" id="btSignalWeak" style="width: 0%;"></div>
+                                            </div><span id="btSignalWeakCount">0</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <!-- Device Activity Timeline -->
-                        <div class="wifi-visual-panel" style="grid-column: span 2;">
-                            <div id="bluetoothTimelineContainer"></div>
+                            <!-- Proximity Radar -->
+                            <div class="wifi-visual-panel bt-radar-panel">
+                                <h5>Proximity Radar</h5>
+                                <div id="btProximityRadar" style="display: flex; justify-content: center; padding: 8px 0;"></div>
+                                <div id="btRadarControls" style="display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-wrap: wrap;">
+                                    <button data-filter="newOnly" class="bt-radar-filter-btn" style="padding: 4px 10px; font-size: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: #888; cursor: pointer;">New Only</button>
+                                    <button data-filter="strongest" class="bt-radar-filter-btn" style="padding: 4px 10px; font-size: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: #888; cursor: pointer;">Strongest</button>
+                                    <button data-filter="unapproved" class="bt-radar-filter-btn" style="padding: 4px 10px; font-size: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: #888; cursor: pointer;">Unapproved</button>
+                                    <button id="btRadarPauseBtn" style="padding: 4px 10px; font-size: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: #888; cursor: pointer;">Pause</button>
+                                </div>
+                                <div id="btZoneSummary" style="display: flex; justify-content: center; gap: 24px; margin-top: 12px; font-size: 11px;">
+                                    <div style="text-align: center;">
+                                        <span id="btZoneImmediate" style="font-size: 20px; font-weight: 600; color: #22c55e;">0</span>
+                                        <div style="color: #666;">Immediate</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <span id="btZoneNear" style="font-size: 20px; font-weight: 600; color: #eab308;">0</span>
+                                        <div style="color: #666;">Near</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <span id="btZoneFar" style="font-size: 20px; font-weight: 600; color: #ef4444;">0</span>
+                                        <div style="color: #666;">Far</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <!-- Right: Bluetooth Device Cards -->
@@ -778,10 +866,29 @@
                             <h5>Bluetooth Devices</h5>
                             <span class="device-count">(<span id="btDeviceListCount">0</span>)</span>
                         </div>
+                        <div class="bt-device-filters" id="btDeviceFilters">
+                            <button class="bt-filter-btn active" data-filter="all">All</button>
+                            <button class="bt-filter-btn" data-filter="new">New</button>
+                            <button class="bt-filter-btn" data-filter="named">Named</button>
+                            <button class="bt-filter-btn" data-filter="strong">Strong</button>
+                        </div>
                         <div class="wifi-device-list-content" id="btDeviceListContent">
                             <div style="color: var(--text-dim); text-align: center; padding: 30px;">
                                 Start scanning to discover Bluetooth devices
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bluetooth Device Detail Modal -->
+                <div id="btDeviceModal" class="bt-modal-overlay" style="display: none;">
+                    <div class="bt-modal">
+                        <div class="bt-modal-header">
+                            <h4 id="btModalTitle">Device Details</h4>
+                            <button class="bt-modal-close" onclick="BluetoothMode.closeModal()">&times;</button>
+                        </div>
+                        <div class="bt-modal-body" id="btModalBody">
+                            <!-- Populated by JavaScript -->
                         </div>
                     </div>
                 </div>
@@ -1414,6 +1521,28 @@
                     </div>
                 </div>
 
+                <!-- Spy Stations Dashboard -->
+                <div id="spyStationsVisuals" class="spy-stations-container" style="display: none;">
+                    <div class="spy-stations-header">
+                        <div class="spy-stations-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+                                <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+                                <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+                            </svg>
+                            Number Stations & Diplomatic Networks
+                        </div>
+                        <div class="spy-stations-count">
+                            <span id="spyStationsVisibleCount">0</span> stations
+                        </div>
+                    </div>
+                    <div class="spy-stations-grid" id="spyStationsGrid">
+                        <!-- Station cards populated by JavaScript -->
+                    </div>
+                </div>
+
                 <!-- Device Intelligence Dashboard (above waterfall for prominence) -->
                 <div class="recon-panel collapsed" id="reconPanel">
                     <div class="recon-header" onclick="toggleReconCollapse()" style="cursor: pointer;">
@@ -1476,6 +1605,7 @@
     <!-- Intercept JS Modules -->
     <script src="{{ url_for('static', filename='js/core/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/audio.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/agents.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/radio-knob.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/signal-guess.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/signal-cards.js') }}"></script>
@@ -1484,7 +1614,18 @@
     <script src="{{ url_for('static', filename='js/components/timeline-adapters/rf-adapter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/timeline-adapters/bluetooth-adapter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/timeline-adapters/wifi-adapter.js') }}"></script>
+    <!-- Bluetooth v2 components -->
+    <script src="{{ url_for('static', filename='js/components/rssi-sparkline.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/message-card.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/device-card.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/proximity-radar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/timeline-heatmap.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/bluetooth.js') }}"></script>
+    <!-- WiFi v2 components -->
+    <script src="{{ url_for('static', filename='js/components/channel-chart.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/wifi.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/listening-post.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/spy-stations.js') }}"></script>
 
     <script>
         // ============================================
@@ -1567,7 +1708,12 @@
             if (!container) return;
 
             // Create timeline using new ActivityTimeline
-            if (typeof ActivityTimeline !== 'undefined') {
+            // For TSCM mode, use SignalTimeline.create() to ensure backward compatibility
+            // with SignalTimeline.addEvent() calls used in TSCM event handlers
+            if (mode === 'tscm' && typeof SignalTimeline !== 'undefined') {
+                SignalTimeline.create(modeConfig.container, modeConfig.config);
+                modeTimelines[mode] = { addEvent: (e) => SignalTimeline.addEvent(e.id, e.strength, e.duration, e.label) };
+            } else if (typeof ActivityTimeline !== 'undefined') {
                 modeTimelines[mode] = ActivityTimeline.create(modeConfig.container, modeConfig.config);
             }
         }
@@ -1732,12 +1878,6 @@
             if (headerHandshakeCount) headerHandshakeCount.textContent = document.getElementById('handshakeCount')?.textContent || '0';
             if (headerDroneCount) headerDroneCount.textContent = document.getElementById('droneCount')?.textContent || '0';
 
-            // Bluetooth stats
-            const headerBtDeviceCount = document.getElementById('headerBtDeviceCount');
-            const headerBtBeaconCount = document.getElementById('headerBtBeaconCount');
-            if (headerBtDeviceCount) headerBtDeviceCount.textContent = document.getElementById('btDeviceCount')?.textContent || '0';
-            if (headerBtBeaconCount) headerBtBeaconCount.textContent = document.getElementById('btBeaconCount')?.textContent || '0';
-
             // Satellite stats
             const headerPassCount = document.getElementById('headerPassCount');
             if (headerPassCount) headerPassCount.textContent = document.getElementById('passCount')?.textContent || '0';
@@ -1898,10 +2038,10 @@
                 });
             });
 
-            // Collapse all sections by default (except SDR Device which is first)
+            // Collapse all sections by default (except Signal Source and SDR Device)
             document.querySelectorAll('.section').forEach((section, index) => {
-                // Keep first section expanded, collapse rest
-                if (index > 0) {
+                // Keep first two sections expanded (Signal Source, SDR Device), collapse rest
+                if (index > 1) {
                     section.classList.add('collapsed');
                 }
             });
@@ -1954,7 +2094,8 @@
                 'pager': 'sdr', 'sensor': 'sdr',
                 'aprs': 'sdr', 'satellite': 'sdr', 'listening': 'sdr',
                 'wifi': 'wireless', 'bluetooth': 'wireless',
-                'tscm': 'security'
+                'tscm': 'security',
+                'rtlamr': 'sdr', 'ais': 'sdr', 'spystations': 'sdr'
             };
 
             // Remove has-active from all dropdowns
@@ -1977,15 +2118,27 @@
 
         // Mode switching
         function switchMode(mode) {
-            // Stop any running scans when switching modes
-            if (isRunning) stopDecoding();
-            if (isSensorRunning) stopSensorDecoding();
-            if (isWifiRunning) stopWifiScan();
-            if (isBtRunning) stopBtScan();
-            if (isAprsRunning) stopAprs();
-            if (isTscmRunning) stopTscmSweep();
+            // Only stop local scans if in local mode (not agent mode)
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            if (!isAgentMode) {
+                if (isRunning) stopDecoding();
+                if (isSensorRunning) stopSensorDecoding();
+                if (isWifiRunning) stopWifiScan();
+                if (isBtRunning) stopBtScan();
+                if (isAprsRunning) stopAprs();
+                if (isTscmRunning) stopTscmSweep();
+            }
 
             currentMode = mode;
+
+            // Sync mode state with current agent/local after switching
+            if (isAgentMode && typeof syncAgentModeStates === 'function') {
+                // Re-sync with agent to update this mode's UI state
+                syncAgentModeStates(currentAgent);
+            } else if (!isAgentMode && typeof syncLocalModeStates === 'function') {
+                // Sync with local status
+                syncLocalModeStates();
+            }
 
             // Close dropdowns and update active state
             closeAllDropdowns();
@@ -2013,23 +2166,22 @@
             document.getElementById('listeningPostMode')?.classList.toggle('active', mode === 'listening');
             document.getElementById('aprsMode')?.classList.toggle('active', mode === 'aprs');
             document.getElementById('tscmMode')?.classList.toggle('active', mode === 'tscm');
+            document.getElementById('aisMode')?.classList.toggle('active', mode === 'ais');
+            document.getElementById('spystationsMode')?.classList.toggle('active', mode === 'spystations');
             const pagerStats = document.getElementById('pagerStats');
             const sensorStats = document.getElementById('sensorStats');
             const satelliteStats = document.getElementById('satelliteStats');
             const wifiStats = document.getElementById('wifiStats');
-            const btStats = document.getElementById('btStats');
             if (pagerStats) pagerStats.style.display = mode === 'pager' ? 'flex' : 'none';
             if (sensorStats) sensorStats.style.display = mode === 'sensor' ? 'flex' : 'none';
             if (satelliteStats) satelliteStats.style.display = mode === 'satellite' ? 'flex' : 'none';
             if (wifiStats) wifiStats.style.display = mode === 'wifi' ? 'flex' : 'none';
-            if (btStats) btStats.style.display = mode === 'bluetooth' ? 'flex' : 'none';
 
             // Update header stats groups
             document.getElementById('headerPagerStats')?.classList.toggle('active', mode === 'pager');
             document.getElementById('headerSensorStats')?.classList.toggle('active', mode === 'sensor');
             document.getElementById('headerSatelliteStats')?.classList.toggle('active', mode === 'satellite');
             document.getElementById('headerWifiStats')?.classList.toggle('active', mode === 'wifi');
-            document.getElementById('headerBtStats')?.classList.toggle('active', mode === 'bluetooth');
 
             // Show/hide dashboard buttons in nav bar
             const satelliteDashboardBtn = document.getElementById('satelliteDashboardBtn');
@@ -2045,7 +2197,9 @@
                 'bluetooth': 'BLUETOOTH',
                 'listening': 'LISTENING POST',
                 'aprs': 'APRS',
-                'tscm': 'TSCM'
+                'tscm': 'TSCM',
+                'ais': 'AIS VESSELS',
+                'spystations': 'SPY STATIONS'
             };
             const activeModeIndicator = document.getElementById('activeModeIndicator');
             if (activeModeIndicator) activeModeIndicator.innerHTML = '<span class="pulse-dot"></span>' + (modeNames[mode] || mode.toUpperCase());
@@ -2055,12 +2209,14 @@
             const listeningPostVisuals = document.getElementById('listeningPostVisuals');
             const aprsVisuals = document.getElementById('aprsVisuals');
             const tscmVisuals = document.getElementById('tscmVisuals');
+            const spyStationsVisuals = document.getElementById('spyStationsVisuals');
             if (wifiLayoutContainer) wifiLayoutContainer.style.display = mode === 'wifi' ? 'flex' : 'none';
             if (btLayoutContainer) btLayoutContainer.style.display = mode === 'bluetooth' ? 'flex' : 'none';
             if (satelliteVisuals) satelliteVisuals.style.display = mode === 'satellite' ? 'block' : 'none';
             if (listeningPostVisuals) listeningPostVisuals.style.display = mode === 'listening' ? 'grid' : 'none';
             if (aprsVisuals) aprsVisuals.style.display = mode === 'aprs' ? 'flex' : 'none';
             if (tscmVisuals) tscmVisuals.style.display = mode === 'tscm' ? 'flex' : 'none';
+            if (spyStationsVisuals) spyStationsVisuals.style.display = mode === 'spystations' ? 'flex' : 'none';
 
             // Show/hide mode-specific timeline containers
             const pagerTimelineContainer = document.getElementById('pagerTimelineContainer');
@@ -2078,7 +2234,9 @@
                 'bluetooth': 'Bluetooth Scanner',
                 'listening': 'Listening Post',
                 'aprs': 'APRS Tracker',
-                'tscm': 'TSCM Counter-Surveillance'
+                'tscm': 'TSCM Counter-Surveillance',
+                'ais': 'AIS Vessel Tracker',
+                'spystations': 'Spy Stations'
             };
             const outputTitle = document.getElementById('outputTitle');
             if (outputTitle) outputTitle.textContent = titles[mode] || 'Signal Monitor';
@@ -2096,7 +2254,7 @@
             const reconBtn = document.getElementById('reconBtn');
             const intelBtn = document.querySelector('[onclick="exportDeviceDB()"]');
             const reconPanel = document.getElementById('reconPanel');
-            if (mode === 'satellite' || mode === 'listening' || mode === 'aprs' || mode === 'tscm') {
+            if (mode === 'satellite' || mode === 'listening' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') {
                 if (reconPanel) reconPanel.style.display = 'none';
                 if (reconBtn) reconBtn.style.display = 'none';
                 if (intelBtn) intelBtn.style.display = 'none';
@@ -2108,6 +2266,11 @@
                     reconPanel.style.display = 'block';
                 }
             }
+
+            // Show agent selector for modes that support remote agents
+            const agentSection = document.getElementById('agentSection');
+            const agentModes = ['pager', 'sensor', 'rtlamr', 'listening', 'aprs', 'wifi', 'bluetooth', 'aircraft', 'tscm', 'ais', 'acars', 'dsc'];
+            if (agentSection) agentSection.style.display = agentModes.includes(mode) ? 'block' : 'none';
 
             // Show RTL-SDR device section for modes that use it
             const rtlDeviceSection = document.getElementById('rtlDeviceSection');
@@ -2122,7 +2285,7 @@
             // Hide output console for modes with their own visualizations
             const outputEl = document.getElementById('output');
             const statusBar = document.querySelector('.status-bar');
-            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm') ? 'none' : 'block';
+            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
             if (statusBar) statusBar.style.display = (mode === 'satellite') ? 'none' : 'flex';
 
             // Load interfaces and initialize visualizations when switching modes
@@ -2130,6 +2293,10 @@
                 refreshWifiInterfaces();
                 initRadar();
                 initWatchList();
+                // Initialize v2 WiFi components
+                if (typeof WiFiMode !== 'undefined') {
+                    WiFiMode.init();
+                }
             } else if (mode === 'bluetooth') {
                 refreshBtInterfaces();
                 initBtRadar();
@@ -2143,6 +2310,13 @@
             } else if (mode === 'satellite') {
                 initPolarPlot();
                 initSatelliteList();
+            } else if (mode === 'listening') {
+                // Check for incoming tune requests from Spy Stations
+                if (typeof checkIncomingTuneRequest === 'function') {
+                    checkIncomingTuneRequest();
+                }
+            } else if (mode === 'spystations') {
+                SpyStations.init();
             }
         }
 
@@ -2176,6 +2350,43 @@
             const gain = document.getElementById('sensorGain').value;
             const ppm = document.getElementById('sensorPpm').value;
             const device = getSelectedDevice();
+
+            // Check if using remote agent
+            if (typeof currentAgent !== 'undefined' && currentAgent !== 'local') {
+                // Check for conflicts with other running SDR modes
+                if (typeof checkAgentModeConflict === 'function' && !checkAgentModeConflict('sensor')) {
+                    return;  // User cancelled or conflict not resolved
+                }
+
+                // Route through agent proxy
+                const config = {
+                    frequency: freq,
+                    gain: gain,
+                    ppm: ppm,
+                    device: device
+                };
+
+                fetch(`/controller/agents/${currentAgent}/sensor/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                }).then(r => r.json())
+                    .then(data => {
+                        // Handle controller proxy response (agent response is nested in 'result')
+                        const scanResult = data.result || data;
+                        if (scanResult.status === 'started' || scanResult.status === 'success') {
+                            setSensorRunning(true);
+                            startAgentSensorStream();
+                            showInfo(`Sensor started on remote agent`);
+                        } else {
+                            alert('Error: ' + (scanResult.message || 'Failed to start sensor on agent'));
+                        }
+                    })
+                    .catch(err => {
+                        alert('Error connecting to agent: ' + err.message);
+                    });
+                return;
+            }
 
             // Check if device is available
             if (!checkDeviceAvailability('sensor')) {
@@ -2235,6 +2446,25 @@
 
         // Stop sensor decoding
         function stopSensorDecoding() {
+            // Check if using remote agent
+            if (typeof currentAgent !== 'undefined' && currentAgent !== 'local') {
+                fetch(`/controller/agents/${currentAgent}/sensor/stop`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        setSensorRunning(false);
+                        if (eventSource) {
+                            eventSource.close();
+                            eventSource = null;
+                        }
+                        if (agentPollInterval) {
+                            clearInterval(agentPollInterval);
+                            agentPollInterval = null;
+                        }
+                        showInfo('Sensor stopped on remote agent');
+                    });
+                return;
+            }
+
             fetch('/stop_sensor', { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
@@ -2245,6 +2475,56 @@
                         eventSource = null;
                     }
                 });
+        }
+
+        // Polling interval for agent data
+        let agentPollInterval = null;
+
+        // Start polling agent for sensor data
+        function startAgentSensorStream() {
+            if (agentPollInterval) {
+                clearInterval(agentPollInterval);
+            }
+
+            // Poll every 2 seconds for new data
+            agentPollInterval = setInterval(() => {
+                if (!isSensorRunning || currentAgent === 'local') {
+                    clearInterval(agentPollInterval);
+                    agentPollInterval = null;
+                    return;
+                }
+
+                fetch(`/controller/agents/${currentAgent}/sensor/data`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.sensors) {
+                            data.sensors.forEach(sensor => {
+                                displaySensorMessage(sensor);
+                            });
+                        }
+                    })
+                    .catch(err => console.error('Agent poll error:', err));
+            }, 2000);
+        }
+
+        // Display a sensor message (works for both local and remote)
+        function displaySensorMessage(msg) {
+            const output = document.getElementById('output');
+            if (!output) return;
+
+            // Remove placeholder
+            const placeholder = output.querySelector('.placeholder');
+            if (placeholder) placeholder.style.display = 'none';
+
+            // Create signal card if SignalCards is available
+            if (typeof SignalCards !== 'undefined' && SignalCards.createFromSensor) {
+                const card = SignalCards.createFromSensor(msg);
+                if (card) {
+                    output.insertBefore(card, output.firstChild);
+                    sensorCount++;
+                    updateStats();
+                }
+            }
         }
 
         function setSensorRunning(running) {
@@ -2386,6 +2666,10 @@
             document.getElementById('rtlamrFrequency').value = freq;
         }
 
+        // RTLAMR mode polling timer for agent mode
+        let rtlamrPollTimer = null;
+        let rtlamrCurrentAgent = null;
+
         function startRtlamrDecoding() {
             const freq = document.getElementById('rtlamrFrequency').value;
             const gain = document.getElementById('rtlamrGain').value;
@@ -2395,8 +2679,12 @@
             const filterid = document.getElementById('rtlamrFilterId').value;
             const unique = document.getElementById('rtlamrUnique').checked;
 
-            // Check if device is available
-            if (!checkDeviceAvailability('rtlamr')) {
+            // Check if using agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            rtlamrCurrentAgent = isAgentMode ? currentAgent : null;
+
+            // Check if device is available (only for local mode)
+            if (!isAgentMode && !checkDeviceAvailability('rtlamr')) {
                 return;
             }
 
@@ -2411,16 +2699,26 @@
                 format: 'json'
             };
 
-            fetch('/start_rtlamr', {
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/rtlamr/start`
+                : '/start_rtlamr';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             }).then(r => r.json())
                 .then(data => {
-                    if (data.status === 'started') {
-                        reserveDevice(parseInt(device), 'rtlamr');
+                    // Handle controller proxy response format
+                    const scanResult = isAgentMode && data.result ? data.result : data;
+
+                    if (scanResult.status === 'started' || scanResult.status === 'success') {
+                        if (!isAgentMode) {
+                            reserveDevice(parseInt(device), 'rtlamr');
+                        }
                         setRtlamrRunning(true);
-                        startRtlamrStream();
+                        startRtlamrStream(isAgentMode);
 
                         // Initialize meter filter bar (reuse sensor filter bar since same structure)
                         const filterContainer = document.getElementById('filterBarContainer');
@@ -2441,20 +2739,33 @@
                         // Clear existing output
                         output.innerHTML = '<div class="placeholder signal-empty-state" style="display: none;"></div>';
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (scanResult.message || scanResult.error || 'Failed to start'));
                     }
                 });
         }
 
         function stopRtlamrDecoding() {
-            fetch('/stop_rtlamr', { method: 'POST' })
+            const isAgentMode = rtlamrCurrentAgent !== null;
+            const endpoint = isAgentMode
+                ? `/controller/agents/${rtlamrCurrentAgent}/rtlamr/stop`
+                : '/stop_rtlamr';
+
+            fetch(endpoint, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    releaseDevice('rtlamr');
+                    if (!isAgentMode) {
+                        releaseDevice('rtlamr');
+                    }
+                    rtlamrCurrentAgent = null;
                     setRtlamrRunning(false);
                     if (eventSource) {
                         eventSource.close();
                         eventSource = null;
+                    }
+                    // Clear polling timer
+                    if (rtlamrPollTimer) {
+                        clearInterval(rtlamrPollTimer);
+                        rtlamrPollTimer = null;
                     }
                 });
         }
@@ -2475,12 +2786,14 @@
             }
         }
 
-        function startRtlamrStream() {
+        function startRtlamrStream(isAgentMode = false) {
             if (eventSource) {
                 eventSource.close();
             }
 
-            eventSource = new EventSource('/stream_rtlamr');
+            // Use different stream endpoint for agent mode
+            const streamUrl = isAgentMode ? '/controller/stream/all' : '/stream_rtlamr';
+            eventSource = new EventSource(streamUrl);
 
             eventSource.onopen = function () {
                 showInfo('RTLAMR stream connected...');
@@ -2488,20 +2801,86 @@
 
             eventSource.onmessage = function (e) {
                 const data = JSON.parse(e.data);
-                if (data.type === 'rtlamr') {
-                    addRtlamrReading(data);
-                } else if (data.type === 'status') {
-                    if (data.text === 'stopped') {
-                        setRtlamrRunning(false);
+
+                if (isAgentMode) {
+                    // Handle multi-agent stream format
+                    if (data.scan_type === 'rtlamr' && data.payload) {
+                        const payload = data.payload;
+                        if (payload.type === 'rtlamr') {
+                            payload.agent_name = data.agent_name;
+                            addRtlamrReading(payload);
+                        } else if (payload.type === 'status') {
+                            if (payload.text === 'stopped') {
+                                setRtlamrRunning(false);
+                            }
+                        } else if (payload.type === 'info' || payload.type === 'raw') {
+                            showInfo(`[${data.agent_name}] ${payload.text}`);
+                        }
                     }
-                } else if (data.type === 'info' || data.type === 'raw') {
-                    showInfo(data.text);
+                } else {
+                    // Local stream format
+                    if (data.type === 'rtlamr') {
+                        addRtlamrReading(data);
+                    } else if (data.type === 'status') {
+                        if (data.text === 'stopped') {
+                            setRtlamrRunning(false);
+                        }
+                    } else if (data.type === 'info' || data.type === 'raw') {
+                        showInfo(data.text);
+                    }
                 }
             };
 
             eventSource.onerror = function (e) {
                 console.error('RTLAMR stream error');
             };
+
+            // Start polling fallback for agent mode
+            if (isAgentMode) {
+                startRtlamrPolling();
+            }
+        }
+
+        // Track last reading count for polling
+        let lastRtlamrReadingCount = 0;
+
+        function startRtlamrPolling() {
+            if (rtlamrPollTimer) return;
+            lastRtlamrReadingCount = 0;
+
+            const pollInterval = 2000;
+            rtlamrPollTimer = setInterval(async () => {
+                if (!isRtlamrRunning || !rtlamrCurrentAgent) {
+                    clearInterval(rtlamrPollTimer);
+                    rtlamrPollTimer = null;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/controller/agents/${rtlamrCurrentAgent}/rtlamr/data`);
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    const result = data.result || data;
+                    const readings = result.data || [];
+
+                    // Process new readings
+                    if (readings.length > lastRtlamrReadingCount) {
+                        const newReadings = readings.slice(lastRtlamrReadingCount);
+                        newReadings.forEach(reading => {
+                            const displayReading = {
+                                type: 'rtlamr',
+                                ...reading,
+                                agent_name: result.agent_name || 'Remote Agent'
+                            };
+                            addRtlamrReading(displayReading);
+                        });
+                        lastRtlamrReadingCount = readings.length;
+                    }
+                } catch (err) {
+                    console.error('RTLAMR polling error:', err);
+                }
+            }, pollInterval);
         }
 
         function addRtlamrReading(data) {
@@ -2970,6 +3349,9 @@
             return protocols;
         }
 
+        // Pager mode polling timer for agent mode
+        let pagerPollTimer = null;
+
         function startDecoding() {
             const freq = document.getElementById('frequency').value;
             const gain = document.getElementById('gain').value;
@@ -2983,13 +3365,16 @@
                 return;
             }
 
-            // Check if device is available
-            if (!checkDeviceAvailability('pager')) {
+            // Check if using agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+
+            // Check if device is available (only for local mode)
+            if (!isAgentMode && !checkDeviceAvailability('pager')) {
                 return;
             }
 
-            // Check for remote SDR
-            const remoteConfig = getRemoteSDRConfig();
+            // Check for remote SDR (only for local mode)
+            const remoteConfig = isAgentMode ? null : getRemoteSDRConfig();
             if (remoteConfig === false) return; // Validation failed
 
             const config = {
@@ -3003,22 +3388,32 @@
                 bias_t: getBiasTEnabled()
             };
 
-            // Add rtl_tcp params if using remote SDR
+            // Add rtl_tcp params if using remote SDR (local mode only)
             if (remoteConfig) {
                 config.rtl_tcp_host = remoteConfig.host;
                 config.rtl_tcp_port = remoteConfig.port;
             }
 
-            fetch('/start', {
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/pager/start`
+                : '/start';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             }).then(r => r.json())
                 .then(data => {
-                    if (data.status === 'started') {
-                        reserveDevice(parseInt(device), 'pager');
+                    // Handle controller proxy response format (agent response is nested in 'result')
+                    const scanResult = isAgentMode && data.result ? data.result : data;
+
+                    if (scanResult.status === 'started' || scanResult.status === 'success') {
+                        if (!isAgentMode) {
+                            reserveDevice(parseInt(device), 'pager');
+                        }
                         setRunning(true);
-                        startStream();
+                        startStream(isAgentMode);
 
                         // Initialize filter bar
                         const filterContainer = document.getElementById('filterBarContainer');
@@ -3034,23 +3429,36 @@
                         // Clear address history for fresh session
                         SignalCards.clearAddressHistory('pager');
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (scanResult.message || scanResult.error || 'Failed to start pager decoding'));
                     }
                 })
                 .catch(err => {
                     console.error('Start error:', err);
+                    alert('Error starting pager decoding: ' + err.message);
                 });
         }
 
         function stopDecoding() {
-            fetch('/stop', { method: 'POST' })
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/pager/stop`
+                : '/stop';
+
+            fetch(endpoint, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    releaseDevice('pager');
+                    if (!isAgentMode) {
+                        releaseDevice('pager');
+                    }
                     setRunning(false);
                     if (eventSource) {
                         eventSource.close();
                         eventSource = null;
+                    }
+                    // Clear polling timer if active
+                    if (pagerPollTimer) {
+                        clearInterval(pagerPollTimer);
+                        pagerPollTimer = null;
                     }
                 });
         }
@@ -3077,13 +3485,22 @@
         }
 
         function checkStatus() {
-            fetch('/status')
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/pager/status`
+                : '/status';
+
+            fetch(endpoint)
                 .then(r => r.json())
                 .then(data => {
-                    if (data.running !== isRunning) {
-                        setRunning(data.running);
-                        if (data.running && !eventSource) {
-                            startStream();
+                    // Handle agent response format (may be nested in 'result')
+                    const statusData = isAgentMode && data.result ? data.result : data;
+                    const running = statusData.running;
+
+                    if (running !== isRunning) {
+                        setRunning(running);
+                        if (running && !eventSource) {
+                            startStream(isAgentMode);
                         }
                     }
                 })
@@ -3116,12 +3533,14 @@
             document.getElementById('stopBtn').style.display = running ? 'block' : 'none';
         }
 
-        function startStream() {
+        function startStream(isAgentMode = false) {
             if (eventSource) {
                 eventSource.close();
             }
 
-            eventSource = new EventSource('/stream');
+            // Use different stream endpoint for agent mode
+            const streamUrl = isAgentMode ? '/controller/stream/all' : '/stream';
+            eventSource = new EventSource(streamUrl);
 
             eventSource.onopen = function () {
                 showInfo('Stream connected...');
@@ -3130,24 +3549,101 @@
             eventSource.onmessage = function (e) {
                 const data = JSON.parse(e.data);
 
-                if (data.type === 'message') {
-                    addMessage(data);
-                } else if (data.type === 'status') {
-                    if (data.text === 'stopped') {
-                        setRunning(false);
-                    } else if (data.text === 'started') {
-                        showInfo('Decoder started, waiting for signals...');
+                // Handle multi-agent stream format
+                if (isAgentMode) {
+                    // Multi-agent stream tags data with scan_type and agent_name
+                    if (data.scan_type === 'pager' && data.payload) {
+                        const payload = data.payload;
+                        if (payload.type === 'message') {
+                            // Add agent info to the message
+                            payload.agent_name = data.agent_name;
+                            addMessage(payload);
+                        } else if (payload.type === 'status') {
+                            if (payload.text === 'stopped') {
+                                setRunning(false);
+                            } else if (payload.text === 'started') {
+                                showInfo(`Decoder started on ${data.agent_name}, waiting for signals...`);
+                            }
+                        } else if (payload.type === 'info') {
+                            showInfo(`[${data.agent_name}] ${payload.text}`);
+                        }
+                    } else if (data.type === 'keepalive') {
+                        // Ignore keepalive messages
                     }
-                } else if (data.type === 'info') {
-                    showInfo(data.text);
-                } else if (data.type === 'raw') {
-                    showInfo(data.text);
+                } else {
+                    // Local stream format
+                    if (data.type === 'message') {
+                        addMessage(data);
+                    } else if (data.type === 'status') {
+                        if (data.text === 'stopped') {
+                            setRunning(false);
+                        } else if (data.text === 'started') {
+                            showInfo('Decoder started, waiting for signals...');
+                        }
+                    } else if (data.type === 'info') {
+                        showInfo(data.text);
+                    } else if (data.type === 'raw') {
+                        showInfo(data.text);
+                    }
                 }
             };
 
             eventSource.onerror = function (e) {
                 checkStatus();
             };
+
+            // Start polling fallback for agent mode (in case push isn't enabled)
+            if (isAgentMode) {
+                startPagerPolling();
+            }
+        }
+
+        // Track last message count to avoid duplicates during polling
+        let lastPagerMsgCount = 0;
+
+        function startPagerPolling() {
+            if (pagerPollTimer) return;
+            lastPagerMsgCount = 0;
+
+            const pollInterval = 2000; // 2 seconds
+            pagerPollTimer = setInterval(async () => {
+                if (!isRunning) {
+                    clearInterval(pagerPollTimer);
+                    pagerPollTimer = null;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/controller/agents/${currentAgent}/pager/data`);
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    const result = data.result || data;
+                    const modeData = result.data || result;
+
+                    // Process messages from polling response
+                    if (modeData.messages && Array.isArray(modeData.messages)) {
+                        const newMsgs = modeData.messages.slice(lastPagerMsgCount);
+                        newMsgs.forEach(msg => {
+                            // Convert to expected format
+                            const displayMsg = {
+                                type: 'message',
+                                protocol: msg.protocol || 'UNKNOWN',
+                                address: msg.address || '',
+                                function: msg.function || '',
+                                msg_type: msg.msg_type || 'Alpha',
+                                message: msg.message || '',
+                                timestamp: msg.received_at || new Date().toISOString(),
+                                agent_name: result.agent_name || 'Remote Agent'
+                            };
+                            addMessage(displayMsg);
+                        });
+                        lastPagerMsgCount = modeData.messages.length;
+                    }
+                } catch (err) {
+                    console.error('Pager polling error:', err);
+                }
+            }, pollInterval);
         }
 
         function addMessage(msg) {
@@ -4216,21 +4712,26 @@
                 }
             });
 
-            // Update UI with more context
-            document.getElementById('rec24Channel').textContent = best24;
+            // Update UI with more context (with null checks for v2 layout)
+            const rec24El = document.getElementById('rec24Channel');
+            const rec24ReasonEl = document.getElementById('rec24Reason');
+            const rec5El = document.getElementById('rec5Channel');
+            const rec5ReasonEl = document.getElementById('rec5Reason');
+
+            if (rec24El) rec24El.textContent = best24;
             if (totalNetworks === 0) {
-                document.getElementById('rec24Reason').textContent = '(no networks detected)';
+                if (rec24ReasonEl) rec24ReasonEl.textContent = '(no networks detected)';
             } else {
                 const usage = channelUsage24.map(c => `CH${c.channel}:${Math.round(c.count)}`).join(', ');
-                document.getElementById('rec24Reason').textContent =
+                if (rec24ReasonEl) rec24ReasonEl.textContent =
                     minCount24 === 0 ? '(clear)' : `(${Math.round(minCount24)} interference) [${usage}]`;
             }
 
-            document.getElementById('rec5Channel').textContent = best5;
+            if (rec5El) rec5El.textContent = best5;
             if (totalNetworks === 0) {
-                document.getElementById('rec5Reason').textContent = '(no networks detected)';
+                if (rec5ReasonEl) rec5ReasonEl.textContent = '(no networks detected)';
             } else {
-                document.getElementById('rec5Reason').textContent =
+                if (rec5ReasonEl) rec5ReasonEl.textContent =
                     minCount5 === 0 ? `(clear, ${channels5g.length - used5g} unused)` : `(${minCount5} networks)`;
             }
         }
@@ -4362,6 +4863,48 @@
 
         // NOTE: Browser Notifications code moved to static/js/core/audio.js
 
+        // Sync legacy WiFi data to v2 channel chart
+        function syncLegacyToChannelChart() {
+            if (typeof ChannelChart === 'undefined') return;
+
+            const networksList = Object.values(wifiNetworks);
+            if (networksList.length === 0) return;
+
+            // Calculate channel stats from legacy networks
+            const stats = {};
+
+            // Initialize 2.4 GHz channels
+            for (let ch = 1; ch <= 11; ch++) {
+                stats[ch] = { channel: ch, band: '2.4GHz', ap_count: 0, utilization_score: 0 };
+            }
+            // Initialize 5 GHz channels
+            [36, 40, 44, 48, 149, 153, 157, 161, 165].forEach(ch => {
+                stats[ch] = { channel: ch, band: '5GHz', ap_count: 0, utilization_score: 0 };
+            });
+
+            // Count APs per channel
+            networksList.forEach(net => {
+                const ch = parseInt(net.channel);
+                if (stats[ch]) {
+                    stats[ch].ap_count++;
+                }
+            });
+
+            // Calculate utilization (0-1)
+            const maxAPs = Math.max(1, ...Object.values(stats).map(s => s.ap_count));
+            Object.values(stats).forEach(s => {
+                s.utilization_score = s.ap_count / maxAPs;
+            });
+
+            // Get active band from tab
+            const activeTab = document.querySelector('.channel-band-tab.active');
+            const band = activeTab ? activeTab.dataset.band : '2.4';
+            const bandFilter = band === '2.4' ? '2.4GHz' : '5GHz';
+
+            const filteredStats = Object.values(stats).filter(s => s.band === bandFilter);
+            ChannelChart.update(filteredStats, []);
+        }
+
         // Update visualizations periodically
         setInterval(() => {
             if (currentMode === 'wifi') {
@@ -4369,6 +4912,7 @@
                 correlateDevices();
                 updateHiddenSsidDisplay();
                 updateProbeAnalysis();
+                syncLegacyToChannelChart();
             }
         }, 2000);
 
@@ -4830,10 +5374,13 @@
                 });
             });
 
-            // Update counters
-            document.getElementById('probeClientCount').textContent = clientsWithProbes.length;
-            document.getElementById('probeSSIDCount').textContent = allProbes.size;
-            document.getElementById('probePrivacyCount').textContent = privacyLeaks;
+            // Update counters (with null checks for v2 layout)
+            const probeClientEl = document.getElementById('probeClientCount');
+            const probeSSIDEl = document.getElementById('probeSSIDCount');
+            const probePrivacyEl = document.getElementById('probePrivacyCount');
+            if (probeClientEl) probeClientEl.textContent = clientsWithProbes.length;
+            if (probeSSIDEl) probeSSIDEl.textContent = allProbes.size;
+            if (probePrivacyEl) probePrivacyEl.textContent = privacyLeaks;
 
             if (clientsWithProbes.length === 0) {
                 list.innerHTML = '<div style="color: var(--text-dim);">Waiting for client probe requests...</div>';
@@ -5791,13 +6338,22 @@
         let btRadarAnimFrame = null;
         let btRadarDevices = [];
 
-        // Refresh Bluetooth interfaces
+        // Refresh Bluetooth interfaces (legacy - now handled by BluetoothMode.init())
         function refreshBtInterfaces() {
+            // New Bluetooth mode uses /api/bluetooth/capabilities instead
+            // This function is kept for backwards compatibility but uses new API
+            if (typeof BluetoothMode !== 'undefined') {
+                BluetoothMode.checkCapabilities();
+                return;
+            }
+            // Legacy fallback (shouldn't be needed)
+            const select = document.getElementById('btInterfaceSelect') || document.getElementById('btAdapterSelect');
+            if (!select) return;
+
             fetch('/bt/interfaces')
                 .then(r => r.json())
                 .then(data => {
-                    const select = document.getElementById('btInterfaceSelect');
-                    if (data.interfaces.length === 0) {
+                    if (!data.interfaces || data.interfaces.length === 0) {
                         select.innerHTML = '<option value="">No BT interfaces found</option>';
                     } else {
                         select.innerHTML = data.interfaces.map(i =>
@@ -5805,13 +6361,16 @@
                         ).join('');
                     }
 
-                    // Update tool status
+                    // Update tool status (if element exists)
                     const statusDiv = document.getElementById('btToolStatus');
-                    statusDiv.innerHTML = `
-                        <span>hcitool:</span><span class="tool-status ${data.tools.hcitool ? 'ok' : 'missing'}">${data.tools.hcitool ? 'OK' : 'Missing'}</span>
-                        <span>bluetoothctl:</span><span class="tool-status ${data.tools.bluetoothctl ? 'ok' : 'missing'}">${data.tools.bluetoothctl ? 'OK' : 'Missing'}</span>
-                    `;
-                });
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <span>hcitool:</span><span class="tool-status ${data.tools.hcitool ? 'ok' : 'missing'}">${data.tools.hcitool ? 'OK' : 'Missing'}</span>
+                            <span>bluetoothctl:</span><span class="tool-status ${data.tools.bluetoothctl ? 'ok' : 'missing'}">${data.tools.bluetoothctl ? 'OK' : 'Missing'}</span>
+                        `;
+                    }
+                })
+                .catch(err => console.warn('Legacy BT interface check failed:', err));
         }
 
         // Start Bluetooth scan
@@ -6073,6 +6632,11 @@
 
         // Handle discovered Bluetooth device (called from batched update)
         function handleBtDeviceImmediate(device) {
+            // Skip if new BluetoothMode is handling devices
+            if (typeof BluetoothMode !== 'undefined') {
+                return;
+            }
+
             const isNew = !btDevices[device.mac];
 
             // Check for Find My network
@@ -6091,7 +6655,6 @@
 
             if (isNew) {
                 btDeviceCount++;
-                document.getElementById('btDeviceCount').textContent = btDeviceCount;
                 playAlert();
                 pulseSignal();
             }
@@ -6298,6 +6861,11 @@
 
         // Add Bluetooth device card to device list panel
         function addBtDeviceCard(device, isNew) {
+            // Skip if new BluetoothMode is handling rendering
+            if (typeof BluetoothMode !== 'undefined' && BluetoothMode.isScanning()) {
+                return;
+            }
+
             // Add to new device list panel
             const deviceList = document.getElementById('btDeviceListContent');
             if (deviceList) {
@@ -6786,11 +7354,19 @@
             }
         }
 
+        // APRS mode polling timer for agent mode
+        let aprsPollTimer = null;
+        let aprsCurrentAgent = null;
+
         function startAprs() {
             // Get values from function bar controls
             const region = document.getElementById('aprsStripRegion').value;
             const device = getSelectedDevice();
             const gain = document.getElementById('aprsStripGain').value;
+
+            // Check if using agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            aprsCurrentAgent = isAgentMode ? currentAgent : null;
 
             // Build request body
             const requestBody = {
@@ -6809,14 +7385,22 @@
                 requestBody.frequency = customFreq;
             }
 
-            fetch('/aprs/start', {
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/aprs/start`
+                : '/aprs/start';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             })
             .then(r => r.json())
             .then(data => {
-                if (data.status === 'started') {
+                // Handle controller proxy response format
+                const scanResult = isAgentMode && data.result ? data.result : data;
+
+                if (scanResult.status === 'started' || scanResult.status === 'success') {
                     isAprsRunning = true;
                     aprsPacketCount = 0;
                     aprsStationCount = 0;
@@ -6840,7 +7424,7 @@
                     document.getElementById('aprsMapStatus').textContent = 'TRACKING';
                     document.getElementById('aprsMapStatus').style.color = 'var(--accent-green)';
                     // Update function bar status
-                    updateAprsStatus('listening', data.frequency);
+                    updateAprsStatus('listening', scanResult.frequency);
                     // Reset function bar stats
                     document.getElementById('aprsStripStations').textContent = '0';
                     document.getElementById('aprsStripPackets').textContent = '0';
@@ -6851,9 +7435,9 @@
                     const customFreqInput = document.getElementById('aprsStripCustomFreq');
                     if (customFreqInput) customFreqInput.disabled = true;
                     startAprsMeterCheck();
-                    startAprsStream();
+                    startAprsStream(isAgentMode);
                 } else {
-                    alert('APRS Error: ' + data.message);
+                    alert('APRS Error: ' + (scanResult.message || scanResult.error || 'Failed to start'));
                     updateAprsStatus('error');
                 }
             })
@@ -6864,10 +7448,16 @@
         }
 
         function stopAprs() {
-            fetch('/aprs/stop', { method: 'POST' })
+            const isAgentMode = aprsCurrentAgent !== null;
+            const endpoint = isAgentMode
+                ? `/controller/agents/${aprsCurrentAgent}/aprs/stop`
+                : '/aprs/stop';
+
+            fetch(endpoint, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
                     isAprsRunning = false;
+                    aprsCurrentAgent = null;
                     // Update function bar buttons
                     document.getElementById('aprsStripStartBtn').style.display = 'inline-block';
                     document.getElementById('aprsStripStopBtn').style.display = 'none';
@@ -6894,29 +7484,60 @@
                         aprsEventSource.close();
                         aprsEventSource = null;
                     }
+                    // Clear polling timer
+                    if (aprsPollTimer) {
+                        clearInterval(aprsPollTimer);
+                        aprsPollTimer = null;
+                    }
                 });
         }
 
-        function startAprsStream() {
+        function startAprsStream(isAgentMode = false) {
             if (aprsEventSource) aprsEventSource.close();
-            aprsEventSource = new EventSource('/aprs/stream');
+
+            // Use different stream endpoint for agent mode
+            const streamUrl = isAgentMode ? '/controller/stream/all' : '/aprs/stream';
+            aprsEventSource = new EventSource(streamUrl);
 
             aprsEventSource.onmessage = function (e) {
                 const data = JSON.parse(e.data);
-                if (data.type === 'aprs') {
-                    aprsPacketCount++;
-                    // Update map footer and function bar
-                    document.getElementById('aprsPacketCount').textContent = aprsPacketCount;
-                    document.getElementById('aprsStripPackets').textContent = aprsPacketCount;
-                    // Switch to tracking state on first packet
-                    const dot = document.getElementById('aprsStripDot');
-                    if (dot && !dot.classList.contains('tracking')) {
-                        updateAprsStatus('tracking');
+
+                if (isAgentMode) {
+                    // Handle multi-agent stream format
+                    if (data.scan_type === 'aprs' && data.payload) {
+                        const payload = data.payload;
+                        if (payload.type === 'aprs') {
+                            aprsPacketCount++;
+                            document.getElementById('aprsPacketCount').textContent = aprsPacketCount;
+                            document.getElementById('aprsStripPackets').textContent = aprsPacketCount;
+                            const dot = document.getElementById('aprsStripDot');
+                            if (dot && !dot.classList.contains('tracking')) {
+                                updateAprsStatus('tracking');
+                            }
+                            // Add agent info
+                            payload.agent_name = data.agent_name;
+                            processAprsPacket(payload);
+                        } else if (payload.type === 'meter') {
+                            updateAprsMeter(payload.level);
+                        }
                     }
-                    processAprsPacket(data);
-                } else if (data.type === 'meter') {
-                    // Update signal indicator in function bar
-                    updateAprsMeter(data.level);
+                } else {
+                    // Local stream format
+                    if (data.type === 'aprs') {
+                        aprsPacketCount++;
+                        // Update map footer and function bar
+                        document.getElementById('aprsPacketCount').textContent = aprsPacketCount;
+                        document.getElementById('aprsStripPackets').textContent = aprsPacketCount;
+                        // Switch to tracking state on first packet
+                        const dot = document.getElementById('aprsStripDot');
+                        if (dot && !dot.classList.contains('tracking')) {
+                            updateAprsStatus('tracking');
+                        }
+                        processAprsPacket(data);
+                    } else if (data.type === 'meter') {
+                        // Update signal indicator in function bar
+                        updateAprsMeter(data.level);
+                    }
                 }
             };
 
@@ -6924,6 +7545,61 @@
                 console.error('APRS stream error');
                 updateAprsStatus('error');
             };
+
+            // Start polling fallback for agent mode
+            if (isAgentMode) {
+                startAprsPolling();
+            }
+        }
+
+        // Track last station count for polling
+        let lastAprsStationCount = 0;
+
+        function startAprsPolling() {
+            if (aprsPollTimer) return;
+            lastAprsStationCount = 0;
+
+            const pollInterval = 2000;
+            aprsPollTimer = setInterval(async () => {
+                if (!isAprsRunning || !aprsCurrentAgent) {
+                    clearInterval(aprsPollTimer);
+                    aprsPollTimer = null;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/controller/agents/${aprsCurrentAgent}/aprs/data`);
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    const result = data.result || data;
+                    const stations = result.data || [];
+
+                    // Process new stations
+                    if (stations.length > lastAprsStationCount) {
+                        const newStations = stations.slice(lastAprsStationCount);
+                        newStations.forEach(station => {
+                            aprsPacketCount++;
+                            document.getElementById('aprsPacketCount').textContent = aprsPacketCount;
+                            document.getElementById('aprsStripPackets').textContent = aprsPacketCount;
+                            const dot = document.getElementById('aprsStripDot');
+                            if (dot && !dot.classList.contains('tracking')) {
+                                updateAprsStatus('tracking');
+                            }
+                            // Convert to expected packet format
+                            const packet = {
+                                type: 'aprs',
+                                ...station,
+                                agent_name: result.agent_name || 'Remote Agent'
+                            };
+                            processAprsPacket(packet);
+                        });
+                        lastAprsStationCount = stations.length;
+                    }
+                } catch (err) {
+                    console.error('APRS polling error:', err);
+                }
+            }, pollInterval);
         }
 
         // Signal Meter Functions
@@ -7412,6 +8088,9 @@
             }
         }
 
+        // Satellite mode agent state
+        let satelliteCurrentAgent = null;
+
         function calculatePasses() {
             const lat = parseFloat(document.getElementById('obsLat').value);
             const lon = parseFloat(document.getElementById('obsLon').value);
@@ -7425,18 +8104,30 @@
                 return;
             }
 
-            fetch('/satellite/predict', {
+            // Check if using agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            satelliteCurrentAgent = isAgentMode ? currentAgent : null;
+
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/satellite/predict`
+                : '/satellite/predict';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ lat, lon, hours, minEl, satellites })
             })
                 .then(r => r.json())
                 .then(data => {
-                    if (data.status === 'success') {
-                        satellitePasses = data.passes;
+                    // Handle controller proxy response format
+                    const result = isAgentMode && data.result ? data.result : data;
+
+                    if (result.status === 'success') {
+                        satellitePasses = result.passes;
                         renderPassList();
-                        document.getElementById('passCount').textContent = data.passes.length;
-                        if (data.passes.length > 0) {
+                        document.getElementById('passCount').textContent = result.passes.length;
+                        if (result.passes.length > 0) {
                             selectPass(0);
                             document.getElementById('satelliteCountdown').style.display = 'block';
                             updateSatelliteCountdown();
@@ -7445,7 +8136,7 @@
                             document.getElementById('satelliteCountdown').style.display = 'none';
                         }
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (result.message || result.error || 'Failed to predict passes'));
                     }
                 });
         }
@@ -7643,15 +8334,24 @@
             const lat = parseFloat(document.getElementById('obsLat').value);
             const lon = parseFloat(document.getElementById('obsLon').value);
 
-            fetch('/satellite/position', {
+            // Check if using agent mode
+            const isAgentMode = satelliteCurrentAgent !== null;
+            const endpoint = isAgentMode
+                ? `/controller/agents/${satelliteCurrentAgent}/satellite/position`
+                : '/satellite/position';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ lat, lon, satellites, includeTrack: true })
             })
                 .then(r => r.json())
                 .then(data => {
-                    if (data.status === 'success' && data.positions) {
-                        updateRealTimeIndicators(data.positions);
+                    // Handle controller proxy response format
+                    const result = isAgentMode && data.result ? data.result : data;
+
+                    if (result.status === 'success' && result.positions) {
+                        updateRealTimeIndicators(result.positions);
                     }
                 });
         }
@@ -8052,10 +8752,33 @@
 
         async function refreshTscmDevices() {
             // Fetch available interfaces for TSCM scanning
+            // Check if agent is selected and route accordingly
             try {
-                const response = await fetch('/tscm/devices');
+                let response;
+                if (typeof currentAgent !== 'undefined' && currentAgent !== 'local') {
+                    // Fetch devices from agent capabilities
+                    response = await fetch(`/controller/agents/${currentAgent}?refresh=true`);
+                } else {
+                    response = await fetch('/tscm/devices');
+                }
                 const data = await response.json();
-                const devices = data.devices || {};
+
+                // Handle both local (/tscm/devices) and agent response formats
+                let devices;
+                const isAgentResponse = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+
+                if (isAgentResponse && data.agent) {
+                    // Agent response format - extract from capabilities/interfaces
+                    const agentInterfaces = data.agent.interfaces || {};
+                    const agentCapabilities = data.agent.capabilities || {};
+                    devices = {
+                        wifi_interfaces: agentInterfaces.wifi_interfaces || [],
+                        bt_adapters: agentInterfaces.bt_adapters || [],
+                        sdr_devices: agentCapabilities.devices || agentInterfaces.sdr_devices || []
+                    };
+                } else {
+                    devices = data.devices || {};
+                }
 
                 // Populate WiFi interfaces
                 const wifiSelect = document.getElementById('tscmWifiInterface');
@@ -8072,7 +8795,11 @@
                         wifiSelect.value = devices.wifi_interfaces[0].name;
                     }
                 } else {
-                    wifiSelect.innerHTML = '<option value="">No WiFi interfaces found</option>';
+                    if (isAgentResponse) {
+                        wifiSelect.innerHTML = '<option value="">Agent manages WiFi</option>';
+                    } else {
+                        wifiSelect.innerHTML = '<option value="">No WiFi interfaces found</option>';
+                    }
                 }
 
                 // Populate Bluetooth adapters
@@ -8090,7 +8817,11 @@
                         btSelect.value = devices.bt_adapters[0].name;
                     }
                 } else {
-                    btSelect.innerHTML = '<option value="">No Bluetooth adapters found</option>';
+                    if (isAgentResponse) {
+                        btSelect.innerHTML = '<option value="">Agent manages Bluetooth</option>';
+                    } else {
+                        btSelect.innerHTML = '<option value="">No Bluetooth adapters found</option>';
+                    }
                 }
 
                 // Populate SDR devices
@@ -8099,16 +8830,20 @@
                 if (devices.sdr_devices && devices.sdr_devices.length > 0) {
                     devices.sdr_devices.forEach(dev => {
                         const opt = document.createElement('option');
-                        opt.value = dev.index;
+                        opt.value = dev.index !== undefined ? dev.index : 0;
                         opt.textContent = dev.display_name || dev.name || 'SDR Device';
                         sdrSelect.appendChild(opt);
                     });
                     // Auto-select first SDR if available
                     if (devices.sdr_devices.length > 0) {
-                        sdrSelect.value = devices.sdr_devices[0].index;
+                        sdrSelect.value = devices.sdr_devices[0].index !== undefined ? devices.sdr_devices[0].index : 0;
                     }
                 } else {
-                    sdrSelect.innerHTML = '<option value="">No SDR devices found</option>';
+                    if (isAgentResponse) {
+                        sdrSelect.innerHTML = '<option value="">Agent manages SDR</option>';
+                    } else {
+                        sdrSelect.innerHTML = '<option value="">No SDR devices found</option>';
+                    }
                 }
 
                 // Show warnings (e.g., not running as root)
@@ -8167,8 +8902,23 @@
             document.getElementById('tscmDeviceWarnings').style.display = 'none';
             document.getElementById('tscmDeviceWarnings').innerHTML = '';
 
+            // Check for agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+
+            // Check for conflicts if using agent
+            if (isAgentMode && typeof checkAgentModeConflict === 'function') {
+                if (!checkAgentModeConflict('tscm')) {
+                    return;  // Conflict detected, user cancelled
+                }
+            }
+
             try {
-                const response = await fetch('/tscm/sweep/start', {
+                // Route to agent or local based on selection
+                const endpoint = isAgentMode
+                    ? `/controller/agents/${currentAgent}/tscm/start`
+                    : '/tscm/sweep/start';
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -8185,7 +8935,9 @@
                 });
 
                 const data = await response.json();
-                if (data.status === 'success') {
+                // Handle controller proxy response (agent response is nested in 'result')
+                const scanResult = isAgentMode && data.result ? data.result : data;
+                if (scanResult.status === 'success' || scanResult.status === 'started') {
                     isTscmRunning = true;
                     tscmSweepStartTime = new Date();
                     tscmSweepEndTime = null;
@@ -8198,16 +8950,16 @@
                     document.getElementById('tscmReportBtn').style.display = 'none';
 
                     // Show warnings if any devices unavailable
-                    if (data.warnings && data.warnings.length > 0) {
+                    if (scanResult.warnings && scanResult.warnings.length > 0) {
                         const warningsDiv = document.getElementById('tscmDeviceWarnings');
-                        warningsDiv.innerHTML = data.warnings.map(w =>
+                        warningsDiv.innerHTML = scanResult.warnings.map(w =>
                             `<div style="color: #ff9933; font-size: 10px; margin-bottom: 2px;">⚠ ${w}</div>`
                         ).join('');
                         warningsDiv.style.display = 'block';
                     }
 
                     // Update device indicators
-                    updateTscmDeviceIndicators(data.devices);
+                    updateTscmDeviceIndicators(scanResult.devices);
 
                     // Reset displays
                     tscmThreats = [];
@@ -8221,9 +8973,9 @@
                     startTscmStream();
                 } else {
                     // Show error with details
-                    let errorMsg = data.message || 'Failed to start sweep';
-                    if (data.details && data.details.length > 0) {
-                        errorMsg += '\n\n' + data.details.join('\n');
+                    let errorMsg = scanResult.message || 'Failed to start sweep';
+                    if (scanResult.details && scanResult.details.length > 0) {
+                        errorMsg += '\n\n' + scanResult.details.join('\n');
                     }
                     alert(errorMsg);
                 }
@@ -8237,6 +8989,15 @@
             const wifiIndicator = document.getElementById('tscmWifiIndicator');
             const btIndicator = document.getElementById('tscmBtIndicator');
             const rfIndicator = document.getElementById('tscmRfIndicator');
+
+            // Safety check for agent mode which may not return devices
+            if (!devices) {
+                // Just mark all as active if we don't have device info
+                if (wifiIndicator) wifiIndicator.classList.add('active');
+                if (btIndicator) btIndicator.classList.add('active');
+                if (rfIndicator) rfIndicator.classList.add('active');
+                return;
+            }
 
             if (wifiIndicator) {
                 wifiIndicator.classList.toggle('active', devices.wifi);
@@ -8254,7 +9015,12 @@
 
         async function stopTscmSweep() {
             try {
-                await fetch('/tscm/sweep/stop', { method: 'POST' });
+                // Route to agent or local based on selection
+                const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+                const endpoint = isAgentMode
+                    ? `/controller/agents/${currentAgent}/tscm/stop`
+                    : '/tscm/sweep/stop';
+                await fetch(endpoint, { method: 'POST' });
             } catch (e) {
                 console.error('Error stopping sweep:', e);
             }
@@ -8264,6 +9030,10 @@
             if (tscmEventSource) {
                 tscmEventSource.close();
                 tscmEventSource = null;
+            }
+            if (typeof tscmAgentPollInterval !== 'undefined' && tscmAgentPollInterval) {
+                clearInterval(tscmAgentPollInterval);
+                tscmAgentPollInterval = null;
             }
 
             document.getElementById('startTscmBtn').style.display = 'block';
@@ -8808,25 +9578,113 @@
             reportWindow.document.close();
         }
 
+        let tscmAgentPollInterval = null;
+
         function startTscmStream() {
             if (tscmEventSource) {
                 tscmEventSource.close();
+                tscmEventSource = null;
+            }
+            if (tscmAgentPollInterval) {
+                clearInterval(tscmAgentPollInterval);
+                tscmAgentPollInterval = null;
             }
 
-            tscmEventSource = new EventSource('/tscm/sweep/stream');
+            // Check if using agent
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
-            tscmEventSource.onmessage = function (event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    handleTscmEvent(data);
-                } catch (e) {
-                    console.error('TSCM SSE parse error:', e);
+            if (isAgentMode) {
+                // For agent mode, poll the agent for TSCM data since push may not be enabled
+                console.log('[TSCM] Starting agent polling mode');
+                pollAgentTscmData();  // Initial poll
+                tscmAgentPollInterval = setInterval(pollAgentTscmData, 2000);  // Poll every 2 seconds
+            } else {
+                // For local mode, use SSE stream
+                const streamUrl = '/tscm/sweep/stream';
+                tscmEventSource = new EventSource(streamUrl);
+
+                tscmEventSource.onmessage = function (event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleTscmEvent(data);
+                    } catch (e) {
+                        console.error('TSCM SSE parse error:', e);
+                    }
+                };
+
+                tscmEventSource.onerror = function () {
+                    console.warn('TSCM SSE connection error');
+                };
+            }
+        }
+
+        async function pollAgentTscmData() {
+            if (!isTscmRunning) {
+                if (tscmAgentPollInterval) {
+                    clearInterval(tscmAgentPollInterval);
+                    tscmAgentPollInterval = null;
                 }
-            };
+                return;
+            }
 
-            tscmEventSource.onerror = function () {
-                console.warn('TSCM SSE connection error');
-            };
+            try {
+                const response = await fetch(`/controller/agents/${currentAgent}/tscm/data`);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    // Agent data is nested: result.data.data (controller wraps agent response)
+                    const data = result.data.data || result.data;
+
+                    // Process WiFi devices
+                    if (data.wifi_devices) {
+                        data.wifi_devices.forEach(device => {
+                            if (!tscmWifiDevices.find(d => d.bssid === device.bssid)) {
+                                handleTscmEvent({ type: 'wifi_device', ...device });
+                            }
+                        });
+                    }
+
+                    // Process Bluetooth devices
+                    if (data.bt_devices) {
+                        data.bt_devices.forEach(device => {
+                            if (!tscmBtDevices.find(d => d.address === device.address)) {
+                                handleTscmEvent({ type: 'bt_device', ...device });
+                            }
+                        });
+                    }
+
+                    // Process anomalies/threats
+                    // Agent now uses same ThreatDetector as local mode, so format matches:
+                    // threat_type, severity, source, identifier, name, signal_strength
+                    if (data.anomalies) {
+                        data.anomalies.forEach(threat => {
+                            handleTscmEvent({
+                                type: 'threat_detected',
+                                ...threat
+                            });
+                        });
+                    }
+
+                    // Process RF signals
+                    if (data.rf_signals) {
+                        data.rf_signals.forEach(signal => {
+                            handleTscmEvent({ type: 'rf_signal', ...signal });
+                        });
+                    }
+
+                    // Update progress (simple time-based estimate)
+                    if (tscmSweepStartTime) {
+                        const elapsed = (Date.now() - tscmSweepStartTime) / 1000;
+                        const sweepType = document.getElementById('tscmSweepType')?.value || 'standard';
+                        const durations = { quick: 120, standard: 300, full: 900 };
+                        const maxDuration = durations[sweepType] || 300;
+                        const progress = Math.min(95, (elapsed / maxDuration) * 100);
+                        updateTscmProgress({ progress: Math.round(progress), phase: 'Scanning' });
+                    }
+                }
+            } catch (e) {
+                console.error('[TSCM] Agent poll error:', e);
+            }
         }
 
         let tscmCorrelations = [];
@@ -8983,7 +9841,7 @@
                 tscmHighInterestDevices.push({
                     id: id,
                     protocol: protocol,
-                    name: device.name || device.ssid || `${device.frequency} MHz`,
+                    name: device.name || device.essid || device.ssid || (device.frequency ? `${device.frequency.toFixed(3)} MHz` : 'Unknown Device'),
                     score: device.score,
                     classification: device.classification,
                     indicators: device.indicators || [],
@@ -9080,7 +9938,7 @@
             document.getElementById('tscmInformationalCard').classList.toggle('active', counts.informational > 0);
             document.getElementById('tscmCorrelationsCard').classList.toggle('active', tscmCorrelations.length > 0);
 
-            // Update threat panel count (now shows high interest items)
+            // Update threat panel count (shows high interest items only)
             document.getElementById('tscmThreatCount').textContent = counts.high_interest;
         }
 
@@ -9142,7 +10000,7 @@
             // Build detailed view
             let html = `
                 <div class="device-detail-header ${getClassificationClass(device.classification)}">
-                    <h3>${getClassificationIcon(device.classification)} ${escapeHtml(device.name || device.ssid || device.mac || device.bssid || device.frequency + ' MHz')}</h3>
+                    <h3>${getClassificationIcon(device.classification)} ${escapeHtml(device.name || device.essid || device.ssid || device.mac || device.bssid || (device.frequency ? device.frequency.toFixed(3) + ' MHz' : 'Unknown'))}</h3>
                     <span class="device-detail-protocol">${protocol.toUpperCase()}</span>
                 </div>
 
@@ -9378,7 +10236,7 @@
                                 <div class="category-device-header">
                                     <span class="category-device-name">
                                         ${getClassificationIcon(d.classification)}
-                                        ${escapeHtml(d.name || d.ssid || d.mac || d.bssid || d.frequency + ' MHz')}
+                                        ${escapeHtml(d.name || d.ssid || d.mac || d.bssid || (d.frequency ? d.frequency.toFixed(3) + ' MHz' : 'Unknown'))}
                                     </span>
                                     <span class="category-device-score">${d.score || 0}</span>
                                 </div>
@@ -10387,8 +11245,9 @@
                     </div>
                     <div class="icon-item"><span class="icon">⚡</span><span class="desc">Meters - Utility meter decoder</span>
                     </div>
-                    <div class="icon-item"><span class="icon">✈️</span><span class="desc">Aircraft - Opens ADS-B
-                            Dashboard</span></div>
+                    <div class="icon-item"><span class="icon">✈️</span><span class="desc">Aircraft - ADS-B tracking &amp; history</span></div>
+                    <div class="icon-item"><span class="icon">🚢</span><span class="desc">Vessels - AIS &amp; VHF DSC distress</span></div>
+                    <div class="icon-item"><span class="icon">📻</span><span class="desc">Spy Stations - Number stations database</span></div>
                     <div class="icon-item"><span class="icon">📍</span><span class="desc">APRS - Amateur radio
                             tracking</span></div>
                     <div class="icon-item"><span class="icon">🛰️</span><span class="desc">Satellite - Pass
@@ -10434,6 +11293,27 @@
                 <ul class="tip-list">
                     <li>Opens the dedicated ADS-B Dashboard for aircraft tracking</li>
                     <li>Features radar scope, map view, airband audio, and ACARS decoding</li>
+                    <li>Optional history mode persists data to Postgres for long-term analysis</li>
+                    <li>Access history dashboard at <code>/adsb/history</code></li>
+                </ul>
+
+                <h3>Vessels (Dashboard)</h3>
+                <ul class="tip-list">
+                    <li>Opens the AIS Dashboard for maritime vessel tracking</li>
+                    <li>Displays vessel name, MMSI, callsign, destination, and navigation data</li>
+                    <li><strong>VHF DSC Channel 70:</strong> Monitors maritime distress frequency (156.525 MHz)</li>
+                    <li>Decodes DSC messages: Distress, Urgency, Safety, and Routine calls</li>
+                    <li>MMSI country identification via Maritime Identification Digits (MID)</li>
+                    <li>Visual alerts for DISTRESS and URGENCY messages with map markers</li>
+                </ul>
+
+                <h3>Spy Stations</h3>
+                <ul class="tip-list">
+                    <li>Database of number stations and diplomatic HF networks</li>
+                    <li>Browse stations from priyom.org with frequencies and schedules</li>
+                    <li>Filter by type (number/diplomatic), country, and mode</li>
+                    <li>Famous stations: UVB-76 "The Buzzer", Cuban HM01, Israeli E17z</li>
+                    <li>Click "Tune" to listen via Listening Post mode</li>
                 </ul>
 
                 <h3>APRS Mode</h3>
@@ -10565,6 +11445,7 @@
                     <li><strong>Utility Meters:</strong> RTL-SDR, rtl_tcp, rtlamr</li>
                     <li><strong>Aircraft (ADS-B):</strong> RTL-SDR, dump1090 or rtl_adsb</li>
                     <li><strong>Aircraft (ACARS):</strong> Second RTL-SDR, acarsdec</li>
+                    <li><strong>Vessels (AIS):</strong> RTL-SDR, AIS-catcher</li>
                     <li><strong>APRS:</strong> RTL-SDR, direwolf or multimon-ng</li>
                     <li><strong>Satellite:</strong> Internet for Celestrak (optional), skyfield</li>
                     <li><strong>WiFi:</strong> Monitor-mode adapter, aircrack-ng suite</li>

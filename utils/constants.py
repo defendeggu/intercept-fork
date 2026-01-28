@@ -203,6 +203,32 @@ SBS_RECONNECT_DELAY = 2.0
 # Default pager log file
 DEFAULT_PAGER_LOG_FILE = 'pager_messages.log'
 
+
+# =============================================================================
+# AIS (Vessel Tracking)
+# =============================================================================
+
+# AIS-catcher TCP server port
+AIS_TCP_PORT = 10110
+
+# AIS stream update interval
+AIS_UPDATE_INTERVAL = 0.5
+
+# AIS reconnect delay on error
+AIS_RECONNECT_DELAY = 2.0
+
+# AIS socket timeout
+AIS_SOCKET_TIMEOUT = 5
+
+# AIS frequencies (MHz)
+AIS_FREQUENCIES = [161.975, 162.025]
+
+# Maximum age for vessel data before cleanup
+MAX_VESSEL_AGE_SECONDS = 600  # 10 minutes
+
+# AIS process termination timeout
+AIS_TERMINATE_TIMEOUT = 5
+
 # WiFi capture temp path prefix
 WIFI_CAPTURE_PATH_PREFIX = '/tmp/intercept_wifi'
 
@@ -211,3 +237,20 @@ HANDSHAKE_CAPTURE_PATH_PREFIX = '/tmp/intercept_handshake_'
 
 # PMKID capture path prefix
 PMKID_CAPTURE_PATH_PREFIX = '/tmp/intercept_pmkid_'
+
+
+# =============================================================================
+# DSC (Digital Selective Calling)
+# =============================================================================
+
+# VHF DSC frequency (Channel 70)
+DSC_VHF_FREQUENCY_MHZ = 156.525
+
+# DSC audio sample rate for rtl_fm
+DSC_SAMPLE_RATE = 48000
+
+# Maximum age for DSC messages in transient store
+MAX_DSC_MESSAGE_AGE_SECONDS = 3600  # 1 hour
+
+# DSC process termination timeout
+DSC_TERMINATE_TIMEOUT = 3

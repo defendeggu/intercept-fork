@@ -203,6 +203,7 @@ check_tools() {
   check_optional "rtlamr"      "Utility meter decoder (requires Go)" rtlamr
   check_required "dump1090"    "ADS-B decoder" dump1090
   check_required "acarsdec"    "ACARS decoder" acarsdec
+  check_required "AIS-catcher" "AIS vessel decoder" AIS-catcher aiscatcher
 
   echo
   info "GPS:"
@@ -412,7 +413,7 @@ install_multimon_ng_from_source_macos() {
 }
 
 install_macos_packages() {
-  TOTAL_STEPS=13
+  TOTAL_STEPS=14
   CURRENT_STEP=0
 
   progress "Checking Homebrew"
@@ -457,6 +458,13 @@ install_macos_packages() {
 
   progress "Installing acarsdec"
   (brew_install acarsdec) || warn "acarsdec not available via Homebrew"
+
+  progress "Installing AIS-catcher"
+  if ! cmd_exists AIS-catcher && ! cmd_exists aiscatcher; then
+    (brew_install aiscatcher) || warn "AIS-catcher not available via Homebrew"
+  else
+    ok "AIS-catcher already installed"
+  fi
 
   progress "Installing aircrack-ng"
   brew_install aircrack-ng
@@ -577,6 +585,34 @@ install_acarsdec_from_source_debian() {
   )
 }
 
+install_aiscatcher_from_source_debian() {
+  info "AIS-catcher not available via APT. Building from source..."
+
+  apt_install build-essential git cmake pkg-config \
+    librtlsdr-dev libusb-1.0-0-dev libcurl4-openssl-dev zlib1g-dev
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning AIS-catcher..."
+    git clone --depth 1 https://github.com/jvde-github/AIS-catcher.git "$tmp_dir/AIS-catcher" >/dev/null 2>&1 \
+      || { warn "Failed to clone AIS-catcher"; exit 1; }
+
+    cd "$tmp_dir/AIS-catcher"
+    mkdir -p build && cd build
+
+    info "Compiling AIS-catcher..."
+    if cmake .. >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
+      ok "AIS-catcher installed successfully."
+    else
+      warn "Failed to build AIS-catcher from source. AIS vessel tracking will not be available."
+    fi
+  )
+}
+
 install_rtlsdr_blog_drivers_debian() {
   # The RTL-SDR Blog drivers provide better support for:
   # - RTL-SDR Blog V4 (R828D tuner)
@@ -684,7 +720,7 @@ install_debian_packages() {
     export NEEDRESTART_MODE=a
   fi
 
-  TOTAL_STEPS=18
+  TOTAL_STEPS=19
   CURRENT_STEP=0
 
   progress "Updating APT package lists"
@@ -814,6 +850,13 @@ install_debian_packages() {
     apt_install acarsdec || true
   fi
   cmd_exists acarsdec || install_acarsdec_from_source_debian
+
+  progress "Installing AIS-catcher"
+  if ! cmd_exists AIS-catcher && ! cmd_exists aiscatcher; then
+    install_aiscatcher_from_source_debian
+  else
+    ok "AIS-catcher already installed"
+  fi
 
   progress "Configuring udev rules"
   setup_udev_rules_debian

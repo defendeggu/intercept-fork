@@ -206,6 +206,8 @@ class ThreatDetector:
         """
         Classify a Bluetooth device into informational/review/high_interest.
 
+        Now uses the v2 tracker detection data if available.
+
         Returns:
             Dict with 'classification', 'reasons', and metadata
         """
@@ -217,7 +219,6 @@ class ThreatDetector:
 
         reasons = []
         classification = 'informational'
-        tracker_info = None
 
         # Track repeat detections
         times_seen = _record_device_seen(f'bt:{mac}') if mac else 1
@@ -225,8 +226,25 @@ class ThreatDetector:
         # Check if in baseline (known device)
         in_baseline = mac in self.baseline_bt_macs if self.baseline else False
 
-        # Check for trackers (do this early for all devices)
-        tracker_info = is_known_tracker(name, manufacturer_data)
+        # Use v2 tracker detection data if available (from get_tscm_bluetooth_snapshot)
+        tracker_data = device.get('tracker', {})
+        is_tracker_v2 = tracker_data.get('is_tracker', False)
+        tracker_type_v2 = tracker_data.get('type')
+        tracker_name_v2 = tracker_data.get('name')
+        tracker_confidence_v2 = tracker_data.get('confidence')
+        tracker_evidence_v2 = tracker_data.get('evidence', [])
+
+        # Use v2 risk analysis if available
+        risk_data = device.get('risk_analysis', {})
+        risk_score = risk_data.get('risk_score', 0)
+        risk_factors = risk_data.get('risk_factors', [])
+
+        # Fall back to legacy detection if v2 not available
+        tracker_info_legacy = None
+        if not is_tracker_v2:
+            tracker_info_legacy = is_known_tracker(name, manufacturer_data)
+
+        is_tracker = is_tracker_v2 or (tracker_info_legacy is not None)
 
         if in_baseline:
             reasons.append('Known device in baseline')
@@ -241,8 +259,24 @@ class ThreatDetector:
                 classification = 'review'
 
             # Check for trackers -> high interest
-            if tracker_info:
-                reasons.append(f"Known tracker: {tracker_info.get('name', 'Unknown')}")
+            if is_tracker_v2:
+                tracker_label = tracker_name_v2 or tracker_type_v2 or 'Unknown tracker'
+                conf_label = f' ({tracker_confidence_v2})' if tracker_confidence_v2 else ''
+                reasons.append(f"Tracker detected: {tracker_label}{conf_label}")
+                classification = 'high_interest'
+
+                # Add evidence from v2 detection
+                for evidence_item in tracker_evidence_v2[:2]:  # First 2 items
+                    reasons.append(f"Evidence: {evidence_item}")
+
+                # Add risk factors if significant
+                if risk_score >= 0.3:
+                    reasons.append(f"Risk score: {int(risk_score * 100)}%")
+                    for factor in risk_factors[:2]:  # First 2 factors
+                        reasons.append(f"Risk: {factor}")
+
+            elif tracker_info_legacy:
+                reasons.append(f"Known tracker: {tracker_info_legacy.get('name', 'Unknown')}")
                 classification = 'high_interest'
 
             # Check for audio-capable devices -> high interest
@@ -268,6 +302,10 @@ class ThreatDetector:
                     classification = 'high_interest'
 
         # Include standardized signal classification
+        try:
+            rssi_val = int(rssi) if rssi else -100
+        except (ValueError, TypeError):
+            rssi_val = -100
         signal_info = get_signal_strength_info(rssi_val)
 
         return {
@@ -275,7 +313,11 @@ class ThreatDetector:
             'reasons': reasons,
             'in_baseline': in_baseline,
             'times_seen': times_seen,
-            'is_tracker': tracker_info is not None,
+            'is_tracker': is_tracker,
+            'tracker_type': tracker_type_v2,
+            'tracker_name': tracker_name_v2,
+            'tracker_confidence': tracker_confidence_v2,
+            'risk_score': risk_score,
             'is_audio_capable': _is_audio_capable_ble(name, device_type),
             'signal_strength': signal_info['strength'],
             'signal_label': signal_info['label'],

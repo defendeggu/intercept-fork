@@ -365,9 +365,13 @@ def get_all_sweep_presets() -> dict:
     }
 
 
-def is_known_tracker(device_name: str | None, manufacturer_data: bytes | None = None) -> dict | None:
+def is_known_tracker(device_name: str | None, manufacturer_data: bytes | str | None = None) -> dict | None:
     """
     Check if a BLE device matches known tracker signatures.
+
+    Args:
+        device_name: Device name to check against patterns
+        manufacturer_data: Manufacturer data as bytes or hex string
 
     Returns:
         Tracker info dict if match found, None otherwise
@@ -379,11 +383,20 @@ def is_known_tracker(device_name: str | None, manufacturer_data: bytes | None = 
                 if pattern in name_lower:
                     return tracker_info
 
-    if manufacturer_data and len(manufacturer_data) >= 2:
-        company_id = int.from_bytes(manufacturer_data[:2], 'little')
-        for tracker_id, tracker_info in BLE_TRACKER_SIGNATURES.items():
-            if tracker_info.get('company_id') == company_id:
-                return tracker_info
+    if manufacturer_data:
+        # Convert hex string to bytes if needed
+        mfr_bytes = manufacturer_data
+        if isinstance(manufacturer_data, str):
+            try:
+                mfr_bytes = bytes.fromhex(manufacturer_data)
+            except ValueError:
+                return None
+
+        if len(mfr_bytes) >= 2:
+            company_id = int.from_bytes(mfr_bytes[:2], 'little')
+            for tracker_id, tracker_info in BLE_TRACKER_SIGNATURES.items():
+                if tracker_info.get('company_id') == company_id:
+                    return tracker_info
 
     return None
 

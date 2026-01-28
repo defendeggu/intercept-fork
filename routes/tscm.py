@@ -54,6 +54,13 @@ from utils.tscm.device_identity import (
     ingest_wifi_dict,
 )
 
+# Import unified Bluetooth scanner helper for TSCM integration
+try:
+    from routes.bluetooth_v2 import get_tscm_bluetooth_snapshot
+    _USE_UNIFIED_BT_SCANNER = True
+except ImportError:
+    _USE_UNIFIED_BT_SCANNER = False
+
 logger = logging.getLogger('intercept.tscm')
 
 tscm_bp = Blueprint('tscm', __name__, url_prefix='/tscm')
@@ -629,166 +636,77 @@ def get_tscm_devices():
 
 
 def _scan_wifi_networks(interface: str) -> list[dict]:
-    """Scan for WiFi networks using system tools."""
-    import platform
-    import re
-    import subprocess
+    """
+    Scan for WiFi networks using the unified WiFi scanner.
 
-    networks = []
+    This is a facade that maintains backwards compatibility with TSCM
+    while using the new unified scanner module.
 
-    if platform.system() == 'Darwin':
-        # macOS: Use airport utility
-        airport_path = '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport'
-        try:
-            result = subprocess.run(
-                [airport_path, '-s'],
-                capture_output=True, text=True, timeout=15
-            )
-            # Parse airport output
-            # Format: SSID BSSID RSSI CHANNEL HT CC SECURITY
-            lines = result.stdout.strip().split('\n')
-            for line in lines[1:]:  # Skip header
-                if not line.strip():
-                    continue
-                # Parse the line - format is space-separated but SSID can have spaces
-                parts = line.split()
-                if len(parts) >= 7:
-                    # BSSID is always XX:XX:XX:XX:XX:XX format
-                    bssid_idx = None
-                    for i, p in enumerate(parts):
-                        if re.match(r'^[0-9a-fA-F:]{17}$', p):
-                            bssid_idx = i
-                            break
-                    if bssid_idx is not None:
-                        ssid = ' '.join(parts[:bssid_idx]) if bssid_idx > 0 else '[Hidden]'
-                        bssid = parts[bssid_idx]
-                        rssi = parts[bssid_idx + 1] if len(parts) > bssid_idx + 1 else '-100'
-                        channel = parts[bssid_idx + 2] if len(parts) > bssid_idx + 2 else '0'
-                        security = ' '.join(parts[bssid_idx + 5:]) if len(parts) > bssid_idx + 5 else ''
-                        networks.append({
-                            'bssid': bssid.upper(),
-                            'essid': ssid or '[Hidden]',
-                            'power': rssi,
-                            'channel': channel,
-                            'privacy': security
-                        })
-        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-            logger.warning(f"macOS WiFi scan failed: {e}")
+    Automatically detects monitor mode interfaces and uses deep scan
+    (airodump-ng) when appropriate.
 
-    else:
-        # Linux: Try multiple scan methods
-        import shutil
+    Args:
+        interface: WiFi interface name (optional).
 
-        # Detect wireless interface if not specified
-        if not interface:
-            try:
-                import glob
-                wireless_paths = glob.glob('/sys/class/net/*/wireless')
-                if wireless_paths:
-                    iface = wireless_paths[0].split('/')[4]
-                else:
-                    iface = 'wlan0'
-            except Exception:
-                iface = 'wlan0'
+    Returns:
+        List of network dicts with: bssid, essid, power, channel, privacy
+    """
+    try:
+        from utils.wifi import get_wifi_scanner
+
+        scanner = get_wifi_scanner()
+
+        # Check if interface is in monitor mode
+        is_monitor = False
+        if interface:
+            is_monitor = scanner._is_monitor_mode_interface(interface)
+
+        if is_monitor:
+            # Use deep scan for monitor mode interfaces
+            logger.info(f"Interface {interface} is in monitor mode, using deep scan")
+
+            # Check if airodump-ng is available
+            caps = scanner.check_capabilities()
+            if not caps.has_airodump_ng:
+                logger.warning("airodump-ng not available for monitor mode scanning")
+                return []
+
+            # Start a short deep scan
+            if not scanner.is_scanning:
+                scanner.start_deep_scan(interface=interface, band='all')
+
+            # Wait briefly for some results
+            import time
+            time.sleep(5)
+
+            # Get current access points
+            networks = []
+            for ap in scanner.access_points:
+                networks.append(ap.to_legacy_dict())
+
+            logger.info(f"WiFi deep scan found {len(networks)} networks")
+            return networks
         else:
-            iface = interface
+            # Use quick scan for managed mode interfaces
+            result = scanner.quick_scan(interface=interface, timeout=15)
 
-        logger.info(f"WiFi scan using interface: {iface}")
+            if result.error:
+                logger.warning(f"WiFi scan error: {result.error}")
 
-        # Method 1: Try iw scan (sometimes works without root)
-        if shutil.which('iw'):
-            try:
-                logger.info("Trying 'iw' scan...")
-                result = subprocess.run(
-                    ['iw', 'dev', iface, 'scan'],
-                    capture_output=True, text=True, timeout=30
-                )
-                if result.returncode == 0 and 'BSS' in result.stdout:
-                    # Parse iw output
-                    current_bss = None
-                    for line in result.stdout.split('\n'):
-                        if line.startswith('BSS '):
-                            if current_bss and current_bss.get('bssid'):
-                                networks.append(current_bss)
-                            # Extract BSSID from "BSS xx:xx:xx:xx:xx:xx(on wlan0)"
-                            bssid_match = re.search(r'BSS ([0-9a-fA-F:]{17})', line)
-                            if bssid_match:
-                                current_bss = {'bssid': bssid_match.group(1).upper(), 'essid': '[Hidden]'}
-                        elif current_bss:
-                            line = line.strip()
-                            if line.startswith('SSID:'):
-                                ssid = line[5:].strip()
-                                current_bss['essid'] = ssid or '[Hidden]'
-                            elif line.startswith('signal:'):
-                                sig_match = re.search(r'(-?\d+)', line)
-                                if sig_match:
-                                    current_bss['power'] = sig_match.group(1)
-                            elif line.startswith('freq:'):
-                                freq = line[5:].strip()
-                                # Convert frequency to channel
-                                try:
-                                    freq_mhz = int(freq)
-                                    if freq_mhz < 3000:
-                                        channel = (freq_mhz - 2407) // 5
-                                    else:
-                                        channel = (freq_mhz - 5000) // 5
-                                    current_bss['channel'] = str(channel)
-                                except ValueError:
-                                    pass
-                            elif 'WPA' in line or 'RSN' in line:
-                                current_bss['privacy'] = 'WPA2' if 'RSN' in line else 'WPA'
-                    if current_bss and current_bss.get('bssid'):
-                        networks.append(current_bss)
-                    logger.info(f"iw scan found {len(networks)} networks")
-                elif 'Operation not permitted' in result.stderr or result.returncode != 0:
-                    logger.warning(f"iw scan requires root: {result.stderr[:100]}")
-            except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-                logger.warning(f"iw scan failed: {e}")
+            # Convert to legacy format for TSCM
+            networks = []
+            for ap in result.access_points:
+                networks.append(ap.to_legacy_dict())
 
-        # Method 2: Try iwlist scan if iw didn't work
-        if not networks and shutil.which('iwlist'):
-            try:
-                logger.info("Trying 'iwlist' scan...")
-                result = subprocess.run(
-                    ['iwlist', iface, 'scan'],
-                    capture_output=True, text=True, timeout=30
-                )
-                if 'Operation not permitted' in result.stderr:
-                    logger.warning("iwlist scan requires root privileges")
-                else:
-                    current_network = {}
-                    for line in result.stdout.split('\n'):
-                        line = line.strip()
-                        if 'Cell' in line and 'Address:' in line:
-                            if current_network.get('bssid'):
-                                networks.append(current_network)
-                            bssid = line.split('Address:')[1].strip()
-                            current_network = {'bssid': bssid.upper(), 'essid': '[Hidden]'}
-                        elif 'ESSID:' in line:
-                            essid = line.split('ESSID:')[1].strip().strip('"')
-                            current_network['essid'] = essid or '[Hidden]'
-                        elif 'Channel:' in line:
-                            channel = line.split('Channel:')[1].strip()
-                            current_network['channel'] = channel
-                        elif 'Signal level=' in line:
-                            match = re.search(r'Signal level[=:]?\s*(-?\d+)', line)
-                            if match:
-                                current_network['power'] = match.group(1)
-                        elif 'Encryption key:' in line:
-                            encrypted = 'on' in line.lower()
-                            current_network['encrypted'] = encrypted
-                        elif 'WPA' in line or 'WPA2' in line:
-                            current_network['privacy'] = 'WPA2' if 'WPA2' in line else 'WPA'
-                    if current_network.get('bssid'):
-                        networks.append(current_network)
-                    logger.info(f"iwlist scan found {len(networks)} networks")
-            except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-                logger.warning(f"iwlist scan failed: {e}")
+            logger.info(f"WiFi scan found {len(networks)} networks")
+            return networks
 
-        if not networks:
-            logger.warning("WiFi scanning requires root privileges. Run with sudo for WiFi scanning.")
-
-    return networks
+    except ImportError as e:
+        logger.error(f"Failed to import wifi scanner: {e}")
+        return []
+    except Exception as e:
+        logger.exception(f"WiFi scan failed: {e}")
+        return []
 
 
 def _scan_bluetooth_devices(interface: str, duration: int = 10) -> list[dict]:
@@ -1026,7 +944,7 @@ def _scan_bluetooth_devices(interface: str, duration: int = 10) -> list[dict]:
     return devices
 
 
-def _scan_rf_signals(sdr_device: int | None, duration: int = 30) -> list[dict]:
+def _scan_rf_signals(sdr_device: int | None, duration: int = 30, stop_check: callable | None = None) -> list[dict]:
     """
     Scan for RF signals using SDR (rtl_power).
 
@@ -1038,7 +956,16 @@ def _scan_rf_signals(sdr_device: int | None, duration: int = 30) -> list[dict]:
     - 915 MHz: US ISM band
     - 1.2 GHz: Video transmitters
     - 2.4 GHz: WiFi, Bluetooth, video transmitters
+
+    Args:
+        sdr_device: SDR device index
+        duration: Scan duration per band
+        stop_check: Optional callable that returns True if scan should stop.
+                   Defaults to checking module-level _sweep_running.
     """
+    # Default stop check uses module-level _sweep_running
+    if stop_check is None:
+        stop_check = lambda: not _sweep_running
     import os
     import shutil
     import subprocess
@@ -1103,7 +1030,7 @@ def _scan_rf_signals(sdr_device: int | None, duration: int = 30) -> list[dict]:
 
         # Scan each band and look for strong signals
         for start_freq, end_freq, bin_size, band_name in scan_bands:
-            if not _sweep_running:
+            if stop_check():
                 break
 
             logger.info(f"Scanning {band_name} ({start_freq/1e6:.1f}-{end_freq/1e6:.1f} MHz)")
@@ -1145,11 +1072,12 @@ def _scan_rf_signals(sdr_device: int | None, duration: int = 30) -> list[dict]:
                                     db_values = [float(x) for x in parts[6:] if x.strip()]
 
                                     # Find peaks above noise floor
+                                    # RTL-SDR dongles have higher noise figures, so use permissive thresholds
                                     noise_floor = sum(db_values) / len(db_values) if db_values else -100
-                                    threshold = noise_floor + 10  # Signal must be 10dB above noise
+                                    threshold = noise_floor + 6  # Signal must be 6dB above noise
 
                                     for idx, db in enumerate(db_values):
-                                        if db > threshold and db > -70:  # Detect signals above -70dBm
+                                        if db > threshold and db > -90:  # Detect signals above -90dBm
                                             freq_hz = hz_low + (idx * hz_step)
                                             freq_mhz = freq_hz / 1000000
 
@@ -1255,7 +1183,7 @@ def _run_sweep(
         last_rf_scan = 0
         wifi_scan_interval = 15  # Scan WiFi every 15 seconds
         bt_scan_interval = 20   # Scan Bluetooth every 20 seconds
-        rf_scan_interval = 60   # Scan RF every 60 seconds (it's slower)
+        rf_scan_interval = 30   # Scan RF every 30 seconds
 
         while _sweep_running and (time.time() - start_time) < duration:
             current_time = time.time()
@@ -1322,7 +1250,15 @@ def _run_sweep(
             # Perform Bluetooth scan
             if bt_enabled and (current_time - last_bt_scan) >= bt_scan_interval:
                 try:
-                    bt_devices = _scan_bluetooth_devices(bt_interface, duration=8)
+                    # Use unified Bluetooth scanner if available
+                    if _USE_UNIFIED_BT_SCANNER:
+                        logger.info("TSCM: Using unified BT scanner for snapshot")
+                        bt_devices = get_tscm_bluetooth_snapshot(duration=8)
+                        logger.info(f"TSCM: Unified scanner returned {len(bt_devices)} devices")
+                    else:
+                        logger.info(f"TSCM: Using legacy BT scanner on {bt_interface}")
+                        bt_devices = _scan_bluetooth_devices(bt_interface, duration=8)
+                        logger.info(f"TSCM: Legacy scanner returned {len(bt_devices)} devices")
                     for device in bt_devices:
                         mac = device.get('mac', '')
                         if mac and mac not in all_bt:
@@ -1373,7 +1309,8 @@ def _run_sweep(
                             })
                     last_bt_scan = current_time
                 except Exception as e:
-                    logger.error(f"Bluetooth scan error: {e}")
+                    import traceback
+                    logger.error(f"Bluetooth scan error: {e}\n{traceback.format_exc()}")
 
             # Perform RF scan using SDR
             if rf_enabled and (current_time - last_rf_scan) >= rf_scan_interval:
@@ -1392,7 +1329,7 @@ def _run_sweep(
                     if not rf_signals and last_rf_scan == 0:
                         _emit_event('rf_status', {
                             'status': 'no_signals',
-                            'message': 'RF scan completed but no signals detected. Check RTL-SDR connection.',
+                            'message': 'RF scan completed - no signals above threshold. This may be normal in a quiet RF environment.',
                         })
 
                     for signal in rf_signals:

@@ -1,5 +1,25 @@
 <!-- WiFi MODE -->
                 <div id="wifiMode" class="mode-content">
+                    <!-- Scan Mode Tabs -->
+                    <div class="section" style="padding: 8px;">
+                        <div class="wifi-scan-mode-tabs" style="display: flex; gap: 4px;">
+                            <button id="wifiScanModeQuick" class="wifi-mode-tab active" style="flex: 1; padding: 8px; font-size: 11px; background: var(--accent-green); color: #000; border: none; border-radius: 4px; cursor: pointer;">
+                                Quick Scan
+                            </button>
+                            <button id="wifiScanModeDeep" class="wifi-mode-tab" style="flex: 1; padding: 8px; font-size: 11px; background: var(--bg-tertiary); color: #888; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">
+                                Deep Scan
+                            </button>
+                        </div>
+                        <div id="wifiCapabilityStatus" class="info-text" style="margin-top: 8px; font-size: 10px;"></div>
+                        <!-- Show All Agents option (visible when agents are available) -->
+                        <div id="wifiShowAllAgentsContainer" style="margin-top: 8px; display: none;">
+                            <label class="inline-checkbox" style="font-size: 10px;">
+                                <input type="checkbox" id="wifiShowAllAgents" onchange="if(typeof WiFiMode !== 'undefined') WiFiMode.toggleShowAllAgents(this.checked)">
+                                Show networks from all agents
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="section">
                         <h3>WiFi Adapter</h3>
                         <div class="form-group">
@@ -133,10 +153,37 @@
                         </div>
                     </div>
 
-                    <button class="run-btn" id="startWifiBtn" onclick="startWifiScan()">
-                        Start Scanning
-                    </button>
-                    <button class="stop-btn" id="stopWifiBtn" onclick="stopWifiScan()" style="display: none;">
+                    <!-- v2 Scan Buttons -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <button class="run-btn" id="wifiQuickScanBtn" onclick="WiFiMode.startQuickScan()" style="flex: 1;">
+                            Quick Scan
+                        </button>
+                        <button class="run-btn" id="wifiDeepScanBtn" onclick="WiFiMode.startDeepScan()" style="flex: 1; background: var(--accent-orange);">
+                            Deep Scan
+                        </button>
+                    </div>
+                    <button class="stop-btn" id="wifiStopScanBtn" onclick="WiFiMode.stopScan()" style="display: none; width: 100%;">
                         Stop Scanning
                     </button>
+
+                    <!-- Legacy Scan Buttons (hidden, for backwards compatibility) -->
+                    <button class="run-btn" id="startWifiBtn" onclick="startWifiScan()" style="display: none;">
+                        Start Scanning (Legacy)
+                    </button>
+                    <button class="stop-btn" id="stopWifiBtn" onclick="stopWifiScan()" style="display: none;">
+                        Stop Scanning (Legacy)
+                    </button>
+
+                    <!-- Export Section -->
+                    <div class="section" style="margin-top: 10px;">
+                        <h3>Export</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="preset-btn" onclick="WiFiMode.exportData('csv')" style="flex: 1;">
+                                Export CSV
+                            </button>
+                            <button class="preset-btn" onclick="WiFiMode.exportData('json')" style="flex: 1;">
+                                Export JSON
+                            </button>
+                        </div>
+                    </div>
                 </div>

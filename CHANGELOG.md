@@ -2,6 +2,42 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.10.0] - 2026-01-25
+
+### Added
+- **AIS Vessel Tracking** - Real-time ship tracking via AIS-catcher
+  - Full-screen dashboard with interactive maritime map
+  - Vessel details: name, MMSI, callsign, destination, ETA
+  - Navigation data: speed, course, heading, rate of turn
+  - Ship type classification and dimensions
+  - Multi-SDR support (RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay)
+- **VHF DSC Channel 70 Monitoring** - Digital Selective Calling for maritime distress
+  - Real-time decoding of DSC messages (Distress, Urgency, Safety, Routine)
+  - MMSI country identification via Maritime Identification Digits (MID) lookup
+  - Position extraction and map markers for distress alerts
+  - Prominent visual overlay for DISTRESS and URGENCY alerts
+  - Permanent database storage for critical alerts with acknowledgement workflow
+- **Spy Stations Database** - Number stations and diplomatic HF networks
+  - Comprehensive database from priyom.org
+  - Station profiles with frequencies, schedules, operators
+  - Filter by type (number/diplomatic), country, and mode
+  - Tune integration with Listening Post
+  - Famous stations: UVB-76, Cuban HM01, Israeli E17z
+- **SDR Device Conflict Detection** - Prevents collisions between AIS and DSC
+- **DSC Alert Summary** - Dashboard counts for unacknowledged distress/urgency alerts
+- **AIS-catcher Installation** - Added to setup.sh for Debian and macOS
+
+### Changed
+- **UI Labels** - Renamed "Scanner" to "Listening Post" and "RTLAMR" to "Meters"
+- **Pager Filter** - Changed from onchange to oninput for real-time filtering
+- **Vessels Dashboard** - Now includes VHF DSC message panel alongside AIS tracking
+- **Dependencies** - Added scipy and numpy for DSC signal processing
+
+### Fixed
+- **DSC Position Decoder** - Corrected octal literal in quadrant check
+
+---
+
 ## [2.9.5] - 2026-01-14
 
 ### Added

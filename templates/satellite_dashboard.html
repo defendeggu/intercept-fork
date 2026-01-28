@@ -38,6 +38,14 @@
             </div>
         </div>
         <div class="status-bar">
+            <!-- Location Source Selector -->
+            <div class="location-selector" id="locationSection">
+                <span class="location-label">Location:</span>
+                <select id="locationSource" class="location-select" title="Select observer location">
+                    <option value="local">Local (This Device)</option>
+                </select>
+                <span class="location-status-dot online" id="locationStatusDot"></span>
+            </div>
             <div class="status-item">
                 <div class="status-dot" id="trackingDot"></div>
                 <span id="trackingStatus">TRACKING</span>
@@ -183,6 +191,49 @@
         </div>
     </main>
 
+    <style>
+        /* Location selector styles */
+        .location-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 15px;
+        }
+        .location-label {
+            font-size: 11px;
+            color: var(--text-secondary, #8899aa);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .location-select {
+            background: rgba(0, 40, 60, 0.8);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            color: #e0f7ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            min-width: 140px;
+        }
+        .location-select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .location-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .location-status-dot.online {
+            background: #00ff88;
+            box-shadow: 0 0 6px #00ff88;
+        }
+        .location-status-dot.offline {
+            background: #ff4444;
+            box-shadow: 0 0 6px #ff4444;
+        }
+    </style>
     <script>
         // Check if embedded mode
         const urlParams = new URLSearchParams(window.location.search);
@@ -197,6 +248,8 @@
         let observerMarker = null;
         let orbitTrack = null;
         let selectedSatellite = 25544;
+        let currentLocationSource = 'local';
+        let agents = [];
 
         const satellites = {
             25544: { name: 'ISS (ZARYA)', color: '#00ffff' },
@@ -256,8 +309,86 @@
             setInterval(updateClock, 1000);
             setInterval(updateCountdown, 1000);
             setInterval(updateRealTimePositions, 5000);
+            loadAgents();
             getLocation();
         });
+
+        async function loadAgents() {
+            try {
+                const response = await fetch('/controller/agents');
+                const data = await response.json();
+                if (data.status === 'success' && data.agents) {
+                    agents = data.agents;
+                    populateLocationSelector();
+                }
+            } catch (err) {
+                console.log('No agents available (controller not running)');
+            }
+        }
+
+        function populateLocationSelector() {
+            const select = document.getElementById('locationSource');
+            if (!select) return;
+
+            // Keep local option, add agents with GPS
+            agents.forEach(agent => {
+                const option = document.createElement('option');
+                option.value = 'agent-' + agent.id;
+                option.textContent = agent.name;
+                if (agent.gps_coords) {
+                    option.textContent += ' (GPS)';
+                }
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', onLocationSourceChange);
+        }
+
+        async function onLocationSourceChange() {
+            const select = document.getElementById('locationSource');
+            const value = select.value;
+            currentLocationSource = value;
+
+            const statusDot = document.getElementById('locationStatusDot');
+
+            if (value === 'local') {
+                // Use local GPS
+                statusDot.className = 'location-status-dot online';
+                getLocation();
+            } else if (value.startsWith('agent-')) {
+                // Fetch agent's GPS position
+                const agentId = value.replace('agent-', '');
+                try {
+                    statusDot.className = 'location-status-dot online';
+                    const response = await fetch(`/controller/agents/${agentId}/status`);
+                    const data = await response.json();
+
+                    if (data.status === 'success' && data.result) {
+                        const agentStatus = data.result;
+                        if (agentStatus.gps_position) {
+                            const gps = agentStatus.gps_position;
+                            document.getElementById('obsLat').value = gps.lat.toFixed(4);
+                            document.getElementById('obsLon').value = gps.lon.toFixed(4);
+
+                            // Update observer marker label
+                            const agent = agents.find(a => a.id == agentId);
+                            if (agent) {
+                                console.log(`Using GPS from agent: ${agent.name} (${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)})`);
+                            }
+
+                            calculatePasses();
+                        } else {
+                            alert('Agent does not have GPS data available');
+                            statusDot.className = 'location-status-dot offline';
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to get agent GPS:', err);
+                    statusDot.className = 'location-status-dot offline';
+                    alert('Failed to connect to agent');
+                }
+            }
+        }
 
         function updateClock() {
             const now = new Date();
@@ -543,6 +674,16 @@
 
             if (observerMarker) groundMap.removeLayer(observerMarker);
 
+            // Determine location label
+            let locationLabel = 'Local Observer';
+            if (currentLocationSource && currentLocationSource.startsWith('agent-')) {
+                const agentId = currentLocationSource.replace('agent-', '');
+                const agent = agents.find(a => a.id == agentId);
+                if (agent) {
+                    locationLabel = agent.name;
+                }
+            }
+
             const obsIcon = L.divIcon({
                 className: 'obs-marker',
                 html: `<div style="width: 12px; height: 12px; background: #ff9500; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 15px #ff9500;"></div>`,
@@ -552,7 +693,7 @@
 
             observerMarker = L.marker([lat, lon], { icon: obsIcon })
                 .addTo(groundMap)
-                .bindPopup('Observer Location');
+                .bindPopup(`<b>${locationLabel}</b><br>${lat.toFixed(4)}°, ${lon.toFixed(4)}°`);
         }
 
         function updateStats() {

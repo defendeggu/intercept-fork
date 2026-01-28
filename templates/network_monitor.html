@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Monitor // INTERCEPT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/agents.css') }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a2e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --border-color: #2a2a3e;
+            --accent-cyan: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-red: #ff3366;
+            --accent-orange: #ff9f1c;
+            --accent-purple: #a855f7;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            letter-spacing: 2px;
+        }
+
+        .logo span {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        .header-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 20px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-dot.connected {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+
+        .status-dot.disconnected {
+            background: var(--accent-red);
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+        }
+
+        .status-value {
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 110px);
+        }
+
+        .data-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .panel-count {
+            font-size: 10px;
+            padding: 2px 8px;
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-cyan);
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .panel-tabs {
+            display: flex;
+            gap: 2px;
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-tab {
+            padding: 6px 12px;
+            font-size: 11px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .panel-tab:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-cyan);
+        }
+
+        .panel-tab.active {
+            background: rgba(0, 212, 255, 0.1);
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 8px 10px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+        }
+
+        .data-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .data-table tr:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .source-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            font-size: 9px;
+            background: rgba(0, 212, 255, 0.15);
+            color: var(--accent-cyan);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .source-badge .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+        }
+
+        /* Different colors for different agents */
+        .source-badge:nth-child(2) {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--accent-green);
+        }
+        .source-badge:nth-child(2) .dot {
+            background: var(--accent-green);
+        }
+
+        .source-badge:nth-child(3) {
+            background: rgba(168, 85, 247, 0.15);
+            color: var(--accent-purple);
+        }
+        .source-badge:nth-child(3) .dot {
+            background: var(--accent-purple);
+        }
+
+        .source-badge:nth-child(4) {
+            background: rgba(255, 159, 28, 0.15);
+            color: var(--accent-orange);
+        }
+        .source-badge:nth-child(4) .dot {
+            background: var(--accent-orange);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        .empty-state-text {
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state-hint {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        /* Sidebar */
+        .sidebar-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .agent-list {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .agent-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .agent-item:last-child {
+            border-bottom: none;
+        }
+
+        .agent-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .agent-status-dot.online {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+
+        .agent-status-dot.offline {
+            background: var(--accent-red);
+        }
+
+        .agent-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .agent-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-url {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-stats {
+            text-align: right;
+        }
+
+        .agent-stat {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .agent-stat-value {
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Event log */
+        .event-log {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .event-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .event-entry {
+            padding: 6px 8px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background: var(--bg-tertiary);
+        }
+
+        .event-time {
+            color: var(--text-secondary);
+            margin-right: 8px;
+        }
+
+        .event-type {
+            color: var(--accent-cyan);
+            margin-right: 8px;
+        }
+
+        .event-agent {
+            color: var(--accent-green);
+        }
+
+        /* Location estimation styles */
+        .location-estimate, .location-native {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            padding: 3px 8px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 4px;
+            font-size: 10px;
+        }
+
+        .location-estimate.high {
+            background: rgba(0, 255, 136, 0.15);
+            border-left: 2px solid var(--accent-green);
+        }
+
+        .location-estimate.medium {
+            background: rgba(255, 159, 28, 0.15);
+            border-left: 2px solid var(--accent-orange);
+        }
+
+        .location-estimate.low {
+            background: rgba(255, 51, 102, 0.15);
+            border-left: 2px solid var(--accent-red);
+        }
+
+        .location-native {
+            background: rgba(168, 85, 247, 0.15);
+            border-left: 2px solid var(--accent-purple);
+        }
+
+        .location-icon {
+            font-size: 12px;
+        }
+
+        .location-coords {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+
+        .location-accuracy {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .location-badge {
+            padding: 1px 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .type-badge.type-wifi { background: rgba(0, 212, 255, 0.2); color: var(--accent-cyan); }
+        .type-badge.type-bluetooth { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
+        .type-badge.type-adsb { background: rgba(0, 255, 136, 0.2); color: var(--accent-green); }
+        .type-badge.type-ais { background: rgba(255, 159, 28, 0.2); color: var(--accent-orange); }
+        .type-badge.type-sensor { background: rgba(255, 51, 102, 0.2); color: var(--accent-red); }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar-panel {
+                flex-direction: row;
+            }
+
+            .agent-list, .event-log {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            NETWORK MONITOR
+            <span>// MULTI-AGENT VIEW</span>
+        </div>
+        <nav class="header-nav">
+            <a href="#" onclick="history.back(); return false;">Back</a>
+            <a href="/">Dashboard</a>
+            <a href="/controller/manage">Manage Agents</a>
+        </nav>
+    </header>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-dot" id="streamStatus"></div>
+            <span class="status-label">Stream:</span>
+            <span class="status-value" id="streamStatusText">Connecting...</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Agents Online:</span>
+            <span class="status-value" id="agentsOnline">0</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Total Entities:</span>
+            <span class="status-value" id="totalEntities">0</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Messages/sec:</span>
+            <span class="status-value" id="messagesPerSec">0</span>
+        </div>
+    </div>
+
+    <main class="main-grid">
+        <div class="data-panel">
+            <div class="panel-header">
+                <span class="panel-title">Aggregated Data</span>
+                <span class="panel-count" id="dataCount">0 entries</span>
+            </div>
+            <div class="panel-tabs">
+                <button class="panel-tab active" data-type="all">All</button>
+                <button class="panel-tab" data-type="adsb">Aircraft</button>
+                <button class="panel-tab" data-type="ais">Vessels</button>
+                <button class="panel-tab" data-type="sensor">Sensors</button>
+                <button class="panel-tab" data-type="wifi">WiFi</button>
+                <button class="panel-tab" data-type="bluetooth">Bluetooth</button>
+            </div>
+            <div class="panel-body">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">📡</div>
+                    <div class="empty-state-text">Waiting for agent data...</div>
+                    <div class="empty-state-hint">Start modes on connected agents to see aggregated data here</div>
+                </div>
+                <table class="data-table" id="dataTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Identifier</th>
+                            <th>Details</th>
+                            <th>Sources</th>
+                            <th>Last Update</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <div class="agent-list">
+                <div class="panel-header">
+                    <span class="panel-title">Connected Agents</span>
+                </div>
+                <div id="agentListBody">
+                    <div class="empty-state" style="padding: 20px;">
+                        <div class="empty-state-text">No agents registered</div>
+                        <div class="empty-state-hint"><a href="/controller/manage">Add agents</a></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="event-log">
+                <div class="panel-header">
+                    <span class="panel-title">Event Log</span>
+                </div>
+                <div class="event-list" id="eventLog">
+                    <div class="event-entry">
+                        <span class="event-time">--:--:--</span>
+                        <span>Waiting for events...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================================================
+        // State
+        // ==========================================================================
+
+        // Aggregated data store - keyed by type+identifier
+        const dataStore = new Map();  // key: "type:identifier" -> { data, sources: Map<agentName, lastSeen> }
+
+        // Agent tracking
+        const agents = new Map();  // agentName -> { lastSeen, messageCount, gps: {lat, lon} }
+
+        // Agent GPS coordinates (fetched from registry)
+        const agentGPS = new Map();  // agentName -> { lat, lon }
+
+        // Estimated locations for devices
+        const locationEstimates = new Map();  // deviceId -> { lat, lon, accuracy, confidence, agents }
+
+        // Stats
+        let messageCount = 0;
+        let lastMessageCountCheck = 0;
+        let messagesPerSecond = 0;
+
+        // Current filter
+        let currentFilter = 'all';
+
+        // SSE connection
+        let eventSource = null;
+
+        // ==========================================================================
+        // SSE Connection
+        // ==========================================================================
+
+        function connectStream() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/controller/stream/all');
+
+            eventSource.onopen = () => {
+                document.getElementById('streamStatus').classList.add('connected');
+                document.getElementById('streamStatus').classList.remove('disconnected');
+                document.getElementById('streamStatusText').textContent = 'Connected';
+                addLogEntry('system', 'Stream connected');
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            eventSource.onerror = () => {
+                document.getElementById('streamStatus').classList.remove('connected');
+                document.getElementById('streamStatus').classList.add('disconnected');
+                document.getElementById('streamStatusText').textContent = 'Disconnected';
+                addLogEntry('error', 'Stream disconnected, reconnecting...');
+
+                // Reconnect after delay
+                setTimeout(connectStream, 3000);
+            };
+        }
+
+        // ==========================================================================
+        // Message Handling
+        // ==========================================================================
+
+        function handleMessage(msg) {
+            if (msg.type === 'keepalive') {
+                return;
+            }
+
+            if (msg.type !== 'agent_data') {
+                return;
+            }
+
+            messageCount++;
+
+            const agentName = msg.agent_name || 'unknown';
+            const scanType = msg.scan_type || 'unknown';
+            const payload = msg.payload || {};
+            const receivedAt = msg.received_at || new Date().toISOString();
+
+            // Update agent tracking
+            if (!agents.has(agentName)) {
+                agents.set(agentName, { lastSeen: receivedAt, messageCount: 1 });
+                addLogEntry('agent', `Agent "${agentName}" started sending data`);
+            } else {
+                const agent = agents.get(agentName);
+                agent.lastSeen = receivedAt;
+                agent.messageCount++;
+            }
+
+            // Process payload based on scan type
+            processPayload(scanType, payload, agentName, receivedAt);
+
+            // Update displays
+            updateAgentList();
+            updateDataTable();
+            updateStats();
+        }
+
+        function processPayload(scanType, payload, agentName, receivedAt) {
+            // Handle different payload structures
+            let entities = [];
+
+            if (Array.isArray(payload)) {
+                entities = payload;
+            } else if (payload.data && Array.isArray(payload.data)) {
+                entities = payload.data;
+            } else if (payload.aircraft && Array.isArray(payload.aircraft)) {
+                entities = payload.aircraft;
+            } else if (payload.vessels && Array.isArray(payload.vessels)) {
+                entities = payload.vessels;
+            } else if (payload.sensors && Array.isArray(payload.sensors)) {
+                entities = payload.sensors;
+            } else if (payload.networks && Array.isArray(payload.networks)) {
+                entities = payload.networks;
+            } else if (payload.devices && Array.isArray(payload.devices)) {
+                entities = payload.devices;
+            } else if (typeof payload === 'object' && Object.keys(payload).length > 0) {
+                // Single entity
+                entities = [payload];
+            }
+
+            entities.forEach(entity => {
+                const identifier = getEntityIdentifier(scanType, entity);
+                if (!identifier) return;
+
+                const key = `${scanType}:${identifier}`;
+
+                if (!dataStore.has(key)) {
+                    dataStore.set(key, {
+                        type: scanType,
+                        identifier: identifier,
+                        data: entity,
+                        sources: new Map(),
+                        rssiByAgent: new Map()  // agentName -> rssi for location estimation
+                    });
+                }
+
+                const entry = dataStore.get(key);
+                entry.sources.set(agentName, receivedAt);
+                entry.data = { ...entry.data, ...entity };  // Merge/update data
+                entry.lastUpdate = receivedAt;
+
+                // Store RSSI for location estimation (WiFi, Bluetooth)
+                const rssi = entity.rssi || entity.signal || entity.signal_strength;
+                if (rssi !== undefined && rssi !== null) {
+                    entry.rssiByAgent.set(agentName, {
+                        rssi: rssi,
+                        timestamp: receivedAt
+                    });
+                }
+
+                // Check if we can estimate location (2+ agents with GPS and RSSI)
+                if (entry.rssiByAgent.size >= 2 && canEstimateLocation(scanType)) {
+                    requestLocationEstimate(identifier, entry);
+                }
+            });
+        }
+
+        // Types that support location estimation (no inherent GPS)
+        function canEstimateLocation(scanType) {
+            return ['wifi', 'bluetooth', 'sensor'].includes(scanType);
+        }
+
+        // Request location estimation from API
+        async function requestLocationEstimate(deviceId, entry) {
+            const observations = [];
+
+            entry.rssiByAgent.forEach((info, agentName) => {
+                const gps = agentGPS.get(agentName);
+                if (gps && gps.lat && gps.lon) {
+                    observations.push({
+                        agent_name: agentName,
+                        agent_lat: gps.lat,
+                        agent_lon: gps.lon,
+                        rssi: info.rssi
+                    });
+                }
+            });
+
+            if (observations.length < 2) {
+                return;  // Not enough agents with GPS
+            }
+
+            try {
+                const resp = await fetch('/controller/api/location/estimate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ observations, environment: 'outdoor' })
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.location) {
+                        locationEstimates.set(deviceId, data.location);
+                        entry.estimatedLocation = data.location;
+                        addLogEntry('location', `Estimated location for ${deviceId}: (${data.location.latitude.toFixed(4)}, ${data.location.longitude.toFixed(4)})`);
+                    }
+                }
+            } catch (e) {
+                console.error('Location estimation failed:', e);
+            }
+        }
+
+        function getEntityIdentifier(scanType, entity) {
+            switch (scanType) {
+                case 'adsb':
+                    return entity.icao || entity.hex;
+                case 'ais':
+                    return entity.mmsi;
+                case 'sensor':
+                    return `${entity.model || 'unknown'}-${entity.id || entity.channel || Math.random()}`;
+                case 'wifi':
+                    return entity.bssid || entity.mac;
+                case 'bluetooth':
+                    return entity.address || entity.mac;
+                case 'aprs':
+                    return entity.callsign || entity.source;
+                case 'pager':
+                    return entity.address || entity.capcode;
+                default:
+                    return entity.id || entity.identifier || JSON.stringify(entity).slice(0, 32);
+            }
+        }
+
+        // ==========================================================================
+        // Display Updates
+        // ==========================================================================
+
+        function updateAgentList() {
+            const container = document.getElementById('agentListBody');
+
+            if (agents.size === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <div class="empty-state-text">No agents sending data</div>
+                        <div class="empty-state-hint"><a href="/controller/manage">Manage agents</a></div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            agents.forEach((info, name) => {
+                const lastSeenDate = new Date(info.lastSeen);
+                const isRecent = (Date.now() - lastSeenDate.getTime()) < 30000;
+
+                html += `
+                    <div class="agent-item">
+                        <div class="agent-status-dot ${isRecent ? 'online' : 'offline'}"></div>
+                        <div class="agent-info">
+                            <div class="agent-name">${escapeHtml(name)}</div>
+                            <div class="agent-url">Last: ${formatTime(info.lastSeen)}</div>
+                        </div>
+                        <div class="agent-stats">
+                            <div class="agent-stat">
+                                <span class="agent-stat-value">${info.messageCount}</span> msgs
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            document.getElementById('agentsOnline').textContent = agents.size;
+        }
+
+        function updateDataTable() {
+            const emptyState = document.getElementById('emptyState');
+            const table = document.getElementById('dataTable');
+            const tbody = document.getElementById('dataTableBody');
+
+            // Filter entries
+            let entries = Array.from(dataStore.values());
+            if (currentFilter !== 'all') {
+                entries = entries.filter(e => e.type === currentFilter);
+            }
+
+            // Sort by last update (most recent first)
+            entries.sort((a, b) => {
+                const aTime = new Date(a.lastUpdate || 0).getTime();
+                const bTime = new Date(b.lastUpdate || 0).getTime();
+                return bTime - aTime;
+            });
+
+            if (entries.length === 0) {
+                emptyState.style.display = 'flex';
+                table.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            table.style.display = 'table';
+
+            let html = '';
+            entries.slice(0, 100).forEach(entry => {
+                const details = getEntityDetails(entry.type, entry.data, entry);
+                const sources = Array.from(entry.sources.keys());
+                const hasLocation = entry.estimatedLocation || (entry.data.lat && entry.data.lon);
+                const locationHtml = getLocationHtml(entry);
+
+                html += `
+                    <tr>
+                        <td><span class="type-badge type-${entry.type}">${entry.type.toUpperCase()}</span></td>
+                        <td class="mono">${escapeHtml(entry.identifier)}</td>
+                        <td>${details}${locationHtml}</td>
+                        <td>
+                            <div class="source-badges">
+                                ${sources.map(s => `<span class="source-badge"><span class="dot"></span>${escapeHtml(s)}</span>`).join('')}
+                            </div>
+                        </td>
+                        <td class="mono">${formatTime(entry.lastUpdate)}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+            document.getElementById('dataCount').textContent = `${entries.length} entries`;
+            document.getElementById('totalEntities').textContent = dataStore.size;
+        }
+
+        function getEntityDetails(type, data, entry) {
+            switch (type) {
+                case 'adsb':
+                    return `${escapeHtml(data.callsign || '--')} | Alt: ${data.altitude || '--'} | Spd: ${data.speed || '--'}`;
+                case 'ais':
+                    return `${escapeHtml(data.name || '--')} | ${data.ship_type || '--'} | ${data.destination || '--'}`;
+                case 'sensor':
+                    return `${escapeHtml(data.model || '--')} | ${data.temperature_C || '--'}°C | ${data.humidity || '--'}%`;
+                case 'wifi':
+                    return `${escapeHtml(data.ssid || '--')} | Ch: ${data.channel || '--'} | ${data.signal || '--'} dBm`;
+                case 'bluetooth':
+                    return `${escapeHtml(data.name || '--')} | ${data.type || '--'} | ${data.rssi || '--'} dBm`;
+                case 'aprs':
+                    return `${escapeHtml(data.callsign || '--')} | ${data.symbol || '--'}`;
+                case 'pager':
+                    return `${escapeHtml(data.message || '--').slice(0, 40)}...`;
+                default:
+                    return JSON.stringify(data).slice(0, 50) + '...';
+            }
+        }
+
+        function getLocationHtml(entry) {
+            // Check for estimated location (trilateration)
+            if (entry.estimatedLocation) {
+                const loc = entry.estimatedLocation;
+                const confidenceClass = loc.confidence > 0.7 ? 'high' : loc.confidence > 0.4 ? 'medium' : 'low';
+                return `<div class="location-estimate ${confidenceClass}">
+                    <span class="location-icon">📍</span>
+                    <span class="location-coords">${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}</span>
+                    <span class="location-accuracy">±${Math.round(loc.accuracy_meters)}m</span>
+                    <span class="location-badge">Estimated</span>
+                </div>`;
+            }
+
+            // Check for inherent location (GPS from the device itself)
+            const data = entry.data;
+            if (data.lat !== undefined && data.lon !== undefined) {
+                return `<div class="location-native">
+                    <span class="location-icon">🛰️</span>
+                    <span class="location-coords">${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</span>
+                    <span class="location-badge">GPS</span>
+                </div>`;
+            }
+
+            return '';
+        }
+
+        function updateStats() {
+            // Calculate messages per second
+            const now = Date.now();
+            if (now - lastMessageCountCheck >= 1000) {
+                messagesPerSecond = messageCount - (lastMessageCountCheck > 0 ? messagesPerSecond : 0);
+                lastMessageCountCheck = now;
+                document.getElementById('messagesPerSec').textContent = messagesPerSecond;
+            }
+        }
+
+        function addLogEntry(type, message) {
+            const log = document.getElementById('eventLog');
+            const time = new Date().toLocaleTimeString();
+
+            const entry = document.createElement('div');
+            entry.className = 'event-entry';
+            entry.innerHTML = `
+                <span class="event-time">${time}</span>
+                <span class="event-type">[${type}]</span>
+                <span>${escapeHtml(message)}</span>
+            `;
+
+            log.insertBefore(entry, log.firstChild);
+
+            // Keep only last 50 entries
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        // ==========================================================================
+        // Utilities
+        // ==========================================================================
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return '--:--:--';
+            try {
+                const date = new Date(isoString);
+                return date.toLocaleTimeString();
+            } catch {
+                return '--:--:--';
+            }
+        }
+
+        // ==========================================================================
+        // Tab Switching
+        // ==========================================================================
+
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentFilter = tab.dataset.type;
+                updateDataTable();
+            });
+        });
+
+        // ==========================================================================
+        // Load Initial Agents
+        // ==========================================================================
+
+        async function loadAgents() {
+            try {
+                const resp = await fetch('/controller/agents?refresh=true');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.agents && data.agents.length > 0) {
+                        data.agents.forEach(agent => {
+                            if (!agents.has(agent.name)) {
+                                agents.set(agent.name, {
+                                    lastSeen: agent.last_seen,
+                                    messageCount: 0,
+                                    healthy: agent.healthy
+                                });
+                            }
+
+                            // Store GPS coordinates for location estimation
+                            if (agent.gps_coords) {
+                                const coords = agent.gps_coords;
+                                const lat = coords.lat || coords.latitude;
+                                const lon = coords.lon || coords.longitude;
+                                if (lat && lon) {
+                                    agentGPS.set(agent.name, { lat, lon });
+                                    addLogEntry('gps', `Agent "${agent.name}" GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+                                }
+                            }
+                        });
+                        updateAgentList();
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load agents:', e);
+            }
+        }
+
+        // ==========================================================================
+        // Stats update interval
+        // ==========================================================================
+
+        setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - lastMessageCountCheck) / 1000;
+            if (elapsed >= 1) {
+                document.getElementById('messagesPerSec').textContent =
+                    Math.round((messageCount - (window.lastMsgCount || 0)) / elapsed);
+                window.lastMsgCount = messageCount;
+                lastMessageCountCheck = now;
+            }
+        }, 1000);
+
+        // ==========================================================================
+        // Initialize
+        // ==========================================================================
+
+        loadAgents();
+        connectStream();
+        addLogEntry('system', 'Network Monitor initialized');
+    </script>
+</body>
+</html>

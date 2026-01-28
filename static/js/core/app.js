@@ -119,7 +119,6 @@ function switchMode(mode) {
     document.getElementById('aircraftStats').style.display = mode === 'aircraft' ? 'flex' : 'none';
     document.getElementById('satelliteStats').style.display = mode === 'satellite' ? 'flex' : 'none';
     document.getElementById('wifiStats').style.display = mode === 'wifi' ? 'flex' : 'none';
-    document.getElementById('btStats').style.display = mode === 'bluetooth' ? 'flex' : 'none';
 
     // Hide signal meter - individual panels show signal strength where needed
     document.getElementById('signalMeter').style.display = 'none';

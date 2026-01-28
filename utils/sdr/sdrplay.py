@@ -133,6 +133,36 @@ class SDRPlayCommandBuilder(CommandBuilder):
 
         return cmd
 
+    def build_ais_command(
+        self,
+        device: SDRDevice,
+        gain: Optional[float] = None,
+        bias_t: bool = False,
+        tcp_port: int = 10110
+    ) -> list[str]:
+        """
+        Build AIS-catcher command for AIS vessel tracking with SDRPlay.
+
+        Uses AIS-catcher with SoapySDR support.
+        """
+        device_str = self._build_device_string(device)
+
+        cmd = [
+            'AIS-catcher',
+            '-d', f'soapysdr -d {device_str}',
+            '-S', str(tcp_port),
+            '-o', '5',
+            '-q',
+        ]
+
+        if gain is not None and gain > 0:
+            cmd.extend(['-gr', 'tuner', str(int(gain))])
+
+        if bias_t:
+            cmd.extend(['-gr', 'biastee', '1'])
+
+        return cmd
+
     def get_capabilities(self) -> SDRCapabilities:
         """Return SDRPlay capabilities."""
         return self.CAPABILITIES

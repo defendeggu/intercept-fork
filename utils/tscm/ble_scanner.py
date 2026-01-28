@@ -178,7 +178,19 @@ class BLEScanner:
                         for company_id, data in adv_data.manufacturer_data.items():
                             ble_device.manufacturer_id = company_id
                             ble_device.manufacturer_name = COMPANY_IDS.get(company_id, f'Unknown ({hex(company_id)})')
-                            ble_device.manufacturer_data = bytes(data)
+                            # Handle various data types safely
+                            try:
+                                if isinstance(data, (bytes, bytearray)):
+                                    ble_device.manufacturer_data = bytes(data)
+                                elif isinstance(data, (list, tuple)):
+                                    ble_device.manufacturer_data = bytes(data)
+                                elif isinstance(data, str):
+                                    ble_device.manufacturer_data = bytes.fromhex(data)
+                                else:
+                                    ble_device.manufacturer_data = bytes(data)
+                            except (TypeError, ValueError) as e:
+                                logger.debug(f"Could not convert manufacturer data: {e}")
+                                ble_device.manufacturer_data = None
 
                             # Check for known trackers
                             self._identify_tracker(ble_device, company_id, data)

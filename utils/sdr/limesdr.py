@@ -134,6 +134,34 @@ class LimeSDRCommandBuilder(CommandBuilder):
 
         return cmd
 
+    def build_ais_command(
+        self,
+        device: SDRDevice,
+        gain: Optional[float] = None,
+        bias_t: bool = False,
+        tcp_port: int = 10110
+    ) -> list[str]:
+        """
+        Build AIS-catcher command for AIS vessel tracking with LimeSDR.
+
+        Uses AIS-catcher with SoapySDR support.
+        Note: LimeSDR does not support bias-T, parameter is ignored.
+        """
+        device_str = self._build_device_string(device)
+
+        cmd = [
+            'AIS-catcher',
+            '-d', f'soapysdr -d {device_str}',
+            '-S', str(tcp_port),
+            '-o', '5',
+            '-q',
+        ]
+
+        if gain is not None and gain > 0:
+            cmd.extend(['-gr', 'tuner', str(int(gain))])
+
+        return cmd
+
     def get_capabilities(self) -> SDRCapabilities:
         """Return LimeSDR capabilities."""
         return self.CAPABILITIES

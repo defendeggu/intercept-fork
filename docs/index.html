@@ -18,6 +18,7 @@
                 <a href="#features">Features</a>
                 <a href="#screenshots">Screenshots</a>
                 <a href="#installation">Install</a>
+                <a href="https://github.com/smittix/intercept/blob/main/docs/DISTRIBUTED_AGENTS.md">Remote Agents</a>
                 <a href="https://github.com/smittix/intercept" class="nav-btn" target="_blank">GitHub</a>
             </div>
         </div>
@@ -34,8 +35,8 @@
             </div>
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-value">8+</span>
-                    <span class="stat-label">SDR Modes</span>
+                    <span class="stat-value">12+</span>
+                    <span class="stat-label">Modes</span>
                 </div>
                 <div class="stat">
                     <span class="stat-value">200+</span>
@@ -105,6 +106,30 @@
                     <h3>TSCM</h3>
                     <p>Counter-surveillance with baseline recording, threat detection, device correlation, and risk scoring.</p>
                 </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Meter Reading</h3>
+                    <p>Intercept smart utility meters via rtl_amr. Monitor electricity, gas, and water meter transmissions.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🚢</div>
+                    <h3>Vessel Tracking</h3>
+                    <p>Real-time AIS ship tracking via AIS-catcher. Monitor maritime traffic with vessel details, course, speed, and destination.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔢</div>
+                    <h3>Spy Stations</h3>
+                    <p>Number stations and diplomatic HF network database. Frequencies, schedules, and background info from priyom.org.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Remote Agents</h3>
+                    <p>Distributed signal intelligence with remote sensor nodes. Deploy agents across multiple locations and aggregate data to a central controller.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -128,6 +153,10 @@
                     <span class="screenshot-label">Bluetooth Scanner</span>
                 </div>
                 <div class="screenshot-item">
+                    <img src="images/wifi.png" alt="WiFi Scanner">
+                    <span class="screenshot-label">WiFi Scanner</span>
+                </div>
+                <div class="screenshot-item">
                     <img src="images/scanner.png" alt="Listening Post">
                     <span class="screenshot-label">Listening Post</span>
                 </div>
@@ -139,6 +168,14 @@
                     <img src="images/tscm-detail.png" alt="Device Detail Dialog">
                     <span class="screenshot-label">Device Analysis</span>
                 </div>
+                <div class="screenshot-item">
+                    <img src="images/remote-agents.png" alt="Remote Agents Management">
+                    <span class="screenshot-label">Remote Agents</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/ais.png" alt="AIS Vessel Tracking">
+                    <span class="screenshot-label">AIS Vessel Tracking</span>
+                </div>
             </div>
         </div>
     </section>
@@ -147,6 +184,10 @@
         <div class="container">
             <h2>Quick Start</h2>
             <p class="section-subtitle">Get up and running in minutes</p>
+
+            <div class="platform-note">
+                <p><strong>Supported Platforms:</strong> Officially tested on Debian and Ubuntu. Partial support for macOS. Other distributions have not been fully tested.</p>
+            </div>
 
             <div class="install-options">
                 <div class="install-card">
@@ -229,7 +270,8 @@ docker compose up -d</code></pre>
                 <div class="footer-links">
                     <a href="https://github.com/smittix/intercept" target="_blank">GitHub</a>
                     <a href="https://discord.gg/EyeksEJmWE" target="_blank">Discord</a>
-                    <a href="USAGE.html">Documentation</a>
+                    <a href="https://github.com/smittix/intercept/blob/main/docs/USAGE.md">Documentation</a>
+                    <a href="https://github.com/smittix/intercept/blob/main/docs/DISTRIBUTED_AGENTS.md">Remote Agents</a>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -238,5 +280,44 @@ docker compose up -d</code></pre>
             </div>
         </div>
     </footer>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox">
+        <span class="lightbox-close">&times;</span>
+        <img class="lightbox-img" id="lightbox-img" src="" alt="">
+        <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+
+    <script>
+        // Lightbox functionality
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const lightboxCaption = document.getElementById('lightbox-caption');
+        const closeBtn = document.querySelector('.lightbox-close');
+
+        document.querySelectorAll('.screenshot-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const img = item.querySelector('img');
+                const label = item.querySelector('.screenshot-label');
+                lightbox.classList.add('active');
+                lightboxImg.src = img.src;
+                lightboxCaption.textContent = label.textContent;
+                document.body.style.overflow = 'hidden';
+            });
+        });
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        closeBtn.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) closeLightbox();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLightbox();
+        });
+    </script>
 </body>
 </html>

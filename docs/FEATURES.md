@@ -16,6 +16,28 @@ Complete feature list for all modules.
 - **Doorbells, remotes, and IoT devices**
 - **Smart meters** and utility monitors
 
+## AIS Vessel Tracking
+
+- **Real-time vessel tracking** via AIS-catcher on 161.975/162.025 MHz
+- **Full-screen dashboard** - dedicated popout with interactive map
+- **Interactive Leaflet map** with OpenStreetMap tiles (dark-themed)
+- **Vessel details popup** - name, MMSI, callsign, destination, ETA
+- **Navigation data** - speed, course, heading, rate of turn
+- **Ship type classification** - cargo, tanker, passenger, fishing, etc.
+- **Vessel dimensions** - length, width, draught
+- **Multi-SDR support** - RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay
+
+## Spy Stations (Number Stations)
+
+- **Comprehensive database** of active number stations and diplomatic networks
+- **Station profiles** - frequencies, schedules, operators, descriptions
+- **Filter by type** - number stations vs diplomatic networks
+- **Filter by country** - Russia, Cuba, Israel, Poland, North Korea, etc.
+- **Filter by mode** - USB, AM, CW, OFDM
+- **Tune integration** - click to tune Listening Post to station frequency
+- **Source links** - references to priyom.org for detailed information
+- **Famous stations** - UVB-76 "The Buzzer", Cuban HM01, Israeli E17z
+
 ## ADS-B Aircraft Tracking
 
 - **Real-time aircraft tracking** via dump1090 or rtl_adsb
@@ -26,6 +48,8 @@ Complete feature list for all modules.
 - **Aircraft filtering** - show all, military only, civil only, or emergency only
 - **Marker clustering** - group nearby aircraft at lower zoom levels
 - **Reception statistics** - max range, message rate, busiest hour, total seen
+- **Persistent ADS-B history** - optional Postgres-backed message and snapshot storage
+- **History reporting dashboard** - session controls, aircraft timelines, and detail modal
 - **Observer location** - manual input or GPS geolocation
 - **Audio alerts** - notifications for military and emergency aircraft
 - **Emergency squawk highlighting** - visual alerts for 7500/7600/7700
@@ -34,6 +58,31 @@ Complete feature list for all modules.
 <p align="center">
   <img src="/static/images/screenshots/screenshot_radar.png" alt="Screenshot">
 </p>
+
+## AIS Vessel Tracking
+
+- **Real-time vessel tracking** via AIS-catcher or rtl_ais
+- **Full-screen dashboard** - dedicated popout with maritime map
+- **Interactive Leaflet map** with OpenStreetMap tiles (dark-themed)
+- **Vessel trails** - optional track history visualization
+- **Vessel details popup** - name, MMSI, callsign, destination, ship type, speed, heading
+- **Country identification** - flag lookup via Maritime Identification Digits (MID)
+
+### VHF DSC Channel 70 Monitoring
+
+Digital Selective Calling (DSC) monitoring on the international maritime distress frequency.
+
+- **Real-time DSC decoding** - Distress, Urgency, Safety, and Routine messages
+- **MMSI country lookup** - 180+ Maritime Identification Digit codes
+- **Distress nature identification** - Fire, Flooding, Collision, Sinking, Piracy, MOB, etc.
+- **Position extraction** - Automatic lat/lon parsing from distress messages
+- **Map markers** - Distress positions plotted with pulsing alert markers
+- **Visual alert overlay** - Prominent popup for DISTRESS and URGENCY messages
+- **Audio alerts** - Notification sound for critical messages
+- **Alert persistence** - Critical alerts stored permanently in database
+- **Acknowledgement workflow** - Track response status with notes
+- **SDR conflict detection** - Prevents device collisions with AIS tracking
+- **Alert summary** - Dashboard counts for unacknowledged distress/urgency
 
 ## Satellite Tracking
 
@@ -115,6 +164,35 @@ Technical Surveillance Countermeasures (TSCM) screening for detecting wireless s
 - Results require professional verification
 - No cryptographic de-randomization
 - Passive screening only (no active probing by default)
+
+## Remote Agents (Distributed SIGINT)
+
+Deploy lightweight sensor nodes across multiple locations and aggregate data to a central controller.
+
+### Architecture
+- **Hub-and-spoke model** - Central controller with multiple remote agents
+- **Push and Pull modes** - Agents can push data automatically or respond to on-demand requests
+- **API key authentication** - Secure communication between agents and controller
+
+### Agent Features
+- **Standalone deployment** - Run on Raspberry Pi, mini PCs, or any Linux device with SDR
+- **All modes supported** - Pager, sensor, ADS-B, AIS, WiFi, Bluetooth, and more
+- **GPS integration** - Automatic location tagging from USB GPS receivers
+- **Multi-SDR support** - Run multiple modes simultaneously on agents with multiple SDRs
+- **Capability discovery** - Controller auto-detects available modes and devices
+
+### Controller Features
+- **Agent management UI** - Register, test, and remove agents from `/controller/manage`
+- **Real-time status** - Health monitoring with online/offline indicators
+- **Unified data stream** - Aggregate data from all agents via SSE
+- **Dashboard integration** - Agent selector in ADS-B, AIS, and main dashboards
+- **Device conflict detection** - Smart warnings when SDR is in use
+
+### Use Cases
+- **Wide-area monitoring** - Cover larger geographic areas with distributed sensors
+- **Remote installations** - Deploy sensors in locations without direct access
+- **Redundancy** - Multiple nodes for reliable coverage
+- **Triangulation** - Use multiple GPS-enabled agents for signal location
 
 ## User Interface
 

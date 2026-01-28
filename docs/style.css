@@ -323,6 +323,55 @@ section h2 {
     font-weight: 500;
 }
 
+/* Lightbox */
+.lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.lightbox.active {
+    display: flex;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 40px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 1001;
+}
+
+.lightbox-close:hover {
+    color: var(--accent);
+}
+
+.lightbox-img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-caption {
+    margin-top: 20px;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 /* Installation */
 .installation {
     background: var(--bg-secondary);
@@ -370,6 +419,25 @@ section h2 {
 .install-note {
     font-size: 0.85rem;
     color: var(--text-muted);
+}
+
+.platform-note {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+}
+
+.platform-note p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.platform-note strong {
+    color: var(--text-primary);
 }
 
 .post-install {

@@ -31,6 +31,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # GPS support
     gpsd-clients \
     # Utilities
+    # APRS
+    direwolf \
+    # WiFi Extra
+    hcxdumptool \
+    hcxtools \
+    # SDR Hardware & SoapySDR
+    soapysdr-tools \
+    soapysdr-module-rtlsdr \
+    soapysdr-module-hackrf \
+    soapysdr-module-lms7 \
+    limesuite \
+    hackrf \
+    # Utilities
     curl \
     procps \
     && rm -rf /var/lib/apt/lists/*
@@ -43,6 +56,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     libncurses-dev \
     libsndfile1-dev \
+    libsoapysdr-dev \
+    libhackrf-dev \
+    liblimesuite-dev \
+    libsqlite3-dev \
+    libcurl4-openssl-dev \
+    zlib1g-dev \
+    libzmq3-dev \
     # Build dump1090
     && cd /tmp \
     && git clone --depth 1 https://github.com/flightaware/dump1090.git \
@@ -51,6 +71,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && cp dump1090 /usr/bin/dump1090-fa \
     && ln -s /usr/bin/dump1090-fa /usr/bin/dump1090 \
     && rm -rf /tmp/dump1090 \
+    # Build AIS-catcher
+    && cd /tmp \
+    && git clone https://github.com/jvde-github/AIS-catcher.git \
+    && cd AIS-catcher \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make \
+    && cp AIS-catcher /usr/bin/AIS-catcher \
+    && cd /tmp \
+    && rm -rf /tmp/AIS-catcher \
+    # Build readsb
+    && cd /tmp \
+    && git clone --depth 1 https://github.com/wiedehopf/readsb.git \
+    && cd readsb \
+    && make BLADERF=no PLUTOSDR=no SOAPYSDR=yes \
+    && cp readsb /usr/bin/readsb \
+    && cd /tmp \
+    && rm -rf /tmp/readsb \
+    # Build rx_tools
+    && cd /tmp \
+    && git clone https://github.com/rxseger/rx_tools.git \
+    && cd rx_tools \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make \
+    && make install \
+    && cd /tmp \
+    && rm -rf /tmp/rx_tools \
     # Build acarsdec
     && cd /tmp \
     && git clone --depth 1 https://github.com/TLeconte/acarsdec.git \
@@ -62,11 +110,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /tmp/acarsdec \
     # Cleanup build tools to reduce image size
     && apt-get remove -y \
-        build-essential \
-        git \
-        pkg-config \
-        cmake \
-        libncurses-dev \
+    build-essential \
+    git \
+    pkg-config \
+    cmake \
+    libncurses-dev \
+    libsndfile1-dev \
+    libsoapysdr-dev \
+    libhackrf-dev \
+    liblimesuite-dev \
+    libsqlite3-dev \
+    libcurl4-openssl-dev \
+    zlib1g-dev \
+    libzmq3-dev \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 

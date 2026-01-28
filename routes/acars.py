@@ -53,11 +53,13 @@ def find_acarsdec():
 def get_acarsdec_json_flag(acarsdec_path: str) -> str:
     """Detect which JSON output flag acarsdec supports.
 
-    Version 4.0+ uses -j for JSON stdout.
-    Version 3.x uses -o 4 for JSON stdout.
+    Different forks use different flags:
+    - TLeconte v4.0+: uses -j for JSON stdout
+    - TLeconte v3.x: uses -o 4 for JSON stdout
+    - f00b4r0 fork (DragonOS): uses --output json:file:- for JSON stdout
     """
     try:
-        # Get version by running acarsdec with no args (shows usage with version)
+        # Get help/version by running acarsdec with no args (shows usage)
         result = subprocess.run(
             [acarsdec_path],
             capture_output=True,
@@ -66,8 +68,15 @@ def get_acarsdec_json_flag(acarsdec_path: str) -> str:
         )
         output = result.stdout + result.stderr
 
-        # Parse version from output like "Acarsdec v4.3.1" or "Acarsdec/acarsserv 3.7"
         import re
+
+        # Check for f00b4r0 fork signature: uses --output instead of -j/-o
+        # f00b4r0's help shows "--output" for output configuration
+        if '--output' in output or 'json:file:' in output.lower():
+            logger.debug("Detected f00b4r0 acarsdec fork (--output syntax)")
+            return '--output'
+
+        # Parse version from output like "Acarsdec v4.3.1" or "Acarsdec/acarsserv 3.7"
         version_match = re.search(r'acarsdec[^\d]*v?(\d+)\.(\d+)', output, re.IGNORECASE)
         if version_match:
             major = int(version_match.group(1))
@@ -80,7 +89,7 @@ def get_acarsdec_json_flag(acarsdec_path: str) -> str:
     except Exception as e:
         logger.debug(f"Could not detect acarsdec version: {e}")
 
-    # Default to -j (modern standard for current builds from source)
+    # Default to -j (TLeconte modern standard)
     return '-j'
 
 
@@ -214,15 +223,20 @@ def start_acars() -> Response:
     acars_last_message_time = None
 
     # Build acarsdec command
-    # acarsdec -j -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
-    # Note: -j is JSON stdout (newer forks), -o 4 was the old syntax
-    # gain/ppm must come BEFORE -r
+    # Different forks have different syntax:
+    # - TLeconte v4+: acarsdec -j -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
+    # - TLeconte v3: acarsdec -o 4 -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
+    # - f00b4r0 (DragonOS): acarsdec --output json:file:- -g <gain> -p <ppm> -r <device> <freq1> ...
+    # Note: gain/ppm must come BEFORE -r
     json_flag = get_acarsdec_json_flag(acarsdec_path)
     cmd = [acarsdec_path]
-    if json_flag == '-j':
-        cmd.append('-j')         # JSON output (newer TLeconte fork)
+    if json_flag == '--output':
+        # f00b4r0 fork: --output json:file (no path = stdout)
+        cmd.extend(['--output', 'json:file'])
+    elif json_flag == '-j':
+        cmd.append('-j')         # JSON output (TLeconte v4+)
     else:
-        cmd.extend(['-o', '4'])  # JSON output (older versions)
+        cmd.extend(['-o', '4'])  # JSON output (TLeconte v3.x)
 
     # Add gain if not auto (must be before -r)
     if gain and str(gain) != '0':
@@ -232,8 +246,14 @@ def start_acars() -> Response:
     if ppm and str(ppm) != '0':
         cmd.extend(['-p', str(ppm)])
 
-    # Add device and frequencies (-r takes device, remaining args are frequencies)
-    cmd.extend(['-r', str(device)])
+    # Add device and frequencies
+    # f00b4r0 uses --rtlsdr <device>, TLeconte uses -r <device>
+    if json_flag == '--output':
+        # Use 3.2 MS/s sample rate for wider bandwidth (handles NA frequency span)
+        cmd.extend(['-m', '256'])
+        cmd.extend(['--rtlsdr', str(device)])
+    else:
+        cmd.extend(['-r', str(device)])
     cmd.extend(frequencies)
 
     logger.info(f"Starting ACARS decoder: {' '.join(cmd)}")

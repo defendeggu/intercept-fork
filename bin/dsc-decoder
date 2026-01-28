@@ -1,0 +1,13 @@
+#!/bin/bash
+# DSC (Digital Selective Calling) decoder wrapper
+# Invokes the Python DSC decoder module
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Set PYTHONPATH to include project root
+export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH}"
+
+# Run the decoder module
+exec python3 -m utils.dsc.decoder "$@"

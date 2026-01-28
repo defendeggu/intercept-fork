@@ -113,6 +113,77 @@ body {
     pointer-events: none;
 }
 
+/* Spinning Globe Background */
+.globe-background {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(80vh, 80vw);
+    height: min(80vh, 80vw);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.globe-svg {
+    width: 100%;
+    height: 100%;
+    color: var(--accent-cyan);
+    opacity: 0.06;
+    animation: globeSpin 60s linear infinite;
+}
+
+[data-theme="light"] .globe-svg {
+    opacity: 0.08;
+}
+
+@keyframes globeSpin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.globe-svg .rotating-meridians {
+    transform-origin: center;
+    animation: meridianSpin 45s linear infinite reverse;
+}
+
+@keyframes meridianSpin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.globe-svg .meridian-1 {
+    transform-origin: center;
+    animation: meridianPulse 8s ease-in-out infinite;
+}
+
+.globe-svg .meridian-2 {
+    transform-origin: center;
+    animation: meridianPulse 8s ease-in-out infinite 2s;
+}
+
+.globe-svg .meridian-3 {
+    transform-origin: center;
+    animation: meridianPulse 8s ease-in-out infinite 4s;
+}
+
+@keyframes meridianPulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
 .welcome-container {
     width: 90%;
     max-width: 900px;
@@ -1303,7 +1374,7 @@ header h1 .tagline {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    overflow: hidden;
+    overflow: visible;
     padding: 12px;
     position: relative;
 }
@@ -1838,6 +1909,27 @@ header h1 .tagline {
     margin-top: 8px;
     text-transform: uppercase;
     letter-spacing: 1px;
+}
+
+/* Agent status indicator */
+.agent-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.agent-status-dot.online {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green);
+}
+
+.agent-status-dot.offline {
+    background: var(--accent-red);
+}
+
+.agent-status-dot.unknown {
+    background: #666;
 }
 
 .header-controls {
@@ -3143,117 +3235,518 @@ header h1 .tagline {
     background: var(--text-dim);
 }
 
-/* WiFi Layout Container - side by side layout */
+/* WiFi Layout Container - 3-column layout */
 .wifi-layout-container {
     display: flex;
-    gap: 15px;
+    flex-direction: column;
+    gap: 10px;
     padding: 15px;
     background: var(--bg-secondary);
     margin: 0 15px 10px 15px;
     border: 1px solid var(--border-color);
-    height: calc(100vh - 200px); /* Take most of the available height */
+    height: calc(100vh - 200px);
     min-height: 400px;
-}
-
-/* WiFi Visualizations */
-.wifi-visuals {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    flex: 1;
-    overflow-y: auto;
-    padding-right: 10px;
-}
-
-/* WiFi Device List (right column) */
-.wifi-device-list {
-    width: 350px;
-    min-width: 300px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
+    box-sizing: border-box;
     overflow: hidden;
 }
 
-.wifi-device-list-header {
+/* WiFi Status Bar */
+.wifi-status-bar {
+    display: flex;
+    gap: 20px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.wifi-status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.wifi-status-label {
+    color: var(--text-dim);
+}
+
+.wifi-status-value {
+    color: var(--accent-cyan);
+    font-weight: 600;
+}
+
+.wifi-status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+}
+
+.wifi-status-indicator.idle { background: #666; }
+.wifi-status-indicator.scanning { background: var(--accent-green); animation: pulse 1s infinite; }
+.wifi-status-indicator.error { background: var(--accent-red); }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* WiFi Main Content - 3 columns */
+.wifi-main-content {
+    display: grid;
+    grid-template-columns: 1fr minmax(240px, 280px) minmax(240px, 280px);
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* WiFi Networks Panel (LEFT) */
+.wifi-networks-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.wifi-networks-header {
     padding: 10px 12px;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.wifi-device-list-header h5 {
+.wifi-networks-header h5 {
     margin: 0;
     color: var(--accent-cyan);
     font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.wifi-device-list-header .device-count {
+.wifi-network-filters {
+    display: flex;
+    gap: 4px;
+}
+
+.wifi-filter-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
     color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wifi-filter-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.wifi-filter-btn.active {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+.wifi-networks-table-wrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.wifi-networks-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 11px;
 }
 
-.wifi-device-list-content {
+.wifi-networks-table thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-tertiary);
+    z-index: 1;
+}
+
+.wifi-networks-table th {
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.wifi-networks-table th:hover {
+    color: var(--accent-cyan);
+}
+
+.wifi-networks-table th.sortable::after {
+    content: ' \2195';
+    opacity: 0.3;
+}
+
+.wifi-networks-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.wifi-network-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.wifi-network-row:hover {
+    background: rgba(0, 255, 255, 0.05);
+}
+
+.wifi-network-row.selected {
+    background: rgba(0, 255, 255, 0.1);
+    border-left: 2px solid var(--accent-cyan);
+}
+
+.wifi-network-row .essid {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.wifi-network-row .badge {
+    display: inline-block;
+    padding: 2px 5px;
+    font-size: 9px;
+    border-radius: 3px;
+    margin-left: 6px;
+}
+
+.wifi-network-row .badge-hidden {
+    background: rgba(255, 165, 0, 0.2);
+    color: var(--accent-orange);
+}
+
+.wifi-network-row .badge-new {
+    background: rgba(0, 255, 0, 0.2);
+    color: var(--accent-green);
+}
+
+.wifi-network-row .rssi-value {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.wifi-network-row .rssi-value.signal-strong { color: var(--accent-green); }
+.wifi-network-row .rssi-value.signal-medium { color: var(--accent-yellow); }
+.wifi-network-row .rssi-value.signal-weak { color: var(--accent-orange); }
+.wifi-network-row .rssi-value.signal-very-weak { color: var(--accent-red); }
+
+.wifi-network-row .security-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 9px;
+    border-radius: 3px;
+}
+
+.wifi-network-row .security-badge.security-wpa3 { background: rgba(0, 255, 0, 0.15); color: var(--accent-green); }
+.wifi-network-row .security-badge.security-wpa { background: rgba(0, 255, 255, 0.15); color: var(--accent-cyan); }
+.wifi-network-row .security-badge.security-wep { background: rgba(255, 165, 0, 0.15); color: var(--accent-orange); }
+.wifi-network-row .security-badge.security-open { background: rgba(255, 0, 0, 0.15); color: var(--accent-red); }
+
+.wifi-network-placeholder td {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.wifi-network-placeholder .placeholder-text {
+    color: var(--text-dim);
+}
+
+/* WiFi Radar Panel (CENTER) */
+.wifi-radar-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.wifi-radar-panel h5 {
+    margin: 0 0 10px 0;
+    color: var(--accent-cyan);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wifi-radar-container {
     flex: 1;
-    overflow-y: auto;
-    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
 }
 
-/* WiFi network cards in device list - more compact */
-.wifi-network-card {
-    margin-bottom: 8px;
-    padding: 10px !important;
+.wifi-zone-summary {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 12px;
 }
 
-.wifi-network-card .header {
-    font-size: 12px;
+.wifi-zone {
+    text-align: center;
 }
 
-/* WiFi client cards in device list */
-.wifi-client-card {
-    margin-bottom: 8px;
-    padding: 10px !important;
-    border-left-color: var(--accent-purple) !important;
-    background: rgba(153, 51, 255, 0.05);
+.wifi-zone-count {
+    display: block;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
 }
 
-.wifi-client-card .header {
-    font-size: 12px;
-}
-
-.wifi-client-card .sensor-data {
+.wifi-zone-label {
     font-size: 10px;
+    color: var(--text-dim);
 }
 
-.wifi-network-card .sensor-data {
+.wifi-zone.near .wifi-zone-count { color: var(--accent-green); }
+.wifi-zone.mid .wifi-zone-count { color: var(--accent-yellow); }
+.wifi-zone.far .wifi-zone-count { color: var(--accent-red); }
+
+/* WiFi Analysis Panel (RIGHT) */
+.wifi-analysis-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.wifi-channel-section,
+.wifi-security-section {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.wifi-channel-section {
+    flex: 1;
+}
+
+.wifi-channel-section h5,
+.wifi-security-section h5 {
+    margin: 0 0 10px 0;
+    color: var(--accent-cyan);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wifi-channel-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.channel-band-tab {
+    flex: 1;
+    padding: 6px 10px;
     font-size: 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.wifi-network-card .preset-btn {
-    font-size: 9px !important;
-    padding: 3px 6px !important;
+.channel-band-tab:hover {
+    background: var(--bg-secondary);
+}
+
+.channel-band-tab.active {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+.wifi-channel-chart {
+    min-height: 120px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.wifi-security-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wifi-security-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.wifi-security-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.wifi-security-item.wpa3 .wifi-security-dot { background: var(--accent-green); }
+.wifi-security-item.wpa2 .wifi-security-dot { background: var(--accent-cyan); }
+.wifi-security-item.wep .wifi-security-dot { background: var(--accent-orange); }
+.wifi-security-item.open .wifi-security-dot { background: var(--accent-red); }
+
+.wifi-security-count {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* WiFi Detail Drawer */
+.wifi-detail-drawer {
+    display: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.wifi-detail-drawer.open {
+    display: block;
+}
+
+.wifi-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wifi-detail-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wifi-detail-essid {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.wifi-detail-bssid {
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--text-dim);
+}
+
+.wifi-detail-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.wifi-detail-close:hover {
+    color: var(--accent-red);
+}
+
+.wifi-detail-content {
+    padding: 15px;
+}
+
+.wifi-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+.wifi-detail-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.wifi-detail-stat .label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.wifi-detail-stat .value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.wifi-detail-clients {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.wifi-detail-clients h6 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+}
+
+/* WiFi Responsive */
+@media (max-width: 1400px) {
+    .wifi-main-content {
+        grid-template-columns: 1fr 240px 240px;
+    }
 }
 
 @media (max-width: 1200px) {
     .wifi-layout-container {
-        flex-direction: column;
         height: auto;
         max-height: calc(100vh - 200px);
     }
 
-    .wifi-visuals {
-        grid-template-columns: 1fr;
-        max-height: 50vh;
+    .wifi-main-content {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
     }
 
-    .wifi-device-list {
-        width: 100%;
-        min-width: auto;
+    .wifi-networks-panel {
+        grid-column: span 2;
         max-height: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .wifi-main-content {
+        grid-template-columns: 1fr;
+    }
+
+    .wifi-networks-panel {
+        grid-column: span 1;
+    }
+
+    .wifi-detail-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -3269,8 +3762,256 @@ header h1 .tagline {
     min-height: 400px;
 }
 
-.bt-layout-container .wifi-visuals {
+.bt-visuals-column {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.bt-main-area {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+}
+
+.bt-side-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.bt-side-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.bt-radar-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.bt-radar-panel #btProximityRadar {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Bluetooth Device Detail Panel */
+.bt-detail-panel {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    flex-shrink: 0;
+    height: 140px;
+    overflow: hidden;
+}
+
+.bt-detail-panel .bt-detail-header {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.bt-detail-panel .bt-detail-header h5 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.bt-detail-body {
+    padding: 8px 10px;
+    height: calc(100% - 30px);
+}
+
+.bt-detail-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.bt-detail-content {
+    height: 100%;
+}
+
+.bt-detail-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.bt-detail-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.bt-detail-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bt-detail-address {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #00d4ff;
+}
+
+.bt-detail-rssi-display {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.bt-detail-rssi-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.bt-detail-rssi-unit {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+.bt-detail-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.bt-detail-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.bt-detail-badge.ble {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+.bt-detail-badge.classic {
+    background: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
+}
+
+.bt-detail-badge.new {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+.bt-detail-badge.baseline {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.bt-detail-badge.flag {
+    background: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+}
+
+.bt-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.bt-detail-stat {
+    background: var(--bg-secondary);
+    padding: 4px 6px;
+    border-radius: 3px;
+    min-width: 0;
+}
+
+.bt-detail-stat-label {
+    display: block;
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.bt-detail-stat-value {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bt-detail-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bt-detail-services {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.bt-detail-services-list {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bt-detail-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.bt-detail-btn:hover {
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+    color: #000;
+}
+
+/* Selected device highlight */
+.bt-device-row.selected {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--accent-cyan);
 }
 
 .bt-device-list {
@@ -3281,100 +4022,419 @@ header h1 .tagline {
     color: var(--accent-purple);
 }
 
-/* Bluetooth Device Type Overview */
-.bt-type-overview {
+/* Bluetooth Device Filters */
+.bt-device-filters {
     display: flex;
-    flex-direction: column;
     gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.bt-filter-btn {
+    padding: 5px 12px;
     font-size: 11px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.bt-type-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
-    background: rgba(0,0,0,0.2);
-    border-radius: 3px;
+.bt-filter-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
-.bt-type-icon {
-    font-size: 14px;
+.bt-filter-btn.active {
+    background: var(--accent-purple);
+    border-color: var(--accent-purple);
+    color: white;
 }
 
 /* Bluetooth Signal Distribution */
 .bt-signal-dist {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    font-size: 10px;
+    gap: 12px;
+    font-size: 11px;
+    padding: 4px 0;
 }
 
 .signal-range {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .signal-range span:first-child {
-    width: 70px;
+    width: 80px;
     color: var(--text-dim);
+    font-size: 10px;
 }
 
 .signal-range span:last-child {
-    width: 20px;
+    width: 28px;
     text-align: right;
+    font-weight: 600;
+    font-size: 12px;
 }
 
 .signal-bar-bg {
     flex: 1;
-    height: 8px;
+    height: 16px;
     background: var(--bg-tertiary);
     border-radius: 4px;
     overflow: hidden;
 }
 
-.signal-bar {
+.bt-signal-dist .signal-bar {
+    width: auto;
     height: 100%;
     border-radius: 4px;
     transition: width 0.3s ease;
 }
 
-.signal-bar.strong {
-    background: var(--accent-green);
+.bt-signal-dist .signal-bar.strong {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
 }
 
-.signal-bar.medium {
-    background: var(--accent-orange);
+.bt-signal-dist .signal-bar.medium {
+    background: linear-gradient(90deg, #eab308, #ca8a04);
 }
 
-.signal-bar.weak {
-    background: var(--accent-red);
+.bt-signal-dist .signal-bar.weak {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
 }
 
-/* Bluetooth Device Cards */
-.bt-device-card {
-    margin-bottom: 8px;
-    padding: 10px !important;
-    border-left-color: var(--accent-purple) !important;
+/* Bluetooth Device Row - Compact Design */
+.bt-device-row {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #666;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
 
-.bt-device-card .header {
-    font-size: 12px;
+.bt-device-row:hover {
+    background: rgba(0, 212, 255, 0.05);
+    border-color: var(--accent-cyan);
 }
 
-.bt-device-card .sensor-data {
+.bt-row-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.bt-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.bt-row-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.bt-proto-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+}
+
+.bt-proto-badge.ble {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.bt-proto-badge.classic {
+    background: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.bt-device-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bt-rssi-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bt-rssi-bar-bg {
+    width: 50px;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bt-rssi-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.bt-rssi-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 28px;
+    text-align: right;
+}
+
+.bt-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.bt-status-dot.new {
+    background: #3b82f6;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}
+
+.bt-status-dot.known {
+    background: #22c55e;
+}
+
+.bt-row-secondary {
     font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    padding-left: 42px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.bt-device-card.tracker {
-    border-left-color: var(--accent-orange) !important;
-    background: rgba(255, 165, 0, 0.05);
+/* Bluetooth Device Modal */
+.bt-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
 }
 
-.bt-device-card.findmy {
-    border-left-color: #007aff !important;
-    background: rgba(0, 122, 255, 0.05);
+.bt-modal {
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #333);
+    background: var(--bg-tertiary, #141428);
+}
+
+.bt-modal-header h4 {
+    margin: 0;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.bt-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim, #666);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.bt-modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.bt-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: calc(85vh - 60px);
+}
+
+.bt-modal-section {
+    margin-bottom: 16px;
+}
+
+.bt-modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.bt-modal-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim, #666);
+    margin-bottom: 8px;
+}
+
+.bt-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.bt-modal-stat {
+    background: var(--bg-tertiary, #141428);
+    padding: 10px 12px;
+    border-radius: 6px;
+}
+
+.bt-modal-stat-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-dim, #666);
+    margin-bottom: 4px;
+}
+
+.bt-modal-stat-value {
+    font-size: 13px;
+    color: var(--text-primary, #e0e0e0);
+    font-family: monospace;
+}
+
+.bt-modal-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+.bt-modal-badge.ble {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.bt-modal-badge.classic {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.bt-modal-badge.new {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.bt-modal-badge.baseline {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.bt-modal-badge.flag {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+}
+
+.bt-modal-rssi {
+    text-align: center;
+    padding: 16px;
+    background: var(--bg-tertiary, #141428);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.bt-modal-rssi-value {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: monospace;
+}
+
+.bt-modal-rssi-label {
+    font-size: 11px;
+    color: var(--text-dim, #666);
+    margin-top: 4px;
+}
+
+.bt-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.bt-modal-actions button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bt-modal-btn-primary {
+    background: var(--accent-cyan, #00d4ff);
+    border: none;
+    color: #000;
+    font-weight: 600;
+}
+
+.bt-modal-btn-primary:hover {
+    background: #00b8e6;
+}
+
+.bt-modal-btn-secondary {
+    background: var(--bg-tertiary, #141428);
+    border: 1px solid var(--border-color, #333);
+    color: var(--text-primary, #e0e0e0);
+}
+
+.bt-modal-btn-secondary:hover {
+    background: var(--bg-secondary, #1a1a2e);
 }
 
 @media (max-width: 1200px) {

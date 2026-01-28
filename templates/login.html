@@ -10,6 +10,31 @@
   </head>
   <body>
     <div class="landing-overlay">
+      <!-- Spinning Globe Background -->
+      <div class="globe-background">
+        <svg class="globe-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer circle -->
+          <circle cx="200" cy="200" r="180" fill="none" stroke="currentColor" stroke-width="0.5"/>
+          <!-- Equator -->
+          <ellipse cx="200" cy="200" rx="180" ry="40" fill="none" stroke="currentColor" stroke-width="0.5"/>
+          <!-- Latitude lines -->
+          <ellipse cx="200" cy="140" rx="145" ry="30" fill="none" stroke="currentColor" stroke-width="0.3"/>
+          <ellipse cx="200" cy="260" rx="145" ry="30" fill="none" stroke="currentColor" stroke-width="0.3"/>
+          <ellipse cx="200" cy="90" rx="85" ry="15" fill="none" stroke="currentColor" stroke-width="0.3"/>
+          <ellipse cx="200" cy="310" rx="85" ry="15" fill="none" stroke="currentColor" stroke-width="0.3"/>
+          <!-- Prime meridian -->
+          <ellipse cx="200" cy="200" rx="40" ry="180" fill="none" stroke="currentColor" stroke-width="0.5" class="meridian meridian-1"/>
+          <!-- Additional meridians -->
+          <ellipse cx="200" cy="200" rx="100" ry="180" fill="none" stroke="currentColor" stroke-width="0.3" class="meridian meridian-2"/>
+          <ellipse cx="200" cy="200" rx="150" ry="180" fill="none" stroke="currentColor" stroke-width="0.3" class="meridian meridian-3"/>
+          <!-- Rotating meridian group -->
+          <g class="rotating-meridians">
+            <ellipse cx="200" cy="200" rx="70" ry="180" fill="none" stroke="currentColor" stroke-width="0.3"/>
+            <ellipse cx="200" cy="200" rx="130" ry="180" fill="none" stroke="currentColor" stroke-width="0.3"/>
+            <ellipse cx="200" cy="200" rx="170" ry="180" fill="none" stroke="currentColor" stroke-width="0.2"/>
+          </g>
+        </svg>
+      </div>
       <div class="landing-scanline"></div>
 
       <div class="landing-content">

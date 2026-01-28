@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADS-B History // INTERCEPT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/adsb_history.css') }}">
+</head>
+<body>
+    <div class="radar-bg"></div>
+    <div class="scanline"></div>
+
+    <header class="header">
+        <div class="logo">
+            ADS-B HISTORY
+            <span>// INTERCEPT REPORTING</span>
+        </div>
+        <div class="status-bar">
+            <a href="/adsb/dashboard" class="back-link">Live Radar</a>
+        </div>
+    </header>
+
+    <main class="history-shell">
+        <section class="summary-strip">
+            <div class="summary-card">
+                <div class="summary-label">Messages</div>
+                <div class="summary-value" id="summaryMessages">--</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Snapshots</div>
+                <div class="summary-value" id="summarySnapshots">--</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Aircraft</div>
+                <div class="summary-value" id="summaryAircraft">--</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">First Seen</div>
+                <div class="summary-value" id="summaryFirstSeen">--</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Last Seen</div>
+                <div class="summary-value" id="summaryLastSeen">--</div>
+            </div>
+        </section>
+
+        <section class="session-strip">
+            <div class="session-status">
+                <div class="status-dot" id="sessionStatusDot"></div>
+                <div>
+                    <div class="session-label">Tracking</div>
+                    <div class="session-value" id="sessionStatusText">--</div>
+                </div>
+            </div>
+            <div class="session-metric">
+                <div class="session-label">Uptime</div>
+                <div class="session-value mono" id="sessionUptime">--:--:--</div>
+            </div>
+            <div class="session-metric">
+                <div class="session-label">Started</div>
+                <div class="session-value" id="sessionStartedAt">--</div>
+            </div>
+            <div class="session-metric">
+                <div class="session-label">Status</div>
+                <div class="session-value" id="sessionNotice">Ready</div>
+            </div>
+            <div class="session-controls">
+                <select id="sessionDeviceSelect"></select>
+                <button class="primary-btn" id="sessionToggleBtn" type="button" onclick="toggleSession()">Start Tracking</button>
+            </div>
+        </section>
+
+        <section class="controls">
+            <div class="control-group">
+                <label for="windowSelect">Window</label>
+                <select id="windowSelect">
+                    <option value="15">15 minutes</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="360">6 hours</option>
+                    <option value="1440">24 hours</option>
+                    <option value="10080">7 days</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="searchInput">Search</label>
+                <input type="text" id="searchInput" placeholder="ICAO / callsign / registration">
+            </div>
+            <div class="control-group">
+                <label for="limitSelect">Limit</label>
+                <select id="limitSelect">
+                    <option value="100">100</option>
+                    <option value="200" selected>200</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                </select>
+            </div>
+            <button class="primary-btn" id="refreshBtn">Refresh</button>
+            <div class="status-pill" id="historyStatus">
+                {% if history_enabled %}
+                HISTORY ONLINE
+                {% else %}
+                HISTORY DISABLED
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <div class="panel aircraft-panel">
+                <div class="panel-header">
+                    <span>RECENT AIRCRAFT</span>
+                    <span class="panel-meta" id="aircraftCount">0</span>
+                </div>
+                <div class="panel-body">
+                    <table class="aircraft-table">
+                        <thead>
+                            <tr>
+                                <th>ICAO</th>
+                                <th>Callsign</th>
+                                <th>Alt</th>
+                                <th>Speed</th>
+                                <th>Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aircraftTableBody">
+                            <tr class="empty-row">
+                                <td colspan="5">No aircraft in this window</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel detail-panel">
+                <div class="panel-header">
+                    <span>DETAIL TIMELINE</span>
+                    <span class="panel-meta" id="detailIcao">--</span>
+                </div>
+                <div class="panel-body">
+                    <div class="detail-card">
+                        <div class="detail-title" id="detailTitle">Select an aircraft</div>
+                        <div class="detail-meta" id="detailMeta">---</div>
+                    </div>
+                    <div class="chart-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">Altitude (ft)</div>
+                            <canvas id="altitudeChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Speed (kt)</div>
+                            <canvas id="speedChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Heading (deg)</div>
+                            <canvas id="headingChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Vertical Rate (fpm)</div>
+                            <canvas id="verticalChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="timeline-list" id="timelineList">
+                        <div class="empty-row">No timeline data</div>
+                    </div>
+                    <div class="squawk-list" id="squawkList">
+                        <div class="empty-row">No squawk changes</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="modal-backdrop" id="aircraftModalBackdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true">
+            <button class="modal-close" id="aircraftModalClose" aria-label="Close">×</button>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="modalTitle">Aircraft</div>
+                    <div class="modal-subtitle" id="modalSubtitle">--</div>
+                </div>
+                <div class="modal-actions">
+                    <button class="nav-btn" id="modalPrev">◀</button>
+                    <button class="nav-btn" id="modalNext">▶</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="modal-photo">
+                    <img id="modalPhoto" alt="Aircraft photo">
+                    <div class="photo-fallback" id="modalPhotoFallback">No photo</div>
+                </div>
+                <div class="modal-details">
+                    <div class="detail-row">
+                        <span>ICAO</span>
+                        <strong id="modalIcao">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Callsign</span>
+                        <strong id="modalCallsign">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Registration</span>
+                        <strong id="modalRegistration">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Type</span>
+                        <strong id="modalType">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Altitude</span>
+                        <strong id="modalAltitude">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Speed</span>
+                        <strong id="modalSpeed">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Heading</span>
+                        <strong id="modalHeading">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Vertical Rate</span>
+                        <strong id="modalVerticalRate">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Squawk</span>
+                        <strong id="modalSquawk">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Position</span>
+                        <strong id="modalPosition">--</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Last Seen</span>
+                        <strong id="modalLastSeen">--</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const historyEnabled = {{ 'true' if history_enabled else 'false' }};
+
+        const summaryMessages = document.getElementById('summaryMessages');
+        const summarySnapshots = document.getElementById('summarySnapshots');
+        const summaryAircraft = document.getElementById('summaryAircraft');
+        const summaryFirstSeen = document.getElementById('summaryFirstSeen');
+        const summaryLastSeen = document.getElementById('summaryLastSeen');
+        const aircraftTableBody = document.getElementById('aircraftTableBody');
+        const aircraftCount = document.getElementById('aircraftCount');
+        const detailIcao = document.getElementById('detailIcao');
+        const detailTitle = document.getElementById('detailTitle');
+        const detailMeta = document.getElementById('detailMeta');
+        const timelineList = document.getElementById('timelineList');
+        const squawkList = document.getElementById('squawkList');
+        const altitudeChart = document.getElementById('altitudeChart');
+        const speedChart = document.getElementById('speedChart');
+        const headingChart = document.getElementById('headingChart');
+        const verticalChart = document.getElementById('verticalChart');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const sessionStatusDot = document.getElementById('sessionStatusDot');
+        const sessionStatusText = document.getElementById('sessionStatusText');
+        const sessionUptime = document.getElementById('sessionUptime');
+        const sessionStartedAt = document.getElementById('sessionStartedAt');
+        const sessionNotice = document.getElementById('sessionNotice');
+        const sessionDeviceSelect = document.getElementById('sessionDeviceSelect');
+        const sessionToggleBtn = document.getElementById('sessionToggleBtn');
+
+        const windowSelect = document.getElementById('windowSelect');
+        const searchInput = document.getElementById('searchInput');
+        const limitSelect = document.getElementById('limitSelect');
+
+        let selectedIcao = '';
+        let sessionStartAt = null;
+        let sessionTimer = null;
+        let recentAircraft = [];
+        let selectedIndex = -1;
+        const photoCache = new Map();
+        const modalBackdrop = document.getElementById('aircraftModalBackdrop');
+        const modalClose = document.getElementById('aircraftModalClose');
+        const modalPrev = document.getElementById('modalPrev');
+        const modalNext = document.getElementById('modalNext');
+
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
+        const modalPhoto = document.getElementById('modalPhoto');
+        const modalPhotoFallback = document.getElementById('modalPhotoFallback');
+        const modalIcao = document.getElementById('modalIcao');
+        const modalCallsign = document.getElementById('modalCallsign');
+        const modalRegistration = document.getElementById('modalRegistration');
+        const modalType = document.getElementById('modalType');
+        const modalAltitude = document.getElementById('modalAltitude');
+        const modalSpeed = document.getElementById('modalSpeed');
+        const modalHeading = document.getElementById('modalHeading');
+        const modalVerticalRate = document.getElementById('modalVerticalRate');
+        const modalSquawk = document.getElementById('modalSquawk');
+        const modalPosition = document.getElementById('modalPosition');
+        const modalLastSeen = document.getElementById('modalLastSeen');
+
+        function formatNumber(value) {
+            if (value === null || value === undefined) {
+                return '--';
+            }
+            return Number(value).toLocaleString();
+        }
+
+        function formatTime(value) {
+            if (!value) {
+                return '--';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return '--';
+            }
+            return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function formatDateTime(value) {
+            if (!value) {
+                return '--';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return '--';
+            }
+            return date.toLocaleString();
+        }
+
+        function valueOrDash(value) {
+            if (value === null || value === undefined || value === '') {
+                return '--';
+            }
+            return value;
+        }
+
+        function formatUptime(seconds) {
+            if (seconds === null || seconds === undefined) {
+                return '--:--:--';
+            }
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function loadSummary() {
+            const sinceMinutes = windowSelect.value;
+            const resp = await fetch(`/adsb/history/summary?since_minutes=${sinceMinutes}`);
+            if (!resp.ok) {
+                return;
+            }
+            const data = await resp.json();
+            summaryMessages.textContent = formatNumber(data.message_count);
+            summarySnapshots.textContent = formatNumber(data.snapshot_count);
+            summaryAircraft.textContent = formatNumber(data.aircraft_count);
+            summaryFirstSeen.textContent = formatTime(data.first_seen);
+            summaryLastSeen.textContent = formatTime(data.last_seen);
+        }
+
+        async function loadAircraft() {
+            const sinceMinutes = windowSelect.value;
+            const limit = limitSelect.value;
+            const search = encodeURIComponent(searchInput.value.trim());
+            const resp = await fetch(`/adsb/history/aircraft?since_minutes=${sinceMinutes}&limit=${limit}&search=${search}`);
+            if (!resp.ok) {
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">History database unavailable</td></tr>';
+                return;
+            }
+            const data = await resp.json();
+            const rows = data.aircraft || [];
+            recentAircraft = rows;
+            aircraftCount.textContent = rows.length;
+            if (!rows.length) {
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">No aircraft in this window</td></tr>';
+                return;
+            }
+            aircraftTableBody.innerHTML = rows.map(row => `
+                <tr class="aircraft-row" data-icao="${row.icao}">
+                    <td class="mono">${row.icao}</td>
+                    <td>${valueOrDash(row.callsign)}</td>
+                    <td>${valueOrDash(row.altitude)}</td>
+                    <td>${valueOrDash(row.speed)}</td>
+                    <td>${formatTime(row.last_seen)}</td>
+                </tr>
+            `).join('');
+
+            document.querySelectorAll('.aircraft-row').forEach((row, index) => {
+                row.addEventListener('click', () => {
+                    selectAircraft(row.dataset.icao);
+                    openModal(index);
+                });
+            });
+        }
+
+        async function selectAircraft(icao) {
+            selectedIcao = icao;
+            detailIcao.textContent = icao || '--';
+            if (!icao) {
+                detailTitle.textContent = 'Select an aircraft';
+                detailMeta.textContent = '---';
+                timelineList.innerHTML = '<div class="empty-row">No timeline data</div>';
+                squawkList.innerHTML = '<div class="empty-row">No squawk changes</div>';
+                drawMetricChart(altitudeChart, [], 'altitude', 'Altitude', 'ft');
+                drawMetricChart(speedChart, [], 'speed', 'Speed', 'kt');
+                drawMetricChart(headingChart, [], 'heading', 'Heading', 'deg');
+                drawMetricChart(verticalChart, [], 'vertical_rate', 'Vertical Rate', 'fpm');
+                return;
+            }
+            await loadTimeline(icao);
+        }
+
+        async function loadTimeline(icao) {
+            const sinceMinutes = windowSelect.value;
+            const resp = await fetch(`/adsb/history/timeline?icao=${icao}&since_minutes=${sinceMinutes}`);
+            if (!resp.ok) {
+                timelineList.innerHTML = '<div class="empty-row">Timeline unavailable</div>';
+                return;
+            }
+            const data = await resp.json();
+            const timeline = data.timeline || [];
+            if (!timeline.length) {
+                timelineList.innerHTML = '<div class="empty-row">No timeline data</div>';
+                squawkList.innerHTML = '<div class="empty-row">No squawk changes</div>';
+                drawMetricChart(altitudeChart, [], 'altitude', 'Altitude', 'ft');
+                drawMetricChart(speedChart, [], 'speed', 'Speed', 'kt');
+                drawMetricChart(headingChart, [], 'heading', 'Heading', 'deg');
+                drawMetricChart(verticalChart, [], 'vertical_rate', 'Vertical Rate', 'fpm');
+                return;
+            }
+            const latest = timeline[timeline.length - 1];
+            detailTitle.textContent = `${icao} Timeline`;
+            detailMeta.textContent = `Alt ${valueOrDash(latest.altitude)} ft | Spd ${valueOrDash(latest.speed)} kt | Head ${valueOrDash(latest.heading)}`;
+            timelineList.innerHTML = timeline.slice(-30).reverse().map(point => `
+                <div class="timeline-row">
+                    <span>${formatTime(point.captured_at)}</span>
+                    <span>Alt ${valueOrDash(point.altitude)} ft</span>
+                    <span>Spd ${valueOrDash(point.speed)} kt</span>
+                    <span>Hdg ${valueOrDash(point.heading)}</span>
+                    <span>V/S ${valueOrDash(point.vertical_rate)} fpm</span>
+                </div>
+            `).join('');
+            updateSquawkChanges(timeline);
+            drawMetricChart(altitudeChart, timeline, 'altitude', 'Altitude', 'ft');
+            drawMetricChart(speedChart, timeline, 'speed', 'Speed', 'kt');
+            drawMetricChart(headingChart, timeline, 'heading', 'Heading', 'deg');
+            drawMetricChart(verticalChart, timeline, 'vertical_rate', 'Vertical Rate', 'fpm');
+        }
+
+        function drawMetricChart(canvas, points, field, label, unit) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            ctx.clearRect(0, 0, width, height);
+
+            if (!points.length) {
+                ctx.fillStyle = 'rgba(156, 163, 175, 0.6)';
+                ctx.font = '12px "JetBrains Mono", monospace';
+                ctx.fillText(`No ${label.toLowerCase()} data`, 12, height / 2);
+                return;
+            }
+
+            const series = points.map(p => p[field]).filter(v => v !== null && v !== undefined);
+            if (!series.length) {
+                ctx.fillStyle = 'rgba(156, 163, 175, 0.6)';
+                ctx.font = '12px "JetBrains Mono", monospace';
+                ctx.fillText(`No ${label.toLowerCase()} data`, 12, height / 2);
+                return;
+            }
+
+            const minVal = Math.min(...series);
+            const maxVal = Math.max(...series);
+            const range = maxVal - minVal || 1;
+            const padding = 20;
+
+            ctx.strokeStyle = 'rgba(74, 158, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(74, 158, 255, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            let started = false;
+            const span = Math.max(1, points.length - 1);
+            points.forEach((point, index) => {
+                if (point[field] === null || point[field] === undefined) {
+                    return;
+                }
+                const x = padding + (index / span) * (width - padding * 2);
+                const y = height - padding - ((point[field] - minVal) / range) * (height - padding * 2);
+                if (!started) {
+                    ctx.moveTo(x, y);
+                    started = true;
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            if (started) {
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(226, 232, 240, 0.8)';
+            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.fillText(`${maxVal} ${unit}`, 12, padding);
+            ctx.fillText(`${minVal} ${unit}`, 12, height - padding);
+        }
+
+        function updateSquawkChanges(points) {
+            const changes = [];
+            let lastSquawk = null;
+            points.forEach(point => {
+                if (point.squawk && point.squawk !== lastSquawk) {
+                    changes.push({ time: point.captured_at, squawk: point.squawk });
+                    lastSquawk = point.squawk;
+                }
+            });
+            if (!changes.length) {
+                squawkList.innerHTML = '<div class="empty-row">No squawk changes</div>';
+                return;
+            }
+            squawkList.innerHTML = changes.slice(-10).reverse().map(change => `
+                <div class="timeline-row">
+                    <span>${formatTime(change.time)}</span>
+                    <span>Squawk ${change.squawk}</span>
+                </div>
+            `).join('');
+        }
+
+        async function loadSessionDevices() {
+            if (!historyEnabled) {
+                sessionDeviceSelect.innerHTML = '<option value="0">History disabled</option>';
+                sessionDeviceSelect.disabled = true;
+                sessionToggleBtn.disabled = true;
+                return;
+            }
+            const resp = await fetch('/devices');
+            if (!resp.ok) {
+                sessionDeviceSelect.innerHTML = '<option value="0">No SDR</option>';
+                return;
+            }
+            const devices = await resp.json();
+            sessionDeviceSelect.innerHTML = '';
+            if (!devices.length) {
+                sessionDeviceSelect.innerHTML = '<option value="0">No SDR</option>';
+                sessionDeviceSelect.disabled = true;
+                return;
+            }
+            devices.forEach((dev, idx) => {
+                const index = dev.index !== undefined ? dev.index : idx;
+                const type = (dev.sdr_type || dev.driver || 'RTL-SDR').toUpperCase();
+                const serial = dev.serial ? ` (${dev.serial.slice(-4)})` : '';
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = `${type} #${index}${serial}`;
+                sessionDeviceSelect.appendChild(opt);
+            });
+            sessionDeviceSelect.disabled = false;
+        }
+
+        async function loadSessionStatus() {
+            const resp = await fetch('/adsb/session');
+            if (!resp.ok) {
+                sessionStatusText.textContent = 'UNKNOWN';
+                sessionStatusDot.classList.remove('active');
+                sessionNotice.textContent = 'Session unavailable';
+                return;
+            }
+            const data = await resp.json();
+            if (data.tracking_active) {
+                sessionStatusText.textContent = 'TRACKING';
+                sessionStatusDot.classList.add('active');
+                sessionToggleBtn.textContent = 'Stop Tracking';
+                sessionToggleBtn.classList.add('stop');
+                sessionNotice.textContent = 'Live';
+            } else {
+                sessionStatusText.textContent = 'STANDBY';
+                sessionStatusDot.classList.remove('active');
+                sessionToggleBtn.textContent = 'Start Tracking';
+                sessionToggleBtn.classList.remove('stop');
+                sessionNotice.textContent = 'Idle';
+            }
+            if (data.session && data.session.started_at) {
+                sessionStartAt = new Date(data.session.started_at);
+                sessionStartedAt.textContent = formatDateTime(data.session.started_at);
+                sessionUptime.textContent = formatUptime(data.uptime_seconds);
+            } else {
+                sessionStartAt = null;
+                sessionStartedAt.textContent = '--';
+                sessionUptime.textContent = '--:--:--';
+            }
+        }
+
+        function startSessionTimer() {
+            if (sessionTimer) {
+                clearInterval(sessionTimer);
+            }
+            sessionTimer = setInterval(() => {
+                if (!sessionStartAt) {
+                    sessionUptime.textContent = '--:--:--';
+                    return;
+                }
+                const seconds = Math.floor((Date.now() - sessionStartAt.getTime()) / 1000);
+                sessionUptime.textContent = formatUptime(seconds);
+            }, 1000);
+        }
+
+        async function toggleSession() {
+            if (!historyEnabled) {
+                return;
+            }
+            sessionToggleBtn.disabled = true;
+            sessionNotice.textContent = 'Working...';
+            if (sessionStatusText.textContent === 'TRACKING') {
+                const resp = await fetch('/adsb/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ source: 'adsb_history' })
+                });
+                if (!resp.ok) {
+                    sessionNotice.textContent = 'Stop failed';
+                }
+            } else {
+                const device = parseInt(sessionDeviceSelect.value, 10) || 0;
+                const resp = await fetch('/adsb/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ device, source: 'adsb_history' })
+                });
+                if (!resp.ok) {
+                    sessionNotice.textContent = 'Start failed';
+                }
+            }
+            await loadSessionStatus();
+            sessionToggleBtn.disabled = false;
+        }
+
+        async function openModal(index) {
+            if (index < 0 || index >= recentAircraft.length) {
+                return;
+            }
+            selectedIndex = index;
+            const ac = recentAircraft[index];
+            modalTitle.textContent = ac.callsign || ac.icao || 'Aircraft';
+            modalSubtitle.textContent = `${valueOrDash(ac.registration)} • ${valueOrDash(ac.type_code)}`;
+            modalIcao.textContent = valueOrDash(ac.icao);
+            modalCallsign.textContent = valueOrDash(ac.callsign);
+            modalRegistration.textContent = valueOrDash(ac.registration);
+            modalType.textContent = [ac.type_desc, ac.type_code].filter(Boolean).join(' • ') || '--';
+            modalAltitude.textContent = ac.altitude ? `${ac.altitude} ft` : '--';
+            modalSpeed.textContent = ac.speed ? `${ac.speed} kt` : '--';
+            modalHeading.textContent = ac.heading !== null && ac.heading !== undefined ? `${ac.heading}°` : '--';
+            modalVerticalRate.textContent = ac.vertical_rate ? `${ac.vertical_rate} fpm` : '--';
+            modalSquawk.textContent = valueOrDash(ac.squawk);
+            if (ac.lat !== null && ac.lat !== undefined && ac.lon !== null && ac.lon !== undefined) {
+                modalPosition.textContent = `${ac.lat.toFixed(4)}, ${ac.lon.toFixed(4)}`;
+            } else {
+                modalPosition.textContent = '--';
+            }
+            modalLastSeen.textContent = formatDateTime(ac.last_seen);
+
+            await loadPhoto(ac.registration);
+            modalBackdrop.classList.add('open');
+        }
+
+        function closeModal() {
+            modalBackdrop.classList.remove('open');
+        }
+
+        async function loadPhoto(registration) {
+            if (!registration) {
+                modalPhoto.style.display = 'none';
+                modalPhotoFallback.style.display = 'flex';
+                return;
+            }
+            if (photoCache.has(registration)) {
+                const url = photoCache.get(registration);
+                if (url) {
+                    modalPhoto.src = url;
+                    modalPhoto.style.display = 'block';
+                    modalPhotoFallback.style.display = 'none';
+                } else {
+                    modalPhoto.style.display = 'none';
+                    modalPhotoFallback.style.display = 'flex';
+                }
+                return;
+            }
+            try {
+                const resp = await fetch(`/adsb/aircraft-photo/${encodeURIComponent(registration)}`);
+                const data = await resp.json();
+                const url = data && data.thumbnail;
+                photoCache.set(registration, url || null);
+                if (url) {
+                    modalPhoto.src = url;
+                    modalPhoto.onerror = () => {
+                        modalPhoto.style.display = 'none';
+                        modalPhotoFallback.style.display = 'flex';
+                    };
+                    modalPhoto.style.display = 'block';
+                    modalPhotoFallback.style.display = 'none';
+                } else {
+                    modalPhoto.style.display = 'none';
+                    modalPhotoFallback.style.display = 'flex';
+                }
+            } catch (err) {
+                modalPhoto.style.display = 'none';
+                modalPhotoFallback.style.display = 'flex';
+            }
+        }
+
+        function moveModal(offset) {
+            const nextIndex = selectedIndex + offset;
+            if (nextIndex < 0 || nextIndex >= recentAircraft.length) {
+                return;
+            }
+            openModal(nextIndex);
+        }
+
+        async function refreshAll() {
+            if (!historyEnabled) {
+                return;
+            }
+            await Promise.all([loadSummary(), loadAircraft(), loadSessionStatus()]);
+            if (selectedIcao) {
+                await loadTimeline(selectedIcao);
+            }
+        }
+
+        refreshBtn.addEventListener('click', refreshAll);
+        windowSelect.addEventListener('change', refreshAll);
+        limitSelect.addEventListener('change', refreshAll);
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchInput._debounce);
+            searchInput._debounce = setTimeout(refreshAll, 350);
+        });
+
+        refreshAll();
+        loadSessionDevices();
+        startSessionTimer();
+        modalClose.addEventListener('click', closeModal);
+        modalBackdrop.addEventListener('click', (event) => {
+            if (event.target === modalBackdrop) {
+                closeModal();
+            }
+        });
+        modalPrev.addEventListener('click', () => moveModal(-1));
+        modalNext.addEventListener('click', () => moveModal(1));
+        window.addEventListener('resize', () => {
+            if (selectedIcao) {
+                loadTimeline(selectedIcao);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -10,11 +10,23 @@ import socket
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Any, Generator
 
 from flask import Blueprint, jsonify, request, Response, render_template
+from flask import make_response
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 import app as app_module
+from config import (
+    ADSB_DB_HOST,
+    ADSB_DB_NAME,
+    ADSB_DB_PASSWORD,
+    ADSB_DB_PORT,
+    ADSB_DB_USER,
+    ADSB_HISTORY_ENABLED,
+)
 from utils.logging import adsb_logger as logger
 from utils.validation import (
     validate_device_index, validate_gain,
@@ -37,6 +49,7 @@ from utils.constants import (
 )
 from utils import aircraft_db
 from utils.mqtt import mqtt_publish
+from utils.adsb_history import adsb_history_writer, adsb_snapshot_writer, _ensure_adsb_schema
 
 adsb_bp = Blueprint('adsb', __name__, url_prefix='/adsb')
 
@@ -73,6 +86,200 @@ DUMP1090_PATHS = [
 ]
 
 
+def _get_part(parts: list[str], index: int) -> str | None:
+    if len(parts) <= index:
+        return None
+    value = parts[index].strip()
+    return value or None
+
+
+def _parse_sbs_timestamp(date_str: str | None, time_str: str | None) -> datetime | None:
+    if not date_str or not time_str:
+        return None
+    combined = f"{date_str} {time_str}"
+    for fmt in ("%Y/%m/%d %H:%M:%S.%f", "%Y/%m/%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(combined, fmt)
+            return parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _build_history_record(
+    parts: list[str],
+    msg_type: str,
+    icao: str,
+    msg_time: datetime | None,
+    logged_time: datetime | None,
+    service_addr: str,
+    raw_line: str,
+) -> dict[str, Any]:
+    return {
+        'received_at': datetime.now(timezone.utc),
+        'msg_time': msg_time,
+        'logged_time': logged_time,
+        'icao': icao,
+        'msg_type': _parse_int(msg_type),
+        'callsign': _get_part(parts, 10),
+        'altitude': _parse_int(_get_part(parts, 11)),
+        'speed': _parse_int(_get_part(parts, 12)),
+        'heading': _parse_int(_get_part(parts, 13)),
+        'vertical_rate': _parse_int(_get_part(parts, 16)),
+        'lat': _parse_float(_get_part(parts, 14)),
+        'lon': _parse_float(_get_part(parts, 15)),
+        'squawk': _get_part(parts, 17),
+        'session_id': _get_part(parts, 2),
+        'aircraft_id': _get_part(parts, 3),
+        'flight_id': _get_part(parts, 5),
+        'raw_line': raw_line,
+        'source_host': service_addr,
+    }
+
+
+_history_schema_checked = False
+
+
+def _get_history_connection():
+    return psycopg2.connect(
+        host=ADSB_DB_HOST,
+        port=ADSB_DB_PORT,
+        dbname=ADSB_DB_NAME,
+        user=ADSB_DB_USER,
+        password=ADSB_DB_PASSWORD,
+    )
+
+
+def _ensure_history_schema() -> None:
+    global _history_schema_checked
+    if _history_schema_checked:
+        return
+    try:
+        with _get_history_connection() as conn:
+            _ensure_adsb_schema(conn)
+        _history_schema_checked = True
+    except Exception as exc:
+        logger.warning("ADS-B schema check failed: %s", exc)
+
+
+def _parse_int_param(value: str | None, default: int, min_value: int | None = None, max_value: int | None = None) -> int:
+    try:
+        parsed = int(value) if value is not None else default
+    except (ValueError, TypeError):
+        parsed = default
+    if min_value is not None:
+        parsed = max(min_value, parsed)
+    if max_value is not None:
+        parsed = min(max_value, parsed)
+    return parsed
+
+
+def _get_active_session() -> dict[str, Any] | None:
+    if not ADSB_HISTORY_ENABLED:
+        return None
+    _ensure_history_schema()
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM adsb_sessions
+                    WHERE ended_at IS NULL
+                    ORDER BY started_at DESC
+                    LIMIT 1
+                    """
+                )
+                return cur.fetchone()
+    except Exception as exc:
+        logger.warning("ADS-B session lookup failed: %s", exc)
+        return None
+
+
+def _record_session_start(
+    *,
+    device_index: int | None,
+    sdr_type: str | None,
+    remote_host: str | None,
+    remote_port: int | None,
+    start_source: str | None,
+    started_by: str | None,
+) -> dict[str, Any] | None:
+    if not ADSB_HISTORY_ENABLED:
+        return None
+    _ensure_history_schema()
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO adsb_sessions (
+                        device_index,
+                        sdr_type,
+                        remote_host,
+                        remote_port,
+                        start_source,
+                        started_by
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING *
+                    """,
+                    (
+                        device_index,
+                        sdr_type,
+                        remote_host,
+                        remote_port,
+                        start_source,
+                        started_by,
+                    ),
+                )
+                return cur.fetchone()
+    except Exception as exc:
+        logger.warning("ADS-B session start record failed: %s", exc)
+        return None
+
+
+def _record_session_stop(*, stop_source: str | None, stopped_by: str | None) -> dict[str, Any] | None:
+    if not ADSB_HISTORY_ENABLED:
+        return None
+    _ensure_history_schema()
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    UPDATE adsb_sessions
+                    SET ended_at = NOW(),
+                        stop_source = COALESCE(%s, stop_source),
+                        stopped_by = COALESCE(%s, stopped_by)
+                    WHERE ended_at IS NULL
+                    RETURNING *
+                    """,
+                    (stop_source, stopped_by),
+                )
+                return cur.fetchone()
+    except Exception as exc:
+        logger.warning("ADS-B session stop record failed: %s", exc)
+        return None
+
 def find_dump1090():
     """Find dump1090 binary, checking PATH and common locations."""
     # First try PATH
@@ -104,6 +311,9 @@ def check_dump1090_service():
 def parse_sbs_stream(service_addr):
     """Parse SBS format data from dump1090 SBS port."""
     global adsb_using_service, adsb_connected, adsb_messages_received, adsb_last_message_time, adsb_bytes_received, adsb_lines_received, _sbs_error_logged
+
+    adsb_history_writer.start()
+    adsb_snapshot_writer.start()
 
     host, port = service_addr.split(':')
     port = int(port)
@@ -158,6 +368,19 @@ def parse_sbs_stream(service_addr):
                         icao = parts[4].upper()
                         if not icao:
                             continue
+
+                        msg_time = _parse_sbs_timestamp(_get_part(parts, 6), _get_part(parts, 7))
+                        logged_time = _parse_sbs_timestamp(_get_part(parts, 8), _get_part(parts, 9))
+                        history_record = _build_history_record(
+                            parts=parts,
+                            msg_type=msg_type,
+                            icao=icao,
+                            msg_time=msg_time,
+                            logged_time=logged_time,
+                            service_addr=service_addr,
+                            raw_line=line,
+                        )
+                        adsb_history_writer.enqueue(history_record)
 
                         aircraft = app_module.adsb_aircraft.get(icao) or {'icao': icao}
 
@@ -232,13 +455,30 @@ def parse_sbs_stream(service_addr):
                         if now - last_update >= ADSB_UPDATE_INTERVAL:
                             for update_icao in pending_updates:
                                 if update_icao in app_module.adsb_aircraft:
-                                    aircraft_data = app_module.adsb_aircraft[update_icao]
+                                    snapshot = app_module.adsb_aircraft[update_icao]
                                     app_module.adsb_queue.put({
                                         'type': 'aircraft',
-                                        **aircraft_data
+                                        **snapshot
                                     })
                                     # Publish to MQTT
-                                    mqtt_publish('adsb', aircraft_data)
+                                    mqtt_publish('adsb', snapshot)
+                                    adsb_snapshot_writer.enqueue({
+                                        'captured_at': datetime.now(timezone.utc),
+                                        'icao': update_icao,
+                                        'callsign': snapshot.get('callsign'),
+                                        'registration': snapshot.get('registration'),
+                                        'type_code': snapshot.get('type_code'),
+                                        'type_desc': snapshot.get('type_desc'),
+                                        'altitude': snapshot.get('altitude'),
+                                        'speed': snapshot.get('speed'),
+                                        'heading': snapshot.get('heading'),
+                                        'vertical_rate': snapshot.get('vertical_rate'),
+                                        'lat': snapshot.get('lat'),
+                                        'lon': snapshot.get('lon'),
+                                        'squawk': snapshot.get('squawk'),
+                                        'source_host': service_addr,
+                                        'snapshot': snapshot,
+                                    })
                             pending_updates.clear()
                             last_update = now
 
@@ -311,6 +551,24 @@ def adsb_status():
     })
 
 
+@adsb_bp.route('/session')
+def adsb_session():
+    """Get ADS-B session status and uptime."""
+    session = _get_active_session()
+    uptime_seconds = None
+    if session and session.get('started_at'):
+        started_at = session['started_at']
+        if isinstance(started_at, datetime):
+            uptime_seconds = int((datetime.now(timezone.utc) - started_at).total_seconds())
+    return jsonify({
+        'tracking_active': adsb_using_service,
+        'connected_to_sbs': adsb_connected,
+        'active_device': adsb_active_device,
+        'session': session,
+        'uptime_seconds': uptime_seconds,
+    })
+
+
 @adsb_bp.route('/start', methods=['POST'])
 def start_adsb():
     """Start ADS-B tracking."""
@@ -318,9 +576,16 @@ def start_adsb():
 
     with app_module.adsb_lock:
         if adsb_using_service:
-            return jsonify({'status': 'already_running', 'message': 'ADS-B tracking already active'}), 409
+            session = _get_active_session()
+            return jsonify({
+                'status': 'already_running',
+                'message': 'ADS-B tracking already active',
+                'session': session
+            }), 409
 
     data = request.json or {}
+    start_source = data.get('source')
+    started_by = request.remote_addr
 
     # Validate inputs
     try:
@@ -346,7 +611,19 @@ def start_adsb():
         adsb_using_service = True
         thread = threading.Thread(target=parse_sbs_stream, args=(remote_addr,), daemon=True)
         thread.start()
-        return jsonify({'status': 'started', 'message': f'Connected to remote dump1090 at {remote_addr}'})
+        session = _record_session_start(
+            device_index=device,
+            sdr_type='remote',
+            remote_host=remote_sbs_host,
+            remote_port=remote_sbs_port,
+            start_source=start_source,
+            started_by=started_by,
+        )
+        return jsonify({
+            'status': 'started',
+            'message': f'Connected to remote dump1090 at {remote_addr}',
+            'session': session
+        })
 
     # Check if dump1090 is already running externally (e.g., user started it manually)
     existing_service = check_dump1090_service()
@@ -355,7 +632,19 @@ def start_adsb():
         adsb_using_service = True
         thread = threading.Thread(target=parse_sbs_stream, args=(existing_service,), daemon=True)
         thread.start()
-        return jsonify({'status': 'started', 'message': 'Connected to existing dump1090 service'})
+        session = _record_session_start(
+            device_index=device,
+            sdr_type='external',
+            remote_host='localhost',
+            remote_port=ADSB_SBS_PORT,
+            start_source=start_source,
+            started_by=started_by,
+        )
+        return jsonify({
+            'status': 'started',
+            'message': 'Connected to existing dump1090 service',
+            'session': session
+        })
 
     # Get SDR type from request
     sdr_type_str = data.get('sdr_type', 'rtlsdr')
@@ -441,7 +730,20 @@ def start_adsb():
         thread = threading.Thread(target=parse_sbs_stream, args=(f'localhost:{ADSB_SBS_PORT}',), daemon=True)
         thread.start()
 
-        return jsonify({'status': 'started', 'message': 'ADS-B tracking started', 'device': device})
+        session = _record_session_start(
+            device_index=device,
+            sdr_type=sdr_type.value,
+            remote_host=None,
+            remote_port=None,
+            start_source=start_source,
+            started_by=started_by,
+        )
+        return jsonify({
+            'status': 'started',
+            'message': 'ADS-B tracking started',
+            'device': device,
+            'session': session
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
@@ -450,6 +752,9 @@ def start_adsb():
 def stop_adsb():
     """Stop ADS-B tracking."""
     global adsb_using_service, adsb_active_device
+    data = request.json or {}
+    stop_source = data.get('source')
+    stopped_by = request.remote_addr
 
     with app_module.adsb_lock:
         if app_module.adsb_process:
@@ -472,7 +777,8 @@ def stop_adsb():
 
     app_module.adsb_aircraft.clear()
     _looked_up_icaos.clear()
-    return jsonify({'status': 'stopped'})
+    session = _record_session_stop(stop_source=stop_source, stopped_by=stopped_by)
+    return jsonify({'status': 'stopped', 'session': session})
 
 
 @adsb_bp.route('/stream')
@@ -502,6 +808,161 @@ def stream_adsb():
 def adsb_dashboard():
     """Popout ADS-B dashboard."""
     return render_template('adsb_dashboard.html')
+
+
+@adsb_bp.route('/history')
+def adsb_history():
+    """ADS-B history reporting dashboard."""
+    resp = make_response(render_template('adsb_history.html', history_enabled=ADSB_HISTORY_ENABLED))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@adsb_bp.route('/history/summary')
+def adsb_history_summary():
+    """Summary stats for ADS-B history window."""
+    if not ADSB_HISTORY_ENABLED:
+        return jsonify({'error': 'ADS-B history is disabled'}), 503
+    _ensure_history_schema()
+
+    since_minutes = _parse_int_param(request.args.get('since_minutes'), 60, 1, 10080)
+    window = f'{since_minutes} minutes'
+
+    sql = """
+        SELECT
+            (SELECT COUNT(*) FROM adsb_messages WHERE received_at >= NOW() - INTERVAL %s) AS message_count,
+            (SELECT COUNT(*) FROM adsb_snapshots WHERE captured_at >= NOW() - INTERVAL %s) AS snapshot_count,
+            (SELECT COUNT(DISTINCT icao) FROM adsb_snapshots WHERE captured_at >= NOW() - INTERVAL %s) AS aircraft_count,
+            (SELECT MIN(captured_at) FROM adsb_snapshots WHERE captured_at >= NOW() - INTERVAL %s) AS first_seen,
+            (SELECT MAX(captured_at) FROM adsb_snapshots WHERE captured_at >= NOW() - INTERVAL %s) AS last_seen
+    """
+
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (window, window, window, window, window))
+                row = cur.fetchone() or {}
+        return jsonify(row)
+    except Exception as exc:
+        logger.warning("ADS-B history summary failed: %s", exc)
+        return jsonify({'error': 'History database unavailable'}), 503
+
+
+@adsb_bp.route('/history/aircraft')
+def adsb_history_aircraft():
+    """List latest aircraft snapshots for a time window."""
+    if not ADSB_HISTORY_ENABLED:
+        return jsonify({'error': 'ADS-B history is disabled'}), 503
+    _ensure_history_schema()
+
+    since_minutes = _parse_int_param(request.args.get('since_minutes'), 60, 1, 10080)
+    limit = _parse_int_param(request.args.get('limit'), 200, 1, 2000)
+    search = (request.args.get('search') or '').strip()
+    window = f'{since_minutes} minutes'
+    pattern = f'%{search}%'
+
+    sql = """
+        SELECT *
+        FROM (
+            SELECT DISTINCT ON (icao)
+                icao,
+                callsign,
+                registration,
+                type_code,
+                type_desc,
+                altitude,
+                speed,
+                heading,
+                vertical_rate,
+                lat,
+                lon,
+                squawk,
+                captured_at AS last_seen
+            FROM adsb_snapshots
+            WHERE captured_at >= NOW() - INTERVAL %s
+              AND (%s = '' OR icao ILIKE %s OR callsign ILIKE %s OR registration ILIKE %s)
+            ORDER BY icao, captured_at DESC
+        ) latest
+        ORDER BY last_seen DESC
+        LIMIT %s
+    """
+
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (window, search, pattern, pattern, pattern, limit))
+                rows = cur.fetchall()
+        return jsonify({'aircraft': rows, 'count': len(rows)})
+    except Exception as exc:
+        logger.warning("ADS-B history aircraft query failed: %s", exc)
+        return jsonify({'error': 'History database unavailable'}), 503
+
+
+@adsb_bp.route('/history/timeline')
+def adsb_history_timeline():
+    """Timeline snapshots for a specific aircraft."""
+    if not ADSB_HISTORY_ENABLED:
+        return jsonify({'error': 'ADS-B history is disabled'}), 503
+    _ensure_history_schema()
+
+    icao = (request.args.get('icao') or '').strip().upper()
+    if not icao:
+        return jsonify({'error': 'icao is required'}), 400
+
+    since_minutes = _parse_int_param(request.args.get('since_minutes'), 60, 1, 10080)
+    limit = _parse_int_param(request.args.get('limit'), 2000, 1, 20000)
+    window = f'{since_minutes} minutes'
+
+    sql = """
+        SELECT captured_at, altitude, speed, heading, vertical_rate, lat, lon, squawk
+        FROM adsb_snapshots
+        WHERE icao = %s
+          AND captured_at >= NOW() - INTERVAL %s
+        ORDER BY captured_at ASC
+        LIMIT %s
+    """
+
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (icao, window, limit))
+                rows = cur.fetchall()
+        return jsonify({'icao': icao, 'timeline': rows, 'count': len(rows)})
+    except Exception as exc:
+        logger.warning("ADS-B history timeline query failed: %s", exc)
+        return jsonify({'error': 'History database unavailable'}), 503
+
+
+@adsb_bp.route('/history/messages')
+def adsb_history_messages():
+    """Raw message history for a specific aircraft."""
+    if not ADSB_HISTORY_ENABLED:
+        return jsonify({'error': 'ADS-B history is disabled'}), 503
+    _ensure_history_schema()
+
+    icao = (request.args.get('icao') or '').strip().upper()
+    since_minutes = _parse_int_param(request.args.get('since_minutes'), 30, 1, 10080)
+    limit = _parse_int_param(request.args.get('limit'), 200, 1, 2000)
+    window = f'{since_minutes} minutes'
+
+    sql = """
+        SELECT received_at, msg_type, callsign, altitude, speed, heading, vertical_rate, lat, lon, squawk
+        FROM adsb_messages
+        WHERE received_at >= NOW() - INTERVAL %s
+          AND (%s = '' OR icao = %s)
+        ORDER BY received_at DESC
+        LIMIT %s
+    """
+
+    try:
+        with _get_history_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (window, icao, icao, limit))
+                rows = cur.fetchall()
+        return jsonify({'icao': icao, 'messages': rows, 'count': len(rows)})
+    except Exception as exc:
+        logger.warning("ADS-B history message query failed: %s", exc)
+        return jsonify({'error': 'History database unavailable'}), 503
 
 
 # ============================================

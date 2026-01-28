@@ -20,6 +20,17 @@
             <span>// INTERCEPT - See the Invisible</span>
         </div>
         <div class="status-bar">
+            <!-- Agent Selector -->
+            <div class="agent-selector-compact" id="agentSection">
+                <select id="agentSelect" class="agent-select-sm" title="Select signal source">
+                    <option value="local">Local</option>
+                </select>
+                <span class="agent-status-dot online" id="agentStatusDot"></span>
+                <label class="show-all-label" title="Show aircraft from all agents on map">
+                    <input type="checkbox" id="showAllAgents" onchange="toggleShowAllAgents()"> All
+                </label>
+            </div>
+            <a href="#" onclick="history.back(); return false;" class="back-link">Back</a>
             <a href="/?mode=aircraft" class="back-link">Main Dashboard</a>
         </div>
     </header>
@@ -59,6 +70,10 @@
                 <span class="strip-value" id="stripAcars">0</span>
                 <span class="strip-label">ACARS</span>
             </div>
+            <div class="strip-stat source-stat" title="Data source (Local or Agent name)">
+                <span class="strip-value" id="stripSource" style="font-size: 10px;">Local</span>
+                <span class="strip-label">SOURCE</span>
+            </div>
             <div class="strip-stat signal-stat" title="Signal quality (messages/errors)">
                 <span class="strip-value" id="stripSignal">--</span>
                 <span class="strip-label">SIGNAL</span>
@@ -77,6 +92,9 @@
             <button type="button" class="strip-btn primary" onclick="generateReport()" title="Generate Session Report">
                 📊 Report
             </button>
+            <a class="strip-btn" href="/adsb/history" title="Open History Reporting">
+                📚 History
+            </a>
             <div class="strip-divider"></div>
             <div class="strip-status">
                 <div class="status-dot inactive" id="trackingDot"></div>
@@ -230,7 +248,7 @@
                     <label title="Use remote dump1090"><input type="checkbox" id="useRemoteDump1090" onchange="toggleRemoteDump1090()"> Remote</label>
                     <span class="remote-dump1090-controls" style="display: none;">
                         <input type="text" id="remoteSbsHost" placeholder="Host" style="width: 70px;">
-                        <input type="number" id="remoteSbsPort" value="30003" style="width: 55px;">
+                        <input type="number" id="remoteSbsPort" value="30003" min="1" max="65535" style="width: 70px;">
                     </span>
                     <select id="adsbDeviceSelect" title="SDR device for ADS-B (1090 MHz)">
                         <option value="0">SDR 0</option>
@@ -295,6 +313,7 @@
         let markers = {};
         let selectedIcao = null;
         let eventSource = null;
+        let agentPollTimer = null;  // Polling fallback for agent mode
         let isTracking = false;
         let currentFilter = 'all';
         let alertedAircraft = {};
@@ -1963,6 +1982,9 @@ ACARS: ${r.statistics.acarsMessages} messages`;
 
             // Auto-connect to gpsd if available
             autoConnectGps();
+
+            // Sync tracking state if ADS-B already running
+            syncTrackingStatus();
         });
 
         // Track which device is being used for ADS-B tracking
@@ -2365,11 +2387,19 @@ sudo make install</code>
 
         async function toggleTracking() {
             const btn = document.getElementById('startBtn');
+            const useAgent = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
 
             if (!isTracking) {
-                // Check for remote dump1090 config
-                const remoteConfig = getRemoteDump1090Config();
+                // Check for remote dump1090 config (only for local mode)
+                const remoteConfig = !useAgent ? getRemoteDump1090Config() : null;
                 if (remoteConfig === false) return;
+
+                // Check for agent SDR conflicts
+                if (useAgent && typeof checkAgentModeConflict === 'function') {
+                    if (!checkAgentModeConflict('adsb')) {
+                        return;  // User cancelled or conflict not resolved
+                    }
+                }
 
                 // Get selected ADS-B device and its SDR type
                 const adsbSelect = document.getElementById('adsbDeviceSelect');
@@ -2387,7 +2417,12 @@ sudo make install</code>
                 }
 
                 try {
-                    const response = await fetch('/adsb/start', {
+                    // Route through agent proxy if using remote agent
+                    const url = useAgent
+                        ? `/controller/agents/${adsbCurrentAgent}/adsb/start`
+                        : '/adsb/start';
+
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestBody)
@@ -2408,12 +2443,23 @@ sudo make install</code>
                         startSessionTimer();
                         isTracking = true;
                         adsbActiveDevice = adsbDevice;  // Track which device is being used
+                        adsbTrackingSource = useAgent ? adsbCurrentAgent : 'local';  // Track which source started tracking
                         btn.textContent = 'STOP';
                         btn.classList.add('active');
                         document.getElementById('trackingDot').classList.remove('inactive');
-                        document.getElementById('trackingStatus').textContent = 'TRACKING';
+                        updateTrackingStatusDisplay();
                         // Disable ADS-B device selector while tracking
                         document.getElementById('adsbDeviceSelect').disabled = true;
+                        // Disable agent selector while tracking
+                        const agentSelect = document.getElementById('agentSelect');
+                        if (agentSelect) agentSelect.disabled = true;
+
+                        // Update agent running modes tracking
+                        if (useAgent && typeof agentRunningModes !== 'undefined') {
+                            if (!agentRunningModes.includes('adsb')) {
+                                agentRunningModes.push('adsb');
+                            }
+                        }
                     } else {
                         alert('Failed to start: ' + (data.message || JSON.stringify(data)));
                     }
@@ -2422,26 +2468,175 @@ sudo make install</code>
                 }
             } else {
                 try {
-                    await fetch('/adsb/stop', { method: 'POST' });
+                    // Route stop through agent proxy if using remote agent
+                    const url = useAgent
+                        ? `/controller/agents/${adsbCurrentAgent}/adsb/stop`
+                        : '/adsb/stop';
+                    await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({})
+                    });
+
+                    // Update agent running modes tracking
+                    if (useAgent && typeof agentRunningModes !== 'undefined') {
+                        agentRunningModes = agentRunningModes.filter(m => m !== 'adsb');
+                    }
                 } catch (err) {}
 
                 stopEventStream();
                 isTracking = false;
                 adsbActiveDevice = null;
+                adsbTrackingSource = null;  // Reset tracking source
                 btn.textContent = 'START';
                 btn.classList.remove('active');
                 document.getElementById('trackingDot').classList.add('inactive');
-                document.getElementById('trackingStatus').textContent = 'STANDBY';
+                updateTrackingStatusDisplay();
                 // Re-enable ADS-B device selector
                 document.getElementById('adsbDeviceSelect').disabled = false;
+                // Re-enable agent selector
+                const agentSelect = document.getElementById('agentSelect');
+                if (agentSelect) agentSelect.disabled = false;
+            }
+        }
+
+        async function syncTrackingStatus() {
+            // This function checks LOCAL tracking status on page load
+            // For local mode: auto-start if session is already running OR SDR is available
+            // For agent mode: don't auto-start (user controls agent tracking)
+
+            const useAgent = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
+            if (useAgent) {
+                console.log('[ADS-B] Agent mode on page load - not auto-starting local');
+                return;
+            }
+
+            try {
+                const response = await fetch('/adsb/session');
+                if (!response.ok) {
+                    // No session info - try to auto-start if SDR available
+                    console.log('[ADS-B] No session found, attempting auto-start...');
+                    await tryAutoStartLocal();
+                    return;
+                }
+                const data = await response.json();
+
+                if (data.tracking_active) {
+                    // Session is running - auto-connect to stream
+                    console.log('[ADS-B] Local session already active - auto-connecting to stream');
+
+                    // Get session info
+                    const session = data.session || {};
+                    const startTime = session.started_at ? Date.parse(session.started_at) : null;
+                    if (startTime) {
+                        stats.sessionStart = startTime;
+                    }
+
+                    const sessionDevice = session.device_index;
+                    if (sessionDevice !== null && sessionDevice !== undefined) {
+                        adsbActiveDevice = sessionDevice;
+                        const adsbSelect = document.getElementById('adsbDeviceSelect');
+                        if (adsbSelect) {
+                            adsbSelect.value = sessionDevice;
+                        }
+                    }
+
+                    // Auto-connect to the running session
+                    isTracking = true;
+                    adsbTrackingSource = 'local';
+                    startEventStream();
+                    drawRangeRings();
+                    startSessionTimer();
+
+                    const btn = document.getElementById('startBtn');
+                    if (btn) {
+                        btn.textContent = 'STOP';
+                        btn.classList.add('active');
+                    }
+                    document.getElementById('trackingDot').classList.remove('inactive');
+                    document.getElementById('trackingDot').classList.add('active');
+                    const statusEl = document.getElementById('trackingStatus');
+                    statusEl.textContent = 'TRACKING';
+                } else {
+                    // Session not active - try to auto-start
+                    console.log('[ADS-B] No active session, attempting auto-start...');
+                    await tryAutoStartLocal();
+                }
+
+            } catch (err) {
+                console.warn('[ADS-B] Failed to sync tracking status:', err);
+                // Try auto-start anyway
+                await tryAutoStartLocal();
+            }
+        }
+
+        async function tryAutoStartLocal() {
+            // Try to auto-start local ADS-B tracking if SDR is available
+            try {
+                // Check if any SDR devices are available
+                const devResponse = await fetch('/devices');
+                if (!devResponse.ok) return;
+
+                const devices = await devResponse.json();
+                if (!devices || devices.length === 0) {
+                    console.log('[ADS-B] No SDR devices found - cannot auto-start');
+                    return;
+                }
+
+                // Try to start tracking on first available device
+                const device = devices[0].index !== undefined ? devices[0].index : 0;
+                console.log(`[ADS-B] Auto-starting local tracking on device ${device}...`);
+
+                const startResponse = await fetch('/adsb/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device: device })
+                });
+
+                const result = await startResponse.json();
+
+                if (result.status === 'success' || result.status === 'started' || result.status === 'already_running') {
+                    console.log('[ADS-B] Auto-start successful');
+                    isTracking = true;
+                    adsbActiveDevice = device;
+                    adsbTrackingSource = 'local';
+                    startEventStream();
+                    drawRangeRings();
+                    startSessionTimer();
+
+                    const btn = document.getElementById('startBtn');
+                    if (btn) {
+                        btn.textContent = 'STOP';
+                        btn.classList.add('active');
+                    }
+                    document.getElementById('trackingDot').classList.remove('inactive');
+                    document.getElementById('trackingDot').classList.add('active');
+                    const statusEl = document.getElementById('trackingStatus');
+                    statusEl.textContent = 'TRACKING';
+                } else {
+                    // SDR might be in use - don't show error, just don't auto-start
+                    console.log('[ADS-B] Auto-start failed (SDR may be in use):', result.error || result.message);
+                }
+            } catch (err) {
+                console.log('[ADS-B] Auto-start error (SDR may be in use):', err.message);
             }
         }
 
         function startEventStream() {
             if (eventSource) eventSource.close();
 
-            console.log('Starting ADS-B event stream...');
-            eventSource = new EventSource('/adsb/stream');
+            const useAgent = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
+            const streamUrl = useAgent ? '/controller/stream/all' : '/adsb/stream';
+
+            console.log(`[ADS-B] startEventStream called - adsbCurrentAgent=${adsbCurrentAgent}, useAgent=${useAgent}, streamUrl=${streamUrl}`);
+            eventSource = new EventSource(streamUrl);
+
+            // Get agent name for filtering multi-agent stream
+            let targetAgentName = null;
+            if (useAgent && typeof agents !== 'undefined') {
+                const agent = agents.find(a => a.id == adsbCurrentAgent);
+                targetAgentName = agent ? agent.name : null;
+            }
 
             eventSource.onopen = () => {
                 console.log('ADS-B stream connected');
@@ -2450,34 +2645,158 @@ sudo make install</code>
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'aircraft') {
-                        updateAircraft(data);
-                    } else if (data.type === 'status') {
-                        console.log('ADS-B status:', data.message);
-                    } else if (data.type === 'keepalive') {
-                        // Keepalive received
+
+                    if (useAgent) {
+                        // Agent mode - handle multi-agent stream format
+                        // Skip keepalive messages
+                        if (data.type === 'keepalive') return;
+
+                        // Filter to only our selected agent
+                        if (targetAgentName && data.agent_name && data.agent_name !== targetAgentName) {
+                            return;
+                        }
+
+                        // Extract aircraft data from push payload
+                        if (data.scan_type === 'adsb' && data.payload) {
+                            const payload = data.payload;
+                            if (payload.aircraft) {
+                                // Handle array or object of aircraft
+                                const aircraftList = Array.isArray(payload.aircraft)
+                                    ? payload.aircraft
+                                    : Object.values(payload.aircraft);
+                                aircraftList.forEach(ac => {
+                                    ac._agent = data.agent_name;
+                                    updateAircraft({ type: 'aircraft', ...ac });
+                                });
+                            }
+                        }
                     } else {
-                        console.log('ADS-B data:', data);
+                        // Local mode - original stream format
+                        if (data.type === 'aircraft') {
+                            updateAircraft(data);
+                        } else if (data.type === 'status') {
+                            console.log('ADS-B status:', data.message);
+                        } else if (data.type === 'keepalive') {
+                            // Keepalive received
+                        } else {
+                            console.log('ADS-B data:', data);
+                        }
                     }
                 } catch (err) {
                     console.error('ADS-B parse error:', err, event.data);
                 }
             };
 
-            eventSource.onerror = (e) => {
-                console.error('ADS-B stream error:', e);
-                if (eventSource.readyState === EventSource.CLOSED) {
-                    console.log('ADS-B stream closed, will not auto-reconnect');
-                }
-            };
-        }
-
-        function stopEventStream() {
-            if (eventSource) {
-                eventSource.close();
-                eventSource = null;
+            // Start polling as fallback when in agent mode (in case push isn't enabled)
+            if (useAgent) {
+                startAgentPolling();
             }
+
+            eventSource.onerror = (e) => {
+            console.error('ADS-B stream error:', e);
+            if (eventSource.readyState === EventSource.CLOSED) {
+                console.log('ADS-B stream closed, will not auto-reconnect');
+            }
+        };
+    }
+
+    function stopEventStream() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
         }
+        if (agentPollTimer) {
+            clearInterval(agentPollTimer);
+            agentPollTimer = null;
+        }
+    }
+
+    /**
+     * Perform a single poll of agent ADS-B data.
+     */
+    async function doAgentPoll() {
+        try {
+            const pollUrl = `/controller/agents/${adsbCurrentAgent}/adsb/data`;
+            console.log(`[ADS-B Poll] Fetching: ${pollUrl}`);
+            const response = await fetch(pollUrl);
+            if (!response.ok) {
+                console.warn(`[ADS-B Poll] Response not OK: ${response.status}`);
+                return;
+            }
+
+            const result = await response.json();
+            console.log('[ADS-B Poll] Raw response keys:', Object.keys(result));
+
+            // Handle double-nested response: result.data.data contains aircraft array
+            // Structure: { agent_id, agent_name, data: { data: [aircraft], agent_gps, ... } }
+            let aircraftData = null;
+            if (result.data && result.data.data) {
+                // Double nested (controller proxy format)
+                aircraftData = result.data.data;
+                console.log('[ADS-B Poll] Found double-nested data, count:', aircraftData.length);
+            } else if (result.data && Array.isArray(result.data)) {
+                // Single nested array
+                aircraftData = result.data;
+                console.log('[ADS-B Poll] Found single-nested array');
+            } else if (Array.isArray(result)) {
+                // Direct array
+                aircraftData = result;
+                console.log('[ADS-B Poll] Found direct array');
+            } else {
+                console.warn('[ADS-B Poll] Unknown data format:', Object.keys(result));
+            }
+
+            // Get agent name
+            let agentName = result.agent_name || 'Agent';
+            if (!result.agent_name && typeof agents !== 'undefined') {
+                const agent = agents.find(a => a.id == adsbCurrentAgent);
+                if (agent) agentName = agent.name;
+            }
+
+            // Process aircraft from polling response
+            if (aircraftData && Array.isArray(aircraftData)) {
+                console.log(`[ADS-B Poll] Processing ${aircraftData.length} aircraft from ${agentName}`);
+                aircraftData.forEach(ac => {
+                    if (ac.icao) {  // Only process valid aircraft
+                        ac._agent = agentName;
+                        updateAircraft({ type: 'aircraft', ...ac });
+                    } else {
+                        console.warn('[ADS-B Poll] Aircraft missing icao:', ac);
+                    }
+                });
+            } else if (aircraftData) {
+                console.warn('[ADS-B Poll] aircraftData is not an array:', typeof aircraftData);
+            } else {
+                console.log('[ADS-B Poll] No aircraft data in response');
+            }
+        } catch (err) {
+            console.error('[ADS-B Poll] Error:', err);
+        }
+    }
+
+    /**
+     * Start polling agent data as fallback when push isn't enabled.
+     */
+    function startAgentPolling() {
+        if (agentPollTimer) return;
+
+        const pollInterval = 2000;  // 2 seconds for ADS-B
+        console.log(`[ADS-B Poll] Starting agent polling for agent ${adsbCurrentAgent}...`);
+
+        // Do an immediate poll first
+        doAgentPoll();
+
+        // Then set up the interval for continuous polling
+        agentPollTimer = setInterval(() => {
+            if (!isTracking) {
+                console.log('[ADS-B Poll] Stopping - isTracking is false');
+                clearInterval(agentPollTimer);
+                agentPollTimer = null;
+                return;
+            }
+            doAgentPoll();
+        }, pollInterval);
+    }
 
         // ============================================
         // AIRCRAFT UPDATES
@@ -2723,6 +3042,9 @@ sudo make install</code>
             const militaryInfo = isMilitaryAircraft(ac.icao, ac.callsign);
             const badge = militaryInfo.military ?
                 `<span style="background:#556b2f;color:#fff;padding:1px 4px;border-radius:2px;font-size:8px;margin-left:4px;">MIL</span>` : '';
+            // Agent badge if aircraft came from remote agent
+            const agentBadge = ac._agent ?
+                `<span class="agent-badge">${ac._agent}</span>` : '';
             // Vertical rate indicator: arrow up (climbing), arrow down (descending), or dash (level)
             let vsIndicator = '-';
             let vsColor = '';
@@ -2733,7 +3055,7 @@ sudo make install</code>
 
             return `
                 <div class="aircraft-header">
-                    <span class="aircraft-callsign">${callsign}${badge}</span>
+                    <span class="aircraft-callsign">${callsign}${badge}${agentBadge}</span>
                     <span class="aircraft-icao">${typeCode ? typeCode + ' • ' : ''}${ac.icao}</span>
                 </div>
                 <div class="aircraft-details">
@@ -3303,6 +3625,8 @@ sudo make install</code>
         // ============================================
         let acarsEventSource = null;
         let isAcarsRunning = false;
+        let acarsCurrentAgent = null;
+        let acarsPollTimer = null;
         let acarsMessageCount = 0;
         let acarsSidebarCollapsed = localStorage.getItem('acarsSidebarCollapsed') === 'true';
         let acarsFrequencies = {
@@ -3375,8 +3699,12 @@ sudo make install</code>
             const device = document.getElementById('acarsDeviceSelect').value;
             const frequencies = getAcarsRegionFreqs();
 
-            // Warn if using same device as ADS-B
-            if (isTracking && device === '0') {
+            // Check if using agent mode
+            const isAgentMode = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
+            acarsCurrentAgent = isAgentMode ? adsbCurrentAgent : null;
+
+            // Warn if using same device as ADS-B (only for local mode)
+            if (!isAgentMode && isTracking && device === '0') {
                 const useAnyway = confirm(
                     'Warning: ADS-B tracking may be using SDR device 0.\n\n' +
                     'ACARS uses VHF frequencies (129-131 MHz) while ADS-B uses 1090 MHz.\n' +
@@ -3386,32 +3714,46 @@ sudo make install</code>
                 if (!useAnyway) return;
             }
 
-            fetch('/acars/start', {
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${adsbCurrentAgent}/acars/start`
+                : '/acars/start';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ device, frequencies, gain: '40' })
             })
             .then(r => r.json())
             .then(data => {
-                if (data.status === 'started') {
+                // Handle controller proxy response format
+                const scanResult = isAgentMode && data.result ? data.result : data;
+
+                if (scanResult.status === 'started' || scanResult.status === 'success') {
                     isAcarsRunning = true;
                     acarsMessageCount = 0;
                     document.getElementById('acarsToggleBtn').textContent = '■ STOP ACARS';
                     document.getElementById('acarsToggleBtn').classList.add('active');
                     document.getElementById('acarsPanelIndicator').classList.add('active');
-                    startAcarsStream();
+                    startAcarsStream(isAgentMode);
                 } else {
-                    alert('ACARS Error: ' + data.message);
+                    alert('ACARS Error: ' + (scanResult.message || scanResult.error || 'Failed to start'));
                 }
             })
             .catch(err => alert('ACARS Error: ' + err));
         }
 
         function stopAcars() {
-            fetch('/acars/stop', { method: 'POST' })
+            const isAgentMode = acarsCurrentAgent !== null;
+            const endpoint = isAgentMode
+                ? `/controller/agents/${acarsCurrentAgent}/acars/stop`
+                : '/acars/stop';
+
+            fetch(endpoint, { method: 'POST' })
                 .then(r => r.json())
                 .then(() => {
                     isAcarsRunning = false;
+                    acarsCurrentAgent = null;
                     document.getElementById('acarsToggleBtn').textContent = '▶ START ACARS';
                     document.getElementById('acarsToggleBtn').classList.remove('active');
                     document.getElementById('acarsPanelIndicator').classList.remove('active');
@@ -3419,27 +3761,123 @@ sudo make install</code>
                         acarsEventSource.close();
                         acarsEventSource = null;
                     }
+                    // Clear polling timer
+                    if (acarsPollTimer) {
+                        clearInterval(acarsPollTimer);
+                        acarsPollTimer = null;
+                    }
                 });
         }
 
-        function startAcarsStream() {
+        // Sync ACARS UI state (called by syncModeUI in agents.js)
+        function setAcarsRunning(running, agentId = null) {
+            isAcarsRunning = running;
+            const btn = document.getElementById('acarsToggleBtn');
+            const indicator = document.getElementById('acarsPanelIndicator');
+
+            if (running) {
+                acarsCurrentAgent = agentId;
+                btn.textContent = '■ STOP ACARS';
+                btn.classList.add('active');
+                if (indicator) indicator.classList.add('active');
+                // Start stream if not already running
+                if (!acarsEventSource && !acarsPollTimer) {
+                    startAcarsStream(agentId !== null);
+                }
+            } else {
+                btn.textContent = '▶ START ACARS';
+                btn.classList.remove('active');
+                if (indicator) indicator.classList.remove('active');
+            }
+        }
+        // Expose to global scope for syncModeUI
+        window.setAcarsRunning = setAcarsRunning;
+
+        function startAcarsStream(isAgentMode = false) {
             if (acarsEventSource) acarsEventSource.close();
-            acarsEventSource = new EventSource('/acars/stream');
+
+            // Use different stream endpoint for agent mode
+            const streamUrl = isAgentMode ? '/controller/stream/all' : '/acars/stream';
+            acarsEventSource = new EventSource(streamUrl);
 
             acarsEventSource.onmessage = function(e) {
                 const data = JSON.parse(e.data);
-                if (data.type === 'acars') {
-                    acarsMessageCount++;
-                    stats.acarsMessages++;
-                    document.getElementById('acarsCount').textContent = acarsMessageCount;
-                    document.getElementById('stripAcars').textContent = stats.acarsMessages;
-                    addAcarsMessage(data);
+
+                if (isAgentMode) {
+                    // Handle multi-agent stream format
+                    if (data.scan_type === 'acars' && data.payload) {
+                        const payload = data.payload;
+                        if (payload.type === 'acars') {
+                            acarsMessageCount++;
+                            stats.acarsMessages++;
+                            document.getElementById('acarsCount').textContent = acarsMessageCount;
+                            document.getElementById('stripAcars').textContent = stats.acarsMessages;
+                            payload.agent_name = data.agent_name;
+                            addAcarsMessage(payload);
+                        }
+                    }
+                } else {
+                    // Local stream format
+                    if (data.type === 'acars') {
+                        acarsMessageCount++;
+                        stats.acarsMessages++;
+                        document.getElementById('acarsCount').textContent = acarsMessageCount;
+                        document.getElementById('stripAcars').textContent = stats.acarsMessages;
+                        addAcarsMessage(data);
+                    }
                 }
             };
 
             acarsEventSource.onerror = function() {
                 console.error('ACARS stream error');
             };
+
+            // Start polling fallback for agent mode
+            if (isAgentMode) {
+                startAcarsPolling();
+            }
+        }
+
+        // Track last ACARS message count for polling
+        let lastAcarsMessageCount = 0;
+
+        function startAcarsPolling() {
+            if (acarsPollTimer) return;
+            lastAcarsMessageCount = 0;
+
+            const pollInterval = 2000;
+            acarsPollTimer = setInterval(async () => {
+                if (!isAcarsRunning || !acarsCurrentAgent) {
+                    clearInterval(acarsPollTimer);
+                    acarsPollTimer = null;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/controller/agents/${acarsCurrentAgent}/acars/data`);
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    const result = data.result || data;
+                    const messages = result.data || [];
+
+                    // Process new messages
+                    if (messages.length > lastAcarsMessageCount) {
+                        const newMessages = messages.slice(lastAcarsMessageCount);
+                        newMessages.forEach(msg => {
+                            acarsMessageCount++;
+                            stats.acarsMessages++;
+                            document.getElementById('acarsCount').textContent = acarsMessageCount;
+                            document.getElementById('stripAcars').textContent = stats.acarsMessages;
+                            msg.agent_name = result.agent_name || 'Remote Agent';
+                            addAcarsMessage(msg);
+                        });
+                        lastAcarsMessageCount = messages.length;
+                    }
+                } catch (err) {
+                    console.error('ACARS polling error:', err);
+                }
+            }, pollInterval);
         }
 
         function addAcarsMessage(data) {
@@ -3926,6 +4364,452 @@ sudo make install</code>
             color: var(--accent-cyan, #00d4ff);
             font-size: 10px;
         }
+
+        /* Agent selector styles */
+        .agent-selector-compact {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 15px;
+        }
+        .agent-select-sm {
+            background: rgba(0, 40, 60, 0.8);
+            border: 1px solid var(--border-color, rgba(0, 200, 255, 0.3));
+            color: var(--text-primary, #e0f7ff);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+        }
+        .agent-select-sm:focus {
+            outline: none;
+            border-color: var(--accent-cyan, #00d4ff);
+        }
+        .agent-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .agent-status-dot.online {
+            background: #4caf50;
+            box-shadow: 0 0 6px #4caf50;
+        }
+        .agent-status-dot.offline {
+            background: #f44336;
+            box-shadow: 0 0 6px #f44336;
+        }
+        .agent-badge {
+            font-size: 9px;
+            color: var(--accent-cyan, #00d4ff);
+            background: rgba(0, 200, 255, 0.1);
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-left: 4px;
+        }
+        #agentModeWarning {
+            color: #f0ad4e;
+            font-size: 10px;
+            padding: 4px 8px;
+            background: rgba(240,173,78,0.1);
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        .show-all-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--text-muted, #a0c4d0);
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .show-all-label input {
+            margin: 0;
+            cursor: pointer;
+        }
     </style>
+
+    <!-- Agent Manager -->
+    <script src="{{ url_for('static', filename='js/core/agents.js') }}"></script>
+    <script>
+        // ADS-B specific agent integration
+        let adsbCurrentAgent = 'local';
+        let adsbTrackingSource = null;  // Track which source started the tracking ('local' or agent id)
+
+        // Helper to get current agent name for display
+        function getAdsbAgentName() {
+            if (adsbCurrentAgent === 'local') return 'Local';
+            if (typeof agents !== 'undefined') {
+                const agent = agents.find(a => a.id == adsbCurrentAgent);
+                return agent ? agent.name : `Agent ${adsbCurrentAgent}`;
+            }
+            return `Agent ${adsbCurrentAgent}`;
+        }
+
+        // Helper to get tracking source name
+        function getTrackingSourceName() {
+            if (!adsbTrackingSource) return null;
+            if (adsbTrackingSource === 'local') return 'Local';
+            if (typeof agents !== 'undefined') {
+                const agent = agents.find(a => a.id == adsbTrackingSource);
+                return agent ? agent.name : `Agent ${adsbTrackingSource}`;
+            }
+            return `Agent ${adsbTrackingSource}`;
+        }
+
+        // Update tracking status display
+        function updateTrackingStatusDisplay() {
+            const statusEl = document.getElementById('trackingStatus');
+            if (!statusEl) return;
+
+            if (!isTracking) {
+                statusEl.textContent = 'STANDBY';
+                statusEl.title = 'Select source and click START';
+            } else {
+                const sourceName = getTrackingSourceName() || getAdsbAgentName();
+                if (sourceName === 'Local') {
+                    statusEl.textContent = 'TRACKING';
+                    statusEl.title = 'Tracking via Local device';
+                } else {
+                    statusEl.textContent = `TRACKING (${sourceName})`;
+                    statusEl.title = `Tracking via remote agent: ${sourceName}`;
+                }
+            }
+        }
+
+        // Override selectAgent for ADS-B page specifics
+        function selectAdsbAgent(agentId) {
+            adsbCurrentAgent = agentId;
+            currentAgent = agentId;  // Update global agent state
+
+            // Stop current tracking if switching agents while tracking
+            if (isTracking && adsbTrackingSource !== agentId) {
+                // Don't auto-stop, just let user see current state
+                console.log('ADS-B: Agent changed while tracking - user should stop/restart');
+            }
+
+            if (agentId === 'local') {
+                // Refresh local devices
+                loadDevices();
+                // Check if local ADS-B is running
+                syncLocalTrackingStatus();
+                // Enable airband controls (local audio works)
+                setAirbandEnabled(true);
+                console.log('ADS-B: Using local device');
+            } else {
+                // Get agent devices
+                refreshAgentDevicesForAdsb(agentId);
+                // Check if agent has ADS-B running (syncAgentModeStates will call setADSBRunning)
+                syncAgentModeStates(agentId);
+                // Disable airband controls (no audio streaming from remote agents)
+                setAirbandEnabled(false);
+                console.log(`ADS-B: Using agent ${agentId}`);
+            }
+            updateAgentStatus();
+            updateSourceIndicator();
+        }
+
+        // Enable/disable airband controls based on local vs remote agent
+        function setAirbandEnabled(enabled) {
+            const airbandControls = document.querySelectorAll('.airband-controls');
+            const playBtn = document.getElementById('airbandBtn');
+
+            airbandControls.forEach(ctrl => {
+                ctrl.disabled = !enabled;
+                ctrl.style.opacity = enabled ? '1' : '0.5';
+            });
+
+            if (playBtn) {
+                playBtn.disabled = !enabled;
+                playBtn.style.opacity = enabled ? '1' : '0.5';
+                if (!enabled) {
+                    playBtn.textContent = '▶ LOCAL ONLY';
+                    playBtn.title = 'Airband requires local audio - not available for remote agents';
+                } else {
+                    playBtn.textContent = '▶ LISTEN';
+                    playBtn.title = 'Start airband audio';
+                }
+            }
+        }
+
+        // Check local ADS-B tracking status
+        async function syncLocalTrackingStatus() {
+            try {
+                const response = await fetch('/adsb/session');
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.tracking_active) {
+                    setADSBRunning(true, 'local');
+                }
+            } catch (err) {
+                console.debug('Failed to sync local ADS-B status:', err);
+            }
+        }
+
+        /**
+         * Set ADS-B tracking UI state - called by syncModeUI from agents.js
+         * Also starts/stops data streaming as needed.
+         * @param {boolean} running - Whether ADS-B is running
+         * @param {string|number|null} source - 'local' or agent ID that started tracking
+         */
+        function setADSBRunning(running, source = null) {
+            console.log(`[ADS-B] setADSBRunning called - running=${running}, source=${source}, adsbCurrentAgent=${adsbCurrentAgent}`);
+            const btn = document.getElementById('startBtn');
+
+            if (running) {
+                isTracking = true;
+
+                // If source is an agent ID (not 'local' and not null), update adsbCurrentAgent
+                // This ensures startEventStream uses the correct routing
+                if (source && source !== 'local') {
+                    adsbCurrentAgent = source;
+                    // Also update the dropdown to match
+                    const agentSelect = document.getElementById('agentSelect');
+                    if (agentSelect) {
+                        agentSelect.value = source;
+                    }
+                    // Update global agent state too
+                    if (typeof currentAgent !== 'undefined') {
+                        currentAgent = source;
+                    }
+                    console.log(`[ADS-B] Updated adsbCurrentAgent to ${source}`);
+                }
+
+                adsbTrackingSource = source || adsbCurrentAgent;  // Track which source is active
+
+                // Update button
+                if (btn) {
+                    btn.textContent = 'STOP';
+                    btn.classList.add('active');
+                    btn.title = 'Click to stop tracking';
+                }
+                const trackingDot = document.getElementById('trackingDot');
+                trackingDot.classList.remove('inactive', 'warn');  // Clear any previous state
+                updateTrackingStatusDisplay();
+                updateSourceIndicator();  // Update source display
+
+                // Disable selectors
+                const adsbSelect = document.getElementById('adsbDeviceSelect');
+                if (adsbSelect) adsbSelect.disabled = true;
+                const agentSelect = document.getElementById('agentSelect');
+                if (agentSelect) agentSelect.disabled = true;
+
+                // Start data stream for the active source
+                const isAgentSource = adsbCurrentAgent !== 'local';
+                if (isAgentSource) {
+                    console.log(`[ADS-B] Starting data stream from agent ${adsbCurrentAgent}`);
+                    startEventStream();
+                    drawRangeRings();
+                    startSessionTimer();
+                } else {
+                    console.log('[ADS-B] Starting local data stream');
+                    startEventStream();
+                    drawRangeRings();
+                    startSessionTimer();
+                }
+            } else {
+                isTracking = false;
+                adsbTrackingSource = null;
+
+                // Update button
+                if (btn) {
+                    btn.textContent = 'START';
+                    btn.classList.remove('active');
+                    btn.title = 'Click to start tracking';
+                }
+                const trackingDot = document.getElementById('trackingDot');
+                trackingDot.classList.remove('warn');  // Clear warn state
+                trackingDot.classList.add('inactive');
+                updateTrackingStatusDisplay();
+
+                // Re-enable selectors
+                const adsbSelect = document.getElementById('adsbDeviceSelect');
+                if (adsbSelect) adsbSelect.disabled = false;
+                const agentSelect = document.getElementById('agentSelect');
+                if (agentSelect) agentSelect.disabled = false;
+
+                // Stop data stream
+                stopEventStream();
+            }
+        }
+
+        // Expose setADSBRunning globally so agents.js syncModeUI can call it
+        window.setADSBRunning = setADSBRunning;
+
+        // Update the SOURCE indicator in the stats strip
+        function updateSourceIndicator() {
+            const sourceEl = document.getElementById('stripSource');
+            if (!sourceEl) return;
+
+            const name = getAdsbAgentName();
+            sourceEl.textContent = name;
+            sourceEl.title = name === 'Local' ? 'Using local device' : `Using remote agent: ${name}`;
+
+            // Update color based on source
+            if (name === 'Local') {
+                sourceEl.style.color = 'var(--accent-green, #00ff88)';
+            } else {
+                sourceEl.style.color = 'var(--accent-cyan, #00d4ff)';
+            }
+        }
+
+        async function refreshAgentDevicesForAdsb(agentId) {
+            try {
+                const response = await fetch(`/controller/agents/${agentId}?refresh=true`);
+                const data = await response.json();
+
+                if (data.agent && data.agent.interfaces) {
+                    // Agent stores SDR devices in interfaces.sdr_devices (same fix as agents.js)
+                    const devices = data.agent.interfaces.sdr_devices || data.agent.interfaces.devices || [];
+                    populateAdsbDeviceSelects(devices);
+
+                    // Update observer location if agent has GPS
+                    if (data.agent.gps_coords) {
+                        const gps = typeof data.agent.gps_coords === 'string'
+                            ? JSON.parse(data.agent.gps_coords)
+                            : data.agent.gps_coords;
+                        if (gps.lat && gps.lon) {
+                            document.getElementById('obsLat').value = gps.lat.toFixed(4);
+                            document.getElementById('obsLon').value = gps.lon.toFixed(4);
+                            updateObserverLoc();
+                            console.log(`Updated observer location from agent GPS: ${gps.lat}, ${gps.lon}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to refresh agent devices:', error);
+            }
+        }
+
+        function populateAdsbDeviceSelects(devices) {
+            const adsbSelect = document.getElementById('adsbDeviceSelect');
+            const airbandSelect = document.getElementById('airbandDeviceSelect');
+            const acarsSelect = document.getElementById('acarsDeviceSelect');
+
+            [adsbSelect, airbandSelect, acarsSelect].forEach(select => {
+                if (!select) return;
+                select.innerHTML = '';
+
+                if (devices.length === 0) {
+                    select.innerHTML = '<option value="0">No SDR found</option>';
+                } else {
+                    devices.forEach(device => {
+                        const opt = document.createElement('option');
+                        opt.value = device.index;
+                        opt.textContent = `Device ${device.index}: ${device.name || device.type || 'SDR'}`;
+                        select.appendChild(opt);
+                    });
+                }
+            });
+        }
+
+        // Hook into page init
+        document.addEventListener('DOMContentLoaded', function() {
+            const agentSelect = document.getElementById('agentSelect');
+            if (agentSelect) {
+                agentSelect.addEventListener('change', function(e) {
+                    selectAdsbAgent(e.target.value);
+                });
+            }
+            // Initialize source indicator
+            updateSourceIndicator();
+        });
+
+        // Show All Agents mode - display aircraft from all agents on the map
+        let showAllAgentsMode = false;
+        let allAgentsEventSource = null;
+
+        function toggleShowAllAgents() {
+            const checkbox = document.getElementById('showAllAgents');
+            showAllAgentsMode = checkbox ? checkbox.checked : false;
+
+            const agentSelect = document.getElementById('agentSelect');
+            const startBtn = document.getElementById('startBtn');
+
+            if (showAllAgentsMode) {
+                // Keep dropdown enabled to select which agent to control
+                // Keep start button enabled to start/stop on selected agent
+                // (agentSelect and startBtn stay enabled)
+
+                // Connect to multi-agent stream (passive listening to all agents)
+                startAllAgentsStream();
+
+                const statusEl = document.getElementById('trackingStatus');
+                statusEl.textContent = 'ALL AGENTS';
+                statusEl.title = 'Receiving data from all connected agents';
+                document.getElementById('trackingDot').classList.remove('inactive');
+
+                // Update source indicator to show ALL
+                const sourceEl = document.getElementById('stripSource');
+                if (sourceEl) {
+                    sourceEl.textContent = 'ALL';
+                    sourceEl.style.color = 'var(--accent-yellow, #ffcc00)';
+                    sourceEl.title = 'Receiving from all connected agents';
+                }
+
+                console.log('Show All Agents mode enabled');
+            } else {
+                // When unchecking "All", dropdown follows normal tracking rules
+                // (disabled only if tracking is active on a specific agent)
+                if (agentSelect) agentSelect.disabled = isTracking && !showAllAgentsMode;
+                if (startBtn) startBtn.disabled = false;
+
+                // Stop multi-agent stream
+                stopAllAgentsStream();
+
+                // Restore proper tracking status and source indicator
+                updateTrackingStatusDisplay();
+                updateSourceIndicator();
+                if (!isTracking) {
+                    document.getElementById('trackingDot').classList.add('inactive');
+                }
+                console.log('Show All Agents mode disabled');
+            }
+        }
+
+        function startAllAgentsStream() {
+            if (allAgentsEventSource) allAgentsEventSource.close();
+
+            allAgentsEventSource = new EventSource('/controller/stream/all');
+            allAgentsEventSource.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'keepalive') return;
+
+                    // Handle ADS-B data from any agent
+                    if (data.scan_type === 'adsb' && data.payload) {
+                        const payload = data.payload;
+                        if (payload.aircraft) {
+                            const aircraftList = Array.isArray(payload.aircraft)
+                                ? payload.aircraft
+                                : Object.values(payload.aircraft);
+                            aircraftList.forEach(ac => {
+                                ac._agent = data.agent_name;
+                                updateAircraft({ type: 'aircraft', ...ac });
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('All agents stream parse error:', err);
+                }
+            };
+
+            allAgentsEventSource.onerror = function() {
+                console.error('All agents stream error');
+                setTimeout(() => {
+                    if (showAllAgentsMode) startAllAgentsStream();
+                }, 3000);
+            };
+        }
+
+        function stopAllAgentsStream() {
+            if (allAgentsEventSource) {
+                allAgentsEventSource.close();
+                allAgentsEventSource = null;
+            }
+        }
+    </script>
 </body>
 </html>

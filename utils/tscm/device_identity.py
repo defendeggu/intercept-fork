@@ -1157,6 +1157,30 @@ def reset_identity_engine() -> None:
     _identity_engine = DeviceIdentityEngine()
 
 
+def _convert_to_bytes(value) -> Optional[bytes]:
+    """Convert various data types to bytes safely."""
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+    if isinstance(value, str):
+        # Assume hex string
+        try:
+            return bytes.fromhex(value)
+        except ValueError:
+            # Not a valid hex string, encode as UTF-8
+            return value.encode('utf-8')
+    if isinstance(value, (list, tuple)):
+        # Array of integers (like dbus.Array)
+        try:
+            return bytes(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def ingest_ble_dict(data: dict) -> DeviceSession:
     """
     Ingest BLE observation from dictionary.
@@ -1173,9 +1197,9 @@ def ingest_ble_dict(data: dict) -> DeviceSession:
         adv_type=data.get('adv_type', 'unknown'),
         adv_flags=data.get('adv_flags'),
         manufacturer_id=data.get('manufacturer_id'),
-        manufacturer_data=bytes.fromhex(data['manufacturer_data']) if data.get('manufacturer_data') else None,
+        manufacturer_data=_convert_to_bytes(data.get('manufacturer_data')),
         service_uuids=data.get('service_uuids', []),
-        service_data=bytes.fromhex(data['service_data']) if data.get('service_data') else None,
+        service_data=_convert_to_bytes(data.get('service_data')),
         local_name=data.get('local_name', data.get('name')),
         appearance=data.get('appearance'),
         packet_length=data.get('packet_length'),
