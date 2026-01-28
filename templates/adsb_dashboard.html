@@ -2896,15 +2896,16 @@ sudo make install</code>
             const callsign = ac.callsign || icao;
             const alt = ac.altitude ? ac.altitude + ' ft' : 'N/A';
             const iconType = getAircraftIconType(ac.type_code, militaryInfo.military);
+            const isSelected = icao === selectedIcao;
 
             const prevState = markerState[icao] || {};
-            const iconChanged = prevState.rotation !== rotation || prevState.color !== color || prevState.iconType !== iconType;
+            const iconChanged = prevState.rotation !== rotation || prevState.color !== color || prevState.iconType !== iconType || prevState.isSelected !== isSelected;
             const tooltipChanged = prevState.callsign !== callsign || prevState.alt !== alt;
 
             if (markers[icao]) {
                 markers[icao].setLatLng([ac.lat, ac.lon]);
                 if (iconChanged) {
-                    markers[icao].setIcon(createMarkerIcon(rotation, color, iconType));
+                    markers[icao].setIcon(createMarkerIcon(rotation, color, iconType, isSelected));
                 }
                 if (tooltipChanged) {
                     markers[icao].unbindTooltip();
@@ -2913,7 +2914,7 @@ sudo make install</code>
                     });
                 }
             } else {
-                markers[icao] = L.marker([ac.lat, ac.lon], { icon: createMarkerIcon(rotation, color, iconType) })
+                markers[icao] = L.marker([ac.lat, ac.lon], { icon: createMarkerIcon(rotation, color, iconType, isSelected) })
                     .addTo(radarMap)
                     .on('click', () => selectAircraft(icao));
                 markers[icao].bindTooltip(`${callsign}<br>${alt}`, {
@@ -2921,7 +2922,7 @@ sudo make install</code>
                 });
             }
 
-            markerState[icao] = { rotation, color, callsign, alt, iconType };
+            markerState[icao] = { rotation, color, callsign, alt, iconType, isSelected };
         }
 
         // Aircraft type icon SVG paths
@@ -2964,12 +2965,14 @@ sudo make install</code>
             return 'jet';
         }
 
-        function createMarkerIcon(rotation, color, iconType = 'jet') {
+        function createMarkerIcon(rotation, color, iconType = 'jet', isSelected = false) {
             const path = AIRCRAFT_ICONS[iconType] || AIRCRAFT_ICONS.jet;
             const size = iconType === 'helicopter' ? 22 : 24;
+            const glowColor = isSelected ? 'rgba(255,255,255,0.9)' : color;
+            const glowSize = isSelected ? '10px' : '5px';
             return L.divIcon({
-                className: `aircraft-marker aircraft-${iconType}`,
-                html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg); color: ${color}; filter: drop-shadow(0 0 5px ${color});">
+                className: `aircraft-marker aircraft-${iconType}${isSelected ? ' selected' : ''}`,
+                html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg); color: ${color}; filter: drop-shadow(0 0 ${glowSize} ${glowColor});">
                     <path fill="currentColor" d="${path}"/>
                 </svg>`,
                 iconSize: [size, size],
@@ -3086,7 +3089,26 @@ sudo make install</code>
         }
 
         function selectAircraft(icao) {
+            const prevSelected = selectedIcao;
             selectedIcao = icao;
+
+            // Update marker icons for both previous and new selection
+            [prevSelected, icao].forEach(targetIcao => {
+                if (targetIcao && markers[targetIcao] && aircraft[targetIcao]) {
+                    const ac = aircraft[targetIcao];
+                    const militaryInfo = isMilitaryAircraft(targetIcao, ac.callsign);
+                    const rotation = Math.round((ac.heading || 0) / 5) * 5;
+                    const color = militaryInfo.military ? '#556b2f' : getAltitudeColor(ac.altitude);
+                    const iconType = getAircraftIconType(ac.type_code, militaryInfo.military);
+                    const isSelected = targetIcao === icao;
+                    markers[targetIcao].setIcon(createMarkerIcon(rotation, color, iconType, isSelected));
+                    // Update marker state to reflect selection
+                    if (markerState[targetIcao]) {
+                        markerState[targetIcao].isSelected = isSelected;
+                    }
+                }
+            });
+
             renderAircraftList();
             showAircraftDetails(icao);
             updateFlightLookupBtn();
