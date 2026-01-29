@@ -190,6 +190,11 @@
     </main>
 
     <script>
+        // Bias-T helper (reads from main dashboard localStorage)
+        function getBiasTEnabled() {
+            return localStorage.getItem('biasTEnabled') === 'true';
+        }
+
         // State
         let vesselMap = null;
         let vessels = {};
@@ -542,7 +547,7 @@
                 fetch(`/controller/agents/${aisCurrentAgent}/ais/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device, gain })
+                    body: JSON.stringify({ device, gain, bias_t: getBiasTEnabled() })
                 })
                 .then(r => r.json())
                 .then(result => {
@@ -567,7 +572,7 @@
             fetch('/ais/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device, gain })
+                body: JSON.stringify({ device, gain, bias_t: getBiasTEnabled() })
             })
             .then(r => r.json())
             .then(data => {
@@ -1619,7 +1624,7 @@
                 fetch(`/controller/agents/${aisCurrentAgent}/ais/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device, gain })
+                    body: JSON.stringify({ device, gain, bias_t: getBiasTEnabled() })
                 })
                 .then(r => r.json())
                 .then(data => {

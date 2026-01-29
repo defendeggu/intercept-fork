@@ -317,6 +317,13 @@
 
     <script>
         // ============================================
+        // BIAS-T HELPER (reads from main dashboard localStorage)
+        // ============================================
+        function getBiasTEnabled() {
+            return localStorage.getItem('biasTEnabled') === 'true';
+        }
+
+        // ============================================
         // STATE
         // ============================================
         let radarMap = null;
@@ -2424,7 +2431,8 @@ sudo make install</code>
                 const adsbDevice = parseInt(document.getElementById('adsbDeviceSelect').value) || 0;
 
                 const requestBody = {
-                    device: adsbDevice
+                    device: adsbDevice,
+                    bias_t: getBiasTEnabled()
                 };
                 if (remoteConfig) {
                     requestBody.remote_sbs_host = remoteConfig.host;
@@ -2605,7 +2613,7 @@ sudo make install</code>
                 const startResponse = await fetch('/adsb/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device: device })
+                    body: JSON.stringify({ device: device, bias_t: getBiasTEnabled() })
                 });
 
                 const result = await startResponse.json();
