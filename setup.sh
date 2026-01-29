@@ -303,6 +303,10 @@ install_python_deps() {
   else
     ok "Python dependencies installed"
   fi
+
+  # Ensure Flask 3.0+ is installed (required for Werkzeug 3.x compatibility)
+  # System apt packages may have older Flask 2.x which is incompatible
+  python -m pip install --upgrade "flask>=3.0.0" >/dev/null 2>&1 || true
   echo
 }
 
