@@ -240,7 +240,7 @@ def iss_schedule():
     """
     Get ISS pass schedule for SSTV reception.
 
-    Uses the satellite prediction endpoint to find upcoming ISS passes.
+    Calculates ISS passes directly using skyfield.
 
     Query parameters:
         latitude: Observer latitude (required)
@@ -260,36 +260,96 @@ def iss_schedule():
             'message': 'latitude and longitude parameters required'
         }), 400
 
-    # Use satellite route to get ISS passes
     try:
-        from flask import current_app
-        import requests
+        from skyfield.api import load, wgs84, EarthSatellite
+        from skyfield.almanac import find_discrete
+        from datetime import timedelta
+        from data.satellites import TLE_SATELLITES
 
-        # Call satellite predict endpoint
-        with current_app.test_client() as client:
-            response = client.post('/satellite/predict', json={
-                'latitude': lat,
-                'longitude': lon,
-                'hours': hours,
-                'satellites': ['ISS'],
-                'minEl': 10
-            })
-            data = response.get_json()
+        # Get ISS TLE
+        iss_tle = TLE_SATELLITES.get('ISS')
+        if not iss_tle:
+            return jsonify({
+                'status': 'error',
+                'message': 'ISS TLE data not available'
+            }), 500
 
-            if data.get('status') == 'success':
-                passes = data.get('passes', [])
-                return jsonify({
-                    'status': 'ok',
-                    'passes': passes,
-                    'count': len(passes),
-                    'sstv_frequency': ISS_SSTV_FREQ,
-                    'note': 'ISS SSTV events are not continuous. Check ARISS.org for scheduled events.'
-                })
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': data.get('message', 'Failed to get ISS passes')
-                }), 500
+        ts = load.timescale()
+        satellite = EarthSatellite(iss_tle[1], iss_tle[2], iss_tle[0], ts)
+        observer = wgs84.latlon(lat, lon)
+
+        t0 = ts.now()
+        t1 = ts.utc(t0.utc_datetime() + timedelta(hours=hours))
+
+        def above_horizon(t):
+            diff = satellite - observer
+            topocentric = diff.at(t)
+            alt, _, _ = topocentric.altaz()
+            return alt.degrees > 0
+
+        above_horizon.step_days = 1/720
+
+        times, events = find_discrete(t0, t1, above_horizon)
+
+        passes = []
+        i = 0
+        while i < len(times):
+            if i < len(events) and events[i]:  # Rising
+                rise_time = times[i]
+                set_time = None
+
+                for j in range(i + 1, len(times)):
+                    if not events[j]:  # Setting
+                        set_time = times[j]
+                        i = j
+                        break
+                else:
+                    i += 1
+                    continue
+
+                if set_time is None:
+                    i += 1
+                    continue
+
+                # Calculate max elevation
+                max_el = 0
+                duration_seconds = (set_time.utc_datetime() - rise_time.utc_datetime()).total_seconds()
+                duration_minutes = int(duration_seconds / 60)
+
+                for k in range(30):
+                    frac = k / 29
+                    t_point = ts.utc(rise_time.utc_datetime() + timedelta(seconds=duration_seconds * frac))
+                    diff = satellite - observer
+                    topocentric = diff.at(t_point)
+                    alt, _, _ = topocentric.altaz()
+                    if alt.degrees > max_el:
+                        max_el = alt.degrees
+
+                if max_el >= 10:  # Min elevation filter
+                    passes.append({
+                        'satellite': 'ISS',
+                        'startTime': rise_time.utc_datetime().strftime('%Y-%m-%d %H:%M UTC'),
+                        'startTimeISO': rise_time.utc_datetime().isoformat(),
+                        'maxEl': round(max_el, 1),
+                        'duration': duration_minutes,
+                        'color': '#00ffff'
+                    })
+
+            i += 1
+
+        return jsonify({
+            'status': 'ok',
+            'passes': passes,
+            'count': len(passes),
+            'sstv_frequency': ISS_SSTV_FREQ,
+            'note': 'ISS SSTV events are not continuous. Check ARISS.org for scheduled events.'
+        })
+
+    except ImportError:
+        return jsonify({
+            'status': 'error',
+            'message': 'skyfield library not installed'
+        }), 503
 
     except Exception as e:
         logger.error(f"Error getting ISS schedule: {e}")
