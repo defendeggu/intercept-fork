@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>iNTERCEPT // See the Invisible</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <!-- Disclaimer gate - must accept before seeing welcome page -->
+    <script>
+        // Check BEFORE page renders - if disclaimer not accepted, hide welcome page
+        if (localStorage.getItem('disclaimerAccepted') !== 'true') {
+            document.write('<style id="disclaimer-gate">.welcome-overlay{display:none !important}</style>');
+            window._showDisclaimerOnLoad = true;
+        }
+    </script>
     <!-- Fonts - Conditional CDN/Local loading -->
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
@@ -1899,31 +1907,30 @@
             const welcome = document.getElementById('welcomePage');
             welcome.classList.add('fade-out');
 
-            // After fade out, hide welcome and show disclaimer if needed
+            // After fade out, hide welcome and switch to mode
             setTimeout(() => {
                 welcome.style.display = 'none';
-                checkDisclaimer();
+                switchMode(mode);
             }, 400);
         }
 
-        // Disclaimer handling
-        function checkDisclaimer() {
-            const accepted = localStorage.getItem('disclaimerAccepted');
-            if (accepted === 'true') {
-                document.getElementById('disclaimerModal').style.display = 'none';
-                // Switch to the selected mode
-                switchMode(selectedStartMode);
-            } else {
-                document.getElementById('disclaimerModal').style.display = 'flex';
-            }
+        // Disclaimer handling - show on page load if not accepted
+        function showDisclaimer() {
+            document.getElementById('disclaimerModal').style.display = 'flex';
         }
 
         function acceptDisclaimer() {
             localStorage.setItem('disclaimerAccepted', 'true');
             document.getElementById('disclaimerModal').classList.add('disclaimer-hidden');
-            // Switch to the selected mode after accepting
+
+            // After fade out, hide disclaimer and show welcome page
             setTimeout(() => {
-                switchMode(selectedStartMode);
+                document.getElementById('disclaimerModal').style.display = 'none';
+                // Remove the gate CSS that was hiding welcome page
+                const gateStyle = document.getElementById('disclaimer-gate');
+                if (gateStyle) gateStyle.remove();
+                // Ensure welcome page is visible
+                document.getElementById('welcomePage').style.display = '';
             }, 300);
         }
 
@@ -1932,7 +1939,12 @@
             document.getElementById('rejectionPage').classList.remove('disclaimer-hidden');
         }
 
-        // Don't auto-check disclaimer - wait for welcome page mode selection
+        // Show disclaimer on page load if not yet accepted
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window._showDisclaimerOnLoad) {
+                showDisclaimer();
+            }
+        });
 
         let eventSource = null;
         let isRunning = false;
