@@ -176,17 +176,21 @@ const SSTV = (function() {
      * Fetch current ISS position
      */
     async function updateIssPosition() {
-        const storedLat = localStorage.getItem('observerLat') || 51.5074;
-        const storedLon = localStorage.getItem('observerLon') || -0.1278;
+        const storedLat = localStorage.getItem('observerLat') || '51.5074';
+        const storedLon = localStorage.getItem('observerLon') || '-0.1278';
 
         try {
-            const response = await fetch(`/sstv/iss-position?latitude=${storedLat}&longitude=${storedLon}`);
+            const url = `/sstv/iss-position?latitude=${storedLat}&longitude=${storedLon}`;
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.status === 'ok') {
                 issPosition = data;
                 updateIssDisplay();
                 renderGlobe();
+                console.log('ISS position updated:', data.lat.toFixed(1), data.lon.toFixed(1));
+            } else {
+                console.warn('ISS position error:', data.message);
             }
         } catch (err) {
             console.error('Failed to get ISS position:', err);
@@ -209,7 +213,7 @@ const SSTV = (function() {
     }
 
     /**
-     * Render 3D globe with ISS position
+     * Render 3D globe with ISS position - globe rotates to center on ISS
      */
     function renderGlobe() {
         const canvas = document.getElementById('sstvGlobe');
@@ -219,6 +223,9 @@ const SSTV = (function() {
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
         const radius = Math.min(cx, cy) - 10;
+
+        // Globe rotation - center on ISS longitude if available
+        const globeRotation = issPosition ? -issPosition.lon : 0;
 
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -247,75 +254,67 @@ const SSTV = (function() {
             ctx.stroke();
         }
 
-        // Longitude lines
+        // Longitude lines (rotated with globe)
         for (let lon = 0; lon < 180; lon += 30) {
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, radius * Math.cos(lon * Math.PI / 180), radius, 0, 0, Math.PI * 2);
-            ctx.stroke();
+            const rotatedLon = lon + globeRotation;
+            const xScale = Math.cos(rotatedLon * Math.PI / 180);
+            if (Math.abs(xScale) > 0.1) {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, Math.abs(xScale) * radius, radius, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         }
 
-        // Draw simple landmasses (simplified continents)
-        ctx.fillStyle = 'rgba(0, 180, 100, 0.3)';
-        ctx.strokeStyle = 'rgba(0, 200, 120, 0.4)';
-        ctx.lineWidth = 1;
-
-        // Draw ISS position
+        // Draw ISS position - always visible since globe is centered on it
         if (issPosition) {
             const issLat = issPosition.lat;
-            const issLon = issPosition.lon;
 
-            // Convert lat/lon to x/y on globe (simple projection)
-            // Only show if on visible hemisphere (simplified: lon between -90 and 90)
-            const normalizedLon = ((issLon + 180) % 360) - 180;
-            const visibleRange = 90;
+            // ISS is always at center horizontally (globe rotated to it)
+            const x = cx;
+            const y = cy - (issLat / 90) * radius;
 
-            if (Math.abs(normalizedLon) <= visibleRange) {
-                const x = cx + (normalizedLon / 90) * radius * Math.cos(issLat * Math.PI / 180);
-                const y = cy - (issLat / 90) * radius;
+            // ISS glow
+            const issGradient = ctx.createRadialGradient(x, y, 0, x, y, 20);
+            issGradient.addColorStop(0, 'rgba(0, 212, 255, 0.9)');
+            issGradient.addColorStop(0.4, 'rgba(0, 212, 255, 0.4)');
+            issGradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
 
-                // ISS glow
-                const issGradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
-                issGradient.addColorStop(0, 'rgba(0, 212, 255, 0.8)');
-                issGradient.addColorStop(0.5, 'rgba(0, 212, 255, 0.3)');
-                issGradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = issGradient;
+            ctx.fill();
 
-                ctx.beginPath();
-                ctx.arc(x, y, 15, 0, Math.PI * 2);
-                ctx.fillStyle = issGradient;
-                ctx.fill();
+            // ISS dot
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#00d4ff';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
-                // ISS dot
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#00d4ff';
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-
-                // ISS label
-                ctx.fillStyle = '#00d4ff';
-                ctx.font = 'bold 9px JetBrains Mono, monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('ISS', x, y - 12);
-            }
+            // ISS label
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 10px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('ISS', x, y - 15);
         }
 
         // Draw globe edge highlight
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+        ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
         // Atmospheric glow
-        const atmoGradient = ctx.createRadialGradient(cx, cy, radius - 5, cx, cy, radius + 8);
+        const atmoGradient = ctx.createRadialGradient(cx, cy, radius - 5, cx, cy, radius + 10);
         atmoGradient.addColorStop(0, 'rgba(0, 212, 255, 0)');
-        atmoGradient.addColorStop(0.5, 'rgba(0, 212, 255, 0.1)');
+        atmoGradient.addColorStop(0.6, 'rgba(0, 212, 255, 0.15)');
         atmoGradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
 
         ctx.beginPath();
-        ctx.arc(cx, cy, radius + 8, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2);
         ctx.fillStyle = atmoGradient;
         ctx.fill();
     }
