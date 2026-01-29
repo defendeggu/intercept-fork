@@ -570,7 +570,7 @@ function loadObserverLocation() {
 /**
  * Detect location using browser GPS
  */
-function detectLocationGPS() {
+function detectLocationGPS(btn) {
     const latInput = document.getElementById('observerLatInput');
     const lonInput = document.getElementById('observerLonInput');
 
@@ -584,7 +584,6 @@ function detectLocationGPS() {
     }
 
     // Show loading state
-    const btn = event.target.closest('button');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<span style="opacity: 0.7;">Detecting...</span>';
     btn.disabled = true;
