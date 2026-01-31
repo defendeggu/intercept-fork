@@ -91,6 +91,17 @@ def register_agent():
     if not base_url:
         return jsonify({'status': 'error', 'message': 'Base URL is required'}), 400
 
+    # Validate URL format
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(base_url)
+        if parsed.scheme not in ('http', 'https'):
+            return jsonify({'status': 'error', 'message': 'URL must start with http:// or https://'}), 400
+        if not parsed.netloc:
+            return jsonify({'status': 'error', 'message': 'Invalid URL format'}), 400
+    except Exception:
+        return jsonify({'status': 'error', 'message': 'Invalid URL format'}), 400
+
     # Check if agent already exists
     existing = get_agent_by_name(name)
     if existing:
@@ -128,9 +139,12 @@ def register_agent():
             update_agent(agent_id, update_last_seen=True)
 
         agent = get_agent(agent_id)
+        message = 'Agent registered successfully'
+        if capabilities is None:
+            message += ' (could not connect - agent may be offline)'
         return jsonify({
             'status': 'success',
-            'message': 'Agent registered successfully',
+            'message': message,
             'agent': agent
         }), 201
 
@@ -460,6 +474,39 @@ def proxy_mode_data(agent_id: int, mode: str):
         })
 
     except (AgentHTTPError, AgentConnectionError) as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Agent error: {e}'
+        }), 502
+
+
+@controller_bp.route('/agents/<int:agent_id>/wifi/monitor', methods=['POST'])
+def proxy_wifi_monitor(agent_id: int):
+    """Toggle monitor mode on a remote agent's WiFi interface."""
+    agent = get_agent(agent_id)
+    if not agent:
+        return jsonify({'status': 'error', 'message': 'Agent not found'}), 404
+
+    data = request.json or {}
+
+    try:
+        client = create_client_from_agent(agent)
+        result = client.post('/wifi/monitor', data)
+
+        return jsonify({
+            'status': result.get('status', 'error'),
+            'agent_id': agent_id,
+            'agent_name': agent['name'],
+            'monitor_interface': result.get('monitor_interface'),
+            'message': result.get('message')
+        })
+
+    except AgentConnectionError as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Cannot connect to agent: {e}'
+        }), 503
+    except AgentHTTPError as e:
         return jsonify({
             'status': 'error',
             'message': f'Agent error: {e}'

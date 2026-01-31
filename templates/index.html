@@ -5444,6 +5444,40 @@
             const select = document.getElementById('wifiInterfaceSelect');
             select.innerHTML = '<option value="">Loading interfaces...</option>';
 
+            // Check if we're in agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+
+            if (isAgentMode) {
+                // Fetch from agent via controller
+                fetch(`/controller/agents/${currentAgent}?refresh=true`)
+                    .then(r => {
+                        if (!r.ok) throw new Error('Failed to fetch agent interfaces');
+                        return r.json();
+                    })
+                    .then(data => {
+                        const interfaces = data.agent?.interfaces?.wifi_interfaces || [];
+                        if (interfaces.length === 0) {
+                            select.innerHTML = '<option value="">No WiFi interfaces on agent</option>';
+                            showNotification('WiFi', 'No WiFi interfaces found on remote agent.');
+                        } else {
+                            select.innerHTML = interfaces.map(i => {
+                                let label = i.name || i;
+                                if (i.display_name) label = i.display_name;
+                                else if (i.type) label += ` (${i.type})`;
+                                if (i.monitor_capable) label += ' [Monitor OK]';
+                                return `<option value="${i.name || i}">${label}</option>`;
+                            }).join('');
+                            showNotification('WiFi', `Found ${interfaces.length} interface(s) on agent`);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to refresh agent interfaces:', err);
+                        select.innerHTML = '<option value="">Error loading agent interfaces</option>';
+                        showNotification('WiFi', 'Failed to load agent interfaces');
+                    });
+                return;
+            }
+
             fetch('/wifi/interfaces')
                 .then(r => {
                     if (!r.ok) throw new Error('Failed to fetch interfaces');
@@ -5500,6 +5534,7 @@
             }
 
             const killProcesses = document.getElementById('killProcesses').checked;
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
             // Show loading state
             const btn = document.getElementById('monitorStartBtn');
@@ -5507,7 +5542,12 @@
             btn.textContent = 'Enabling...';
             btn.disabled = true;
 
-            fetch('/wifi/monitor', {
+            // Use agent endpoint if in agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/wifi/monitor`
+                : '/wifi/monitor';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ interface: iface, action: 'start', kill_processes: killProcesses })
@@ -5519,29 +5559,13 @@
                     if (data.status === 'success') {
                         monitorInterface = data.monitor_interface;
                         updateMonitorStatus(true);
-                        showInfo('Monitor mode enabled on ' + monitorInterface + ' - Ready to scan!');
+                        const location = isAgentMode ? ' on remote agent' : '';
+                        showInfo('Monitor mode enabled on ' + monitorInterface + location + ' - Ready to scan!');
 
                         // Refresh interface list and auto-select the monitor interface
-                        fetch('/wifi/interfaces')
-                            .then(r => r.json())
-                            .then(ifaceData => {
-                                const select = document.getElementById('wifiInterfaceSelect');
-                                if (ifaceData.interfaces.length > 0) {
-                                    select.innerHTML = ifaceData.interfaces.map(i => {
-                                        let label = i.name;
-                                        let details = [];
-                                        if (i.chipset) details.push(i.chipset);
-                                        else if (i.driver) details.push(i.driver);
-                                        if (i.mac) details.push(i.mac.substring(0, 8) + '...');
-                                        if (details.length > 0) label += ' - ' + details.join(' | ');
-                                        label += ` (${i.type})`;
-                                        if (i.monitor_capable) label += ' [Monitor OK]';
-                                        return `<option value="${i.name}" ${i.name === monitorInterface ? 'selected' : ''}>${label}</option>`;
-                                    }).join('');
-                                }
-                            });
+                        refreshWifiInterfaces();
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 })
                 .catch(err => {
@@ -5554,8 +5578,13 @@
         // Disable monitor mode
         function disableMonitorMode() {
             const iface = monitorInterface || document.getElementById('wifiInterfaceSelect').value;
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
-            fetch('/wifi/monitor', {
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/wifi/monitor`
+                : '/wifi/monitor';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ interface: iface, action: 'stop' })
@@ -5566,7 +5595,7 @@
                         updateMonitorStatus(false);
                         showInfo('Monitor mode disabled');
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 });
         }

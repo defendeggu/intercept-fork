@@ -77,6 +77,7 @@ const WiFiMode = (function() {
     let scanMode = 'quick'; // 'quick' or 'deep'
     let eventSource = null;
     let pollTimer = null;
+    let agentPollTimer = null;
 
     // Data stores
     let networks = new Map(); // bssid -> network
@@ -505,8 +506,13 @@ const WiFiMode = (function() {
                 console.log('[WiFiMode] Agent deep scan started:', scanResult);
             }
 
-            // Start SSE stream for real-time updates
+            // Start SSE stream for real-time updates (works with push-enabled agents)
             startEventStream();
+
+            // Also start polling for agent data (works without push enabled)
+            if (isAgentMode) {
+                startAgentDeepScanPolling();
+            }
         } catch (error) {
             console.error('[WiFiMode] Deep scan error:', error);
             showError(error.message);
@@ -522,6 +528,9 @@ const WiFiMode = (function() {
             clearInterval(pollTimer);
             pollTimer = null;
         }
+
+        // Stop agent polling
+        stopAgentDeepScanPolling();
 
         // Close event stream
         if (eventSource) {
@@ -584,9 +593,15 @@ const WiFiMode = (function() {
             const status = isAgentMode && data.result ? data.result : data;
 
             if (status.is_scanning || status.running) {
-                setScanning(true, status.scan_mode);
-                if (status.scan_mode === 'deep') {
+                // Agent returns scan_type in params, local returns scan_mode
+                const detectedMode = status.scan_mode || (status.params && status.params.scan_type) || 'deep';
+                setScanning(true, detectedMode);
+                if (detectedMode === 'deep') {
                     startEventStream();
+                    // Also start polling for agent mode (works without push enabled)
+                    if (isAgentMode) {
+                        startAgentDeepScanPolling();
+                    }
                 } else {
                     startQuickScanPolling();
                 }
@@ -653,6 +668,76 @@ const WiFiMode = (function() {
         result.access_points.forEach(ap => {
             if (onNetworkUpdate) onNetworkUpdate(ap);
         });
+    }
+
+    // ==========================================================================
+    // Agent Deep Scan Polling (fallback when push is not enabled)
+    // ==========================================================================
+
+    function startAgentDeepScanPolling() {
+        if (agentPollTimer) return;
+
+        console.log('[WiFiMode] Starting agent deep scan polling...');
+
+        agentPollTimer = setInterval(async () => {
+            if (!isScanning || scanMode !== 'deep') {
+                clearInterval(agentPollTimer);
+                agentPollTimer = null;
+                return;
+            }
+
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            if (!isAgentMode) {
+                clearInterval(agentPollTimer);
+                agentPollTimer = null;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/controller/agents/${currentAgent}/wifi/data`);
+                if (!response.ok) return;
+
+                const result = await response.json();
+                if (result.status !== 'success' || !result.data) return;
+
+                const data = result.data.data || result.data;
+                const agentName = result.agent_name || 'Remote';
+
+                // Process networks
+                if (data.networks && Array.isArray(data.networks)) {
+                    data.networks.forEach(net => {
+                        net._agent = agentName;
+                        handleStreamEvent({
+                            type: 'network_update',
+                            network: net
+                        });
+                    });
+                }
+
+                // Process clients
+                if (data.clients && Array.isArray(data.clients)) {
+                    data.clients.forEach(client => {
+                        client._agent = agentName;
+                        handleStreamEvent({
+                            type: 'client_update',
+                            client: client
+                        });
+                    });
+                }
+
+                console.debug(`[WiFiMode] Agent poll: ${data.networks?.length || 0} networks, ${data.clients?.length || 0} clients`);
+
+            } catch (error) {
+                console.debug('[WiFiMode] Agent poll error:', error);
+            }
+        }, 2000); // Poll every 2 seconds
+    }
+
+    function stopAgentDeepScanPolling() {
+        if (agentPollTimer) {
+            clearInterval(agentPollTimer);
+            agentPollTimer = null;
+        }
     }
 
     // ==========================================================================
@@ -1305,6 +1390,9 @@ const WiFiMode = (function() {
 
         // Refresh capabilities for new agent
         checkCapabilities();
+
+        // Check if new agent already has a scan running
+        checkScanStatus();
 
         lastAgentId = currentAgentId;
     }
