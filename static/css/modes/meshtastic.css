@@ -1,0 +1,1610 @@
+/**
+ * Meshtastic Mode Styles
+ * Mesh network monitoring interface
+ */
+
+/* ============================================
+   MODE VISIBILITY
+   ============================================ */
+#meshtasticMode.active {
+    display: block !important;
+}
+
+/* ============================================
+   MAIN SIDEBAR COLLAPSE (for Meshtastic mode)
+   ============================================ */
+
+/* When sidebar is hidden, adjust layout */
+.main-content.mesh-sidebar-hidden {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.main-content.mesh-sidebar-hidden > .sidebar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+.main-content.mesh-sidebar-hidden > .output-panel {
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Hide Sidebar Button in sidebar */
+.mesh-hide-sidebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.15s ease;
+}
+
+.mesh-hide-sidebar-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.mesh-hide-sidebar-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* When sidebar is hidden, highlight the toggle button in stats strip */
+.main-content.mesh-sidebar-hidden .mesh-strip-sidebar-toggle {
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+.main-content.mesh-sidebar-hidden .mesh-strip-sidebar-toggle:hover {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+/* Sidebar toggle button in stats strip */
+.mesh-strip-sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+    pointer-events: auto;
+    z-index: 100;
+    position: relative;
+}
+
+.mesh-strip-sidebar-toggle:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.mesh-strip-sidebar-toggle svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.2s ease;
+}
+
+@media (min-width: 1024px) {
+    .main-content.mesh-sidebar-hidden .mesh-strip-sidebar-toggle svg {
+        transform: rotate(180deg);
+    }
+}
+
+/* ============================================
+   COLLAPSIBLE SIDEBAR CONTENT
+   ============================================ */
+.mesh-sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: all 0.15s ease;
+}
+
+.mesh-sidebar-toggle:hover {
+    background: var(--bg-card);
+    border-color: var(--border-light);
+}
+
+.mesh-sidebar-toggle-icon {
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform 0.2s ease;
+}
+
+.mesh-sidebar-toggle-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mesh-sidebar-content {
+    display: block;
+    transition: all 0.2s ease;
+}
+
+/* Collapsed state */
+#meshtasticMode.mesh-sidebar-collapsed .mesh-sidebar-content {
+    display: none;
+}
+
+#meshtasticMode.mesh-sidebar-collapsed .mesh-sidebar-toggle-icon {
+    transform: rotate(0deg);
+}
+
+#meshtasticMode:not(.mesh-sidebar-collapsed) .mesh-sidebar-toggle-icon {
+    transform: rotate(90deg);
+}
+
+/* ============================================
+   MAIN VISUALS CONTAINER
+   ============================================ */
+.mesh-visuals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ============================================
+   MAIN ROW (Map + Messages side by side)
+   ============================================ */
+.mesh-main-row {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ============================================
+   STATS STRIP (Compact Header Bar)
+   ============================================ */
+.mesh-stats-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.mesh-strip-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.mesh-strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mesh-strip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.mesh-strip-dot.disconnected {
+    background: var(--text-dim);
+}
+
+.mesh-strip-dot.connecting {
+    background: var(--accent-yellow);
+    animation: pulse 1s infinite;
+}
+
+.mesh-strip-dot.connected {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green);
+}
+
+.mesh-strip-status-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.mesh-strip-select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    max-width: 120px;
+}
+
+.mesh-strip-input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    max-width: 140px;
+}
+
+.mesh-strip-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.mesh-strip-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.mesh-strip-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 5px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.mesh-strip-btn.connect {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+.mesh-strip-btn.connect:hover {
+    background: var(--accent-cyan-bright, #00d4ff);
+}
+
+.mesh-strip-btn.disconnect {
+    background: var(--accent-red, #ff3366);
+    color: white;
+}
+
+.mesh-strip-btn.disconnect:hover {
+    background: #ff1a53;
+}
+
+.mesh-strip-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+}
+
+.mesh-strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 50px;
+}
+
+.mesh-strip-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+.mesh-strip-value.accent-cyan {
+    color: var(--accent-cyan);
+}
+
+.mesh-strip-value.accent-green {
+    color: var(--accent-green);
+}
+
+.mesh-strip-id {
+    font-size: 10px;
+    color: var(--accent-cyan);
+}
+
+.mesh-strip-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+    .mesh-stats-strip {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .mesh-strip-group {
+        gap: 8px;
+    }
+
+    .mesh-strip-divider {
+        display: none;
+    }
+
+    .mesh-strip-stat {
+        min-width: 40px;
+    }
+
+    .mesh-strip-value {
+        font-size: 11px;
+        max-width: 60px;
+    }
+}
+
+/* ============================================
+   NODE MAP SECTION
+   ============================================ */
+.mesh-map-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 400px;
+}
+
+.mesh-map-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mesh-map-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mesh-map-title svg {
+    color: var(--accent-cyan);
+}
+
+.mesh-map-stats {
+    display: flex;
+    gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.mesh-map-stats span:last-child {
+    color: var(--accent-green);
+}
+
+.mesh-map {
+    flex: 1;
+    min-height: 0;
+    background: var(--bg-primary);
+}
+
+/* Leaflet map overrides for dark theme */
+.mesh-map .leaflet-container {
+    background: var(--bg-primary);
+}
+
+/* Override Leaflet's default div-icon styling for mesh markers */
+.mesh-marker-wrapper.leaflet-div-icon {
+    background: transparent;
+    border: none;
+}
+
+.mesh-map .leaflet-popup-content-wrapper {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.mesh-map .leaflet-popup-tip {
+    background: var(--bg-card);
+}
+
+.mesh-map .leaflet-popup-content {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin: 10px 12px;
+}
+
+/* Custom node marker - high visibility on dark maps */
+.mesh-node-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #00ffff;  /* Bright cyan for maximum visibility */
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        0 0 20px 8px rgba(0, 255, 255, 0.7),  /* Strong outer glow */
+        inset 0 0 8px rgba(255, 255, 255, 0.3);  /* Inner highlight */
+    color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.mesh-node-marker.local {
+    background: #00ff88;  /* Bright green for local node */
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        0 0 20px 8px rgba(0, 255, 136, 0.7),  /* Strong green glow */
+        inset 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.mesh-node-marker.stale {
+    background: #888888;
+    border-color: #aaaaaa;
+    opacity: 0.8;
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.4),
+        0 0 8px 2px rgba(136, 136, 136, 0.3);  /* Subtle glow for stale */
+}
+
+/* ============================================
+   MESSAGES SECTION
+   ============================================ */
+.mesh-messages-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 400px;
+}
+
+/* ============================================
+   CONNECTION STATUS
+   ============================================ */
+.mesh-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.mesh-status-dot.disconnected {
+    background: var(--accent-red, #ff3366);
+}
+
+.mesh-status-dot.connecting {
+    background: var(--accent-yellow, #ffc107);
+    animation: pulse-status 1s ease-in-out infinite;
+}
+
+.mesh-status-dot.connected {
+    background: var(--accent-green, #22c55e);
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ============================================
+   NODE INFO PANEL
+   ============================================ */
+.mesh-node-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.mesh-node-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+}
+
+.mesh-node-label {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+}
+
+.mesh-node-value {
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.mesh-node-id {
+    color: var(--accent-cyan);
+}
+
+/* ============================================
+   CHANNEL LIST
+   ============================================ */
+.mesh-channel-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    transition: all 0.15s ease;
+}
+
+.mesh-channel-item:hover {
+    border-color: var(--border-light);
+}
+
+.mesh-channel-item.disabled {
+    opacity: 0.5;
+}
+
+.mesh-channel-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.mesh-channel-index {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--bg-primary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.mesh-channel-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mesh-channel-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.mesh-channel-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.mesh-badge-primary {
+    background: rgba(74, 158, 255, 0.15);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+}
+
+.mesh-badge-secondary {
+    background: rgba(136, 136, 136, 0.15);
+    color: var(--text-secondary);
+    border: 1px solid rgba(136, 136, 136, 0.3);
+}
+
+.mesh-badge-encrypted {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.mesh-badge-unencrypted {
+    background: rgba(255, 51, 102, 0.15);
+    color: var(--accent-red, #ff3366);
+    border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+.mesh-channel-configure {
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.mesh-channel-configure:hover {
+    color: var(--text-primary);
+    border-color: var(--border-light);
+    background: var(--bg-primary);
+}
+
+/* ============================================
+   MESSAGE FEED CONTAINER
+   ============================================ */
+.mesh-messages-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.mesh-messages-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.mesh-messages-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mesh-messages-title svg {
+    color: var(--accent-cyan);
+}
+
+.mesh-messages-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mesh-messages-filter select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 6px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.mesh-messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 12px;
+}
+
+/* ============================================
+   MESSAGE CARD
+   ============================================ */
+.mesh-message-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-cyan);
+    border-radius: 4px;
+    padding: 12px 14px;
+    transition: all 0.15s ease;
+}
+
+.mesh-message-card:hover {
+    border-color: var(--border-light);
+    border-left-color: var(--accent-cyan);
+}
+
+.mesh-message-card.text-message {
+    border-left-color: var(--accent-cyan);
+}
+
+.mesh-message-card.position-message {
+    border-left-color: var(--accent-green);
+}
+
+.mesh-message-card.telemetry-message {
+    border-left-color: var(--accent-purple, #a855f7);
+}
+
+.mesh-message-card.nodeinfo-message {
+    border-left-color: var(--accent-orange);
+}
+
+.mesh-message-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mesh-message-route {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.mesh-message-from {
+    color: var(--accent-cyan);
+    font-weight: 600;
+}
+
+.mesh-message-arrow {
+    color: var(--text-dim);
+}
+
+.mesh-message-to {
+    color: var(--text-secondary);
+}
+
+.mesh-message-to.broadcast {
+    color: var(--accent-yellow);
+}
+
+.mesh-message-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+}
+
+.mesh-message-channel {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--text-secondary);
+}
+
+.mesh-message-time {
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.mesh-message-body {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.mesh-message-body.app-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+.mesh-message-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.mesh-signal-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+}
+
+.mesh-signal-label {
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.mesh-signal-value {
+    font-weight: 600;
+}
+
+.mesh-signal-value.rssi {
+    color: var(--accent-cyan);
+}
+
+.mesh-signal-value.snr {
+    color: var(--accent-green);
+}
+
+.mesh-signal-value.snr.poor {
+    color: var(--accent-orange);
+}
+
+.mesh-signal-value.snr.bad {
+    color: var(--accent-red, #ff3366);
+}
+
+/* ============================================
+   MESSAGE STATUS (Pending/Sent/Failed)
+   ============================================ */
+.mesh-message-card.pending {
+    opacity: 0.7;
+    border-left-color: var(--text-dim);
+}
+
+.mesh-message-card.pending .mesh-message-from {
+    color: var(--text-secondary);
+}
+
+.mesh-message-card.failed {
+    border-left-color: var(--accent-red, #ff3366);
+    background: rgba(255, 51, 102, 0.05);
+}
+
+.mesh-message-card.sent {
+    border-left-color: var(--accent-green);
+}
+
+.mesh-message-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mesh-message-status.sending {
+    background: var(--bg-secondary);
+    color: var(--text-dim);
+    animation: pulse-sending 1.5s ease-in-out infinite;
+}
+
+.mesh-message-status.failed {
+    background: rgba(255, 51, 102, 0.15);
+    color: var(--accent-red, #ff3366);
+}
+
+@keyframes pulse-sending {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* Send button sending state */
+.mesh-compose-send.sending {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.mesh-messages-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.mesh-messages-empty svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
+.mesh-messages-empty p {
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+/* ============================================
+   MODAL FORM STYLING
+   ============================================ */
+#meshChannelModal .form-group label {
+    display: block;
+}
+
+#meshChannelModal input[type="text"],
+#meshChannelModal select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+#meshChannelModal input[type="text"]:focus,
+#meshChannelModal select:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+/* ============================================
+   MESSAGE COMPOSE
+   ============================================ */
+.mesh-compose {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 16px;
+    flex-shrink: 0;
+}
+
+.mesh-compose-header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.mesh-compose-channel {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    min-width: 70px;
+    cursor: pointer;
+}
+
+.mesh-compose-channel:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.mesh-compose-to {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    flex: 1;
+    min-width: 100px;
+}
+
+.mesh-compose-to:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.mesh-compose-to::placeholder {
+    color: var(--text-dim);
+}
+
+.mesh-compose-body {
+    display: flex;
+    gap: 8px;
+}
+
+.mesh-compose-input {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.mesh-compose-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.mesh-compose-input::placeholder {
+    color: var(--text-dim);
+}
+
+.mesh-compose-send {
+    background: var(--accent-cyan);
+    border: none;
+    border-radius: 4px;
+    padding: 10px 14px;
+    cursor: pointer;
+    color: #000;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mesh-compose-send:hover {
+    background: var(--accent-green);
+    transform: scale(1.05);
+}
+
+.mesh-compose-send:active {
+    transform: scale(0.98);
+}
+
+.mesh-compose-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.mesh-compose-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    text-align: right;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .mesh-main-row {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .mesh-map-section,
+    .mesh-messages-section {
+        flex: none;
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .mesh-map-section {
+        min-height: 200px;
+    }
+
+    .mesh-messages-section {
+        min-height: 250px;
+    }
+
+    .mesh-map {
+        min-height: 180px;
+    }
+
+    .mesh-map-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .mesh-channel-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .mesh-channel-badges {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .mesh-channel-configure {
+        width: 100%;
+        text-align: center;
+        min-height: 36px;
+    }
+
+    .mesh-message-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .mesh-message-meta {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .mesh-compose-header {
+        flex-direction: column;
+    }
+
+    .mesh-compose-to {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .mesh-messages-container {
+        padding: 8px;
+    }
+
+    .mesh-message-card {
+        padding: 10px;
+    }
+
+    .mesh-message-signal {
+        flex-wrap: wrap;
+    }
+}
+
+/* Touch device compliance */
+@media (pointer: coarse) {
+    .mesh-channel-configure {
+        min-height: 44px;
+        padding: 8px 12px;
+    }
+
+    .mesh-compose-send {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .mesh-compose-input {
+        min-height: 44px;
+    }
+}
+
+/* ============================================
+   TRACEROUTE BUTTON IN POPUP
+   ============================================ */
+.mesh-traceroute-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--accent-cyan);
+    border: none;
+    border-radius: 4px;
+    color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mesh-traceroute-btn:hover {
+    background: var(--accent-green);
+    transform: scale(1.02);
+}
+
+/* ============================================
+   TRACEROUTE MODAL CONTENT
+   ============================================ */
+.mesh-traceroute-content {
+    min-height: 100px;
+}
+
+.mesh-traceroute-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.mesh-traceroute-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: mesh-spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes mesh-spin {
+    to { transform: rotate(360deg); }
+}
+
+.mesh-traceroute-error {
+    padding: 16px;
+    background: rgba(255, 51, 102, 0.1);
+    border: 1px solid var(--accent-red, #ff3366);
+    border-radius: 6px;
+    color: var(--accent-red, #ff3366);
+    font-size: 12px;
+}
+
+.mesh-traceroute-section {
+    margin-bottom: 16px;
+}
+
+.mesh-traceroute-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+.mesh-traceroute-path {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.mesh-traceroute-hop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-width: 70px;
+}
+
+.mesh-traceroute-hop-node {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    margin-bottom: 4px;
+}
+
+.mesh-traceroute-hop-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.mesh-traceroute-snr {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.mesh-traceroute-snr.snr-good {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.mesh-traceroute-snr.snr-ok {
+    background: rgba(74, 158, 255, 0.15);
+    color: var(--accent-cyan);
+}
+
+.mesh-traceroute-snr.snr-poor {
+    background: rgba(255, 193, 7, 0.15);
+    color: var(--accent-orange);
+}
+
+.mesh-traceroute-snr.snr-bad {
+    background: rgba(255, 51, 102, 0.15);
+    color: var(--accent-red, #ff3366);
+}
+
+.mesh-traceroute-arrow {
+    font-size: 18px;
+    color: var(--text-dim);
+    font-weight: bold;
+}
+
+.mesh-traceroute-timestamp {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+/* Responsive traceroute path */
+@media (max-width: 600px) {
+    .mesh-traceroute-path {
+        flex-direction: column;
+    }
+
+    .mesh-traceroute-hop {
+        width: 100%;
+    }
+
+    .mesh-traceroute-arrow {
+        transform: rotate(90deg);
+    }
+}
+
+/* ============================================
+   NODE POPUP ACTION BUTTONS
+   ============================================ */
+.mesh-position-btn,
+.mesh-telemetry-btn {
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mesh-position-btn:hover,
+.mesh-telemetry-btn:hover {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+/* ============================================
+   QR CODE BUTTON
+   ============================================ */
+.mesh-qr-btn {
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mesh-qr-btn:hover {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+/* ============================================
+   TELEMETRY CHARTS
+   ============================================ */
+.mesh-telemetry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mesh-telemetry-chart {
+    margin-bottom: 20px;
+}
+
+.mesh-telemetry-chart-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.mesh-telemetry-current {
+    font-size: 14px;
+    color: var(--accent-cyan);
+}
+
+.mesh-telemetry-svg {
+    width: 100%;
+    height: 100px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.mesh-chart-line {
+    stroke: var(--accent-cyan);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mesh-chart-grid {
+    stroke: var(--border-color);
+    stroke-width: 1;
+}
+
+.mesh-chart-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: var(--text-dim);
+}
+
+/* ============================================
+   NETWORK TOPOLOGY
+   ============================================ */
+.mesh-network-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mesh-network-node {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.mesh-network-node-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mesh-network-node-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+}
+
+.mesh-network-node-count {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.mesh-network-neighbors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mesh-network-neighbor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.mesh-network-neighbor-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.mesh-network-neighbor-snr {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.mesh-network-neighbor-snr.snr-good {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.mesh-network-neighbor-snr.snr-ok {
+    background: rgba(74, 158, 255, 0.15);
+    color: var(--accent-cyan);
+}
+
+.mesh-network-neighbor-snr.snr-poor {
+    background: rgba(255, 193, 7, 0.15);
+    color: var(--accent-orange);
+}
+
+.mesh-network-neighbor-snr.snr-bad {
+    background: rgba(255, 51, 102, 0.15);
+    color: var(--accent-red, #ff3366);
+}
+
+/* ============================================
+   FIRMWARE BADGES
+   ============================================ */
+.mesh-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.mesh-badge-success {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.mesh-badge-warning {
+    background: rgba(255, 193, 7, 0.15);
+    color: var(--accent-orange);
+}

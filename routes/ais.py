@@ -15,6 +15,7 @@ from typing import Generator
 from flask import Blueprint, jsonify, request, Response, render_template
 
 import app as app_module
+from config import SHARED_OBSERVER_LOCATION_ENABLED
 from utils.logging import get_logger
 from utils.validation import validate_device_index, validate_gain
 from utils.sse import format_sse
@@ -480,4 +481,7 @@ def stream_ais():
 @ais_bp.route('/dashboard')
 def ais_dashboard():
     """Popout AIS dashboard."""
-    return render_template('ais_dashboard.html')
+    return render_template(
+        'ais_dashboard.html',
+        shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+    )

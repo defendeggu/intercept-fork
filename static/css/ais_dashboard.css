@@ -370,10 +370,7 @@ body {
     font-family: 'JetBrains Mono', monospace;
 }
 
-.leaflet-tile-pane,
-.leaflet-container .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2) !important;
-}
+/* Using actual dark tiles now - no filter needed */
 
 .leaflet-control-zoom a {
     background: var(--bg-panel) !important;
@@ -757,6 +754,55 @@ body {
 
 .vessel-marker.selected svg {
     filter: drop-shadow(0 0 8px rgba(255,255,255,0.8)) !important;
+}
+
+/* ============================================
+   TRACKED VESSEL PULSATING RING
+   ============================================ */
+.vessel-marker.selected {
+    position: relative;
+}
+
+.tracking-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--accent-cyan);
+    border-radius: 50%;
+    animation: tracking-pulse 1.5s ease-out infinite;
+    pointer-events: none;
+}
+
+.tracking-ring-inner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 50%;
+    animation: tracking-pulse 1.5s ease-out infinite 0.3s;
+    pointer-events: none;
+}
+
+@keyframes tracking-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+        border-color: rgba(74, 158, 255, 1);
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.8);
+        opacity: 0;
+        border-color: rgba(74, 158, 255, 0);
+    }
 }
 
 /* Range rings */
@@ -1200,4 +1246,34 @@ body {
     .dsc-distress-alert .dsc-alert-header {
         font-size: 18px;
     }
+}
+
+/* GPS Indicator */
+.gps-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid #22c55e;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #22c55e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 10px;
+}
+
+.gps-indicator .gps-dot {
+    width: 6px;
+    height: 6px;
+    background: #22c55e;
+    border-radius: 50%;
+    animation: gps-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gps-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
 }

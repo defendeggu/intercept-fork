@@ -1,6 +1,6 @@
 [project]
 name = "intercept"
-version = "2.10.0"
+version = "2.12.0"
 description = "Signal Intelligence Platform - Pager/433MHz/ADS-B/Satellite/WiFi/Bluetooth"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: System :: Networking :: Monitoring",
 ]
 dependencies = [
-    "flask>=2.0.0",
+    "flask>=3.0.0",
     "skyfield>=1.45",
     "pyserial>=3.5",
     "Werkzeug>=3.1.5",

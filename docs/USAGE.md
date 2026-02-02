@@ -65,12 +65,17 @@ INTERCEPT automatically detects known trackers:
    - **Manual Entry** - Type coordinates directly
    - **Browser GPS** - Use browser's built-in geolocation (requires HTTPS)
    - **USB GPS Dongle** - Connect a USB GPS receiver for continuous updates
+   - **Shared Location** - By default, the observer location is shared across modules
+     (disable with `INTERCEPT_SHARED_OBSERVER_LOCATION=false`)
 4. **Start Tracking** - Click "Start Tracking" to begin ADS-B reception
 5. **View Map** - Aircraft appear on the interactive Leaflet map
 6. **Click Aircraft** - Click markers for detailed information
 7. **Display Options** - Toggle callsigns, altitude, trails, range rings, clustering
 8. **Filter Aircraft** - Use dropdown to show all, military, civil, or emergency only
 9. **Full Dashboard** - Click "Full Screen Dashboard" for dedicated radar view
+
+> Note: ADS-B auto-start is disabled by default. To enable auto-start on dashboard load,
+> set `INTERCEPT_ADSB_AUTO_START=true`.
 
 ### Emergency Squawks
 
@@ -96,12 +101,40 @@ Set the following environment variables (Docker recommended):
 | `INTERCEPT_ADSB_DB_USER` | `intercept` | Database user |
 | `INTERCEPT_ADSB_DB_PASSWORD` | `intercept` | Database password |
 
+### Other ADS-B Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INTERCEPT_ADSB_AUTO_START` | `false` | Auto-start ADS-B tracking when the dashboard loads |
+| `INTERCEPT_SHARED_OBSERVER_LOCATION` | `true` | Share observer location across ADS-B/AIS/SSTV/Satellite modules |
+
+**Local install example**
+
+```bash
+INTERCEPT_ADSB_AUTO_START=true \
+INTERCEPT_SHARED_OBSERVER_LOCATION=false \
+python app.py
+```
+
+**Docker example (.env)**
+
+```bash
+INTERCEPT_ADSB_AUTO_START=true
+INTERCEPT_SHARED_OBSERVER_LOCATION=false
+```
+
 ### Docker Setup
 
 `docker-compose.yml` includes an `adsb_db` service and a persistent volume for history storage:
 
 ```bash
-docker compose up -d
+docker compose --profile history up -d
+```
+
+To store Postgres data on external storage, set `PGDATA_PATH` (defaults to `./pgdata`):
+
+```bash
+PGDATA_PATH=/mnt/usbpi1/intercept/pgdata
 ```
 
 ### Using the History Dashboard

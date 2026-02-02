@@ -240,6 +240,11 @@
     </div>
 
     <script>
+        // Bias-T helper (reads from main dashboard localStorage)
+        function getBiasTEnabled() {
+            return localStorage.getItem('biasTEnabled') === 'true';
+        }
+
         const historyEnabled = {{ 'true' if history_enabled else 'false' }};
 
         const summaryMessages = document.getElementById('summaryMessages');
@@ -632,7 +637,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ device, source: 'adsb_history' })
+                    body: JSON.stringify({ device, source: 'adsb_history', bias_t: getBiasTEnabled() })
                 });
                 if (!resp.ok) {
                     sessionNotice.textContent = 'Start failed';

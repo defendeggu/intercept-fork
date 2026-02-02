@@ -33,14 +33,57 @@ def get_tool_path(name: str) -> str | None:
     return None
 
 
+def _get_soapy_env() -> dict[str, str]:
+    """Get environment variables needed for SoapySDR on macOS.
+
+    On macOS with Homebrew, SoapySDR modules are installed in paths that
+    require SOAPY_SDR_ROOT or DYLD_LIBRARY_PATH to be set. This fixes
+    detection issues where modules like SoapyHackRF are installed but
+    not found by SoapySDRUtil.
+
+    See: https://github.com/smittix/intercept/issues/77
+    """
+    import platform
+    env = os.environ.copy()
+
+    if platform.system() == 'Darwin':
+        # Homebrew paths for Apple Silicon and Intel Macs
+        homebrew_paths = ['/opt/homebrew', '/usr/local']
+        lib_paths = []
+        module_paths = []
+
+        for base in homebrew_paths:
+            lib_path = f'{base}/lib'
+            if os.path.isdir(lib_path):
+                lib_paths.append(lib_path)
+            # SoapySDR modules are in lib/SoapySDR/modules<version>
+            soapy_mod_base = f'{base}/lib/SoapySDR'
+            if os.path.isdir(soapy_mod_base):
+                module_paths.append(soapy_mod_base)
+
+        if lib_paths:
+            current_dyld = env.get('DYLD_LIBRARY_PATH', '')
+            env['DYLD_LIBRARY_PATH'] = ':'.join(lib_paths + ([current_dyld] if current_dyld else []))
+
+        # Set SOAPY_SDR_ROOT if we found Homebrew installation
+        for base in homebrew_paths:
+            if os.path.isdir(f'{base}/lib/SoapySDR'):
+                env['SOAPY_SDR_ROOT'] = base
+                break
+
+    return env
+
+
 def check_soapy_factory(factory_name: str) -> bool:
     """Check if a SoapySDR factory/module is available using SoapySDRUtil."""
     try:
         # Run SoapySDRUtil --info and look for the factory in 'Available factories'
-        result = subprocess.run(['SoapySDRUtil', '--info'], capture_output=True, text=True)
+        # Use macOS-aware environment to find Homebrew-installed modules
+        env = _get_soapy_env()
+        result = subprocess.run(['SoapySDRUtil', '--info'], capture_output=True, text=True, env=env)
         if result.returncode != 0:
             return False
-            
+
         # Parse output for available factories
         # Format usually: "Available factories... hackrf, lime, rtlsdr"
         for line in result.stdout.splitlines():

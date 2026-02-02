@@ -204,6 +204,7 @@ check_tools() {
   check_required "dump1090"    "ADS-B decoder" dump1090
   check_required "acarsdec"    "ACARS decoder" acarsdec
   check_required "AIS-catcher" "AIS vessel decoder" AIS-catcher aiscatcher
+  check_optional "slowrx"      "SSTV decoder (ISS images)" slowrx
 
   echo
   info "GPS:"
@@ -303,6 +304,10 @@ install_python_deps() {
   else
     ok "Python dependencies installed"
   fi
+
+  # Ensure Flask 3.0+ is installed (required for Werkzeug 3.x compatibility)
+  # System apt packages may have older Flask 2.x which is incompatible
+  python -m pip install --upgrade "flask>=3.0.0" >/dev/null 2>&1 || true
   echo
 }
 
@@ -381,6 +386,49 @@ install_rtlamr_from_source() {
   fi
 }
 
+install_slowrx_from_source_macos() {
+  info "slowrx not available via Homebrew. Building from source..."
+
+  # Ensure build dependencies are installed
+  brew_install cmake
+  brew_install fftw
+  brew_install libsndfile
+  brew_install gtk+3
+  brew_install pkg-config
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning slowrx..."
+    git clone --depth 1 https://github.com/windytan/slowrx.git "$tmp_dir/slowrx" >/dev/null 2>&1 \
+      || { warn "Failed to clone slowrx"; exit 1; }
+
+    cd "$tmp_dir/slowrx"
+    info "Compiling slowrx..."
+    mkdir -p build && cd build
+    local cmake_log make_log
+    cmake_log=$(cmake .. 2>&1) || {
+      warn "cmake failed for slowrx:"
+      echo "$cmake_log" | tail -20
+      exit 1
+    }
+    make_log=$(make 2>&1) || {
+      warn "make failed for slowrx:"
+      echo "$make_log" | tail -20
+      exit 1
+    }
+
+    # Install to /usr/local/bin
+    if [[ -w /usr/local/bin ]]; then
+      install -m 0755 slowrx /usr/local/bin/slowrx
+    else
+      sudo install -m 0755 slowrx /usr/local/bin/slowrx
+    fi
+    ok "slowrx installed successfully from source"
+  )
+}
+
 install_multimon_ng_from_source_macos() {
   info "multimon-ng not available via Homebrew. Building from source..."
 
@@ -413,7 +461,7 @@ install_multimon_ng_from_source_macos() {
 }
 
 install_macos_packages() {
-  TOTAL_STEPS=14
+  TOTAL_STEPS=16
   CURRENT_STEP=0
 
   progress "Checking Homebrew"
@@ -432,6 +480,13 @@ install_macos_packages() {
 
   progress "Installing direwolf (APRS decoder)"
   (brew_install direwolf) || warn "direwolf not available via Homebrew"
+
+  progress "Installing slowrx (SSTV decoder)"
+  if ! cmd_exists slowrx; then
+    install_slowrx_from_source_macos || warn "slowrx build failed - ISS SSTV decoding will not be available"
+  else
+    ok "slowrx already installed"
+  fi
 
   progress "Installing ffmpeg"
   brew_install ffmpeg
@@ -477,6 +532,19 @@ install_macos_packages() {
 
   progress "Installing gpsd"
   brew_install gpsd
+
+  progress "Installing Ubertooth tools (optional)"
+  if ! cmd_exists ubertooth-btle; then
+    echo
+    info "Ubertooth is used for advanced Bluetooth packet sniffing with Ubertooth One hardware."
+    if ask_yes_no "Do you want to install Ubertooth tools?"; then
+      brew_install ubertooth || warn "Ubertooth not available via Homebrew"
+    else
+      warn "Skipping Ubertooth installation. You can install it later if needed."
+    fi
+  else
+    ok "Ubertooth already installed"
+  fi
 
   warn "macOS note: hcitool/hciconfig are Linux (BlueZ) utilities and often unavailable on macOS."
   info "TSCM BLE scanning uses bleak library (installed via pip) for manufacturer data detection."
@@ -536,6 +604,8 @@ install_dump1090_from_source_debian() {
       || { fail "Failed to clone FlightAware dump1090"; exit 1; }
 
     cd "$tmp_dir/dump1090"
+    # Remove -Werror to prevent build failures on newer GCC versions
+    sed -i 's/-Werror//g' Makefile 2>/dev/null || sed -i '' 's/-Werror//g' Makefile
     info "Compiling FlightAware dump1090..."
     if make BLADERF=no RTLSDR=yes >/dev/null 2>&1; then
       $SUDO install -m 0755 dump1090 /usr/local/bin/dump1090
@@ -543,17 +613,17 @@ install_dump1090_from_source_debian() {
       exit 0
     fi
 
-    warn "FlightAware build failed. Falling back to antirez/dump1090..."
+    warn "FlightAware build failed. Falling back to wiedehopf/readsb..."
     rm -rf "$tmp_dir/dump1090"
-    git clone --depth 1 https://github.com/antirez/dump1090.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
-      || { fail "Failed to clone antirez dump1090"; exit 1; }
+    git clone --depth 1 https://github.com/wiedehopf/readsb.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
+      || { fail "Failed to clone wiedehopf/readsb"; exit 1; }
 
     cd "$tmp_dir/dump1090"
-    info "Compiling antirez dump1090..."
-    make >/dev/null 2>&1 || { fail "Failed to build dump1090 from source (required)."; exit 1; }
+    info "Compiling readsb..."
+    make RTLSDR=yes >/dev/null 2>&1 || { fail "Failed to build readsb from source (required)."; exit 1; }
 
-    $SUDO install -m 0755 dump1090 /usr/local/bin/dump1090
-    ok "dump1090 installed successfully (antirez)."
+    $SUDO install -m 0755 readsb /usr/local/bin/dump1090
+    ok "dump1090 installed successfully (via readsb)."
   )
 }
 
@@ -609,6 +679,65 @@ install_aiscatcher_from_source_debian() {
       ok "AIS-catcher installed successfully."
     else
       warn "Failed to build AIS-catcher from source. AIS vessel tracking will not be available."
+    fi
+  )
+}
+
+install_slowrx_from_source_debian() {
+  info "slowrx not available via APT. Building from source..."
+
+  # slowrx uses a simple Makefile, not CMake
+  apt_install build-essential git pkg-config \
+    libfftw3-dev libsndfile1-dev libgtk-3-dev libasound2-dev libpulse-dev
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning slowrx..."
+    git clone --depth 1 https://github.com/windytan/slowrx.git "$tmp_dir/slowrx" >/dev/null 2>&1 \
+      || { warn "Failed to clone slowrx"; exit 1; }
+
+    cd "$tmp_dir/slowrx"
+
+    info "Compiling slowrx..."
+    local make_log
+    make_log=$(make 2>&1) || {
+      warn "make failed for slowrx:"
+      echo "$make_log" | tail -20
+      warn "ISS SSTV decoding will not be available."
+      exit 1
+    }
+    $SUDO install -m 0755 slowrx /usr/local/bin/slowrx
+    ok "slowrx installed successfully."
+  )
+}
+
+install_ubertooth_from_source_debian() {
+  info "Building Ubertooth from source..."
+
+  apt_install build-essential git cmake libusb-1.0-0-dev pkg-config libbluetooth-dev
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning Ubertooth..."
+    git clone --depth 1 https://github.com/greatscottgadgets/ubertooth.git "$tmp_dir/ubertooth" >/dev/null 2>&1 \
+      || { warn "Failed to clone Ubertooth"; exit 1; }
+
+    cd "$tmp_dir/ubertooth/host"
+    mkdir -p build && cd build
+
+    info "Compiling Ubertooth..."
+    if cmake .. >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO make install >/dev/null 2>&1
+      $SUDO ldconfig
+      ok "Ubertooth installed successfully from source."
+    else
+      warn "Failed to build Ubertooth from source."
     fi
   )
 }
@@ -720,7 +849,7 @@ install_debian_packages() {
     export NEEDRESTART_MODE=a
   fi
 
-  TOTAL_STEPS=19
+  TOTAL_STEPS=21
   CURRENT_STEP=0
 
   progress "Updating APT package lists"
@@ -764,19 +893,9 @@ install_debian_packages() {
 
   progress "RTL-SDR Blog drivers"
   if cmd_exists rtl_test; then
-    info "RTL-SDR tools already installed."
-    if $IS_DRAGONOS; then
-      info "Skipping RTL-SDR Blog driver installation (DragonOS has working drivers)."
-    else
-      echo "RTL-SDR Blog drivers provide improved support for V4 dongles."
-      echo "Installing these will REPLACE your current RTL-SDR drivers."
-      if ask_yes_no "Install RTL-SDR Blog drivers?"; then
-        install_rtlsdr_blog_drivers_debian
-      else
-        ok "Keeping existing RTL-SDR drivers."
-      fi
-    fi
+    ok "RTL-SDR drivers already installed"
   else
+    info "RTL-SDR drivers not found, installing RTL-SDR Blog drivers..."
     install_rtlsdr_blog_drivers_debian
   fi
 
@@ -785,6 +904,9 @@ install_debian_packages() {
 
   progress "Installing direwolf (APRS decoder)"
   apt_install direwolf || true
+
+  progress "Installing slowrx (SSTV decoder)"
+  apt_install slowrx || cmd_exists slowrx || install_slowrx_from_source_debian
 
   progress "Installing ffmpeg"
   apt_install ffmpeg
@@ -817,6 +939,19 @@ install_debian_packages() {
 
   progress "Installing Bluetooth tools"
   apt_install bluez bluetooth || true
+
+  progress "Installing Ubertooth tools (optional)"
+  if ! cmd_exists ubertooth-btle; then
+    echo
+    info "Ubertooth is used for advanced Bluetooth packet sniffing with Ubertooth One hardware."
+    if ask_yes_no "Do you want to install Ubertooth tools?"; then
+      apt_install libubertooth-dev ubertooth || install_ubertooth_from_source_debian
+    else
+      warn "Skipping Ubertooth installation. You can install it later if needed."
+    fi
+  else
+    ok "Ubertooth already installed"
+  fi
 
   progress "Installing SoapySDR"
   # Exclude xtrx-dkms - its kernel module fails to build on newer kernels (6.14+)
@@ -862,11 +997,12 @@ install_debian_packages() {
   setup_udev_rules_debian
 
   progress "Kernel driver configuration"
-  echo
   if $IS_DRAGONOS; then
     info "DragonOS already has RTL-SDR drivers configured correctly."
-    info "Skipping kernel driver blacklist (not needed)."
+  elif [[ -f /etc/modprobe.d/blacklist-rtlsdr.conf ]]; then
+    ok "DVB kernel drivers already blacklisted"
   else
+    echo
     echo "The DVB-T kernel drivers conflict with RTL-SDR userspace access."
     echo "Blacklisting them allows rtl_sdr tools to access the device."
     if ask_yes_no "Blacklist conflicting kernel drivers?"; then
@@ -956,3 +1092,4 @@ main() {
 }
 
 main "$@"
+exit 0

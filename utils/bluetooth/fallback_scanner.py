@@ -531,6 +531,16 @@ class FallbackScanner:
         except Exception:
             pass
 
+        # Try ubertooth (raw packet capture with Ubertooth One hardware)
+        try:
+            from .ubertooth_scanner import UbertoothScanner
+            self._active_scanner = UbertoothScanner(on_observation=self._on_observation)
+            if self._active_scanner.start():
+                self._backend = 'ubertooth'
+                return True
+        except Exception:
+            pass
+
         logger.error("No fallback scanner available")
         return False
 

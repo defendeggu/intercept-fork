@@ -6,11 +6,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>iNTERCEPT // See the Invisible</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <!-- Leaflet.js for APRS map -->
+    <!-- Disclaimer gate - must accept before seeing welcome page -->
+    <script>
+        // Check BEFORE page renders - if disclaimer not accepted, hide welcome page
+        if (localStorage.getItem('disclaimerAccepted') !== 'true') {
+            document.write('<style id="disclaimer-gate">.welcome-overlay{display:none !important}</style>');
+            window._showDisclaimerOnLoad = true;
+        }
+    </script>
+    <script>
+        window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/core/observer-location.js') }}"></script>
+    <!-- Fonts - Conditional CDN/Local loading -->
+    {% if offline_settings.fonts_source == 'local' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    {% else %}
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    {% endif %}
+    <!-- Leaflet.js for APRS map - Conditional CDN/Local loading -->
+    {% if offline_settings.assets_source == 'local' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+    <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+    {% else %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <!-- Chart.js for signal strength graphs -->
+    {% endif %}
+    <!-- Chart.js for signal strength graphs - Conditional CDN/Local loading -->
+    {% if offline_settings.assets_source == 'local' %}
+    <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+    {% else %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/acars.css') }}">
@@ -22,6 +49,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/device-cards.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/proximity-viz.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/spy-stations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/meshtastic.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/sstv.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}">
 </head>
 
 <body>
@@ -105,67 +136,89 @@
                 <!-- Right: Mode Selection -->
                 <div class="welcome-modes">
                     <h2>Select Mode</h2>
-                    <div class="mode-grid">
-                        <button class="mode-card" onclick="selectMode('pager')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg></span>
-                            <span class="mode-name">Pager</span>
-                            <span class="mode-desc">POCSAG/FLEX decoding</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('sensor')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>
-                            <span class="mode-name">433MHz</span>
-                            <span class="mode-desc">IoT sensor monitoring</span>
-                        </button>
-                        <a href="/adsb/dashboard" class="mode-card" style="text-decoration: none;">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span>
-                            <span class="mode-name">Aircraft</span>
-                            <span class="mode-desc">ADS-B tracking</span>
-                        </a>
-                        <a href="/ais/dashboard" class="mode-card" style="text-decoration: none;">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span>
-                            <span class="mode-name">Vessels</span>
-                            <span class="mode-desc">AIS ship tracking</span>
-                        </a>
-                        <button class="mode-card" onclick="selectMode('wifi')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
-                            <span class="mode-name">WiFi</span>
-                            <span class="mode-desc">Network reconnaissance</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('bluetooth')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span>
-                            <span class="mode-name">Bluetooth</span>
-                            <span class="mode-desc">Device discovery</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('tscm')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-                            <span class="mode-name">TSCM</span>
-                            <span class="mode-desc">Counter-surveillance</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('satellite')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span>
-                            <span class="mode-name">Satellite</span>
-                            <span class="mode-desc">Pass prediction</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('listening')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
-                            <span class="mode-name">Listening Post</span>
-                            <span class="mode-desc">Frequency scanning</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('aprs')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
-                            <span class="mode-name">APRS</span>
-                            <span class="mode-desc">Amateur radio</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('rtlamr')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/><circle cx="12" cy="12" r="4"/></svg></span>
-                            <span class="mode-name">Meters</span>
-                            <span class="mode-desc">Utility meters</span>
-                        </button>
-                        <button class="mode-card" onclick="selectMode('spystations')">
-                            <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span>
-                            <span class="mode-name">Spy Stations</span>
-                            <span class="mode-desc">Number stations & diplomatic</span>
-                        </button>
+
+                    <!-- SDR / Radio Frequency -->
+                    <div class="mode-category">
+                        <h3 class="mode-category-title"><span class="mode-category-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span> SDR / RF</h3>
+                        <div class="mode-grid mode-grid-compact">
+                            <button class="mode-card mode-card-sm" onclick="selectMode('pager')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg></span>
+                                <span class="mode-name">Pager</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('sensor')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg></span>
+                                <span class="mode-name">433MHz</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('rtlamr')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+                                <span class="mode-name">Meters</span>
+                            </button>
+                            <a href="/adsb/dashboard" class="mode-card mode-card-sm" style="text-decoration: none;">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span>
+                                <span class="mode-name">Aircraft</span>
+                            </a>
+                            <a href="/ais/dashboard" class="mode-card mode-card-sm" style="text-decoration: none;">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/></svg></span>
+                                <span class="mode-name">Vessels</span>
+                            </a>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('aprs')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+                                <span class="mode-name">APRS</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('listening')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
+                                <span class="mode-name">Listening Post</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('spystations')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span>
+                                <span class="mode-name">Spy Stations</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('meshtastic')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span>
+                                <span class="mode-name">Meshtastic</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Wireless -->
+                    <div class="mode-category">
+                        <h3 class="mode-category-title"><span class="mode-category-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span> Wireless</h3>
+                        <div class="mode-grid mode-grid-compact">
+                            <button class="mode-card mode-card-sm" onclick="selectMode('wifi')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
+                                <span class="mode-name">WiFi</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('bluetooth')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span>
+                                <span class="mode-name">Bluetooth</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Security -->
+                    <div class="mode-category">
+                        <h3 class="mode-category-title"><span class="mode-category-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span> Security</h3>
+                        <div class="mode-grid mode-grid-compact">
+                            <button class="mode-card mode-card-sm" onclick="selectMode('tscm')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                                <span class="mode-name">TSCM</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Space -->
+                    <div class="mode-category">
+                        <h3 class="mode-category-title"><span class="mode-category-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span> Space</h3>
+                        <div class="mode-grid mode-grid-compact">
+                            <button class="mode-card mode-card-sm" onclick="selectMode('satellite')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span>
+                                <span class="mode-name">Satellite</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('sstv')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M3 9h2"/><path d="M19 9h2"/><path d="M3 15h2"/><path d="M19 15h2"/></svg></span>
+                                <span class="mode-name">ISS SSTV</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -262,7 +315,7 @@
             <span></span>
             <span></span>
         </button>
-        <div class="logo">
+        <a href="https://smittix.github.io/intercept" target="_blank" rel="noopener noreferrer" class="logo">
             <svg width="50" height="50" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <!-- Signal brackets - left side -->
                 <path d="M15 30 Q5 50, 15 70" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"
@@ -286,7 +339,7 @@
                 <!-- bottom terminal bar -->
                 <rect x="38" y="76" width="24" height="4" rx="1" fill="#00d4ff" />
             </svg>
-        </div>
+        </a>
         <h1>iNTERCEPT <span class="tagline">// See the Invisible</span> <span class="version-badge">v{{ version
                 }}</span></h1>
         <p class="subtitle">Signal Intelligence & Counter Surveillance Platform <span class="active-mode-indicator"
@@ -309,9 +362,9 @@
                 <a href="/adsb/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span><span class="nav-label">Aircraft</span></a>
                 <a href="/ais/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span><span class="nav-label">Vessels</span></a>
                 <button class="mode-nav-btn" onclick="switchMode('aprs')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="nav-label">APRS</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('satellite')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span><span class="nav-label">Satellite</span></button>
                 <button class="mode-nav-btn" onclick="switchMode('listening')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span><span class="nav-label">Listening Post</span></button>
                 <button class="mode-nav-btn" onclick="switchMode('spystations')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span><span class="nav-label">Spy Stations</span></button>
+                <button class="mode-nav-btn" onclick="switchMode('meshtastic')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span><span class="nav-label">Meshtastic</span></button>
             </div>
         </div>
         <div class="mode-nav-dropdown" data-group="wireless">
@@ -335,6 +388,17 @@
                 <button class="mode-nav-btn" onclick="switchMode('tscm')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><span class="nav-label">TSCM</span></button>
             </div>
         </div>
+        <div class="mode-nav-dropdown" data-group="space">
+            <button class="mode-nav-dropdown-btn" onclick="toggleNavDropdown('space')">
+                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>
+                <span class="nav-label">Space</span>
+                <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+            </button>
+            <div class="mode-nav-dropdown-menu">
+                <button class="mode-nav-btn" onclick="switchMode('satellite')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span><span class="nav-label">Satellite</span></button>
+                <button class="mode-nav-btn" onclick="switchMode('sstv')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M3 9h2"/><path d="M19 9h2"/><path d="M3 15h2"/><path d="M19 15h2"/></svg></span><span class="nav-label">ISS SSTV</span></button>
+            </div>
+        </div>
         <div class="mode-nav-actions">
             <a href="/satellite/dashboard" target="_blank" class="nav-action-btn" id="satelliteDashboardBtn"
                 style="display: none;">
@@ -348,6 +412,10 @@
             </div>
             <div class="nav-divider"></div>
             <div class="nav-tools">
+                <button class="nav-tool-btn" onclick="toggleAnimations()" title="Toggle Animations">
+                    <span class="icon-effects-on icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>
+                    <span class="icon-effects-off icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span>
+                </button>
                 <button class="nav-tool-btn" onclick="toggleTheme()" title="Toggle Light/Dark Theme">
                     <span class="icon-moon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
                     <span class="icon-sun icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
@@ -357,6 +425,7 @@
                 <button class="nav-tool-btn" onclick="showMqttSettings()" title="MQTT Settings" id="mqttBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span></button>
                 <a href="/controller/monitor" class="nav-tool-btn" title="Network Monitor - Multi-Agent View" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span></a>
                 <a href="/controller/manage" class="nav-tool-btn" title="Manage Remote Agents" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></a>
+                <button class="nav-tool-btn" onclick="showSettings()" title="Settings"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
                 <button class="nav-tool-btn" onclick="showHelp()" title="Help & Documentation">?</button>
                 <button class="nav-tool-btn" onclick="logout(event)" title="Logout">
                     <span class="power-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -377,8 +446,10 @@
         <button class="mobile-nav-btn" data-mode="bluetooth" onclick="switchMode('bluetooth')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span> BT</button>
         <button class="mobile-nav-btn" data-mode="tscm" onclick="switchMode('tscm')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span> TSCM</button>
         <button class="mobile-nav-btn" data-mode="satellite" onclick="switchMode('satellite')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/></svg></span> Sat</button>
+        <button class="mobile-nav-btn" data-mode="sstv" onclick="switchMode('sstv')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></span> SSTV</button>
         <button class="mobile-nav-btn" data-mode="listening" onclick="switchMode('listening')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span> Scanner</button>
         <button class="mobile-nav-btn" data-mode="spystations" onclick="switchMode('spystations')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span> Spy</button>
+        <button class="mobile-nav-btn" data-mode="meshtastic" onclick="switchMode('meshtastic')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span> Mesh</button>
     </nav>
 
     <!-- Mobile Drawer Overlay -->
@@ -520,6 +591,8 @@
 
                 {% include 'partials/modes/satellite.html' %}
 
+                {% include 'partials/modes/sstv.html' %}
+
                 {% include 'partials/modes/listening-post.html' %}
 
                 {% include 'partials/modes/tscm.html' %}
@@ -527,6 +600,8 @@
                 {% include 'partials/modes/ais.html' %}
 
                 {% include 'partials/modes/spy-stations.html' %}
+
+                {% include 'partials/modes/meshtastic.html' %}
 
                 <button class="preset-btn" onclick="killAll()"
                     style="width: 100%; margin-top: 10px; border-color: #ff3366; color: #ff3366;">
@@ -1543,6 +1618,292 @@
                     </div>
                 </div>
 
+                <!-- Meshtastic Messages Dashboard -->
+                <div id="meshtasticVisuals" class="mesh-visuals-container" style="display: none;">
+                    <!-- Compact Status Strip -->
+                    <div class="mesh-stats-strip">
+                        <div class="mesh-strip-group">
+                            <button class="mesh-strip-sidebar-toggle" onclick="Meshtastic.toggleSidebar()" title="Toggle sidebar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+                                </svg>
+                            </button>
+                            <div class="mesh-strip-status">
+                                <span class="mesh-strip-dot disconnected" id="meshStripDot"></span>
+                                <span class="mesh-strip-status-text" id="meshStripStatus">Disconnected</span>
+                            </div>
+                            <select id="meshStripConnType" class="mesh-strip-select" title="Connection Type" onchange="Meshtastic.onConnectionTypeChange()" style="width: 70px;">
+                                <option value="serial">Serial</option>
+                                <option value="tcp">TCP</option>
+                            </select>
+                            <select id="meshStripDevice" class="mesh-strip-select" title="Device">
+                                <option value="">Auto-detect</option>
+                            </select>
+                            <input type="text" id="meshStripHostname" class="mesh-strip-input" placeholder="IP address" title="Hostname/IP for TCP" style="display: none; width: 120px;">
+                            <button class="mesh-strip-btn connect" id="meshStripConnectBtn" onclick="Meshtastic.start()">Connect</button>
+                            <button class="mesh-strip-btn disconnect" id="meshStripDisconnectBtn" onclick="Meshtastic.stop()" style="display: none;">Disconnect</button>
+                        </div>
+                        <div class="mesh-strip-divider"></div>
+                        <div class="mesh-strip-group">
+                            <div class="mesh-strip-stat">
+                                <span class="mesh-strip-value" id="meshStripNodeName">--</span>
+                                <span class="mesh-strip-label">NODE</span>
+                            </div>
+                            <div class="mesh-strip-stat">
+                                <span class="mesh-strip-value mesh-strip-id" id="meshStripNodeId">--</span>
+                                <span class="mesh-strip-label">ID</span>
+                            </div>
+                            <div class="mesh-strip-stat">
+                                <span class="mesh-strip-value" id="meshStripModel">--</span>
+                                <span class="mesh-strip-label">MODEL</span>
+                            </div>
+                        </div>
+                        <div class="mesh-strip-divider"></div>
+                        <div class="mesh-strip-group">
+                            <div class="mesh-strip-stat">
+                                <span class="mesh-strip-value accent-cyan" id="meshStripMsgCount">0</span>
+                                <span class="mesh-strip-label">MSGS</span>
+                            </div>
+                            <div class="mesh-strip-stat">
+                                <span class="mesh-strip-value accent-green" id="meshStripNodeCount">0</span>
+                                <span class="mesh-strip-label">NODES</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content Row (Messages + Map side by side) -->
+                    <div class="mesh-main-row">
+                        <!-- Messages Section -->
+                        <div class="mesh-messages-section">
+                            <div class="mesh-messages-header">
+                                <div class="mesh-messages-title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                    Messages
+                                </div>
+                                <div class="mesh-messages-filter">
+                                    <select id="meshVisualsFilter" onchange="Meshtastic.applyFilter()">
+                                        <option value="">All Channels</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mesh-messages-list" id="meshMessagesGrid">
+                                <div class="mesh-messages-empty">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                        <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                                    </svg>
+                                    <p>Connect to a Meshtastic device to see messages</p>
+                                </div>
+                            </div>
+                            <!-- Message Compose Box -->
+                            <div class="mesh-compose" id="meshCompose" style="display: none;">
+                            <div class="mesh-compose-header">
+                                <select id="meshComposeChannel" class="mesh-compose-channel" title="Channel to send on">
+                                    <option value="0">CH 0</option>
+                                </select>
+                                <input type="text" id="meshComposeTo" placeholder="^all (broadcast)" class="mesh-compose-to" title="Destination node ID or ^all for broadcast">
+                            </div>
+                            <div class="mesh-compose-body">
+                                <input type="text" id="meshComposeText" placeholder="Type a message..." maxlength="237" class="mesh-compose-input" oninput="Meshtastic.updateCharCount()" onkeydown="Meshtastic.handleComposeKeydown(event)">
+                                <button onclick="Meshtastic.sendMessage()" class="mesh-compose-send" title="Send message">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="mesh-compose-hint">
+                                <span id="meshComposeCount">0</span>/237
+                            </div>
+                            </div>
+                        </div>
+
+                        <!-- Node Map -->
+                        <div class="mesh-map-section">
+                            <div class="mesh-map-header">
+                                <div class="mesh-map-title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                        <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                                    </svg>
+                                    Node Map
+                                </div>
+                                <div class="mesh-map-stats">
+                                    <span>NODES: <span id="meshMapNodeCount">0</span></span>
+                                    <span>WITH GPS: <span id="meshMapGpsCount">0</span></span>
+                                </div>
+                            </div>
+                            <div id="meshMap" class="mesh-map"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SSTV Decoder Dashboard -->
+                <div id="sstvVisuals" class="sstv-visuals-container" style="display: none;">
+                    <!-- Status Strip -->
+                    <div class="sstv-stats-strip">
+                        <div class="sstv-strip-group">
+                            <div class="sstv-strip-status">
+                                <span class="sstv-strip-dot idle" id="sstvStripDot"></span>
+                                <span class="sstv-strip-status-text" id="sstvStripStatus">Idle</span>
+                            </div>
+                            <button class="sstv-strip-btn start" id="sstvStartBtn" onclick="SSTV.start()">Start</button>
+                            <button class="sstv-strip-btn stop" id="sstvStopBtn" onclick="SSTV.stop()" style="display: none;">Stop</button>
+                        </div>
+                        <div class="sstv-strip-divider"></div>
+                        <div class="sstv-strip-group">
+                            <div class="sstv-strip-stat">
+                                <span class="sstv-strip-value accent-cyan">145.800</span>
+                                <span class="sstv-strip-label">MHZ</span>
+                            </div>
+                            <div class="sstv-strip-stat">
+                                <span class="sstv-strip-value" id="sstvStripImageCount">0</span>
+                                <span class="sstv-strip-label">IMAGES</span>
+                            </div>
+                        </div>
+                        <div class="sstv-strip-divider"></div>
+                        <!-- Location Controls -->
+                        <div class="sstv-strip-group">
+                            <div class="sstv-strip-location">
+                                <span class="sstv-strip-label" style="margin-right: 6px;">LOC</span>
+                                <input type="number" id="sstvObsLat" class="sstv-loc-input" step="0.0001" placeholder="Lat" title="Latitude">
+                                <input type="number" id="sstvObsLon" class="sstv-loc-input" step="0.0001" placeholder="Lon" title="Longitude">
+                                <button class="sstv-strip-btn gps" onclick="SSTV.useGPS(this)" title="Use GPS location">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                                        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+                                        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+                                        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                                    </svg>
+                                    GPS
+                                </button>
+                            </div>
+                        </div>
+                        <div class="sstv-strip-divider"></div>
+                        <!-- TLE Update -->
+                        <div class="sstv-strip-group">
+                            <button class="sstv-strip-btn update-tle" onclick="SSTV.updateTLE(this)" title="Update satellite orbital data from CelesTrak">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                                    <path d="M16 21h5v-5"/>
+                                </svg>
+                                Update TLE
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ISS Tracking Map + Countdown Row -->
+                    <div class="sstv-top-row">
+                        <!-- ISS Map -->
+                        <div class="sstv-map-row">
+                            <div class="sstv-map-container">
+                                <div id="sstvIssMap" class="sstv-iss-map"></div>
+                                <div class="sstv-map-overlay">
+                                    <div class="sstv-map-info">
+                                        <span class="sstv-map-label">ISS</span>
+                                        <span class="sstv-map-coords"><span id="sstvIssLat">--.-</span>°, <span id="sstvIssLon">--.-</span>°</span>
+                                        <span class="sstv-map-alt">Alt: <span id="sstvIssAlt">---</span> km</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Next Pass Countdown Panel -->
+                        <div class="sstv-countdown-panel">
+                            <div class="sstv-countdown-header">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Next Pass</span>
+                            </div>
+                            <div class="sstv-countdown-body">
+                                <div class="sstv-countdown-timer" id="sstvCountdownTimer">
+                                    <span class="sstv-countdown-value" id="sstvCountdownValue">--:--:--</span>
+                                    <span class="sstv-countdown-label" id="sstvCountdownLabel">Set location</span>
+                                </div>
+                                <div class="sstv-countdown-details">
+                                    <div class="sstv-countdown-detail">
+                                        <span class="sstv-detail-label">Start</span>
+                                        <span class="sstv-detail-value" id="sstvPassStart">--:--</span>
+                                    </div>
+                                    <div class="sstv-countdown-detail">
+                                        <span class="sstv-detail-label">Max El</span>
+                                        <span class="sstv-detail-value" id="sstvPassMaxEl">--°</span>
+                                    </div>
+                                    <div class="sstv-countdown-detail">
+                                        <span class="sstv-detail-label">Duration</span>
+                                        <span class="sstv-detail-value" id="sstvPassDuration">-- min</span>
+                                    </div>
+                                    <div class="sstv-countdown-detail">
+                                        <span class="sstv-detail-label">Direction</span>
+                                        <span class="sstv-detail-value" id="sstvPassDirection">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="sstv-countdown-status" id="sstvCountdownStatus">
+                                <span class="sstv-status-dot"></span>
+                                <span>Waiting for pass data...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Row (Live + Gallery) -->
+                    <div class="sstv-main-row">
+                        <!-- Live Decode Section -->
+                        <div class="sstv-live-section">
+                            <div class="sstv-live-header">
+                                <div class="sstv-live-title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                    Live Decode
+                                </div>
+                            </div>
+                            <div class="sstv-live-content" id="sstvLiveContent">
+                                <div class="sstv-idle-state">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                        <path d="M3 9h2M19 9h2M3 15h2M19 15h2"/>
+                                    </svg>
+                                    <h4>ISS SSTV Decoder</h4>
+                                    <p>Click Start to listen for SSTV transmissions on 145.800 MHz</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gallery Section -->
+                        <div class="sstv-gallery-section">
+                            <div class="sstv-gallery-header">
+                                <div class="sstv-gallery-title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21 15 16 10 5 21"/>
+                                    </svg>
+                                    Decoded Images
+                                </div>
+                                <span class="sstv-gallery-count" id="sstvImageCount">0</span>
+                            </div>
+                            <div class="sstv-gallery-grid" id="sstvGallery">
+                                <div class="sstv-gallery-empty">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21 15 16 10 5 21"/>
+                                    </svg>
+                                    <p>No images decoded yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Device Intelligence Dashboard (above waterfall for prominence) -->
                 <div class="recon-panel collapsed" id="reconPanel">
                     <div class="recon-header" onclick="toggleReconCollapse()" style="cursor: pointer;">
@@ -1616,6 +1977,8 @@
     <script src="{{ url_for('static', filename='js/components/timeline-adapters/wifi-adapter.js') }}"></script>
     <!-- Bluetooth v2 components -->
     <script src="{{ url_for('static', filename='js/components/rssi-sparkline.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/consumption-sparkline.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/meter-aggregator.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/message-card.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/device-card.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/proximity-radar.js') }}"></script>
@@ -1626,6 +1989,8 @@
     <script src="{{ url_for('static', filename='js/modes/wifi.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/listening-post.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/spy-stations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/meshtastic.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/sstv.js') }}"></script>
 
     <script>
         // ============================================
@@ -1744,31 +2109,30 @@
             const welcome = document.getElementById('welcomePage');
             welcome.classList.add('fade-out');
 
-            // After fade out, hide welcome and show disclaimer if needed
+            // After fade out, hide welcome and switch to mode
             setTimeout(() => {
                 welcome.style.display = 'none';
-                checkDisclaimer();
+                switchMode(mode);
             }, 400);
         }
 
-        // Disclaimer handling
-        function checkDisclaimer() {
-            const accepted = localStorage.getItem('disclaimerAccepted');
-            if (accepted === 'true') {
-                document.getElementById('disclaimerModal').style.display = 'none';
-                // Switch to the selected mode
-                switchMode(selectedStartMode);
-            } else {
-                document.getElementById('disclaimerModal').style.display = 'flex';
-            }
+        // Disclaimer handling - show on page load if not accepted
+        function showDisclaimer() {
+            document.getElementById('disclaimerModal').style.display = 'flex';
         }
 
         function acceptDisclaimer() {
             localStorage.setItem('disclaimerAccepted', 'true');
             document.getElementById('disclaimerModal').classList.add('disclaimer-hidden');
-            // Switch to the selected mode after accepting
+
+            // After fade out, hide disclaimer and show welcome page
             setTimeout(() => {
-                switchMode(selectedStartMode);
+                document.getElementById('disclaimerModal').style.display = 'none';
+                // Remove the gate CSS that was hiding welcome page
+                const gateStyle = document.getElementById('disclaimer-gate');
+                if (gateStyle) gateStyle.remove();
+                // Ensure welcome page is visible
+                document.getElementById('welcomePage').style.display = '';
             }, 300);
         }
 
@@ -1777,7 +2141,12 @@
             document.getElementById('rejectionPage').classList.remove('disclaimer-hidden');
         }
 
-        // Don't auto-check disclaimer - wait for welcome page mode selection
+        // Show disclaimer on page load if not yet accepted
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window._showDisclaimerOnLoad) {
+                showDisclaimer();
+            }
+        });
 
         let eventSource = null;
         let isRunning = false;
@@ -1895,6 +2264,9 @@
 
         // Observer location for distance calculations (load from localStorage or default to London)
         let observerLocation = (function () {
+            if (window.ObserverLocation && ObserverLocation.getForModule) {
+                return ObserverLocation.getForModule('observerLocation');
+            }
             const saved = localStorage.getItem('observerLocation');
             if (saved) {
                 try {
@@ -2092,10 +2464,12 @@
             // Map modes to their dropdown groups
             const modeGroups = {
                 'pager': 'sdr', 'sensor': 'sdr',
-                'aprs': 'sdr', 'satellite': 'sdr', 'listening': 'sdr',
+                'aprs': 'sdr', 'listening': 'sdr',
                 'wifi': 'wireless', 'bluetooth': 'wireless',
                 'tscm': 'security',
-                'rtlamr': 'sdr', 'ais': 'sdr', 'spystations': 'sdr'
+                'rtlamr': 'sdr', 'ais': 'sdr', 'spystations': 'sdr',
+                'meshtastic': 'sdr',
+                'satellite': 'space', 'sstv': 'space'
             };
 
             // Remove has-active from all dropdowns
@@ -2149,7 +2523,7 @@
             const modeMap = {
                 'pager': 'pager', 'sensor': '433',
                 'satellite': 'satellite', 'wifi': 'wifi', 'bluetooth': 'bluetooth',
-                'listening': 'listening', 'aprs': 'aprs', 'tscm': 'tscm'
+                'listening': 'listening', 'aprs': 'aprs', 'tscm': 'tscm', 'meshtastic': 'meshtastic'
             };
             document.querySelectorAll('.mode-nav-btn').forEach(btn => {
                 const label = btn.querySelector('.nav-label');
@@ -2161,6 +2535,7 @@
             document.getElementById('sensorMode')?.classList.toggle('active', mode === 'sensor');
             document.getElementById('rtlamrMode')?.classList.toggle('active', mode === 'rtlamr');
             document.getElementById('satelliteMode')?.classList.toggle('active', mode === 'satellite');
+            document.getElementById('sstvMode')?.classList.toggle('active', mode === 'sstv');
             document.getElementById('wifiMode')?.classList.toggle('active', mode === 'wifi');
             document.getElementById('bluetoothMode')?.classList.toggle('active', mode === 'bluetooth');
             document.getElementById('listeningPostMode')?.classList.toggle('active', mode === 'listening');
@@ -2168,6 +2543,7 @@
             document.getElementById('tscmMode')?.classList.toggle('active', mode === 'tscm');
             document.getElementById('aisMode')?.classList.toggle('active', mode === 'ais');
             document.getElementById('spystationsMode')?.classList.toggle('active', mode === 'spystations');
+            document.getElementById('meshtasticMode')?.classList.toggle('active', mode === 'meshtastic');
             const pagerStats = document.getElementById('pagerStats');
             const sensorStats = document.getElementById('sensorStats');
             const satelliteStats = document.getElementById('satelliteStats');
@@ -2193,13 +2569,15 @@
                 'sensor': '433MHZ',
                 'rtlamr': 'METERS',
                 'satellite': 'SATELLITE',
+                'sstv': 'ISS SSTV',
                 'wifi': 'WIFI',
                 'bluetooth': 'BLUETOOTH',
                 'listening': 'LISTENING POST',
                 'aprs': 'APRS',
                 'tscm': 'TSCM',
                 'ais': 'AIS VESSELS',
-                'spystations': 'SPY STATIONS'
+                'spystations': 'SPY STATIONS',
+                'meshtastic': 'MESHTASTIC'
             };
             const activeModeIndicator = document.getElementById('activeModeIndicator');
             if (activeModeIndicator) activeModeIndicator.innerHTML = '<span class="pulse-dot"></span>' + (modeNames[mode] || mode.toUpperCase());
@@ -2210,6 +2588,8 @@
             const aprsVisuals = document.getElementById('aprsVisuals');
             const tscmVisuals = document.getElementById('tscmVisuals');
             const spyStationsVisuals = document.getElementById('spyStationsVisuals');
+            const meshtasticVisuals = document.getElementById('meshtasticVisuals');
+            const sstvVisuals = document.getElementById('sstvVisuals');
             if (wifiLayoutContainer) wifiLayoutContainer.style.display = mode === 'wifi' ? 'flex' : 'none';
             if (btLayoutContainer) btLayoutContainer.style.display = mode === 'bluetooth' ? 'flex' : 'none';
             if (satelliteVisuals) satelliteVisuals.style.display = mode === 'satellite' ? 'block' : 'none';
@@ -2217,6 +2597,18 @@
             if (aprsVisuals) aprsVisuals.style.display = mode === 'aprs' ? 'flex' : 'none';
             if (tscmVisuals) tscmVisuals.style.display = mode === 'tscm' ? 'flex' : 'none';
             if (spyStationsVisuals) spyStationsVisuals.style.display = mode === 'spystations' ? 'flex' : 'none';
+            if (meshtasticVisuals) meshtasticVisuals.style.display = mode === 'meshtastic' ? 'flex' : 'none';
+            if (sstvVisuals) sstvVisuals.style.display = mode === 'sstv' ? 'flex' : 'none';
+
+            // Hide sidebar by default for Meshtastic mode, show for others
+            const mainContent = document.querySelector('.main-content');
+            if (mainContent) {
+                if (mode === 'meshtastic') {
+                    mainContent.classList.add('mesh-sidebar-hidden');
+                } else {
+                    mainContent.classList.remove('mesh-sidebar-hidden');
+                }
+            }
 
             // Show/hide mode-specific timeline containers
             const pagerTimelineContainer = document.getElementById('pagerTimelineContainer');
@@ -2230,13 +2622,15 @@
                 'sensor': '433MHz Sensor Monitor',
                 'rtlamr': 'Utility Meter Monitor',
                 'satellite': 'Satellite Monitor',
+                'sstv': 'ISS SSTV Decoder',
                 'wifi': 'WiFi Scanner',
                 'bluetooth': 'Bluetooth Scanner',
                 'listening': 'Listening Post',
                 'aprs': 'APRS Tracker',
                 'tscm': 'TSCM Counter-Surveillance',
                 'ais': 'AIS Vessel Tracker',
-                'spystations': 'Spy Stations'
+                'spystations': 'Spy Stations',
+                'meshtastic': 'Meshtastic Mesh Monitor'
             };
             const outputTitle = document.getElementById('outputTitle');
             if (outputTitle) outputTitle.textContent = titles[mode] || 'Signal Monitor';
@@ -2254,7 +2648,7 @@
             const reconBtn = document.getElementById('reconBtn');
             const intelBtn = document.querySelector('[onclick="exportDeviceDB()"]');
             const reconPanel = document.getElementById('reconPanel');
-            if (mode === 'satellite' || mode === 'listening' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') {
+            if (mode === 'satellite' || mode === 'sstv' || mode === 'listening' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic') {
                 if (reconPanel) reconPanel.style.display = 'none';
                 if (reconBtn) reconBtn.style.display = 'none';
                 if (intelBtn) intelBtn.style.display = 'none';
@@ -2274,7 +2668,7 @@
 
             // Show RTL-SDR device section for modes that use it
             const rtlDeviceSection = document.getElementById('rtlDeviceSection');
-            if (rtlDeviceSection) rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'listening' || mode === 'aprs') ? 'block' : 'none';
+            if (rtlDeviceSection) rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'listening' || mode === 'aprs' || mode === 'sstv') ? 'block' : 'none';
 
             // Toggle mode-specific tool status displays
             const toolStatusPager = document.getElementById('toolStatusPager');
@@ -2285,8 +2679,16 @@
             // Hide output console for modes with their own visualizations
             const outputEl = document.getElementById('output');
             const statusBar = document.querySelector('.status-bar');
-            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
+            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic') ? 'none' : 'block';
             if (statusBar) statusBar.style.display = (mode === 'satellite') ? 'none' : 'flex';
+
+            // Restore sidebar when leaving Meshtastic mode (user may have collapsed it)
+            if (mode !== 'meshtastic') {
+                const mainContent = document.querySelector('.main-content');
+                if (mainContent) {
+                    mainContent.classList.remove('mesh-sidebar-hidden');
+                }
+            }
 
             // Load interfaces and initialize visualizations when switching modes
             if (mode === 'wifi') {
@@ -2317,18 +2719,28 @@
                 }
             } else if (mode === 'spystations') {
                 SpyStations.init();
+            } else if (mode === 'meshtastic') {
+                Meshtastic.init();
+                // Fix map sizing after container becomes visible
+                setTimeout(() => {
+                    Meshtastic.invalidateMap();
+                }, 100);
+            } else if (mode === 'sstv') {
+                SSTV.init();
             }
         }
 
         // Handle window resize for maps (especially important on mobile orientation change)
         window.addEventListener('resize', function () {
             if (aprsMap) aprsMap.invalidateSize();
+            if (typeof Meshtastic !== 'undefined') Meshtastic.invalidateMap();
         });
 
         // Also handle orientation changes explicitly for mobile
         window.addEventListener('orientationchange', function () {
             setTimeout(() => {
                 if (aprsMap) aprsMap.invalidateSize();
+                if (typeof Meshtastic !== 'undefined') Meshtastic.invalidateMap();
             }, 200);
         });
 
@@ -2607,7 +3019,18 @@
             if (data.pressure_hPa !== undefined) {
                 msg.pressure = data.pressure_hPa;
                 msg.pressure_unit = 'hPa';
+            } else if (data.pressure_PSI !== undefined) {
+                msg.pressure = data.pressure_PSI;
+                msg.pressure_unit = 'PSI';
+            } else if (data.pressure_kPa !== undefined) {
+                msg.pressure = data.pressure_kPa;
+                msg.pressure_unit = 'kPa';
+            } else if (data.tire_pressure_kPa !== undefined) {
+                msg.pressure = data.tire_pressure_kPa;
+                msg.pressure_unit = 'kPa';
             }
+            if (data.flags !== undefined) msg.state = data.flags;
+            else if (data.state !== undefined) msg.state = data.state;
             if (data.wind_avg_km_h !== undefined) {
                 msg.wind_speed = data.wind_avg_km_h;
                 msg.wind_unit = 'km/h';
@@ -2888,17 +3311,18 @@
             const placeholder = output.querySelector('.placeholder');
             if (placeholder) placeholder.remove();
 
-            // Store for export
+            // Store for export (all raw readings)
             allMessages.push(data);
-            playAlert();
             pulseSignal();
 
             sensorCount++;
             document.getElementById('sensorCount').textContent = sensorCount;
 
+            // Aggregate meter data using MeterAggregator
+            const { meter, isNew } = MeterAggregator.ingest(data);
+
             // Track unique meters by ID
-            const msgData = data.Message || {};
-            const meterId = msgData.ID || 'Unknown';
+            const meterId = meter.id;
             if (meterId !== 'Unknown') {
                 const deviceKey = 'METER_' + meterId;
                 if (!uniqueDevices.has(deviceKey)) {
@@ -2907,28 +3331,34 @@
                 }
             }
 
-            // Convert rtlamr data to our card format
-            const msg = {
-                id: String(meterId),
-                type: data.Type || 'Unknown',
-                consumption: msgData.Consumption,
-                unit: 'units',
-                endpoint_type: msgData.EndpointType,
-                endpoint_id: msgData.EndpointID,
-                timestamp: new Date().toISOString()
-            };
+            // Check if card already exists for this meter
+            const existingCard = document.getElementById('metercard_' + meterId);
 
-            // Create card using SignalCards component
-            const card = SignalCards.createMeterCard(msg);
-            output.insertBefore(card, output.firstChild);
+            if (existingCard) {
+                // Update existing card in place
+                SignalCards.updateAggregatedMeterCard(existingCard, meter);
+            } else {
+                // Create new aggregated meter card
+                const card = SignalCards.createAggregatedMeterCard(meter);
+                output.insertBefore(card, output.firstChild);
+
+                // Only play alert for new meters (not updates)
+                playAlert();
+            }
 
             // Update filter counts
             SignalCards.updateCounts(output);
 
-            // Limit output to 50 cards
-            const cards = output.querySelectorAll('.signal-card');
+            // Limit to max 50 unique meters (cards won't pile up since we update in place)
+            const cards = output.querySelectorAll('.signal-card.meter-aggregated');
             while (cards.length > 50) {
-                output.removeChild(output.lastChild);
+                // Remove oldest card (last one)
+                const oldestCard = output.querySelector('.signal-card.meter-aggregated:last-of-type');
+                if (oldestCard) {
+                    output.removeChild(oldestCard);
+                } else {
+                    break;
+                }
             }
         }
 
@@ -3803,6 +4233,11 @@
             document.getElementById('sensorCount').textContent = '0';
             document.getElementById('deviceCount').textContent = '0';
 
+            // Clear meter aggregator data
+            if (typeof MeterAggregator !== 'undefined') {
+                MeterAggregator.clear();
+            }
+
             // Reset recon data
             deviceDatabase.clear();
             newDeviceAlerts = 0;
@@ -3921,6 +4356,9 @@
                 return 'WIFI_CLIENT_' + (data.address || 'UNK').replace(/:/g, '');
             } else if (data.protocol === 'Bluetooth' || data.protocol === 'BLE') {
                 return 'BT_' + (data.address || 'UNK').replace(/:/g, '');
+            } else if (data.protocol === 'Meter') {
+                // Utility meter (rtlamr)
+                return 'METER_' + (data.meterId || data.address || 'UNK');
             } else if (data.model) {
                 // 433MHz sensor
                 const id = data.id || data.channel || data.unit || '0';
@@ -4112,6 +4550,94 @@
             originalAddSensorReading(data);
             trackDevice(data);
         };
+
+        // Hook rtlamr readings into device intelligence
+        const originalAddRtlamrReading = addRtlamrReading;
+        addRtlamrReading = function (data) {
+            originalAddRtlamrReading(data);
+            // Transform rtlamr data for device tracking
+            const msgData = data.Message || {};
+            const meterInfo = getMeterTypeInfo(msgData.EndpointType, data.Type);
+            trackDevice({
+                protocol: 'Meter',
+                meterId: String(msgData.ID || 'Unknown'),
+                address: String(msgData.ID || 'Unknown'),
+                message: `${meterInfo.utility} - ${(msgData.Consumption || 0).toLocaleString()} units`,
+                model: meterInfo.manufacturer || data.Type || 'Unknown',
+                meterType: data.Type,
+                endpointType: msgData.EndpointType,
+                utility: meterInfo.utility,
+                manufacturer: meterInfo.manufacturer,
+                consumption: msgData.Consumption
+            });
+        };
+
+        // Meter type/manufacturer lookup based on ERT endpoint types and message formats
+        function getMeterTypeInfo(endpointType, msgType) {
+            // Common ERT endpoint type mappings (varies by utility)
+            const endpointInfo = {
+                // Electric meter types (0-7 common)
+                0: { utility: 'Electric', manufacturer: 'Generic' },
+                1: { utility: 'Electric', manufacturer: 'Generic' },
+                2: { utility: 'Electric', manufacturer: 'Itron' },
+                3: { utility: 'Electric', manufacturer: 'Itron' },
+                4: { utility: 'Electric', manufacturer: 'Landis+Gyr' },
+                5: { utility: 'Electric', manufacturer: 'Landis+Gyr' },
+                6: { utility: 'Electric', manufacturer: 'Elster' },
+                7: { utility: 'Electric', manufacturer: 'Elster' },
+                // Gas meter types (8-15)
+                8: { utility: 'Gas', manufacturer: 'Itron' },
+                9: { utility: 'Gas', manufacturer: 'Itron' },
+                10: { utility: 'Gas', manufacturer: 'Sensus' },
+                11: { utility: 'Gas', manufacturer: 'Sensus' },
+                12: { utility: 'Gas', manufacturer: 'Badger' },
+                13: { utility: 'Gas', manufacturer: 'Neptune' },
+                // Water meter types (16-23)
+                16: { utility: 'Water', manufacturer: 'Badger' },
+                17: { utility: 'Water', manufacturer: 'Badger' },
+                18: { utility: 'Water', manufacturer: 'Neptune' },
+                19: { utility: 'Water', manufacturer: 'Neptune' },
+                20: { utility: 'Water', manufacturer: 'Sensus' },
+                21: { utility: 'Water', manufacturer: 'Sensus' },
+                22: { utility: 'Water', manufacturer: 'Master Meter' },
+                23: { utility: 'Water', manufacturer: 'Mueller' },
+                // Extended types
+                156: { utility: 'Electric', manufacturer: 'Itron OpenWay' },
+                157: { utility: 'Electric', manufacturer: 'Itron OpenWay' },
+                180: { utility: 'Gas', manufacturer: 'Itron ERT' },
+                188: { utility: 'Water', manufacturer: 'Badger ORION' },
+                220: { utility: 'Electric', manufacturer: 'Landis+Gyr Focus' }
+            };
+
+            // Message type hints
+            const msgTypeInfo = {
+                'SCM': { utility: 'Electric', manufacturer: 'Standard ERT' },
+                'SCM+': { utility: 'Electric', manufacturer: 'Enhanced ERT' },
+                'IDM': { utility: 'Electric', manufacturer: 'Interval Data' },
+                'NetIDM': { utility: 'Electric', manufacturer: 'Network IDM' },
+                'R900': { utility: 'Water', manufacturer: 'Neptune R900' },
+                'R900BCD': { utility: 'Water', manufacturer: 'Neptune R900' }
+            };
+
+            // Try endpoint type first
+            if (endpointType !== undefined && endpointInfo[endpointType]) {
+                return endpointInfo[endpointType];
+            }
+
+            // Fall back to message type
+            if (msgType && msgTypeInfo[msgType]) {
+                return msgTypeInfo[msgType];
+            }
+
+            // Default based on endpoint range
+            if (endpointType !== undefined) {
+                if (endpointType < 8) return { utility: 'Electric', manufacturer: 'Unknown' };
+                if (endpointType < 16) return { utility: 'Gas', manufacturer: 'Unknown' };
+                if (endpointType < 24) return { utility: 'Water', manufacturer: 'Unknown' };
+            }
+
+            return { utility: 'Unknown', manufacturer: 'Unknown' };
+        }
 
         // Export device database
         function exportDeviceDB() {
@@ -4921,6 +5447,53 @@
             const select = document.getElementById('wifiInterfaceSelect');
             select.innerHTML = '<option value="">Loading interfaces...</option>';
 
+            // Check if we're in agent mode
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+
+            if (isAgentMode) {
+                // Fetch from agent via controller
+                fetch(`/controller/agents/${currentAgent}?refresh=true`)
+                    .then(r => {
+                        if (!r.ok) throw new Error('Failed to fetch agent interfaces');
+                        return r.json();
+                    })
+                    .then(data => {
+                        const interfaces = data.agent?.interfaces?.wifi_interfaces || [];
+                        if (interfaces.length === 0) {
+                            select.innerHTML = '<option value="">No WiFi interfaces on agent</option>';
+                            showNotification('WiFi', 'No WiFi interfaces found on remote agent.');
+                            monitorInterface = null;
+                            updateMonitorStatus(false);
+                        } else {
+                            select.innerHTML = interfaces.map(i => {
+                                let label = i.name || i;
+                                if (i.display_name) label = i.display_name;
+                                else if (i.type) label += ` (${i.type})`;
+                                if (i.monitor_capable) label += ' [Monitor OK]';
+                                return `<option value="${i.name || i}" data-type="${i.type || 'managed'}">${label}</option>`;
+                            }).join('');
+                            showNotification('WiFi', `Found ${interfaces.length} interface(s) on agent`);
+
+                            // Check if any interface is already in monitor mode
+                            const monitorIface = interfaces.find(i => i.type === 'monitor');
+                            if (monitorIface) {
+                                monitorInterface = monitorIface.name;
+                                updateMonitorStatus(true);
+                                select.value = monitorIface.name;
+                            } else {
+                                monitorInterface = null;
+                                updateMonitorStatus(false);
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to refresh agent interfaces:', err);
+                        select.innerHTML = '<option value="">Error loading agent interfaces</option>';
+                        showNotification('WiFi', 'Failed to load agent interfaces');
+                    });
+                return;
+            }
+
             fetch('/wifi/interfaces')
                 .then(r => {
                     if (!r.ok) throw new Error('Failed to fetch interfaces');
@@ -4977,6 +5550,7 @@
             }
 
             const killProcesses = document.getElementById('killProcesses').checked;
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
             // Show loading state
             const btn = document.getElementById('monitorStartBtn');
@@ -4984,7 +5558,12 @@
             btn.textContent = 'Enabling...';
             btn.disabled = true;
 
-            fetch('/wifi/monitor', {
+            // Use agent endpoint if in agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/wifi/monitor`
+                : '/wifi/monitor';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ interface: iface, action: 'start', kill_processes: killProcesses })
@@ -4996,29 +5575,13 @@
                     if (data.status === 'success') {
                         monitorInterface = data.monitor_interface;
                         updateMonitorStatus(true);
-                        showInfo('Monitor mode enabled on ' + monitorInterface + ' - Ready to scan!');
+                        const location = isAgentMode ? ' on remote agent' : '';
+                        showInfo('Monitor mode enabled on ' + monitorInterface + location + ' - Ready to scan!');
 
                         // Refresh interface list and auto-select the monitor interface
-                        fetch('/wifi/interfaces')
-                            .then(r => r.json())
-                            .then(ifaceData => {
-                                const select = document.getElementById('wifiInterfaceSelect');
-                                if (ifaceData.interfaces.length > 0) {
-                                    select.innerHTML = ifaceData.interfaces.map(i => {
-                                        let label = i.name;
-                                        let details = [];
-                                        if (i.chipset) details.push(i.chipset);
-                                        else if (i.driver) details.push(i.driver);
-                                        if (i.mac) details.push(i.mac.substring(0, 8) + '...');
-                                        if (details.length > 0) label += ' - ' + details.join(' | ');
-                                        label += ` (${i.type})`;
-                                        if (i.monitor_capable) label += ' [Monitor OK]';
-                                        return `<option value="${i.name}" ${i.name === monitorInterface ? 'selected' : ''}>${label}</option>`;
-                                    }).join('');
-                                }
-                            });
+                        refreshWifiInterfaces();
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 })
                 .catch(err => {
@@ -5031,8 +5594,13 @@
         // Disable monitor mode
         function disableMonitorMode() {
             const iface = monitorInterface || document.getElementById('wifiInterfaceSelect').value;
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
-            fetch('/wifi/monitor', {
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/wifi/monitor`
+                : '/wifi/monitor';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ interface: iface, action: 'stop' })
@@ -5043,7 +5611,7 @@
                         updateMonitorStatus(false);
                         showInfo('Monitor mode disabled');
                     } else {
-                        alert('Error: ' + data.message);
+                        alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 });
         }
@@ -7301,12 +7869,19 @@
             const initialZoom = (aprsUserLocation.lat || gpsLastPosition?.latitude) ? 8 : 4;
 
             aprsMap = L.map('aprsMap').setView([initialLat, initialLon], initialZoom);
+            window.aprsMap = aprsMap;
 
-            // OpenStreetMap with roads - better for APRS station tracking
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            }).addTo(aprsMap);
+            // Use settings manager for tile layer (allows runtime changes)
+            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+                Settings.createTileLayer().addTo(aprsMap);
+                Settings.registerMap(aprsMap);
+            } else {
+                L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                    maxZoom: 19,
+                    subdomains: 'abcd'
+                }).addTo(aprsMap);
+            }
 
             // Add user marker if GPS position is already available
             if (gpsConnected && gpsLastPosition && gpsLastPosition.latitude && gpsLastPosition.longitude) {
@@ -7857,8 +8432,15 @@
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     position => {
-                        document.getElementById('obsLat').value = position.coords.latitude.toFixed(4);
-                        document.getElementById('obsLon').value = position.coords.longitude.toFixed(4);
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        document.getElementById('obsLat').value = lat.toFixed(4);
+                        document.getElementById('obsLon').value = lon.toFixed(4);
+                        observerLocation.lat = lat;
+                        observerLocation.lon = lon;
+                        if (window.ObserverLocation && ObserverLocation.isSharedEnabled()) {
+                            ObserverLocation.setShared({ lat, lon });
+                        }
                         showInfo('Location updated!');
                     },
                     error => {
@@ -7958,6 +8540,9 @@
             // Update observerLocation
             observerLocation.lat = position.latitude;
             observerLocation.lon = position.longitude;
+            if (window.ObserverLocation && ObserverLocation.isSharedEnabled()) {
+                ObserverLocation.setShared({ lat: position.latitude, lon: position.longitude });
+            }
 
             // Update APRS user location
             updateAprsUserLocation(position);
@@ -8205,11 +8790,19 @@
                 zoomControl: true,
                 attributionControl: false
             });
+            window.groundTrackMap = groundTrackMap;
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(groundTrackMap);
+            // Use settings manager for tile layer (allows runtime changes)
+            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+                Settings.createTileLayer().addTo(groundTrackMap);
+                Settings.registerMap(groundTrackMap);
+            } else {
+                L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                    maxZoom: 19,
+                    subdomains: 'abcd'
+                }).addTo(groundTrackMap);
+            }
 
             // Add observer marker
             const lat = parseFloat(document.getElementById('obsLat').value) || 51.5;
@@ -8680,12 +9273,34 @@
             }).catch(err => console.warn('Failed to save theme to server:', err));
         }
 
-        // Load saved theme on page load
+        // Animation toggle functions
+        function toggleAnimations() {
+            const html = document.documentElement;
+            const currentState = html.getAttribute('data-animations');
+            const newState = currentState === 'off' ? 'on' : 'off';
+
+            if (newState === 'on') {
+                html.removeAttribute('data-animations');
+            } else {
+                html.setAttribute('data-animations', newState);
+            }
+
+            // Save to localStorage for persistence
+            localStorage.setItem('intercept-animations', newState);
+        }
+
+        // Load saved theme and animations on page load
         (function () {
             // First apply localStorage theme for instant load (no flash)
             const localTheme = localStorage.getItem('intercept-theme');
             if (localTheme === 'light') {
                 document.documentElement.setAttribute('data-theme', 'light');
+            }
+
+            // Apply animations preference
+            const localAnimations = localStorage.getItem('intercept-animations');
+            if (localAnimations === 'off') {
+                document.documentElement.setAttribute('data-animations', 'off');
             }
 
             // Then fetch from server to sync (in case changed on another device)
@@ -11369,6 +11984,16 @@
                     <li>Useful for security audits and bug sweeps</li>
                     <li><em style="color: var(--text-muted);">Note: This feature is in early development</em></li>
                 </ul>
+
+                <h3>Meshtastic Mode</h3>
+                <ul class="tip-list">
+                    <li>Integrates with Meshtastic LoRa mesh network devices</li>
+                    <li>Connect Heltec, T-Beam, RAK, or other compatible devices via USB</li>
+                    <li>Real-time message streaming with RSSI and SNR metrics</li>
+                    <li>Configure channels with encryption keys</li>
+                    <li>View connected nodes and message history</li>
+                    <li>Requires: Meshtastic device + <code>pip install meshtastic</code></li>
+                </ul>
             </div>
 
             <!-- WiFi Section -->
@@ -11429,6 +12054,8 @@
                     <li><strong>Export data:</strong> Use export buttons to save captured data as JSON</li>
                     <li><strong>Device Intelligence:</strong> Tracks device patterns over time</li>
                     <li><strong>Theme toggle:</strong> Click the theme button in header to switch dark/light mode</li>
+                    <li><strong>Settings:</strong> Click the gear icon in the header to access settings</li>
+                    <li><strong>Offline mode:</strong> Enable in Settings to use local assets without internet</li>
                 </ul>
 
                 <h3>Keyboard Shortcuts</h3>
@@ -11461,38 +12088,6 @@
                     <li>Passive monitoring may be legal; active attacks require authorization</li>
                     <li>Check local laws regarding radio frequency monitoring</li>
                 </ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dependencies Modal -->
-    <div id="depsModal" class="help-modal" onclick="if(event.target === this) hideDependencies()">
-        <div class="help-content" style="max-width: 800px;">
-            <button class="help-close" onclick="hideDependencies()">×</button>
-            <h2>Tool Dependencies</h2>
-            <p style="color: var(--text-dim); margin-bottom: 15px;">Check which tools are installed for each mode. <span
-                    style="color: var(--accent-green);">●</span> = Installed, <span
-                    style="color: var(--accent-red);">●</span> = Missing</p>
-            <div id="depsContent" style="max-height: 60vh; overflow-y: auto;">
-                <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                    Loading dependencies...
-                </div>
-            </div>
-            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                <h3 style="margin-bottom: 10px;">Quick Install (Debian/Ubuntu)</h3>
-                <div
-                    style="background: var(--bg-tertiary); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; overflow-x: auto;">
-                    <div>sudo apt install rtl-sdr multimon-ng rtl-433 aircrack-ng bluez dump1090-mutability hcxdumptool
-                        hcxtools</div>
-                    <div style="margin-top: 5px;">pip install skyfield flask</div>
-                </div>
-                <div style="margin-top: 10px; font-size: 11px; color: var(--text-dim);">
-                    <strong>Note:</strong> ACARS decoding requires <code>acarsdec</code> which must be built from
-                    source.
-                    See <a href="https://github.com/TLeconte/acarsdec" target="_blank"
-                        style="color: var(--accent-cyan);">github.com/TLeconte/acarsdec</a> or run
-                    <code>./setup.sh</code> for automated installation.
-                </div>
             </div>
         </div>
     </div>
@@ -11944,12 +12539,6 @@
                             }
                         }
 
-                        const btn = document.getElementById('depsBtn');
-                        if (btn && missingModes > 0) {
-                            btn.style.color = 'var(--accent-orange)';
-                            btn.title = missingModes + ' mode(s) have missing tools - click to see details';
-                        }
-
                         // Show startup prompt if tools are missing and not dismissed
                         // Only show if disclaimer has been accepted
                         const disclaimerAccepted = localStorage.getItem('disclaimerAccepted') === 'true';
@@ -11993,7 +12582,7 @@
                         <strong style="color: var(--accent-orange);">${modeCount} mode(s)</strong> require tools that aren't installed.
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <button class="action-btn" onclick="closeStartupDeps(); showDependencies();" style="padding: 10px 16px; font-size: 12px;">
+                        <button class="action-btn" onclick="closeStartupDeps(); showSettings(); switchSettingsTab('tools');" style="padding: 10px 16px; font-size: 12px;">
                             View Details & Install
                         </button>
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); cursor: pointer;">
@@ -12036,6 +12625,17 @@
             }, 600); // 600ms is enough for the user to perceive the color change
         }
     </script>
+
+    <!-- Settings Modal -->
+    {% include 'partials/settings-modal.html' %}
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Settings Manager -->
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <!-- Updater -->
+    <script src="{{ url_for('static', filename='js/core/updater.js') }}"></script>
 </body>
 
 </html>

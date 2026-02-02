@@ -27,7 +27,7 @@ from typing import Any
 
 from flask import Flask, render_template, jsonify, send_file, Response, request,redirect, url_for, flash, session
 from werkzeug.security import check_password_hash
-from config import VERSION, CHANGELOG
+from config import VERSION, CHANGELOG, SHARED_OBSERVER_LOCATION_ENABLED
 from utils.dependencies import check_tool, check_all_dependencies, TOOL_DEPENDENCIES
 from utils.process import cleanup_stale_processes
 from utils.sdr import SDRFactory
@@ -90,6 +90,25 @@ def add_security_headers(response):
     # Permissions policy (disable unnecessary features)
     response.headers['Permissions-Policy'] = 'geolocation=(self), microphone=()'
     return response
+
+
+# ============================================
+# CONTEXT PROCESSORS
+# ============================================
+
+@app.context_processor
+def inject_offline_settings():
+    """Inject offline settings into all templates."""
+    from utils.database import get_setting
+    return {
+        'offline_settings': {
+            'enabled': get_setting('offline.enabled', False),
+            'assets_source': get_setting('offline.assets_source', 'cdn'),
+            'fonts_source': get_setting('offline.fonts_source', 'cdn'),
+            'tile_provider': get_setting('offline.tile_provider', 'openstreetmap'),
+            'tile_server_url': get_setting('offline.tile_server_url', '')
+        }
+    }
 
 
 # ============================================
@@ -261,7 +280,14 @@ def index() -> str:
         'rtlamr': check_tool('rtlamr')
     }
     devices = [d.to_dict() for d in SDRFactory.detect_devices()]
-    return render_template('index.html', tools=tools, devices=devices, version=VERSION, changelog=CHANGELOG)
+    return render_template(
+        'index.html',
+        tools=tools,
+        devices=devices,
+        version=VERSION,
+        changelog=CHANGELOG,
+        shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+    )
 
 
 @app.route('/favicon.svg')
@@ -719,6 +745,22 @@ def main() -> None:
     # Register blueprints
     from routes import register_blueprints
     register_blueprints(app)
+
+    # Update TLE data in background thread (non-blocking)
+    def update_tle_background():
+        try:
+            from routes.satellite import refresh_tle_data
+            print("Updating satellite TLE data from CelesTrak...")
+            updated = refresh_tle_data()
+            if updated:
+                print(f"TLE data updated for: {', '.join(updated)}")
+            else:
+                print("TLE update: No satellites updated (may be offline)")
+        except Exception as e:
+            print(f"TLE update failed (will use cached data): {e}")
+
+    tle_thread = threading.Thread(target=update_tle_background, daemon=True)
+    tle_thread.start()
 
     # Initialize WebSocket for audio streaming
     try:

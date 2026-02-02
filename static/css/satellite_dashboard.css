@@ -626,10 +626,7 @@ body {
     background: var(--bg-dark) !important;
 }
 
-.leaflet-tile-pane,
-.leaflet-container .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2) !important;
-}
+/* Using actual dark tiles now - no filter needed */
 
 .leaflet-control-zoom a {
     background: var(--bg-panel) !important;

@@ -2,6 +2,100 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.12.0] - 2026-01-29
+
+### Added
+- **ISS SSTV Decoder Mode** - Receive Slow Scan Television transmissions from the ISS
+  - Real-time ISS tracking globe with accurate position via N2YO API
+  - Leaflet world map showing ISS ground track and current position
+  - Location settings for ISS pass predictions
+  - Integration with satellite tracking TLE data
+- **GitHub Update Notifications** - Automatic new version alerts
+  - Checks for updates on app startup
+  - Unobtrusive notification when new releases are available
+  - Configurable check interval via settings
+- **Meshtastic Enhancements**
+  - QR code support for easy device sharing
+  - Telemetry display with battery, voltage, and environmental data
+  - Traceroute visualization for mesh network topology
+  - Improved node synchronization between map and top bar
+- **UI Improvements**
+  - New Space category for satellite and ISS-related modes
+  - Pulsating ring effect for tracked aircraft/vessels
+  - Map marker highlighting for selected aircraft in ADS-B
+  - Consolidated settings and dependencies into single modal
+- **Auto-Update TLE Data** - Satellite tracking data updates automatically on app startup
+- **GPS Auto-Connect** - AIS dashboard now connects to gpsd automatically
+
+### Changed
+- **Utility Meters** - Added device grouping by ID with consumption trends
+- **Utility Meters** - Device intelligence and manufacturer information display
+
+### Fixed
+- **SoapySDR** - Module detection on macOS with Homebrew
+- **dump1090** - Build failures in Docker containers
+- **dump1090** - Build failures on Kali Linux and newer GCC versions
+- **Flask** - Ensure Flask 3.0+ compatibility in setup script
+- **psycopg2** - Now optional for Flask/Werkzeug compatibility
+- **Bias-T** - Setting now properly passed to ADS-B and AIS dashboards
+- **Dark Mode Maps** - Removed CSS filter that was inverting dark tiles
+- **Map Tiles** - Fixed CARTO tile URLs and added cache-busting
+- **Meshtastic** - Traceroute button and dark mode map fixes
+- **ADS-B Dashboard** - Height adjustment to prevent bottom controls cutoff
+- **Audio Visualizer** - Now works without spectrum canvas
+
+---
+
+## [2.11.0] - 2026-01-28
+
+### Added
+- **Meshtastic Mesh Network Integration** - LoRa mesh communication support
+  - Connect to Meshtastic devices (Heltec, T-Beam, RAK) via USB/Serial
+  - Real-time message streaming via SSE
+  - Channel configuration with encryption key support
+  - Node information display with signal metrics (RSSI, SNR)
+  - Message history with up to 500 messages
+- **Ubertooth One BLE Scanner** - Advanced Bluetooth scanning
+  - Passive BLE packet capture across all 40 BLE channels
+  - Raw advertising payload access
+  - Integration with existing Bluetooth scanning modes
+  - Automatic detection of Ubertooth hardware
+- **Offline Mode** - Run iNTERCEPT without internet connectivity
+  - Bundled Leaflet 1.9.4 (JS, CSS, marker images)
+  - Bundled Chart.js 4.4.1
+  - Bundled Inter and JetBrains Mono fonts (woff2)
+  - Local asset status checking and validation
+- **Settings Modal** - New configuration interface accessible from navigation
+  - Offline tab: Toggle offline mode, configure asset sources
+  - Display tab: Theme and animation preferences
+  - About tab: Version info and links
+- **Multiple Map Tile Providers** - Choose from:
+  - OpenStreetMap (default)
+  - CartoDB Dark
+  - CartoDB Positron (light)
+  - ESRI World Imagery
+  - Custom tile server URL
+
+### Changed
+- **Dashboard Templates** - Conditional asset loading based on offline settings
+- **Bluetooth Scanner** - Added Ubertooth backend alongside BlueZ/DBus
+- **Dependencies** - Added meshtastic SDK to requirements.txt
+
+### Technical
+- Added `routes/meshtastic.py` for Meshtastic API endpoints
+- Added `utils/meshtastic.py` for device management
+- Added `utils/bluetooth/ubertooth_scanner.py` for Ubertooth support
+- Added `routes/offline.py` for offline mode API
+- Added `static/js/core/settings-manager.js` for client-side settings
+- Added `static/css/settings.css` for settings modal styles
+- Added `static/css/modes/meshtastic.css` for Meshtastic UI
+- Added `static/js/modes/meshtastic.js` for Meshtastic frontend
+- Added `templates/partials/modes/meshtastic.html` for Meshtastic mode
+- Added `templates/partials/settings-modal.html` for settings UI
+- Added `static/vendor/` directory structure for bundled assets
+
+---
+
 ## [2.10.0] - 2026-01-25
 
 ### Added

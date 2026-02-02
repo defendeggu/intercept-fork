@@ -1,5 +1,5 @@
 # Core dependencies
-flask>=2.0.0
+flask>=3.0.0
 flask-limiter>=2.5.4
 requests>=2.28.0
 Werkzeug>=3.1.5
@@ -22,6 +22,12 @@ pyserial>=3.5
 
 # MQTT support (optional - for publishing decoded data to MQTT broker)
 paho-mqtt>=1.6.0
+
+# Meshtastic mesh network support (optional - only needed for Meshtastic features)
+meshtastic>=2.0.0
+
+# QR code generation for Meshtastic channels (optional)
+qrcode[pil]>=7.4
 
 # Development dependencies (install with: pip install -r requirements-dev.txt)
 # pytest>=7.0.0

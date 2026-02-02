@@ -35,9 +35,11 @@ Support the developer of this open-source project
 - **Satellite Tracking** - Pass prediction using TLE data
 - **ADS-B History** - Persistent aircraft history with reporting dashboard (Postgres optional)
 - **WiFi Scanning** - Monitor mode reconnaissance via aircrack-ng
-- **Bluetooth Scanning** - Device discovery and tracker detection
+- **Bluetooth Scanning** - Device discovery and tracker detection (with Ubertooth support)
+- **Meshtastic** - LoRa mesh network integration
 - **Spy Stations** - Number stations and diplomatic HF network database
 - **Remote Agents** - Distributed SIGINT with remote sensor nodes
+- **Offline Mode** - Bundled assets for air-gapped/field deployments
 
 ---
 
@@ -70,6 +72,47 @@ The ADS-B history feature persists aircraft messages to Postgres for long-term a
 ```bash
 # Start with ADS-B history and Postgres
 docker compose --profile history up -d
+```
+
+Set the following environment variables (for example in a `.env` file):
+
+```bash
+INTERCEPT_ADSB_HISTORY_ENABLED=true
+INTERCEPT_ADSB_DB_HOST=adsb_db
+INTERCEPT_ADSB_DB_PORT=5432
+INTERCEPT_ADSB_DB_NAME=intercept_adsb
+INTERCEPT_ADSB_DB_USER=intercept
+INTERCEPT_ADSB_DB_PASSWORD=intercept
+```
+
+### Other ADS-B Settings
+
+Set these as environment variables for either local installs or Docker:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INTERCEPT_ADSB_AUTO_START` | `false` | Auto-start ADS-B tracking when the dashboard loads |
+| `INTERCEPT_SHARED_OBSERVER_LOCATION` | `true` | Share observer location across ADS-B/AIS/SSTV/Satellite modules |
+
+**Local install example**
+
+```bash
+INTERCEPT_ADSB_AUTO_START=true \
+INTERCEPT_SHARED_OBSERVER_LOCATION=false \
+python app.py
+```
+
+**Docker example (.env)**
+
+```bash
+INTERCEPT_ADSB_AUTO_START=true
+INTERCEPT_SHARED_OBSERVER_LOCATION=false
+```
+
+To store Postgres data on external storage, set `PGDATA_PATH` (defaults to `./pgdata`):
+
+```bash
+PGDATA_PATH=/mnt/usbpi1/intercept/pgdata
 ```
 
 Then open **/adsb/history** for the reporting dashboard.

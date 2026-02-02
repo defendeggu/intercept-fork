@@ -1,0 +1,876 @@
+/**
+ * SSTV Mode Styles
+ * ISS Slow-Scan Television decoder interface
+ */
+
+/* ============================================
+   MODE VISIBILITY
+   ============================================ */
+#sstvMode.active {
+    display: block !important;
+}
+
+/* ============================================
+   VISUALS CONTAINER
+   ============================================ */
+.sstv-visuals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    min-height: 0;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ============================================
+   MAIN ROW (Live Decode + Gallery)
+   ============================================ */
+.sstv-main-row {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ============================================
+   STATS STRIP
+   ============================================ */
+.sstv-stats-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.sstv-strip-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sstv-strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sstv-strip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sstv-strip-dot.idle {
+    background: var(--text-dim);
+}
+
+.sstv-strip-dot.listening {
+    background: var(--accent-yellow);
+    animation: pulse 1s infinite;
+}
+
+.sstv-strip-dot.decoding {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 6px var(--accent-cyan);
+    animation: pulse 0.5s infinite;
+}
+
+.sstv-strip-status-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.sstv-strip-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 5px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.sstv-strip-btn.start {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+.sstv-strip-btn.start:hover {
+    background: var(--accent-cyan-bright, #00d4ff);
+}
+
+.sstv-strip-btn.stop {
+    background: var(--accent-red, #ff3366);
+    color: white;
+}
+
+.sstv-strip-btn.stop:hover {
+    background: #ff1a53;
+}
+
+.sstv-strip-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+}
+
+.sstv-strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 50px;
+}
+
+.sstv-strip-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-strip-value.accent-cyan {
+    color: var(--accent-cyan);
+}
+
+.sstv-strip-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Location inputs in strip */
+.sstv-strip-location {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sstv-loc-input {
+    width: 70px;
+    padding: 4px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.sstv-loc-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.sstv-strip-btn.gps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.sstv-strip-btn.gps:hover {
+    background: var(--accent-green);
+    color: #000;
+    border-color: var(--accent-green);
+}
+
+.sstv-strip-btn.update-tle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.sstv-strip-btn.update-tle:hover {
+    background: var(--accent-orange);
+    color: #000;
+    border-color: var(--accent-orange);
+}
+
+/* ============================================
+   LIVE DECODE SECTION
+   ============================================ */
+.sstv-live-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 300px;
+}
+
+.sstv-live-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sstv-live-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-live-title svg {
+    color: var(--accent-cyan);
+}
+
+.sstv-live-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    min-height: 0;
+}
+
+.sstv-canvas-container {
+    position: relative;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#sstvCanvas {
+    display: block;
+    image-rendering: pixelated;
+}
+
+.sstv-decode-info {
+    width: 100%;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sstv-mode-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-cyan);
+    text-align: center;
+}
+
+.sstv-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sstv-progress-bar .progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.sstv-status-message {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* Idle state */
+.sstv-idle-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+}
+
+.sstv-idle-state svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.sstv-idle-state h4 {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.sstv-idle-state p {
+    font-size: 12px;
+    max-width: 250px;
+}
+
+/* ============================================
+   GALLERY SECTION
+   ============================================ */
+.sstv-gallery-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1.5;
+    min-width: 300px;
+}
+
+.sstv-gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sstv-gallery-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-gallery-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent-cyan);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.sstv-gallery-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    padding: 12px;
+    overflow-y: auto;
+    align-content: start;
+}
+
+.sstv-image-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.sstv-image-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+}
+
+.sstv-image-preview {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    background: #000;
+    display: block;
+}
+
+.sstv-image-info {
+    padding: 8px 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.sstv-image-mode {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    margin-bottom: 4px;
+}
+
+.sstv-image-timestamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+}
+
+/* Empty gallery state */
+.sstv-gallery-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    grid-column: 1 / -1;
+}
+
+.sstv-gallery-empty svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
+/* ============================================
+   TOP ROW (Map + Countdown)
+   ============================================ */
+.sstv-top-row {
+    display: flex;
+    gap: 12px;
+    height: 220px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   ISS MAP ROW
+   ============================================ */
+.sstv-map-row {
+    flex: 1.5;
+    min-width: 0;
+    height: 100%;
+}
+
+.sstv-map-container {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    height: 100%;
+}
+
+.sstv-iss-map {
+    width: 100%;
+    height: 100%;
+    background: #0a1628;
+}
+
+.sstv-map-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.sstv-map-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.sstv-map-label {
+    font-size: 10px;
+    font-weight: bold;
+    color: #ffcc00;
+    background: rgba(255, 204, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.sstv-map-coords {
+    font-size: 11px;
+    color: var(--accent-cyan);
+}
+
+.sstv-map-alt {
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.sstv-pass-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.sstv-pass-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.sstv-pass-value {
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+/* ============================================
+   ISS MAP MARKER
+   ============================================ */
+.sstv-iss-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.sstv-iss-dot {
+    width: 16px;
+    height: 16px;
+    background: #ffcc00;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 0 0 30px rgba(255, 204, 0, 0.4);
+    animation: iss-pulse 2s ease-in-out infinite;
+}
+
+.sstv-iss-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.5);
+    margin-top: 2px;
+}
+
+@keyframes iss-pulse {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 0 0 30px rgba(255, 204, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(255, 204, 0, 1), 0 0 50px rgba(255, 204, 0, 0.6);
+    }
+}
+
+/* Override Leaflet default marker styles */
+.leaflet-marker-icon.sstv-iss-marker {
+    background: transparent;
+    border: none;
+}
+
+/* ============================================
+   COUNTDOWN PANEL
+   ============================================ */
+.sstv-countdown-panel {
+    flex: 1;
+    min-width: 280px;
+    max-width: 380px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+}
+
+.sstv-countdown-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-countdown-header svg {
+    color: var(--accent-cyan);
+}
+
+.sstv-countdown-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    gap: 10px;
+}
+
+.sstv-countdown-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.sstv-countdown-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.sstv-countdown-value.imminent {
+    color: var(--accent-green);
+    text-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+    animation: countdown-pulse 1s ease-in-out infinite;
+}
+
+.sstv-countdown-value.active {
+    color: var(--accent-yellow);
+    text-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
+    animation: countdown-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes countdown-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.sstv-countdown-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sstv-countdown-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 12px;
+    width: 100%;
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.sstv-countdown-detail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.sstv-detail-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sstv-detail-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-countdown-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid var(--border-color);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.sstv-countdown-status .sstv-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+}
+
+.sstv-countdown-status.has-pass .sstv-status-dot {
+    background: var(--accent-cyan);
+}
+
+.sstv-countdown-status.imminent .sstv-status-dot {
+    background: var(--accent-green);
+    animation: pulse 1s infinite;
+}
+
+.sstv-countdown-status.active .sstv-status-dot {
+    background: var(--accent-yellow);
+    box-shadow: 0 0 8px var(--accent-yellow);
+    animation: pulse 0.5s infinite;
+}
+
+/* ============================================
+   IMAGE MODAL
+   ============================================ */
+.sstv-image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 40px;
+}
+
+.sstv-image-modal.show {
+    display: flex;
+}
+
+.sstv-image-modal img {
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.sstv-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+
+.sstv-modal-close:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .sstv-main-row {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .sstv-live-section {
+        max-width: none;
+        min-height: 350px;
+    }
+
+    .sstv-gallery-section {
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .sstv-top-row {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .sstv-map-row {
+        flex: none;
+        height: 180px;
+    }
+
+    .sstv-countdown-panel {
+        min-width: auto;
+        max-width: none;
+        height: auto;
+    }
+
+    .sstv-countdown-value {
+        font-size: 24px;
+    }
+
+    .sstv-iss-map {
+        height: 180px;
+    }
+
+    .sstv-map-overlay {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sstv-stats-strip {
+        padding: 8px 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .sstv-strip-divider {
+        display: none;
+    }
+
+    .sstv-strip-location {
+        flex-wrap: wrap;
+    }
+
+    .sstv-loc-input {
+        width: 55px;
+    }
+
+    .sstv-gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .sstv-iss-map {
+        height: 150px;
+    }
+
+    .sstv-map-info {
+        gap: 8px;
+    }
+
+    .sstv-map-overlay {
+        padding: 6px 10px;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}

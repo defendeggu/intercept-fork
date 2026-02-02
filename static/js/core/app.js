@@ -32,6 +32,9 @@ let muted = localStorage.getItem('audioMuted') === 'true';
 
 // Observer location (load from localStorage or default to London)
 let observerLocation = (function() {
+    if (window.ObserverLocation && ObserverLocation.getForModule) {
+        return ObserverLocation.getForModule('observerLocation');
+    }
     const saved = localStorage.getItem('observerLocation');
     if (saved) {
         try {
@@ -95,7 +98,7 @@ function switchMode(mode) {
     const modeMap = {
         'pager': 'pager', 'sensor': '433', 'aircraft': 'aircraft',
         'satellite': 'satellite', 'wifi': 'wifi', 'bluetooth': 'bluetooth',
-        'listening': 'listening'
+        'listening': 'listening', 'meshtastic': 'meshtastic'
     };
     document.querySelectorAll('.mode-nav-btn').forEach(btn => {
         const label = btn.querySelector('.nav-label');
@@ -107,11 +110,16 @@ function switchMode(mode) {
     // Toggle mode content visibility
     document.getElementById('pagerMode').classList.toggle('active', mode === 'pager');
     document.getElementById('sensorMode').classList.toggle('active', mode === 'sensor');
-    document.getElementById('aircraftMode').classList.toggle('active', mode === 'aircraft');
+    document.getElementById('aircraftMode')?.classList.toggle('active', mode === 'aircraft');
     document.getElementById('satelliteMode').classList.toggle('active', mode === 'satellite');
     document.getElementById('wifiMode').classList.toggle('active', mode === 'wifi');
     document.getElementById('bluetoothMode').classList.toggle('active', mode === 'bluetooth');
     document.getElementById('listeningPostMode').classList.toggle('active', mode === 'listening');
+    document.getElementById('aprsMode')?.classList.toggle('active', mode === 'aprs');
+    document.getElementById('tscmMode')?.classList.toggle('active', mode === 'tscm');
+    document.getElementById('rtlamrMode')?.classList.toggle('active', mode === 'rtlamr');
+    document.getElementById('spystationsMode')?.classList.toggle('active', mode === 'spystations');
+    document.getElementById('meshtasticMode')?.classList.toggle('active', mode === 'meshtastic');
 
     // Toggle stats visibility
     document.getElementById('pagerStats').style.display = mode === 'pager' ? 'flex' : 'none';
@@ -137,7 +145,8 @@ function switchMode(mode) {
         'bluetooth': 'BLUETOOTH',
         'listening': 'LISTENING POST',
         'tscm': 'TSCM',
-        'aprs': 'APRS'
+        'aprs': 'APRS',
+        'meshtastic': 'MESHTASTIC'
     };
     document.getElementById('activeModeIndicator').innerHTML = '<span class="pulse-dot"></span>' + modeNames[mode];
 
@@ -167,7 +176,8 @@ function switchMode(mode) {
         'satellite': 'Satellite Monitor',
         'wifi': 'WiFi Scanner',
         'bluetooth': 'Bluetooth Scanner',
-        'listening': 'Listening Post'
+        'listening': 'Listening Post',
+        'meshtastic': 'Meshtastic Mesh Monitor'
     };
     document.getElementById('outputTitle').textContent = titles[mode] || 'Signal Monitor';
 
@@ -197,10 +207,10 @@ function switchMode(mode) {
 
     // Hide waterfall and output console for modes with their own visualizations
     document.querySelector('.waterfall-container').style.display =
-        (mode === 'satellite' || mode === 'listening' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth') ? 'none' : 'block';
+        (mode === 'satellite' || mode === 'listening' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth' || mode === 'meshtastic' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
     document.getElementById('output').style.display =
-        (mode === 'satellite' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth') ? 'none' : 'block';
-    document.querySelector('.status-bar').style.display = (mode === 'satellite' || mode === 'tscm') ? 'none' : 'flex';
+        (mode === 'satellite' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth' || mode === 'meshtastic' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
+    document.querySelector('.status-bar').style.display = (mode === 'satellite' || mode === 'tscm' || mode === 'meshtastic' || mode === 'aprs' || mode === 'spystations') ? 'none' : 'flex';
 
     // Load interfaces and initialize visualizations when switching modes
     if (mode === 'wifi') {
@@ -221,6 +231,8 @@ function switchMode(mode) {
         if (typeof checkAudioTools === 'function') checkAudioTools();
         if (typeof populateScannerDeviceSelect === 'function') populateScannerDeviceSelect();
         if (typeof populateAudioDeviceSelect === 'function') populateAudioDeviceSelect();
+    } else if (mode === 'meshtastic') {
+        if (typeof Meshtastic !== 'undefined' && Meshtastic.init) Meshtastic.init();
     }
 }
 

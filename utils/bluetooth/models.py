@@ -407,6 +407,7 @@ class SystemCapabilities:
     has_hcitool: bool = False
     has_bluetoothctl: bool = False
     has_btmgmt: bool = False
+    has_ubertooth: bool = False
 
     # Recommended backend
     recommended_backend: str = 'none'
@@ -421,7 +422,8 @@ class SystemCapabilities:
             (self.has_dbus and self.has_bluez and len(self.adapters) > 0) or
             self.has_bleak or
             self.has_hcitool or
-            self.has_bluetoothctl
+            self.has_bluetoothctl or
+            self.has_ubertooth
         )
 
     def to_dict(self) -> dict:
@@ -442,6 +444,7 @@ class SystemCapabilities:
             'has_hcitool': self.has_hcitool,
             'has_bluetoothctl': self.has_bluetoothctl,
             'has_btmgmt': self.has_btmgmt,
+            'has_ubertooth': self.has_ubertooth,
             'preferred_backend': self.recommended_backend,  # Alias for frontend
             'recommended_backend': self.recommended_backend,
             'issues': self.issues,

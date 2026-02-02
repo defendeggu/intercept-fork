@@ -36,6 +36,10 @@ services:
       # - INTERCEPT_ADSB_DB_NAME=intercept_adsb
       # - INTERCEPT_ADSB_DB_USER=intercept
       # - INTERCEPT_ADSB_DB_PASSWORD=intercept
+      # ADS-B auto-start on dashboard load (default false)
+      - INTERCEPT_ADSB_AUTO_START=${INTERCEPT_ADSB_AUTO_START:-false}
+      # Shared observer location across modules
+      - INTERCEPT_SHARED_OBSERVER_LOCATION=${INTERCEPT_SHARED_OBSERVER_LOCATION:-true}
     # Network mode for WiFi scanning (requires host network)
     # network_mode: host
     restart: unless-stopped
@@ -68,6 +72,10 @@ services:
       - INTERCEPT_ADSB_DB_NAME=intercept_adsb
       - INTERCEPT_ADSB_DB_USER=intercept
       - INTERCEPT_ADSB_DB_PASSWORD=intercept
+      # ADS-B auto-start on dashboard load (default false)
+      - INTERCEPT_ADSB_AUTO_START=${INTERCEPT_ADSB_AUTO_START:-false}
+      # Shared observer location across modules
+      - INTERCEPT_SHARED_OBSERVER_LOCATION=${INTERCEPT_SHARED_OBSERVER_LOCATION:-true}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:5050/health"]

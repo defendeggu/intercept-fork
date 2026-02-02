@@ -156,6 +156,43 @@ def _find_soapy_util() -> str | None:
     return None
 
 
+def _get_soapy_env() -> dict:
+    """Get environment variables needed for SoapySDR on macOS.
+
+    On macOS with Homebrew, SoapySDR modules are installed in paths that
+    require SOAPY_SDR_ROOT or DYLD_LIBRARY_PATH to be set. This fixes
+    detection issues where modules like SoapyHackRF are installed but
+    not found by SoapySDRUtil.
+
+    See: https://github.com/smittix/intercept/issues/77
+    """
+    import os
+    import platform
+    env = os.environ.copy()
+
+    if platform.system() == 'Darwin':
+        # Homebrew paths for Apple Silicon and Intel Macs
+        homebrew_paths = ['/opt/homebrew', '/usr/local']
+        lib_paths = []
+
+        for base in homebrew_paths:
+            lib_path = f'{base}/lib'
+            if os.path.isdir(lib_path):
+                lib_paths.append(lib_path)
+
+        if lib_paths:
+            current_dyld = env.get('DYLD_LIBRARY_PATH', '')
+            env['DYLD_LIBRARY_PATH'] = ':'.join(lib_paths + ([current_dyld] if current_dyld else []))
+
+        # Set SOAPY_SDR_ROOT if we found Homebrew installation
+        for base in homebrew_paths:
+            if os.path.isdir(f'{base}/lib/SoapySDR'):
+                env['SOAPY_SDR_ROOT'] = base
+                break
+
+    return env
+
+
 def detect_soapy_devices(skip_types: Optional[set[SDRType]] = None) -> list[SDRDevice]:
     """
     Detect SDR devices via SoapySDR.
@@ -174,11 +211,14 @@ def detect_soapy_devices(skip_types: Optional[set[SDRType]] = None) -> list[SDRD
         return devices
 
     try:
+        # Use macOS-aware environment to find Homebrew-installed modules
+        env = _get_soapy_env()
         result = subprocess.run(
             [soapy_cmd, '--find'],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            env=env
         )
 
         # Parse SoapySDR output

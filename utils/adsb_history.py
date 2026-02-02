@@ -9,8 +9,16 @@ import time
 from datetime import datetime, timezone
 from typing import Iterable
 
-import psycopg2
-from psycopg2.extras import execute_values, Json
+# psycopg2 is optional - only needed for PostgreSQL history persistence
+try:
+    import psycopg2
+    from psycopg2.extras import execute_values, Json
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    psycopg2 = None  # type: ignore
+    execute_values = None  # type: ignore
+    Json = None  # type: ignore
+    PSYCOPG2_AVAILABLE = False
 
 from config import (
     ADSB_DB_HOST,
@@ -199,7 +207,7 @@ class AdsbHistoryWriter:
     """Background writer for ADS-B history records."""
 
     def __init__(self) -> None:
-        self.enabled = ADSB_HISTORY_ENABLED
+        self.enabled = ADSB_HISTORY_ENABLED and PSYCOPG2_AVAILABLE
         self._queue: queue.Queue[dict] = queue.Queue(maxsize=ADSB_HISTORY_QUEUE_SIZE)
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -297,7 +305,7 @@ class AdsbSnapshotWriter:
     """Background writer for ADS-B snapshot records."""
 
     def __init__(self) -> None:
-        self.enabled = ADSB_HISTORY_ENABLED
+        self.enabled = ADSB_HISTORY_ENABLED and PSYCOPG2_AVAILABLE
         self._queue: queue.Queue[dict] = queue.Queue(maxsize=ADSB_HISTORY_QUEUE_SIZE)
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()

@@ -67,7 +67,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && cd /tmp \
     && git clone --depth 1 https://github.com/flightaware/dump1090.git \
     && cd dump1090 \
-    && make \
+    && sed -i 's/-Werror//g' Makefile \
+    && make BLADERF=no RTLSDR=yes \
     && cp dump1090 /usr/bin/dump1090-fa \
     && ln -s /usr/bin/dump1090-fa /usr/bin/dump1090 \
     && rm -rf /tmp/dump1090 \

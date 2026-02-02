@@ -172,15 +172,15 @@ body {
 }
 
 /* Main dashboard grid - Mobile first */
-/* Header ~55px + Stats strip ~36px = ~91px, using 95px for safety */
+/* Header ~55px + Stats strip ~55px = ~110px, using 115px for safety */
 .dashboard {
     position: relative;
     z-index: 10;
     display: flex;
     flex-direction: column;
     gap: 0;
-    height: calc(100dvh - 95px);
-    height: calc(100vh - 95px); /* Fallback */
+    height: calc(100dvh - 115px);
+    height: calc(100vh - 115px); /* Fallback */
     min-height: 400px;
 }
 
@@ -216,7 +216,7 @@ body {
 @media (min-width: 1024px) {
     .acars-sidebar {
         display: flex;
-        max-height: calc(100dvh - 95px);
+        max-height: calc(100dvh - 115px);
     }
 }
 
@@ -903,10 +903,7 @@ body {
     background: var(--bg-dark) !important;
 }
 
-.leaflet-tile-pane,
-.leaflet-container .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2) !important;
-}
+/* Using actual dark tiles now - no filter needed */
 
 .leaflet-control-zoom a {
     background: var(--bg-panel) !important;
@@ -1146,6 +1143,55 @@ body {
     50% { opacity: 0.5; transform: scale(0.8); }
 }
 
+/* ============================================
+   TRACKED AIRCRAFT PULSATING RING
+   ============================================ */
+.aircraft-marker.selected {
+    position: relative;
+}
+
+.tracking-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--accent-cyan);
+    border-radius: 50%;
+    animation: tracking-pulse 1.5s ease-out infinite;
+    pointer-events: none;
+}
+
+.tracking-ring-inner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 50%;
+    animation: tracking-pulse 1.5s ease-out infinite 0.3s;
+    pointer-events: none;
+}
+
+@keyframes tracking-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+        border-color: rgba(74, 158, 255, 1);
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.8);
+        opacity: 0;
+        border-color: rgba(74, 158, 255, 0);
+    }
+}
+
 /* ============== MOBILE/TABLET FIXES ============== */
 @media (max-width: 1023px) {
     /* Dashboard - allow scrolling */
@@ -1153,7 +1199,7 @@ body {
         display: flex !important;
         flex-direction: column !important;
         height: auto !important;
-        min-height: calc(100dvh - 95px);
+        min-height: calc(100dvh - 115px);
         overflow-y: auto !important;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;

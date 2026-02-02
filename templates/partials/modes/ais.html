@@ -45,7 +45,7 @@
         fetch('/ais/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device, gain })
+            body: JSON.stringify({ device, gain, bias_t: typeof getBiasTEnabled === 'function' ? getBiasTEnabled() : false })
         })
         .then(r => r.json())
         .then(data => {

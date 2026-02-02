@@ -873,6 +873,150 @@ class ModeManager:
         return data
 
     # =========================================================================
+    # WiFi Monitor Mode
+    # =========================================================================
+
+    def toggle_monitor_mode(self, params: dict) -> dict:
+        """Enable or disable monitor mode on a WiFi interface."""
+        import re
+
+        action = params.get('action', 'start')
+        interface = params.get('interface', '')
+        kill_processes = params.get('kill_processes', False)
+
+        # Validate interface name (alphanumeric, underscore, dash only)
+        if not interface or not re.match(r'^[a-zA-Z][a-zA-Z0-9_-]*$', interface):
+            return {'status': 'error', 'message': 'Invalid interface name'}
+
+        airmon_path = self._get_tool_path('airmon-ng')
+        iw_path = self._get_tool_path('iw')
+
+        if action == 'start':
+            if airmon_path:
+                try:
+                    # Get interfaces before
+                    def get_wireless_interfaces():
+                        interfaces = set()
+                        try:
+                            for iface in os.listdir('/sys/class/net'):
+                                if os.path.exists(f'/sys/class/net/{iface}/wireless') or 'mon' in iface:
+                                    interfaces.add(iface)
+                        except OSError:
+                            pass
+                        return interfaces
+
+                    interfaces_before = get_wireless_interfaces()
+
+                    # Kill interfering processes if requested
+                    if kill_processes:
+                        subprocess.run([airmon_path, 'check', 'kill'],
+                                      capture_output=True, timeout=10)
+
+                    # Start monitor mode
+                    result = subprocess.run([airmon_path, 'start', interface],
+                                          capture_output=True, text=True, timeout=15)
+                    output = result.stdout + result.stderr
+
+                    time.sleep(1)
+                    interfaces_after = get_wireless_interfaces()
+
+                    # Find the new monitor interface
+                    new_interfaces = interfaces_after - interfaces_before
+                    monitor_iface = None
+
+                    if new_interfaces:
+                        for iface in new_interfaces:
+                            if 'mon' in iface:
+                                monitor_iface = iface
+                                break
+                        if not monitor_iface:
+                            monitor_iface = list(new_interfaces)[0]
+
+                    # Try to parse from airmon-ng output
+                    if not monitor_iface:
+                        patterns = [
+                            r'\b([a-zA-Z][a-zA-Z0-9_-]*mon)\b',
+                            r'\[phy\d+\]([a-zA-Z][a-zA-Z0-9_-]*mon)',
+                            r'enabled.*?\[phy\d+\]([a-zA-Z][a-zA-Z0-9_-]*)',
+                        ]
+                        for pattern in patterns:
+                            match = re.search(pattern, output, re.IGNORECASE)
+                            if match:
+                                candidate = match.group(1)
+                                if candidate and not candidate[0].isdigit():
+                                    monitor_iface = candidate
+                                    break
+
+                    # Fallback: check if original interface is in monitor mode
+                    if not monitor_iface:
+                        try:
+                            result = subprocess.run(['iwconfig', interface],
+                                                  capture_output=True, text=True, timeout=5)
+                            if 'Mode:Monitor' in result.stdout:
+                                monitor_iface = interface
+                        except (subprocess.SubprocessError, OSError):
+                            pass
+
+                    # Last resort: try common naming
+                    if not monitor_iface:
+                        potential = interface + 'mon'
+                        if os.path.exists(f'/sys/class/net/{potential}'):
+                            monitor_iface = potential
+
+                    if not monitor_iface or not os.path.exists(f'/sys/class/net/{monitor_iface}'):
+                        all_wireless = list(get_wireless_interfaces())
+                        return {
+                            'status': 'error',
+                            'message': f'Monitor interface not created. airmon-ng output: {output[:500]}. Available interfaces: {all_wireless}'
+                        }
+
+                    self.wifi_monitor_interface = monitor_iface
+                    self._capabilities = None  # Invalidate cache so interfaces refresh
+                    logger.info(f"Monitor mode enabled on {monitor_iface}")
+                    return {'status': 'success', 'monitor_interface': monitor_iface}
+
+                except Exception as e:
+                    logger.error(f"Error enabling monitor mode: {e}")
+                    return {'status': 'error', 'message': str(e)}
+
+            elif iw_path:
+                try:
+                    subprocess.run(['ip', 'link', 'set', interface, 'down'], capture_output=True)
+                    subprocess.run([iw_path, interface, 'set', 'monitor', 'control'], capture_output=True)
+                    subprocess.run(['ip', 'link', 'set', interface, 'up'], capture_output=True)
+                    self.wifi_monitor_interface = interface
+                    self._capabilities = None  # Invalidate cache
+                    return {'status': 'success', 'monitor_interface': interface}
+                except Exception as e:
+                    return {'status': 'error', 'message': str(e)}
+            else:
+                return {'status': 'error', 'message': 'No monitor mode tools available (airmon-ng or iw)'}
+
+        else:  # stop
+            current_iface = getattr(self, 'wifi_monitor_interface', None) or interface
+            if airmon_path:
+                try:
+                    subprocess.run([airmon_path, 'stop', current_iface],
+                                  capture_output=True, text=True, timeout=15)
+                    self.wifi_monitor_interface = None
+                    self._capabilities = None  # Invalidate cache
+                    return {'status': 'success', 'message': 'Monitor mode disabled'}
+                except Exception as e:
+                    return {'status': 'error', 'message': str(e)}
+            elif iw_path:
+                try:
+                    subprocess.run(['ip', 'link', 'set', current_iface, 'down'], capture_output=True)
+                    subprocess.run([iw_path, current_iface, 'set', 'type', 'managed'], capture_output=True)
+                    subprocess.run(['ip', 'link', 'set', current_iface, 'up'], capture_output=True)
+                    self.wifi_monitor_interface = None
+                    self._capabilities = None  # Invalidate cache
+                    return {'status': 'success', 'message': 'Monitor mode disabled'}
+                except Exception as e:
+                    return {'status': 'error', 'message': str(e)}
+
+        return {'status': 'error', 'message': 'Unknown action'}
+
+    # =========================================================================
     # Mode-specific implementations
     # =========================================================================
 
@@ -914,26 +1058,34 @@ class ModeManager:
         """Internal mode stop - terminates processes and cleans up."""
         logger.info(f"Stopping mode {mode}")
 
-        # Signal stop
+        # Signal stop first - this unblocks any waiting threads
         if mode in self.stop_events:
             self.stop_events[mode].set()
 
         # Terminate process if running
         if mode in self.processes:
             proc = self.processes[mode]
-            if proc and proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+            try:
+                if proc and proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        try:
+                            proc.wait(timeout=1)
+                        except Exception:
+                            pass
+            except (OSError, ProcessLookupError) as e:
+                # Process already dead or inaccessible
+                logger.debug(f"Process cleanup for {mode}: {e}")
             del self.processes[mode]
 
-        # Wait for output thread
+        # Wait for output thread (short timeout since stop event is set)
         if mode in self.output_threads:
             thread = self.output_threads[mode]
             if thread and thread.is_alive():
-                thread.join(timeout=2)
+                thread.join(timeout=1)
             del self.output_threads[mode]
 
         # Clean up
@@ -1137,10 +1289,16 @@ class ModeManager:
                 except json.JSONDecodeError:
                     pass  # Not JSON, ignore
 
+        except (OSError, ValueError) as e:
+            # Bad file descriptor or closed file - process was terminated
+            logger.debug(f"Sensor output reader stopped: {e}")
         except Exception as e:
             logger.error(f"Sensor output reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             logger.info("Sensor output reader stopped")
 
     # -------------------------------------------------------------------------
@@ -2102,15 +2260,24 @@ class ModeManager:
 
                     logger.debug(f"Pager: {parsed.get('protocol')} addr={parsed.get('address')}")
 
+        except (OSError, ValueError) as e:
+            # Bad file descriptor or closed file - process was terminated
+            logger.debug(f"Pager reader stopped: {e}")
         except Exception as e:
             logger.error(f"Pager reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             if 'pager_rtl' in self.processes:
-                rtl_proc = self.processes['pager_rtl']
-                if rtl_proc.poll() is None:
-                    rtl_proc.terminate()
-                del self.processes['pager_rtl']
+                try:
+                    rtl_proc = self.processes['pager_rtl']
+                    if rtl_proc.poll() is None:
+                        rtl_proc.terminate()
+                    del self.processes['pager_rtl']
+                except Exception:
+                    pass
             logger.info("Pager reader stopped")
 
     def _parse_pager_message(self, line: str) -> dict | None:
@@ -2492,10 +2659,15 @@ class ModeManager:
                 except json.JSONDecodeError:
                     pass
 
+        except (OSError, ValueError) as e:
+            logger.debug(f"ACARS reader stopped: {e}")
         except Exception as e:
             logger.error(f"ACARS reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             logger.info("ACARS reader stopped")
 
     # -------------------------------------------------------------------------
@@ -2632,15 +2804,23 @@ class ModeManager:
 
                     logger.debug(f"APRS: {callsign}")
 
+        except (OSError, ValueError) as e:
+            logger.debug(f"APRS reader stopped: {e}")
         except Exception as e:
             logger.error(f"APRS reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             if 'aprs_rtl' in self.processes:
-                rtl_proc = self.processes['aprs_rtl']
-                if rtl_proc.poll() is None:
-                    rtl_proc.terminate()
-                del self.processes['aprs_rtl']
+                try:
+                    rtl_proc = self.processes['aprs_rtl']
+                    if rtl_proc.poll() is None:
+                        rtl_proc.terminate()
+                    del self.processes['aprs_rtl']
+                except Exception:
+                    pass
             logger.info("APRS reader stopped")
 
     def _parse_aprs_packet(self, line: str) -> dict | None:
@@ -2788,15 +2968,23 @@ class ModeManager:
                 except json.JSONDecodeError:
                     pass
 
+        except (OSError, ValueError) as e:
+            logger.debug(f"RTLAMR reader stopped: {e}")
         except Exception as e:
             logger.error(f"RTLAMR reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             if 'rtlamr_tcp' in self.processes:
-                tcp_proc = self.processes['rtlamr_tcp']
-                if tcp_proc.poll() is None:
-                    tcp_proc.terminate()
-                del self.processes['rtlamr_tcp']
+                try:
+                    tcp_proc = self.processes['rtlamr_tcp']
+                    if tcp_proc.poll() is None:
+                        tcp_proc.terminate()
+                    del self.processes['rtlamr_tcp']
+                except Exception:
+                    pass
             logger.info("RTLAMR reader stopped")
 
     # -------------------------------------------------------------------------
@@ -2901,10 +3089,15 @@ class ModeManager:
 
         except ImportError:
             logger.warning("DSCDecoder not available (missing scipy/numpy)")
+        except (OSError, ValueError) as e:
+            logger.debug(f"DSC reader stopped: {e}")
         except Exception as e:
             logger.error(f"DSC reader error: {e}")
         finally:
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                pass
             logger.info("DSC reader stopped")
 
     # -------------------------------------------------------------------------
@@ -3629,6 +3822,12 @@ class InterceptAgentHandler(BaseHTTPRequestHandler):
                 config.push_interval = int(body['push_interval'])
             self._send_json({'status': 'updated', 'config': config.to_dict()})
 
+        elif path == '/wifi/monitor':
+            # Enable/disable monitor mode on WiFi interface
+            result = mode_manager.toggle_monitor_mode(body)
+            status = 200 if result.get('status') == 'success' else 400
+            self._send_json(result, status)
+
         elif path.startswith('/') and path.count('/') == 2:
             # /{mode}/start or /{mode}/stop
             parts = path.split('/')
@@ -3794,19 +3993,53 @@ def main():
     print("  Press Ctrl+C to stop")
     print()
 
-    # Handle shutdown
+    # Shutdown flag
+    shutdown_requested = threading.Event()
+
+    # Handle shutdown - run cleanup in separate thread to avoid blocking
     def signal_handler(sig, frame):
+        if shutdown_requested.is_set():
+            # Already shutting down, force exit
+            print("\nForce exit...")
+            os._exit(1)
+        shutdown_requested.set()
         print("\nShutting down...")
-        # Stop all running modes
-        for mode in list(mode_manager.running_modes.keys()):
-            mode_manager.stop_mode(mode)
-        if data_push_loop:
-            data_push_loop.stop()
-        if push_client:
-            push_client.stop()
-        gps_manager.stop()
-        httpd.shutdown()
-        sys.exit(0)
+
+        def cleanup():
+            # Stop all running modes first (they have subprocesses)
+            for mode in list(mode_manager.running_modes.keys()):
+                try:
+                    mode_manager.stop_mode(mode)
+                except Exception as e:
+                    logger.debug(f"Error stopping {mode}: {e}")
+
+            # Stop push services
+            if data_push_loop:
+                try:
+                    data_push_loop.stop()
+                except Exception:
+                    pass
+            if push_client:
+                try:
+                    push_client.stop()
+                except Exception:
+                    pass
+
+            # Stop GPS
+            try:
+                gps_manager.stop()
+            except Exception:
+                pass
+
+            # Shutdown HTTP server
+            try:
+                httpd.shutdown()
+            except Exception:
+                pass
+
+        # Run cleanup in background thread so signal handler returns quickly
+        cleanup_thread = threading.Thread(target=cleanup, daemon=True)
+        cleanup_thread.start()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -3815,9 +4048,14 @@ def main():
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
-    finally:
-        if push_client:
-            push_client.stop()
+    except Exception:
+        pass
+
+    # Give cleanup thread time to finish
+    if shutdown_requested.is_set():
+        time.sleep(0.5)
+
+    print("Agent stopped.")
 
 
 if __name__ == '__main__':

@@ -35,6 +35,10 @@ let visualizerAnimationId = null;
 let peakLevel = 0;
 let peakDecay = 0.95;
 
+// Signal level for synthesizer visualization
+let currentSignalLevel = 0;
+let signalLevelThreshold = 1000;
+
 // Track recent signal hits to prevent duplicates
 let recentSignalHits = new Map();
 
@@ -283,6 +287,7 @@ function stopScanner() {
             isScannerRunning = false;
             isScannerPaused = false;
             scannerSignalActive = false;
+            currentSignalLevel = 0;
 
             // Re-enable listen button (will be in local mode after stop)
             updateListenButtonState(false);
@@ -581,6 +586,12 @@ function handleFrequencyUpdate(data) {
 
     // Update level meter if present
     if (data.level !== undefined) {
+        // Store for synthesizer visualization
+        currentSignalLevel = data.level;
+        if (data.threshold !== undefined) {
+            signalLevelThreshold = data.threshold;
+        }
+
         const levelPercent = Math.min(100, (data.level / 5000) * 100);
         const levelBar = document.getElementById('scannerLevelBar');
         if (levelBar) {
@@ -648,6 +659,8 @@ function handleSignalFound(data) {
                 scannerAudio.volume = knobValue / 100;
             }
             scannerAudio.play().catch(e => console.warn('[SCANNER] Audio autoplay blocked:', e));
+            // Initialize audio visualizer to feed signal levels to synthesizer
+            initAudioVisualizer();
         }
     }
 
@@ -1169,13 +1182,20 @@ async function tuneToFrequency(freq, mod) {
 
 function initAudioVisualizer() {
     const audioPlayer = document.getElementById('scannerAudioPlayer');
-    if (!audioPlayer) return;
+    if (!audioPlayer) {
+        console.warn('[VISUALIZER] No audio player found');
+        return;
+    }
+
+    console.log('[VISUALIZER] Initializing with audio player, src:', audioPlayer.src);
 
     if (!visualizerContext) {
         visualizerContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('[VISUALIZER] Created audio context');
     }
 
     if (visualizerContext.state === 'suspended') {
+        console.log('[VISUALIZER] Resuming suspended audio context');
         visualizerContext.resume();
     }
 
@@ -1188,25 +1208,36 @@ function initAudioVisualizer() {
 
             visualizerSource.connect(visualizerAnalyser);
             visualizerAnalyser.connect(visualizerContext.destination);
+            console.log('[VISUALIZER] Audio source and analyser connected');
         } catch (e) {
-            console.warn('Could not create audio source:', e);
-            return;
+            console.error('[VISUALIZER] Could not create audio source:', e);
+            // Try to continue anyway if analyser exists
+            if (!visualizerAnalyser) return;
         }
+    } else {
+        console.log('[VISUALIZER] Reusing existing audio source');
     }
 
     const container = document.getElementById('audioVisualizerContainer');
     if (container) container.style.display = 'block';
 
-    drawAudioVisualizer();
+    // Start the visualization loop
+    if (!visualizerAnimationId) {
+        console.log('[VISUALIZER] Starting draw loop');
+        drawAudioVisualizer();
+    } else {
+        console.log('[VISUALIZER] Draw loop already running');
+    }
 }
 
 function drawAudioVisualizer() {
-    if (!visualizerAnalyser) return;
+    if (!visualizerAnalyser) {
+        console.warn('[VISUALIZER] No analyser available');
+        return;
+    }
 
     const canvas = document.getElementById('audioSpectrumCanvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas ? canvas.getContext('2d') : null;
     const bufferLength = visualizerAnalyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
@@ -1221,6 +1252,12 @@ function drawAudioVisualizer() {
         }
         const average = sum / bufferLength;
         const levelPercent = (average / 255) * 100;
+
+        // Feed audio level to synthesizer visualization during direct listening
+        if (isDirectListening || isScannerRunning) {
+            // Scale 0-255 average to 0-3000 range (matching SSE scan_update levels)
+            currentSignalLevel = (average / 255) * 3000;
+        }
 
         if (levelPercent > peakLevel) {
             peakLevel = levelPercent;
@@ -1238,26 +1275,29 @@ function drawAudioVisualizer() {
         const db = average > 0 ? Math.round(20 * Math.log10(average / 255)) : -60;
         if (meterValue) meterValue.textContent = db + ' dB';
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Only draw spectrum if canvas exists
+        if (ctx && canvas) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const barWidth = canvas.width / bufferLength * 2.5;
-        let x = 0;
+            const barWidth = canvas.width / bufferLength * 2.5;
+            let x = 0;
 
-        for (let i = 0; i < bufferLength; i++) {
-            const barHeight = (dataArray[i] / 255) * canvas.height;
-            const hue = 200 - (i / bufferLength) * 60;
-            const lightness = 40 + (dataArray[i] / 255) * 30;
-            ctx.fillStyle = `hsl(${hue}, 80%, ${lightness}%)`;
-            ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
-            x += barWidth;
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * canvas.height;
+                const hue = 200 - (i / bufferLength) * 60;
+                const lightness = 40 + (dataArray[i] / 255) * 30;
+                ctx.fillStyle = `hsl(${hue}, 80%, ${lightness}%)`;
+                ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+                x += barWidth;
+            }
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '8px JetBrains Mono';
+            ctx.fillText('0', 2, canvas.height - 2);
+            ctx.fillText('4kHz', canvas.width / 4, canvas.height - 2);
+            ctx.fillText('8kHz', canvas.width / 2, canvas.height - 2);
         }
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.font = '8px JetBrains Mono';
-        ctx.fillText('0', 2, canvas.height - 2);
-        ctx.fillText('4kHz', canvas.width / 4, canvas.height - 2);
-        ctx.fillText('8kHz', canvas.width / 2, canvas.height - 2);
     }
 
     draw();
@@ -1512,6 +1552,9 @@ function initSynthesizer() {
     drawSynthesizer();
 }
 
+// Debug: log signal level periodically
+let lastSynthDebugLog = 0;
+
 function drawSynthesizer() {
     if (!synthCtx || !synthCanvas) return;
 
@@ -1523,30 +1566,62 @@ function drawSynthesizer() {
     synthCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     synthCtx.fillRect(0, 0, width, height);
 
-    // Determine activity level based on state
+    // Determine activity level based on actual signal level
     let activityLevel = 0;
+    let signalIntensity = 0;
+
+    // Debug logging every 2 seconds
+    const now = Date.now();
+    if (now - lastSynthDebugLog > 2000) {
+        console.log('[SYNTH] State:', {
+            isScannerRunning,
+            isDirectListening,
+            scannerSignalActive,
+            currentSignalLevel,
+            visualizerAnalyser: !!visualizerAnalyser
+        });
+        lastSynthDebugLog = now;
+    }
+
     if (isScannerRunning && !isScannerPaused) {
-        activityLevel = scannerSignalActive ? 0.9 : 0.4;
+        // Use actual signal level data (0-5000 range, normalize to 0-1)
+        signalIntensity = Math.min(1, currentSignalLevel / 3000);
+        // Base activity when scanning, boosted by actual signal strength
+        activityLevel = 0.15 + (signalIntensity * 0.85);
+        if (scannerSignalActive) {
+            activityLevel = Math.max(activityLevel, 0.7);
+        }
     } else if (isDirectListening) {
-        activityLevel = 0.7;
+        // For direct listening, use signal level if available
+        signalIntensity = Math.min(1, currentSignalLevel / 3000);
+        activityLevel = 0.2 + (signalIntensity * 0.8);
     }
 
     // Update bar targets
     for (let i = 0; i < SYNTH_BAR_COUNT; i++) {
         if (activityLevel > 0) {
-            // Create wave-like pattern with some randomness
-            const wave = Math.sin((Date.now() / 200) + (i * 0.3)) * 0.3;
-            const random = Math.random() * 0.4;
-            const centerBoost = 1 - Math.abs((i - SYNTH_BAR_COUNT / 2) / (SYNTH_BAR_COUNT / 2)) * 0.5;
-            synthBars[i].targetHeight = (wave + random + 0.3) * activityLevel * centerBoost * height;
+            // Create wave-like pattern modulated by actual signal strength
+            const time = Date.now() / 200;
+            // Multiple wave frequencies for more organic feel
+            const wave1 = Math.sin(time + (i * 0.3)) * 0.2;
+            const wave2 = Math.sin(time * 1.7 + (i * 0.5)) * 0.15;
+            // Less randomness when signal is weak, more when strong
+            const randomAmount = 0.1 + (signalIntensity * 0.3);
+            const random = (Math.random() - 0.5) * randomAmount;
+            // Center bars tend to be taller (frequency spectrum shape)
+            const centerBoost = 1 - Math.abs((i - SYNTH_BAR_COUNT / 2) / (SYNTH_BAR_COUNT / 2)) * 0.4;
+            // Combine all factors with signal-driven amplitude
+            const baseHeight = 0.15 + (signalIntensity * 0.5);
+            synthBars[i].targetHeight = (baseHeight + wave1 + wave2 + random) * activityLevel * centerBoost * height;
         } else {
             // Idle state - minimal activity
             synthBars[i].targetHeight = (Math.sin((Date.now() / 500) + (i * 0.5)) * 0.1 + 0.1) * height * 0.3;
         }
 
-        // Smooth animation
+        // Smooth animation - faster response when signal changes
+        const springStrength = signalIntensity > 0.3 ? 0.15 : 0.1;
         const diff = synthBars[i].targetHeight - synthBars[i].height;
-        synthBars[i].velocity += diff * 0.1;
+        synthBars[i].velocity += diff * springStrength;
         synthBars[i].velocity *= 0.8;
         synthBars[i].height += synthBars[i].velocity;
         synthBars[i].height = Math.max(2, Math.min(height - 4, synthBars[i].height));
@@ -1598,6 +1673,13 @@ function drawSynthesizer() {
     synthCtx.moveTo(0, height / 2);
     synthCtx.lineTo(width, height / 2);
     synthCtx.stroke();
+
+    // Debug: show signal level value
+    if (isScannerRunning || isDirectListening) {
+        synthCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        synthCtx.font = '9px monospace';
+        synthCtx.fillText(`lvl:${Math.round(currentSignalLevel)}`, 4, 10);
+    }
 
     synthAnimationId = requestAnimationFrame(drawSynthesizer);
 }
@@ -2053,6 +2135,9 @@ async function _startDirectListenInternal() {
             console.log('[LISTEN] Initial play blocked, waiting for canplay');
         });
 
+        // Initialize audio visualizer to feed signal levels to synthesizer
+        initAudioVisualizer();
+
         isDirectListening = true;
         updateDirectListenUI(true, freq);
         addScannerLogEntry(`${freq.toFixed(3)} MHz (${currentModulation.toUpperCase()})`, '', 'signal');
@@ -2104,6 +2189,7 @@ function stopDirectListen() {
     fetch('/listening/audio/stop', { method: 'POST' }).catch(() => {});
 
     isDirectListening = false;
+    currentSignalLevel = 0;
     updateDirectListenUI(false);
     addScannerLogEntry('Listening stopped');
 }

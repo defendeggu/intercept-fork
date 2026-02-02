@@ -1,0 +1,42 @@
+<!-- SSTV MODE -->
+<div id="sstvMode" class="mode-content">
+    <div class="section">
+        <h3>ISS SSTV Decoder</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Decode Slow-Scan Television images from the International Space Station.
+            ISS SSTV transmits on 145.800 MHz FM during special events.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Decoder Settings</h3>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="number" id="sstvFrequency" value="145.800" step="0.001" min="100" max="500">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Resources</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <a href="https://ariss.org/" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                ARISS.org (Event Schedule)
+            </a>
+            <a href="https://www.amsat.org/sstv-from-iss/" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                AMSAT SSTV Guide
+            </a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>About SSTV</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim);">
+            SSTV (Slow-Scan Television) is a method for transmitting images via radio.
+            The ISS periodically transmits commemorative images during special events
+            which can be received with an RTL-SDR and appropriate software.
+        </p>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+            Common modes: PD120, PD180, Martin1, Scottie1
+        </p>
+    </div>
+</div>

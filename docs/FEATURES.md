@@ -165,6 +165,49 @@ Technical Surveillance Countermeasures (TSCM) screening for detecting wireless s
 - No cryptographic de-randomization
 - Passive screening only (no active probing by default)
 
+## Meshtastic Mesh Networks
+
+Integration with Meshtastic LoRa mesh networking devices for decentralized communication.
+
+### Device Support
+- **Heltec** - LoRa32 series
+- **T-Beam** - TTGO T-Beam with GPS
+- **RAK** - WisBlock series
+- Any Meshtastic-compatible device via USB/Serial
+
+### Features
+- **Real-time messaging** - Stream messages as they arrive
+- **Channel configuration** - Set encryption keys and channel names
+- **Node information** - View connected nodes with signal metrics
+- **Message history** - Up to 500 messages retained
+- **Signal quality** - RSSI and SNR for each message
+- **Hop tracking** - See message hop count
+
+### Requirements
+- Physical Meshtastic device connected via USB
+- Meshtastic Python SDK (`pip install meshtastic`)
+
+## Ubertooth One BLE Scanning
+
+Advanced Bluetooth Low Energy scanning using Ubertooth One hardware.
+
+### Capabilities
+- **40-channel scanning** - Capture BLE advertisements across all channels
+- **Raw payload access** - Full advertising data for analysis
+- **Passive sniffing** - No active scanning required
+- **MAC address extraction** - Public and random address types
+- **RSSI measurement** - Signal strength for proximity estimation
+
+### Integration
+- Works alongside standard BlueZ/DBus Bluetooth scanning
+- Automatically detected when ubertooth-btle is available
+- Falls back to standard adapter if Ubertooth not present
+
+### Requirements
+- Ubertooth One hardware
+- ubertooth-btle command-line tool installed
+- libubertooth library
+
 ## Remote Agents (Distributed SIGINT)
 
 Deploy lightweight sensor nodes across multiple locations and aggregate data to a central controller.
@@ -214,6 +257,42 @@ Deploy lightweight sensor nodes across multiple locations and aggregate data to 
 | F1 | Open help |
 | ? | Open help (when not typing) |
 | Escape | Close help/modals |
+
+## Offline Mode
+
+Run iNTERCEPT without internet connectivity by using bundled local assets.
+
+### Bundled Assets
+- **Leaflet 1.9.4** - Map library with marker images
+- **Chart.js 4.4.1** - Signal strength graphs
+- **Inter font** - Primary UI font (400, 500, 600, 700 weights)
+- **JetBrains Mono font** - Monospace/code font (400, 500, 600, 700 weights)
+
+### Settings Modal
+Access via the gear icon in the navigation bar:
+- **Offline Tab** - Toggle offline mode, configure asset sources (CDN vs local)
+- **Display Tab** - Theme and animation preferences
+- **About Tab** - Version info and links
+
+### Map Tile Providers
+Choose from multiple tile sources for maps:
+- **OpenStreetMap** - Default, general purpose
+- **CartoDB Dark** - Dark themed, matches UI
+- **CartoDB Positron** - Light themed
+- **ESRI World Imagery** - Satellite imagery
+- **Custom URL** - Connect to your own tile server (e.g., local OpenStreetMap tile cache)
+
+### Local Asset Status
+The settings modal shows availability status for each bundled asset:
+- Green "Available" badge when asset is present
+- Red "Missing" badge when asset is not found
+- Click "Check Assets" to refresh status
+
+### Use Cases
+- **Air-gapped environments** - Run on isolated networks
+- **Field deployments** - Operate without reliable internet
+- **Local tile servers** - Use pre-cached map tiles for specific regions
+- **Reduced latency** - Faster loading with local assets
 
 ## General
 

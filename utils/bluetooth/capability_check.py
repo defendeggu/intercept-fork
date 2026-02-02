@@ -238,6 +238,9 @@ def _check_fallback_tools(caps: SystemCapabilities) -> None:
     # Check btmgmt
     caps.has_btmgmt = shutil.which('btmgmt') is not None
 
+    # Check ubertooth tools (Ubertooth One hardware)
+    caps.has_ubertooth = shutil.which('ubertooth-btle') is not None
+
     # Check CAP_NET_ADMIN for non-root users
     if not caps.is_root:
         _check_capabilities_permission(caps)

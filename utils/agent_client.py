@@ -141,6 +141,10 @@ class AgentClient:
         except requests.RequestException as e:
             raise AgentHTTPError(f"Request failed: {e}")
 
+    def post(self, path: str, data: dict | None = None) -> dict:
+        """Public POST method for arbitrary endpoints."""
+        return self._post(path, data)
+
     # =========================================================================
     # Capability & Status
     # =========================================================================
