@@ -525,6 +525,11 @@ def scanner_loop_power():
 
             # Process segments in ascending frequency order to avoid backtracking in UI
             segments.sort(key=lambda s: s[0])
+            total_bins = sum(len(seg[3]) for seg in segments)
+            if total_bins <= 0:
+                time.sleep(0.2)
+                continue
+            global_index = 0
 
             for sweep_start, sweep_end, sweep_bin, bin_values in segments:
                 # Noise floor (median)
@@ -545,16 +550,19 @@ def scanner_loop_power():
                     snr = val - noise_floor
                     level = int(max(0, snr) * 100)
                     threshold = int(snr_threshold * 100)
+                    progress = min(1.0, global_index / max(1, total_bins - 1))
                     try:
                         scanner_queue.put_nowait({
                             'type': 'scan_update',
                             'frequency': scanner_current_freq,
                             'level': level,
                             'threshold': threshold,
-                            'detected': snr >= snr_threshold
+                            'detected': snr >= snr_threshold,
+                            'progress': progress
                         })
                     except queue.Full:
                         pass
+                    global_index += emit_stride
 
                 # Detect peaks (clusters above threshold)
                 peaks = []
