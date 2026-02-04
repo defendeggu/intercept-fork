@@ -33,6 +33,9 @@ const ProximityRadar = (function() {
     let activeFilter = null;
     let onDeviceClick = null;
     let selectedDeviceKey = null;
+    let isHovered = false;
+    let renderPending = false;
+    let renderTimer = null;
 
     /**
      * Initialize the radar component
@@ -162,8 +165,18 @@ const ProximityRadar = (function() {
             devices.set(device.device_key, device);
         });
 
-        // Apply filter and render
-        renderDevices();
+        // Defer render while user is hovering to prevent DOM rebuild flicker
+        if (isHovered) {
+            renderPending = true;
+            return;
+        }
+
+        // Debounce rapid updates (e.g. per-device SSE events)
+        if (renderTimer) clearTimeout(renderTimer);
+        renderTimer = setTimeout(() => {
+            renderTimer = null;
+            renderDevices();
+        }, 200);
     }
 
     /**
@@ -232,12 +245,20 @@ const ProximityRadar = (function() {
 
         devicesGroup.innerHTML = dots;
 
-        // Attach click handlers
+        // Attach event handlers
         devicesGroup.querySelectorAll('.radar-device').forEach(el => {
             el.addEventListener('click', (e) => {
                 const deviceKey = el.getAttribute('data-device-key');
                 if (onDeviceClick && deviceKey) {
                     onDeviceClick(deviceKey);
+                }
+            });
+            el.addEventListener('mouseenter', () => { isHovered = true; });
+            el.addEventListener('mouseleave', () => {
+                isHovered = false;
+                if (renderPending) {
+                    renderPending = false;
+                    renderDevices();
                 }
             });
         });
