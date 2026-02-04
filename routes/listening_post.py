@@ -425,6 +425,19 @@ def scanner_loop_power():
                 '-d', str(device),
             ]
 
+            # Emit an initial progress update for UI
+            try:
+                scanner_current_freq = start_mhz
+                scanner_queue.put_nowait({
+                    'type': 'scan_update',
+                    'frequency': scanner_current_freq,
+                    'level': 0,
+                    'threshold': int(float(scanner_config.get('snr_threshold', 12)) * 100),
+                    'detected': False
+                })
+            except queue.Full:
+                pass
+
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                 scanner_power_process = proc
@@ -439,6 +452,17 @@ def scanner_loop_power():
                 break
 
             if not stdout:
+                add_activity_log('error', start_mhz, 'Power sweep produced no data')
+                try:
+                    scanner_queue.put_nowait({
+                        'type': 'scan_update',
+                        'frequency': end_mhz,
+                        'level': 0,
+                        'threshold': int(float(scanner_config.get('snr_threshold', 12)) * 100),
+                        'detected': False
+                    })
+                except queue.Full:
+                    pass
                 time.sleep(0.2)
                 continue
 
@@ -479,6 +503,17 @@ def scanner_loop_power():
                     continue
 
                 if not bin_values:
+                    add_activity_log('error', start_mhz, 'Power sweep bins missing')
+                    try:
+                        scanner_queue.put_nowait({
+                            'type': 'scan_update',
+                            'frequency': end_mhz,
+                            'level': 0,
+                            'threshold': int(float(scanner_config.get('snr_threshold', 12)) * 100),
+                            'detected': False
+                        })
+                    except queue.Full:
+                        pass
                     continue
 
                 # Noise floor (median)
@@ -803,6 +838,13 @@ def start_scanner() -> Response:
                 'status': 'error',
                 'message': 'Scanner already running'
             }), 409
+
+    # Clear stale queue entries so UI updates immediately
+    try:
+        while True:
+            scanner_queue.get_nowait()
+    except queue.Empty:
+        pass
 
     data = request.json or {}
 
