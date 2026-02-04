@@ -2121,7 +2121,7 @@ async function _startDirectListenInternal() {
         await new Promise(r => setTimeout(r, 300));
 
         // Connect to new stream
-        const streamUrl = `/listening/audio/stream?t=${Date.now()}`;
+        const streamUrl = `/listening/audio/stream?fresh=1&t=${Date.now()}`;
         console.log('[LISTEN] Connecting to stream:', streamUrl);
         audioPlayer.src = streamUrl;
         audioPlayer.preload = 'auto';

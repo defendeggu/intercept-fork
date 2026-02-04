@@ -939,6 +939,13 @@ def audio_probe() -> Response:
 @listening_post_bp.route('/audio/stream')
 def stream_audio() -> Response:
     """Stream WAV audio."""
+    # Optionally restart pipeline so the stream starts with a fresh header
+    if request.args.get('fresh') == '1' and audio_running:
+        try:
+            _start_audio_stream(audio_frequency or 0.0, audio_modulation or 'fm')
+        except Exception as e:
+            logger.error(f"Audio stream restart failed: {e}")
+
     # Wait for audio to be ready (up to 2 seconds for modulation/squelch changes)
     for _ in range(40):
         if audio_running and audio_process:
