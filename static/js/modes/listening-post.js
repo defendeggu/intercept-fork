@@ -598,49 +598,48 @@ function handleFrequencyUpdate(data) {
         return;
     }
 
+    const hasProgress = data.progress !== undefined && Number.isFinite(data.progress);
     const freqValue = (typeof data.frequency === 'number' && Number.isFinite(data.frequency))
         ? data.frequency
         : null;
+    const stepMhz = Math.max(0.001, (scannerStepKhz || 1) / 1000);
+    const freqTolerance = stepMhz * 2;
 
     let progressValue = null;
-    if (freqValue !== null) {
-        const stepMhz = Math.max(0.001, (scannerStepKhz || 1) / 1000);
-        const freqTolerance = stepMhz * 2;
-
-        if (lastScanFreq !== null && (freqValue + freqTolerance) < lastScanFreq) {
-            const nearEnd = lastScanFreq >= (scannerEndFreq - freqTolerance * 2);
-            const nearStart = freqValue <= (scannerStartFreq + freqTolerance * 2);
-            if (nearEnd && nearStart) {
-                scannerCycles++;
-                const cyclesEl = document.getElementById('mainScanCycles');
-                if (cyclesEl) cyclesEl.textContent = scannerCycles;
-                lastScanFreq = null;
-                lastScanProgress = null;
-                if (scannerTotalSteps > 0) {
-                    scannerFreqsScanned = scannerCycles * scannerTotalSteps;
-                    const freqsEl = document.getElementById('mainFreqsScanned');
-                    if (freqsEl) freqsEl.textContent = scannerFreqsScanned;
-                }
-            } else {
+    if (hasProgress) {
+        progressValue = data.progress;
+        const clamped = Math.max(0, Math.min(1, progressValue));
+        if (lastScanProgress !== null && clamped < lastScanProgress) {
+            const isCycleReset = lastScanProgress > 0.85 && clamped < 0.15;
+            if (!isCycleReset) {
                 return;
             }
         }
-
+        lastScanProgress = clamped;
+    } else if (freqValue !== null) {
+        if (lastScanFreq !== null && (freqValue + freqTolerance) < lastScanFreq) {
+            const nearEnd = lastScanFreq >= (scannerEndFreq - freqTolerance * 2);
+            const nearStart = freqValue <= (scannerStartFreq + freqTolerance * 2);
+            if (!nearEnd || !nearStart) {
+                return;
+            }
+        }
         lastScanFreq = freqValue;
         progressValue = (freqValue - scannerStartFreq) / range;
-    } else if (data.progress !== undefined && Number.isFinite(data.progress)) {
-        progressValue = data.progress;
+        lastScanProgress = Math.max(0, Math.min(1, progressValue));
     } else {
         if (scannerMethod === 'power') {
             return;
         }
         progressValue = 0;
+        lastScanProgress = 0;
     }
 
     const clampedProgress = Math.max(0, Math.min(1, progressValue));
-    lastScanProgress = clampedProgress;
 
-    const displayFreq = (freqValue !== null)
+    const displayFreq = (freqValue !== null
+        && freqValue >= (scannerStartFreq - freqTolerance)
+        && freqValue <= (scannerEndFreq + freqTolerance))
         ? freqValue
         : scannerStartFreq + (clampedProgress * range);
     const freqStr = displayFreq.toFixed(3);
