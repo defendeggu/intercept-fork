@@ -50,6 +50,7 @@ scanner_paused = False
 scanner_current_freq = 0.0
 scanner_active_device: Optional[int] = None
 listening_active_device: Optional[int] = None
+scanner_power_process: Optional[subprocess.Popen] = None
 scanner_config = {
     'start_freq': 88.0,
     'end_freq': 108.0,
@@ -381,7 +382,7 @@ def scanner_loop():
 
 def scanner_loop_power():
     """Power sweep scanner using rtl_power to detect peaks."""
-    global scanner_running, scanner_paused, scanner_current_freq
+    global scanner_running, scanner_paused, scanner_current_freq, scanner_power_process
 
     logger.info("Power sweep scanner thread started")
     add_activity_log('scanner_start', scanner_config['start_freq'],
@@ -426,10 +427,16 @@ def scanner_loop_power():
 
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                scanner_power_process = proc
                 stdout, _ = proc.communicate(timeout=15)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 stdout = b''
+            finally:
+                scanner_power_process = None
+
+            if not scanner_running:
+                break
 
             if not stdout:
                 time.sleep(0.2)
@@ -900,10 +907,20 @@ def start_scanner() -> Response:
 @listening_post_bp.route('/scanner/stop', methods=['POST'])
 def stop_scanner() -> Response:
     """Stop the frequency scanner."""
-    global scanner_running, scanner_active_device
+    global scanner_running, scanner_active_device, scanner_power_process
 
     scanner_running = False
     _stop_audio_stream()
+    if scanner_power_process and scanner_power_process.poll() is None:
+        try:
+            scanner_power_process.terminate()
+            scanner_power_process.wait(timeout=1)
+        except Exception:
+            try:
+                scanner_power_process.kill()
+            except Exception:
+                pass
+        scanner_power_process = None
     if scanner_active_device is not None:
         app_module.release_sdr_device(scanner_active_device)
         scanner_active_device = None
@@ -1067,7 +1084,7 @@ def get_presets() -> Response:
 @listening_post_bp.route('/audio/start', methods=['POST'])
 def start_audio() -> Response:
     """Start audio at specific frequency (manual mode)."""
-    global scanner_running, scanner_active_device, listening_active_device
+    global scanner_running, scanner_active_device, listening_active_device, scanner_power_process
 
     # Stop scanner if running
     if scanner_running:
@@ -1075,6 +1092,16 @@ def start_audio() -> Response:
         if scanner_active_device is not None:
             app_module.release_sdr_device(scanner_active_device)
             scanner_active_device = None
+        if scanner_power_process and scanner_power_process.poll() is None:
+            try:
+                scanner_power_process.terminate()
+                scanner_power_process.wait(timeout=1)
+            except Exception:
+                try:
+                    scanner_power_process.kill()
+                except Exception:
+                    pass
+            scanner_power_process = None
         time.sleep(0.5)
 
     data = request.json or {}
