@@ -652,6 +652,10 @@ function handleSignalFound(data) {
             const streamUrl = getStreamUrl(data.frequency, data.modulation);
             console.log('[SCANNER] Starting audio for signal:', data.frequency, 'MHz');
             scannerAudio.src = streamUrl;
+            scannerAudio.preload = 'auto';
+            scannerAudio.autoplay = true;
+            scannerAudio.muted = false;
+            scannerAudio.load();
             // Apply current volume from knob
             const volumeKnob = document.getElementById('radioVolumeKnob');
             if (volumeKnob && volumeKnob._knob) {
@@ -660,7 +664,7 @@ function handleSignalFound(data) {
                 const knobValue = parseFloat(volumeKnob.dataset.value) || 80;
                 scannerAudio.volume = knobValue / 100;
             }
-            scannerAudio.play().catch(e => console.warn('[SCANNER] Audio autoplay blocked:', e));
+            attemptAudioPlay(scannerAudio);
             // Initialize audio visualizer to feed signal levels to synthesizer
             initAudioVisualizer();
         }
@@ -1702,9 +1706,7 @@ function stopSynthesizer() {
 function getStreamUrl(freq, mod) {
     const frequency = freq || parseFloat(document.getElementById('radioScanStart')?.value) || 118.0;
     const modulation = mod || currentModulation || 'am';
-    const squelch = parseInt(document.getElementById('radioSquelchValue')?.textContent) || 30;
-    const gain = parseInt(document.getElementById('radioGainValue')?.textContent) || 40;
-    return `/listening/audio/stream?freq=${frequency}&mod=${modulation}&squelch=${squelch}&gain=${gain}&t=${Date.now()}`;
+    return `/listening/audio/stream?fresh=1&freq=${frequency}&mod=${modulation}&t=${Date.now()}`;
 }
 
 function initListeningPost() {
