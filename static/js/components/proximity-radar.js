@@ -33,6 +33,9 @@ const ProximityRadar = (function() {
     let activeFilter = null;
     let onDeviceClick = null;
     let selectedDeviceKey = null;
+    let isHovered = false;
+    let renderPending = false;
+    let renderTimer = null;
 
     /**
      * Initialize the radar component
@@ -162,8 +165,18 @@ const ProximityRadar = (function() {
             devices.set(device.device_key, device);
         });
 
-        // Apply filter and render
-        renderDevices();
+        // Defer render while user is hovering to prevent DOM rebuild flicker
+        if (isHovered) {
+            renderPending = true;
+            return;
+        }
+
+        // Debounce rapid updates (e.g. per-device SSE events)
+        if (renderTimer) clearTimeout(renderTimer);
+        renderTimer = setTimeout(() => {
+            renderTimer = null;
+            renderDevices();
+        }, 200);
     }
 
     /**
@@ -207,30 +220,45 @@ const ProximityRadar = (function() {
             const pulseClass = isNew ? 'radar-dot-pulse' : '';
             const isSelected = selectedDeviceKey && device.device_key === selectedDeviceKey;
 
+            // Hit area size (prevents hover flicker when scaling)
+            const hitAreaSize = Math.max(dotSize * 2, 15);
+
             return `
-                <g class="radar-device ${pulseClass}${isSelected ? ' selected' : ''}" data-device-key="${escapeAttr(device.device_key)}"
-                   transform="translate(${x}, ${y})" style="cursor: pointer;">
-                    ${isSelected ? `<circle r="${dotSize + 8}" fill="none" stroke="#00d4ff" stroke-width="2" stroke-opacity="0.8">
-                        <animate attributeName="r" values="${dotSize + 6};${dotSize + 10};${dotSize + 6}" dur="1.5s" repeatCount="indefinite"/>
-                        <animate attributeName="stroke-opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
-                    </circle>` : ''}
-                    <circle r="${dotSize}" fill="${color}"
-                            fill-opacity="${isSelected ? 1 : 0.4 + confidence * 0.5}"
-                            stroke="${isSelected ? '#00d4ff' : color}" stroke-width="${isSelected ? 2 : 1}" />
-                    ${device.is_new && !isSelected ? `<circle r="${dotSize + 3}" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2,2" />` : ''}
-                    <title>${escapeHtml(device.name || device.address)} (${device.rssi_current || '--'} dBm)</title>
+                <g transform="translate(${x}, ${y})">
+                    <g class="radar-device ${pulseClass}${isSelected ? ' selected' : ''}" data-device-key="${escapeAttr(device.device_key)}"
+                       style="cursor: pointer;">
+                        <!-- Invisible hit area to prevent hover flicker -->
+                        <circle class="radar-device-hitarea" r="${hitAreaSize}" fill="transparent" />
+                        ${isSelected ? `<circle r="${dotSize + 8}" fill="none" stroke="#00d4ff" stroke-width="2" stroke-opacity="0.8">
+                            <animate attributeName="r" values="${dotSize + 6};${dotSize + 10};${dotSize + 6}" dur="1.5s" repeatCount="indefinite"/>
+                            <animate attributeName="stroke-opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>` : ''}
+                        <circle r="${dotSize}" fill="${color}"
+                                fill-opacity="${isSelected ? 1 : 0.4 + confidence * 0.5}"
+                                stroke="${isSelected ? '#00d4ff' : color}" stroke-width="${isSelected ? 2 : 1}" />
+                        ${device.is_new && !isSelected ? `<circle r="${dotSize + 3}" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2,2" />` : ''}
+                        <title>${escapeHtml(device.name || device.address)} (${device.rssi_current || '--'} dBm)</title>
+                    </g>
                 </g>
             `;
         }).join('');
 
         devicesGroup.innerHTML = dots;
 
-        // Attach click handlers
+        // Attach event handlers
         devicesGroup.querySelectorAll('.radar-device').forEach(el => {
             el.addEventListener('click', (e) => {
                 const deviceKey = el.getAttribute('data-device-key');
                 if (onDeviceClick && deviceKey) {
                     onDeviceClick(deviceKey);
+                }
+            });
+            el.addEventListener('mouseenter', () => { isHovered = true; });
+            el.addEventListener('mouseleave', () => {
+                isHovered = false;
+                if (renderPending) {
+                    renderPending = false;
+                    renderDevices();
                 }
             });
         });

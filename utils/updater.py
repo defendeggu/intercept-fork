@@ -9,11 +9,12 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from datetime import datetime
 from typing import Any
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import config
 from utils.database import get_setting, set_setting
@@ -509,6 +510,7 @@ def perform_update(stash_changes: bool = False) -> dict[str, Any]:
             'success': True,
             'updated': True,
             'message': 'Update successful! Please restart the application.',
+            'restart_required': True,
             'requirements_changed': requirements_changed,
             'stashed': stashed,
             'stash_restored': stashed,
@@ -526,4 +528,84 @@ def perform_update(stash_changes: bool = False) -> dict[str, Any]:
         return {
             'success': False,
             'error': str(e)
+        }
+
+
+def restart_application() -> dict[str, Any]:
+    """
+    Restart the application using os.execv to replace the current process.
+
+    This function:
+    1. Cleans up all running decoder processes
+    2. Stops the cleanup manager
+    3. Replaces the current process with a fresh Python interpreter
+
+    Returns:
+        Dict with status (though this is typically not reached due to execv)
+    """
+    import app as app_module
+    from utils.cleanup import cleanup_manager
+    from utils.process import cleanup_all_processes
+
+    logger.info("Application restart requested")
+
+    try:
+        # Step 1: Kill all decoder processes
+        logger.info("Stopping all decoder processes...")
+        cleanup_all_processes()
+
+        # Step 2: Clear global process state
+        with app_module.process_lock:
+            app_module.current_process = None
+        with app_module.sensor_lock:
+            app_module.sensor_process = None
+        with app_module.wifi_lock:
+            app_module.wifi_process = None
+        with app_module.adsb_lock:
+            app_module.adsb_process = None
+        with app_module.ais_lock:
+            app_module.ais_process = None
+        with app_module.acars_lock:
+            app_module.acars_process = None
+        with app_module.aprs_lock:
+            app_module.aprs_process = None
+            app_module.aprs_rtl_process = None
+        with app_module.dsc_lock:
+            app_module.dsc_process = None
+            app_module.dsc_rtl_process = None
+
+        # Step 3: Clear SDR device registry
+        with app_module.sdr_device_registry_lock:
+            app_module.sdr_device_registry.clear()
+
+        # Step 4: Stop cleanup manager
+        logger.info("Stopping cleanup manager...")
+        cleanup_manager.stop()
+
+        # Step 5: Prepare for restart using os.execv
+        # Get the Python executable and script path
+        python_executable = sys.executable
+        script_path = os.path.abspath(sys.argv[0])
+
+        # Build argument list (preserve original command-line args)
+        args = [python_executable, script_path] + sys.argv[1:]
+
+        logger.info(f"Restarting with: {' '.join(args)}")
+
+        # Flush any pending log output
+        logging.shutdown()
+
+        # Use os.execv to replace the current process
+        # This will not return - the process is replaced entirely
+        os.execv(python_executable, args)
+
+        # This code is never reached
+        return {'success': True, 'message': 'Restarting...'}
+
+    except Exception as e:
+        logger.error(f"Restart failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to restart application. Please restart manually.'
         }

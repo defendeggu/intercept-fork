@@ -246,10 +246,10 @@ function toggleSection(el) {
 
 function toggleTheme() {
     const html = document.documentElement;
-    const currentTheme = html.getAttribute('data-theme');
+    const currentTheme = html.getAttribute('data-theme') || 'dark';
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     html.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+    localStorage.setItem('intercept-theme', newTheme);
 
     // Update button text
     const btn = document.getElementById('themeToggle');
@@ -259,7 +259,7 @@ function toggleTheme() {
 }
 
 function loadTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedTheme = localStorage.getItem('intercept-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     const btn = document.getElementById('themeToggle');
     if (btn) {
@@ -373,7 +373,7 @@ function showInfo(text) {
 
     const infoEl = document.createElement('div');
     infoEl.className = 'info-msg';
-    infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "JetBrains Mono", monospace; font-size: 11px; color: #888; word-break: break-all;';
+    infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "Space Mono", monospace; font-size: 11px; color: #888; word-break: break-all;';
     infoEl.textContent = text;
     output.insertBefore(infoEl, output.firstChild);
 }
@@ -387,7 +387,7 @@ function showError(text) {
 
     const errorEl = document.createElement('div');
     errorEl.className = 'error-msg';
-    errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "JetBrains Mono", monospace; font-size: 11px; color: #ff6688; word-break: break-all;';
+    errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "Space Mono", monospace; font-size: 11px; color: #ff6688; word-break: break-all;';
     errorEl.textContent = '⚠ ' + text;
     output.insertBefore(errorEl, output.firstChild);
 }

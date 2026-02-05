@@ -27,7 +27,7 @@
 }
 
 .spy-stations-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
@@ -101,7 +101,7 @@
 }
 
 .spy-station-name {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
@@ -117,7 +117,7 @@
 
 /* Type Badge */
 .spy-station-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
@@ -173,7 +173,7 @@
 }
 
 .spy-meta-mode {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-orange);
 }
@@ -186,7 +186,7 @@
 }
 
 .spy-freq-list {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--accent-cyan);
     line-height: 1.6;
@@ -199,7 +199,7 @@
 }
 
 .spy-freq-item {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--accent-cyan);
     background: var(--bg-secondary);
@@ -236,7 +236,7 @@
 }
 
 .spy-freq-select {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 6px 8px;
     background: var(--bg-secondary);
@@ -273,7 +273,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;

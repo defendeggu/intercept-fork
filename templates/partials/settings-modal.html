@@ -52,7 +52,7 @@
                 <div class="settings-row">
                     <div class="settings-label">
                         <span class="settings-label-text">Web Fonts</span>
-                        <span class="settings-label-desc">Inter, JetBrains Mono</span>
+                        <span class="settings-label-desc">Space Mono</span>
                     </div>
                     <select id="fontsSource" class="settings-select" onchange="Settings.setFontsSource(this.value)">
                         <option value="cdn">Google Fonts (Online)</option>
@@ -72,6 +72,7 @@
                     <select id="tileProvider" class="settings-select" onchange="Settings.setTileProvider(this.value)">
                         <option value="openstreetmap">OpenStreetMap</option>
                         <option value="cartodb_dark">CartoDB Dark</option>
+                        <option value="cartodb_dark_cyan">CartoDB Dark (Cyan Tint)</option>
                         <option value="cartodb_light">CartoDB Positron</option>
                         <option value="esri_world">ESRI World Imagery</option>
                         <option value="custom">Custom URL</option>
@@ -105,7 +106,7 @@
                         <span class="asset-badge checking" id="statusInter">Checking...</span>
                     </div>
                     <div class="asset-status-row">
-                        <span class="asset-name">JetBrains Mono</span>
+                        <span class="asset-name">Space Mono</span>
                         <span class="asset-badge checking" id="statusJetbrains">Checking...</span>
                     </div>
                 </div>
@@ -168,7 +169,7 @@
 
             <div class="settings-group">
                 <div class="settings-group-title">Current Location</div>
-                <div id="currentLocationDisplay" style="padding: 12px; background: var(--bg-tertiary); border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+                <div id="currentLocationDisplay" style="padding: 12px; background: var(--bg-tertiary); border-radius: 6px; font-family: var(--font-mono); font-size: 12px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                         <span style="color: var(--text-dim);">Latitude</span>
                         <span id="currentLatDisplay" style="color: var(--accent-cyan);">Not set</span>
@@ -295,7 +296,23 @@
                     </p>
                 </div>
             </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Support the Project</div>
+                <p style="color: var(--text-dim); margin-bottom: 15px; font-size: 12px;">
+                    If you find iNTERCEPT useful, consider supporting its development.
+                </p>
+                <a href="https://buymeacoffee.com/smittix" target="_blank" rel="noopener noreferrer" class="donate-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; vertical-align: -3px; margin-right: 8px;">
+                        <path d="M17 8h1a4 4 0 1 1 0 8h-1"/>
+                        <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+                        <line x1="6" y1="2" x2="6" y2="4"/>
+                        <line x1="10" y1="2" x2="10" y2="4"/>
+                        <line x1="14" y1="2" x2="14" y2="4"/>
+                    </svg>
+                    Buy Me a Coffee
+                </a>
+            </div>
         </div>
     </div>
 </div>
-

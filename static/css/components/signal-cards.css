@@ -47,7 +47,7 @@
 }
 
 .signal-feed-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.06em;
@@ -59,7 +59,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--accent-green);
     text-transform: uppercase;
@@ -107,7 +107,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     font-size: 11px;
     font-weight: 500;
     padding: 5px 10px;
@@ -144,7 +144,7 @@
 .signal-filter-btn[data-filter="baseline"] .filter-dot { background: var(--signal-baseline); }
 
 .signal-filter-count {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     background: var(--bg-secondary);
     padding: 1px 5px;
@@ -255,7 +255,7 @@
 
 /* Protocol badge */
 .signal-proto-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -297,7 +297,7 @@
 
 /* Frequency/Address badge */
 .signal-freq-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 500;
     color: var(--text-primary);
@@ -376,7 +376,7 @@
 }
 
 .signal-sender {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--accent-green);
 }
@@ -392,7 +392,7 @@
 }
 
 .signal-timestamp {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     margin-left: auto;
@@ -400,7 +400,7 @@
 
 /* Message content preview */
 .signal-message {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-primary);
     background: var(--bg-secondary);
@@ -638,13 +638,13 @@
 }
 
 .signal-advanced-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-primary);
 }
 
 .signal-raw-data {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
     background: var(--bg-primary);
@@ -716,7 +716,7 @@
     position: absolute;
     bottom: 4px;
     right: 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
     background: var(--bg-card);
@@ -864,7 +864,7 @@
 .signal-search-input {
     width: 100%;
     padding: 6px 10px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     font-size: 11px;
     color: var(--text-primary);
     background: var(--bg-card);
@@ -887,7 +887,7 @@
    SEEN COUNT BADGE
    ============================================ */
 .signal-seen-count {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     background: var(--bg-secondary);
@@ -923,7 +923,7 @@
 }
 
 .signal-sensor-reading .sensor-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 500;
     color: var(--text-primary);
@@ -967,7 +967,7 @@
 }
 
 .signal-meter-reading .meter-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
@@ -1020,6 +1020,8 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0; /* Allow column to shrink in grid */
+    overflow: hidden;
 }
 
 .meter-aggregated-label {
@@ -1030,10 +1032,13 @@
 }
 
 .meter-aggregated-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Consumption column */
@@ -1044,7 +1049,7 @@
 
 /* Delta badge */
 .meter-delta {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 2px 6px;
     border-radius: 3px;
@@ -1068,20 +1073,25 @@
     min-height: 28px;
     display: flex;
     align-items: center;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .meter-sparkline-placeholder {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
 }
 
 /* Rate display */
 .meter-rate-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 500;
     color: var(--accent-cyan, #4a9eff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Update animation */
@@ -1151,7 +1161,7 @@
    DISTANCE DISPLAY
    ============================================ */
 .signal-distance {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-green);
     font-weight: 500;
@@ -1298,7 +1308,7 @@
 }
 
 .signal-strength-indicator.no-data {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
     opacity: 0.5;
@@ -1314,7 +1324,7 @@
 }
 
 .signal-strength-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
@@ -1394,7 +1404,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 
@@ -1510,7 +1520,7 @@
 }
 
 .station-raw-modal-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--accent-cyan, #00d4ff);
@@ -1546,7 +1556,7 @@
 }
 
 .station-raw-data-display {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.6;
     color: var(--accent-green, #00ff88);
@@ -1571,7 +1581,7 @@
 }
 
 .station-raw-copy-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 8px 16px;
     background: var(--accent-purple, #8a2be2);
@@ -1741,7 +1751,7 @@
 }
 
 .signal-details-modal-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 15px;
     font-weight: 600;
     color: var(--accent-cyan, #00d4ff);
@@ -1778,7 +1788,7 @@
 }
 
 .signal-details-copy-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 8px 16px;
     background: var(--accent-purple, #8a2be2);
@@ -1804,7 +1814,7 @@
 }
 
 .signal-details-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1816,7 +1826,7 @@
 }
 
 .signal-details-message {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     color: var(--text-primary, #e0e0e0);
     background: var(--bg-secondary, #252525);
@@ -1847,14 +1857,14 @@
 }
 
 .signal-details-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
     color: var(--text-primary, #e0e0e0);
 }
 
 /* Raw data in modal */
 .signal-details-modal .signal-raw-data {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-secondary, #aaa);
     background: var(--bg-tertiary, #1a1a1a);

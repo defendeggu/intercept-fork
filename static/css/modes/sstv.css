@@ -86,14 +86,14 @@
 }
 
 .sstv-strip-status-text {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
     text-transform: uppercase;
 }
 
 .sstv-strip-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 5px 12px;
     border: none;
@@ -137,7 +137,7 @@
 }
 
 .sstv-strip-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -148,7 +148,7 @@
 }
 
 .sstv-strip-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 8px;
     color: var(--text-dim);
     text-transform: uppercase;
@@ -165,7 +165,7 @@
 .sstv-loc-input {
     width: 70px;
     padding: 4px 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -236,7 +236,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -278,7 +278,7 @@
 }
 
 .sstv-mode-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--accent-cyan);
     text-align: center;
@@ -300,7 +300,7 @@
 }
 
 .sstv-status-message {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     text-align: center;
@@ -362,14 +362,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
 }
 
 .sstv-gallery-count {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-cyan);
     background: var(--bg-secondary);
@@ -416,7 +416,7 @@
 }
 
 .sstv-image-mode {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     color: var(--accent-cyan);
@@ -424,7 +424,7 @@
 }
 
 .sstv-image-timestamp {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
 }
@@ -500,7 +500,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .sstv-map-label {
@@ -526,7 +526,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .sstv-pass-label {
@@ -561,7 +561,7 @@
 }
 
 .sstv-iss-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: bold;
     color: #ffcc00;
@@ -607,7 +607,7 @@
     padding: 10px 14px;
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid var(--border-color);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -635,7 +635,7 @@
 }
 
 .sstv-countdown-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 28px;
     font-weight: 700;
     color: var(--accent-cyan);
@@ -661,7 +661,7 @@
 }
 
 .sstv-countdown-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     text-transform: uppercase;
@@ -686,7 +686,7 @@
 }
 
 .sstv-detail-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 8px;
     color: var(--text-dim);
     text-transform: uppercase;
@@ -694,7 +694,7 @@
 }
 
 .sstv-detail-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -708,7 +708,7 @@
     padding: 8px 14px;
     background: rgba(0, 0, 0, 0.15);
     border-top: 1px solid var(--border-color);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
     text-transform: uppercase;

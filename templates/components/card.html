@@ -1,0 +1,24 @@
+{#
+  Card/Panel Component
+  Reusable container with optional header and footer
+
+  Variables:
+    - title: Optional card header title
+    - indicator: If true, shows status indicator dot in header
+    - indicator_active: If true, indicator is active/green
+    - no_padding: If true, removes body padding
+#}
+
+<div class="panel">
+    {% if title %}
+    <div class="panel-header">
+        <span>{{ title }}</span>
+        {% if indicator %}
+        <div class="panel-indicator {% if indicator_active %}active{% endif %}"></div>
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="panel-content{% if no_padding %}" style="padding: 0;{% else %}{% endif %}">
+        {{ caller() }}
+    </div>
+</div>

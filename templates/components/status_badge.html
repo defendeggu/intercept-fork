@@ -1,0 +1,27 @@
+{#
+  Status Badge Component
+  Compact status indicator with dot and text
+
+  Variables:
+    - status: 'online', 'offline', 'warning', 'error' (default: 'offline')
+    - text: Status text to display
+    - id: Optional ID for the text element (for JS updates)
+    - dot_id: Optional ID for the dot element (for JS updates)
+    - pulse: If true, adds pulse animation to dot
+#}
+
+{% set status_class = {
+    'online': 'online',
+    'active': 'online',
+    'offline': 'offline',
+    'warning': 'warning',
+    'error': 'error',
+    'inactive': 'inactive'
+}.get(status|default('offline'), 'inactive') %}
+
+<div class="status-badge flex items-center gap-2">
+    <div class="status-dot {{ status_class }}{% if pulse %} pulse{% endif %}"
+         {% if dot_id %}id="{{ dot_id }}"{% endif %}></div>
+    <span class="text-sm"
+          {% if id %}id="{{ id }}"{% endif %}>{{ text|default('Unknown') }}</span>
+</div>

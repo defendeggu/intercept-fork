@@ -8,7 +8,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -18,7 +18,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     {% endif %}
+    <!-- Core CSS variables -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/satellite_dashboard.css') }}">
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
@@ -66,9 +71,11 @@
                 <span id="trackingStatus">TRACKING</span>
             </div>
             <div class="datetime" id="utcTime">--:--:-- UTC</div>
-            <a href="/?mode=satellite" class="back-link">Main Dashboard</a>
         </div>
     </header>
+
+    {% set active_mode = 'satellite' %}
+    {% include 'partials/nav.html' with context %}
 
     <main class="dashboard">
         <!-- Polar Plot -->
@@ -217,7 +224,7 @@
         .location-label {
             font-size: 11px;
             color: var(--text-secondary, #8899aa);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
         }
         .location-select {
             background: rgba(0, 40, 60, 0.8);
@@ -226,7 +233,7 @@
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 11px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             cursor: pointer;
             min-width: 140px;
         }
@@ -431,7 +438,7 @@
                 now.toISOString().substring(11, 19) + ' UTC';
         }
 
-        function initGroundMap() {
+        async function initGroundMap() {
             groundMap = L.map('groundMap', {
                 center: [20, 0],
                 zoom: 2,
@@ -442,14 +449,17 @@
 
             // Use settings manager for tile layer (allows runtime changes)
             window.groundMap = groundMap;
-            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+            if (typeof Settings !== 'undefined') {
+                // Wait for settings to load from server before applying tiles
+                await Settings.init();
                 Settings.createTileLayer().addTo(groundMap);
                 Settings.registerMap(groundMap);
             } else {
                 L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
                     maxZoom: 19,
-                    subdomains: 'abcd'
+                    subdomains: 'abcd',
+                    className: 'tile-layer-cyan'
                 }).addTo(groundMap);
             }
 
@@ -589,7 +599,7 @@
                 ctx.stroke();
 
                 ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                ctx.font = '10px JetBrains Mono';
+                ctx.font = '10px Space Mono';
                 ctx.fillText(el + '°', cx + 5, cy - r + 12);
             }
 
@@ -957,7 +967,7 @@
                 ctx.stroke();
 
                 ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                ctx.font = '10px JetBrains Mono';
+                ctx.font = '10px Space Mono';
                 ctx.fillText(elRing + '°', cx + 5, cy - r + 12);
             }
 
@@ -1024,7 +1034,7 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(satellites[selectedSatellite]?.name || 'SAT', x, y - 20);
 
-                ctx.font = '10px JetBrains Mono';
+                ctx.font = '10px Space Mono';
                 ctx.fillStyle = el > 0 ? '#00ff88' : '#ff4444';
                 ctx.fillText(el.toFixed(1) + '°', x, y + 25);
             } else {
@@ -1073,11 +1083,20 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(satellites[selectedSatellite]?.name || 'SAT', x, y - 20);
 
-                ctx.font = '10px JetBrains Mono';
+                ctx.font = '10px Space Mono';
                 ctx.fillStyle = el > 0 ? '#00ff88' : '#ff4444';
                 ctx.fillText(el.toFixed(1) + '°', x, y + 25);
             }
         }
     </script>
+
+    <!-- Settings Modal -->
+    {% include 'partials/settings-modal.html' %}
+
+    <!-- Help Modal -->
+    {% include 'partials/help-modal.html' %}
+
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/global-nav.js') }}"></script>
 </body>
 </html>

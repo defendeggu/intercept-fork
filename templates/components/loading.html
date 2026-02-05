@@ -1,0 +1,27 @@
+{#
+  Loading State Component
+  Display while data is being fetched
+
+  Variables:
+    - text: Optional loading text (default: "Loading...")
+    - size: 'sm', 'md', or 'lg' (default: 'md')
+    - overlay: If true, renders as full overlay
+#}
+
+{% if overlay %}
+<div class="loading-overlay">
+    <div class="loading-content">
+        <div class="spinner {% if size == 'sm' %}spinner-sm{% elif size == 'lg' %}spinner-lg{% endif %}"></div>
+        {% if text %}
+        <div class="loading-text mt-3 text-secondary text-sm">{{ text }}</div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="loading-inline flex items-center gap-3">
+    <div class="spinner {% if size == 'sm' %}spinner-sm{% elif size == 'lg' %}spinner-lg{% endif %}"></div>
+    {% if text %}
+    <span class="text-secondary text-sm">{{ text }}</span>
+    {% endif %}
+</div>
+{% endif %}

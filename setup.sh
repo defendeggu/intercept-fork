@@ -1092,4 +1092,7 @@ main() {
 }
 
 main "$@"
+
+# Clear traps before exiting to prevent spurious errors during cleanup
+trap - ERR EXIT
 exit 0

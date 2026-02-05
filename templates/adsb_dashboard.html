@@ -8,7 +8,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -18,7 +18,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     {% endif %}
+    <!-- Core CSS variables -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/adsb_dashboard.css') }}">
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
@@ -46,10 +51,11 @@
                     <input type="checkbox" id="showAllAgents" onchange="toggleShowAllAgents()"> All
                 </label>
             </div>
-            <a href="#" onclick="history.back(); return false;" class="back-link">Back</a>
-            <a href="/?mode=aircraft" class="back-link">Main Dashboard</a>
         </div>
     </header>
+
+    {% set active_mode = 'adsb' %}
+    {% include 'partials/nav.html' with context %}
 
     <!-- Slim Statistics Bar -->
     <div class="stats-strip">
@@ -269,6 +275,7 @@
                     <select id="adsbDeviceSelect" title="SDR device for ADS-B (1090 MHz)">
                         <option value="0">SDR 0</option>
                     </select>
+                    <label class="bias-t-label" title="Enable Bias-T power for external LNA/preamp"><input type="checkbox" id="adsbBiasT" onchange="saveAdsbBiasTSetting()"> Bias-T</label>
                     <button class="start-btn" id="startBtn" onclick="toggleTracking()">START</button>
                 </div>
             </div>
@@ -322,10 +329,23 @@
 
     <script>
         // ============================================
-        // BIAS-T HELPER (reads from main dashboard localStorage)
+        // BIAS-T HELPER
         // ============================================
         function getBiasTEnabled() {
-            return localStorage.getItem('biasTEnabled') === 'true';
+            return document.getElementById('adsbBiasT')?.checked || false;
+        }
+
+        function saveAdsbBiasTSetting() {
+            const enabled = document.getElementById('adsbBiasT')?.checked || false;
+            localStorage.setItem('adsbBiasTEnabled', enabled);
+        }
+
+        function loadAdsbBiasTSetting() {
+            const saved = localStorage.getItem('adsbBiasTEnabled');
+            if (saved === 'true') {
+                const checkbox = document.getElementById('adsbBiasT');
+                if (checkbox) checkbox.checked = true;
+            }
         }
 
         // ============================================
@@ -1369,7 +1389,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                     // Range label
                     const rangeNm = Math.round(maxRange * ratio);
                     ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                    ctx.font = '10px JetBrains Mono';
+                    ctx.font = '10px Space Mono';
                     ctx.fillText(`${rangeNm}`, this.centerX + r + 5, this.centerY + 4);
                 });
             }
@@ -1510,7 +1530,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                     // Label
                     if (blip.callsign || blip.selected) {
                         ctx.fillStyle = '#00ffff';
-                        ctx.font = '9px JetBrains Mono';
+                        ctx.font = '9px Space Mono';
                         ctx.textAlign = 'left';
                         ctx.fillText(blip.callsign || blip.icao, blip.x + 8, blip.y - 5);
                         if (blip.altitude) {
@@ -1628,7 +1648,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 // Range label
                 const rangeNm = Math.round(maxRange * ratio);
                 ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
-                ctx.font = '10px JetBrains Mono';
+                ctx.font = '10px Space Mono';
                 ctx.fillText(`${rangeNm}nm`, centerX + r + 5, centerY);
             });
 
@@ -2008,6 +2028,9 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             const detectionToggle = document.getElementById('detectionSoundToggle');
             if (detectionToggle) detectionToggle.checked = detectionSoundEnabled;
 
+            // Load Bias-T setting from localStorage
+            loadAdsbBiasTSetting();
+
             initMap();
             initDeviceSelectors();
             updateClock();
@@ -2046,28 +2069,18 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                     } else {
                         devices.forEach((dev, i) => {
                             const idx = dev.index !== undefined ? dev.index : i;
-
-                            // Build descriptive label
-                            const type = dev.sdr_type || dev.driver || 'RTL-SDR';
-                            const typeName = type.toUpperCase().replace('RTLSDR', 'RTL-SDR');
-                            const shortSerial = dev.serial ? ` (${dev.serial.slice(-4)})` : '';
-                            const displayName = `${typeName} #${idx}${shortSerial}`;
-                            const fullName = dev.name || `${typeName} Device ${idx}`;
-                            const tooltip = `${fullName}${dev.serial ? ' - Serial: ' + dev.serial : ''}`;
+                            const displayName = `SDR ${idx}: ${dev.name}`;
 
                             // Add to ADS-B selector
                             const adsbOpt = document.createElement('option');
                             adsbOpt.value = idx;
                             adsbOpt.textContent = displayName;
-                            adsbOpt.title = tooltip;
-                            adsbOpt.dataset.sdrType = dev.sdr_type || 'rtlsdr';
                             adsbSelect.appendChild(adsbOpt);
 
                             // Add to Airband selector
                             const airbandOpt = document.createElement('option');
                             airbandOpt.value = idx;
                             airbandOpt.textContent = displayName;
-                            airbandOpt.title = tooltip;
                             airbandSelect.appendChild(airbandOpt);
                         });
 
@@ -2248,7 +2261,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 z-index: 10000;
                 box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 max-width: 320px;
-                font-family: 'Inter', sans-serif;
+                font-family: var(--font-sans);
             `;
 
             if (type === 'not_installed') {
@@ -2333,7 +2346,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 box-shadow: 0 4px 20px rgba(0,0,0,0.5);
                 max-width: 500px;
                 text-align: left;
-                font-family: 'Inter', sans-serif;
+                font-family: var(--font-sans);
             `;
             warning.innerHTML = `
                 <div style="font-weight: bold; margin-bottom: 8px;">⚠️ ${typeList} Detected - readsb Required</div>
@@ -2341,7 +2354,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 <details style="font-size: 11px;">
                     <summary style="cursor: pointer; margin-bottom: 8px;">Installation Instructions</summary>
                     <div style="background: rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; margin-top: 5px;">
-                        <code style="display: block; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 10px;">sudo apt install build-essential libsoapysdr-dev librtlsdr-dev
+                        <code style="display: block; white-space: pre-wrap; font-family: var(--font-mono); font-size: 10px;">sudo apt install build-essential libsoapysdr-dev librtlsdr-dev
 git clone https://github.com/wiedehopf/readsb.git
 cd readsb
 make HAVE_SOAPYSDR=1
@@ -2359,7 +2372,7 @@ sudo make install</code>
                 now.toISOString().substring(11, 19) + ' UTC';
         }
 
-        function initMap() {
+        async function initMap() {
             radarMap = L.map('radarMap', {
                 center: [observerLocation.lat, observerLocation.lon],
                 zoom: 7,
@@ -2369,14 +2382,17 @@ sudo make install</code>
 
             // Use settings manager for tile layer (allows runtime changes)
             window.radarMap = radarMap;
-            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+            if (typeof Settings !== 'undefined') {
+                // Wait for settings to load from server before applying tiles
+                await Settings.init();
                 Settings.createTileLayer().addTo(radarMap);
                 Settings.registerMap(radarMap);
             } else {
                 L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
                     maxZoom: 19,
-                    subdomains: 'abcd'
+                    subdomains: 'abcd',
+                    className: 'tile-layer-cyan'
                 }).addTo(radarMap);
             }
 
@@ -4009,7 +4025,7 @@ sudo make install</code>
                         devices.forEach((d, i) => {
                             const opt = document.createElement('option');
                             opt.value = d.index || i;
-                            opt.textContent = `Device ${d.index || i}: ${d.name || d.type || 'SDR'}`;
+                            opt.textContent = `SDR ${d.index || i}: ${d.name || d.type || 'SDR'}`;
                             select.appendChild(opt);
                         });
                         // Default to device 1 if available (device 0 likely used for ADS-B)
@@ -4197,7 +4213,7 @@ sudo make install</code>
             background: var(--bg-tertiary, #252525);
         }
         .squawk-current-code {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 32px;
             font-weight: bold;
         }
@@ -4244,7 +4260,7 @@ sudo make install</code>
             background: rgba(255, 0, 0, 0.2);
         }
         .squawk-ref-table .squawk-code {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-weight: bold;
             color: var(--accent-cyan, #00d4ff);
         }
@@ -4392,7 +4408,7 @@ sudo make install</code>
             flex-wrap: wrap;
         }
         .watchlist-value {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-weight: bold;
             color: var(--accent-cyan, #00d4ff);
             font-size: 13px;
@@ -4460,7 +4476,7 @@ sudo make install</code>
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 11px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             cursor: pointer;
         }
         .agent-select-sm:focus {
@@ -4512,8 +4528,17 @@ sudo make install</code>
         }
     </style>
 
+    <!-- Settings Modal -->
+    {% include 'partials/settings-modal.html' %}
+
+    <!-- Help Modal -->
+    {% include 'partials/help-modal.html' %}
+
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+
     <!-- Agent Manager -->
     <script src="{{ url_for('static', filename='js/core/agents.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/global-nav.js') }}"></script>
     <script>
         // ADS-B specific agent integration
         let adsbCurrentAgent = 'local';
@@ -4779,7 +4804,8 @@ sudo make install</code>
                     devices.forEach(device => {
                         const opt = document.createElement('option');
                         opt.value = device.index;
-                        opt.textContent = `Device ${device.index}: ${device.name || device.type || 'SDR'}`;
+                        opt.textContent = `SDR ${device.index}: ${device.name || device.type || 'SDR'}`;
+                        opt.dataset.sdrType = device.type || 'rtlsdr';
                         select.appendChild(opt);
                     });
                 }

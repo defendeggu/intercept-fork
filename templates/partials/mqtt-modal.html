@@ -1,0 +1,268 @@
+<!-- MQTT Settings Modal -->
+<div id="mqttModal" class="settings-modal" onclick="if(event.target === this) hideMqttSettings()">
+    <div class="settings-content" style="max-width: 500px;">
+        <div class="settings-header">
+            <h2>
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span>
+                MQTT Settings
+            </h2>
+            <button class="settings-close" onclick="hideMqttSettings()">&times;</button>
+        </div>
+
+        <div class="settings-section active">
+            <!-- Connection Status -->
+            <div class="settings-group">
+                <div class="settings-group-title">Connection Status</div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Status</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="mqttStatusIndicator" style="width: 10px; height: 10px; border-radius: 50%; background: var(--text-dim);"></span>
+                        <span id="mqttStatusText">Unknown</span>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Enable MQTT</span>
+                        <span class="settings-label-desc">Publish decoded data to MQTT broker</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mqttEnabled" onchange="toggleMqttEnabled()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Broker Settings -->
+            <div class="settings-group">
+                <div class="settings-group-title">Broker Configuration</div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Host</span>
+                    </div>
+                    <input type="text" id="mqttHost" class="settings-input" placeholder="localhost" style="width: 200px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Port</span>
+                    </div>
+                    <input type="number" id="mqttPort" class="settings-input" value="1883" min="1" max="65535" style="width: 100px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Username</span>
+                        <span class="settings-label-desc">Optional</span>
+                    </div>
+                    <input type="text" id="mqttUsername" class="settings-input" placeholder="(optional)" style="width: 200px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Password</span>
+                        <span class="settings-label-desc">Optional</span>
+                    </div>
+                    <input type="password" id="mqttPassword" class="settings-input" placeholder="(optional)" style="width: 200px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Topic Prefix</span>
+                    </div>
+                    <input type="text" id="mqttTopicPrefix" class="settings-input" value="intercept" style="width: 200px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Use TLS</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mqttUseTls">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Topics -->
+            <div class="settings-group">
+                <div class="settings-group-title">Enabled Topics</div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">POCSAG/Pager</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicPocsag" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">ADS-B</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicAdsb" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">ACARS</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicAcars" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">APRS</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicAprs" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">433MHz Sensors</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicSensor" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-label-text">RTLAMR/Meters</span></div>
+                    <label class="toggle-switch"><input type="checkbox" id="mqttTopicRtlamr" checked><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="settings-group">
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="testMqttConnection()">Test Connection</button>
+                    <button class="btn btn-primary" onclick="saveMqttSettings()">Save Settings</button>
+                </div>
+            </div>
+
+            <!-- Help -->
+            <div class="settings-group" style="margin-top: 10px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px;">
+                <p style="margin: 0; font-size: 12px; color: var(--text-dim);">
+                    <strong>Setup:</strong> Install a local MQTT broker with:
+                </p>
+                <code style="display: block; background: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-top: 5px; font-size: 11px;">
+                    sudo apt install mosquitto mosquitto-clients
+                </code>
+                <p style="margin-top: 10px; font-size: 11px; color: var(--text-dim);">
+                    Topics: <code>{prefix}/pocsag</code>, <code>{prefix}/adsb</code>, <code>{prefix}/acars</code>, <code>{prefix}/aprs</code>, <code>{prefix}/sensor</code>, <code>{prefix}/rtlamr</code>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // MQTT Settings Functions
+    function showMqttSettings() {
+        document.getElementById('mqttModal').classList.add('active');
+        loadMqttSettings();
+    }
+
+    function hideMqttSettings() {
+        document.getElementById('mqttModal').classList.remove('active');
+    }
+
+    function loadMqttSettings() {
+        fetch('/mqtt/status')
+            .then(r => r.json())
+            .then(data => {
+                const statusText = document.getElementById('mqttStatusText');
+                const statusIndicator = document.getElementById('mqttStatusIndicator');
+
+                if (!data.available) {
+                    statusText.textContent = 'paho-mqtt not installed';
+                    statusIndicator.style.background = 'var(--accent-orange)';
+                } else if (data.connected) {
+                    statusText.textContent = 'Connected';
+                    statusIndicator.style.background = 'var(--accent-green)';
+                } else if (data.enabled) {
+                    statusText.textContent = 'Disconnected';
+                    statusIndicator.style.background = 'var(--accent-red)';
+                } else {
+                    statusText.textContent = 'Disabled';
+                    statusIndicator.style.background = 'var(--text-dim)';
+                }
+
+                const config = data.config || {};
+                document.getElementById('mqttEnabled').checked = config.enabled || false;
+                document.getElementById('mqttHost').value = config.broker_host || 'localhost';
+                document.getElementById('mqttPort').value = config.broker_port || 1883;
+                document.getElementById('mqttUsername').value = config.username || '';
+                document.getElementById('mqttPassword').value = '';
+                document.getElementById('mqttTopicPrefix').value = config.topic_prefix || 'intercept';
+                document.getElementById('mqttUseTls').checked = config.use_tls || false;
+
+                const topics = config.topics || {};
+                document.getElementById('mqttTopicPocsag').checked = topics.pocsag !== false;
+                document.getElementById('mqttTopicAdsb').checked = topics.adsb !== false;
+                document.getElementById('mqttTopicAcars').checked = topics.acars !== false;
+                document.getElementById('mqttTopicAprs').checked = topics.aprs !== false;
+                document.getElementById('mqttTopicSensor').checked = topics.sensor !== false;
+                document.getElementById('mqttTopicRtlamr').checked = topics.rtlamr !== false;
+            })
+            .catch(err => {
+                console.error('Failed to load MQTT settings:', err);
+                document.getElementById('mqttStatusText').textContent = 'Error loading settings';
+                document.getElementById('mqttStatusIndicator').style.background = 'var(--accent-red)';
+            });
+    }
+
+    function toggleMqttEnabled() {
+        const enabled = document.getElementById('mqttEnabled').checked;
+        fetch('/mqtt/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        })
+        .then(r => r.json())
+        .then(data => {
+            loadMqttSettings();
+        })
+        .catch(err => console.error('Failed to toggle MQTT:', err));
+    }
+
+    function saveMqttSettings() {
+        const config = {
+            enabled: document.getElementById('mqttEnabled').checked,
+            broker_host: document.getElementById('mqttHost').value,
+            broker_port: parseInt(document.getElementById('mqttPort').value) || 1883,
+            username: document.getElementById('mqttUsername').value,
+            topic_prefix: document.getElementById('mqttTopicPrefix').value || 'intercept',
+            use_tls: document.getElementById('mqttUseTls').checked,
+            topics: {
+                pocsag: document.getElementById('mqttTopicPocsag').checked,
+                adsb: document.getElementById('mqttTopicAdsb').checked,
+                acars: document.getElementById('mqttTopicAcars').checked,
+                aprs: document.getElementById('mqttTopicAprs').checked,
+                sensor: document.getElementById('mqttTopicSensor').checked,
+                rtlamr: document.getElementById('mqttTopicRtlamr').checked
+            }
+        };
+
+        const password = document.getElementById('mqttPassword').value;
+        if (password) {
+            config.password = password;
+        }
+
+        fetch('/mqtt/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                loadMqttSettings();
+                alert('MQTT settings saved successfully');
+            } else {
+                alert('Failed to save: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Failed to save MQTT settings:', err);
+            alert('Failed to save settings');
+        });
+    }
+
+    function testMqttConnection() {
+        const statusText = document.getElementById('mqttStatusText');
+        statusText.textContent = 'Testing...';
+
+        fetch('/mqtt/test', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Connection successful!');
+                } else {
+                    alert('Connection failed: ' + (data.message || 'Unknown error'));
+                }
+                loadMqttSettings();
+            })
+            .catch(err => {
+                alert('Test failed: ' + err.message);
+                loadMqttSettings();
+            });
+    }
+</script>

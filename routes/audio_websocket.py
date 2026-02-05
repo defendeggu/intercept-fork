@@ -229,7 +229,11 @@ def init_audio_websocket(app: Flask):
                 except TimeoutError:
                     pass
                 except Exception as e:
-                    if "timed out" not in str(e).lower():
+                    msg = str(e).lower()
+                    if "connection closed" in msg:
+                        logger.info("WebSocket closed by client")
+                        break
+                    if "timed out" not in msg:
                         logger.error(f"WebSocket receive error: {e}")
 
                 # Stream audio data if active

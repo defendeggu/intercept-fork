@@ -1,0 +1,47 @@
+{#
+  Stats Strip Component
+  Horizontal bar displaying key metrics
+
+  Variables:
+    - stats: List of stat objects with 'id', 'value', 'label', and optional 'title'
+    - show_divider: Show divider after stats (default: true)
+    - status_dot_id: Optional ID for status indicator dot
+    - status_text_id: Optional ID for status text
+    - time_id: Optional ID for time display
+#}
+
+<div class="stats-strip">
+    <div class="stats-strip-inner">
+        {% for stat in stats %}
+        <div class="strip-stat" {% if stat.title %}title="{{ stat.title }}"{% endif %}>
+            <span class="strip-value" id="{{ stat.id }}">{{ stat.value|default('0') }}</span>
+            <span class="strip-label">{{ stat.label }}</span>
+        </div>
+        {% endfor %}
+
+        {% if show_divider|default(true) %}
+        <div class="strip-divider"></div>
+        {% endif %}
+
+        {# Additional content from caller #}
+        {% if caller is defined %}
+        {{ caller() }}
+        {% endif %}
+
+        {% if status_dot_id or status_text_id %}
+        <div class="strip-divider"></div>
+        <div class="strip-status">
+            {% if status_dot_id %}
+            <div class="status-dot inactive" id="{{ status_dot_id }}"></div>
+            {% endif %}
+            {% if status_text_id %}
+            <span id="{{ status_text_id }}">STANDBY</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if time_id %}
+        <div class="strip-time" id="{{ time_id }}">--:--:-- UTC</div>
+        {% endif %}
+    </div>
+</div>

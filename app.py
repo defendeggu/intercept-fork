@@ -39,6 +39,7 @@ from utils.constants import (
     MAX_BT_DEVICE_AGE_SECONDS,
     MAX_VESSEL_AGE_SECONDS,
     MAX_DSC_MESSAGE_AGE_SECONDS,
+    MAX_DEAUTH_ALERTS_AGE_SECONDS,
     QUEUE_MAX_SIZE,
 )
 import logging
@@ -105,7 +106,7 @@ def inject_offline_settings():
             'enabled': get_setting('offline.enabled', False),
             'assets_source': get_setting('offline.assets_source', 'cdn'),
             'fonts_source': get_setting('offline.fonts_source', 'cdn'),
-            'tile_provider': get_setting('offline.tile_provider', 'openstreetmap'),
+            'tile_provider': get_setting('offline.tile_provider', 'cartodb_dark_cyan'),
             'tile_server_url': get_setting('offline.tile_server_url', '')
         }
     }
@@ -176,6 +177,11 @@ dsc_lock = threading.Lock()
 tscm_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 tscm_lock = threading.Lock()
 
+# Deauth Attack Detection
+deauth_detector = None
+deauth_detector_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+deauth_detector_lock = threading.Lock()
+
 # ============================================
 # GLOBAL STATE DICTIONARIES
 # ============================================
@@ -205,6 +211,9 @@ ais_vessels = DataStore(max_age_seconds=MAX_VESSEL_AGE_SECONDS, name='ais_vessel
 # DSC (Digital Selective Calling) state - using DataStore for automatic cleanup
 dsc_messages = DataStore(max_age_seconds=MAX_DSC_MESSAGE_AGE_SECONDS, name='dsc_messages')
 
+# Deauth alerts - using DataStore for automatic cleanup
+deauth_alerts = DataStore(max_age_seconds=MAX_DEAUTH_ALERTS_AGE_SECONDS, name='deauth_alerts')
+
 # Satellite state
 satellite_passes = []  # Predicted satellite passes (not auto-cleaned, calculated)
 
@@ -216,6 +225,53 @@ cleanup_manager.register(bt_beacons)
 cleanup_manager.register(adsb_aircraft)
 cleanup_manager.register(ais_vessels)
 cleanup_manager.register(dsc_messages)
+cleanup_manager.register(deauth_alerts)
+
+# ============================================
+# SDR DEVICE REGISTRY
+# ============================================
+# Tracks which mode is using which SDR device to prevent conflicts
+# Key: device_index (int), Value: mode_name (str)
+sdr_device_registry: dict[int, str] = {}
+sdr_device_registry_lock = threading.Lock()
+
+
+def claim_sdr_device(device_index: int, mode_name: str) -> str | None:
+    """Claim an SDR device for a mode.
+
+    Args:
+        device_index: The SDR device index to claim
+        mode_name: Name of the mode claiming the device (e.g., 'sensor', 'rtlamr')
+
+    Returns:
+        Error message if device is in use, None if successfully claimed
+    """
+    with sdr_device_registry_lock:
+        if device_index in sdr_device_registry:
+            in_use_by = sdr_device_registry[device_index]
+            return f'SDR device {device_index} is in use by {in_use_by}. Stop {in_use_by} first or use a different device.'
+        sdr_device_registry[device_index] = mode_name
+        return None
+
+
+def release_sdr_device(device_index: int) -> None:
+    """Release an SDR device from the registry.
+
+    Args:
+        device_index: The SDR device index to release
+    """
+    with sdr_device_registry_lock:
+        sdr_device_registry.pop(device_index, None)
+
+
+def get_sdr_device_status() -> dict[int, str]:
+    """Get current SDR device allocations.
+
+    Returns:
+        Dictionary mapping device indices to mode names
+    """
+    with sdr_device_registry_lock:
+        return dict(sdr_device_registry)
 
 
 # ============================================
@@ -226,6 +282,10 @@ cleanup_manager.register(dsc_messages)
 def require_login():
     # Routes that don't require login (to avoid infinite redirect loop)
     allowed_routes = ['login', 'static', 'favicon', 'health', 'health_check']
+
+    # Allow audio streaming endpoints without session auth
+    if request.path.startswith('/listening/audio/'):
+        return None
 
     # Controller API endpoints use API key auth, not session auth
     # Allow agent push/pull endpoints without session login
@@ -300,6 +360,22 @@ def get_devices() -> Response:
     """Get all detected SDR devices with hardware type info."""
     devices = SDRFactory.detect_devices()
     return jsonify([d.to_dict() for d in devices])
+
+
+@app.route('/devices/status')
+def get_devices_status() -> Response:
+    """Get all SDR devices with usage status."""
+    devices = SDRFactory.detect_devices()
+    registry = get_sdr_device_status()
+
+    result = []
+    for device in devices:
+        d = device.to_dict()
+        d['in_use'] = device.index in registry
+        d['used_by'] = registry.get(device.index)
+        result.append(d)
+
+    return jsonify(result)
 
 
 @app.route('/devices/debug')
@@ -585,19 +661,21 @@ def health_check() -> Response:
 
 @app.route('/killall', methods=['POST'])
 def kill_all() -> Response:
-    """Kill all decoder and WiFi processes."""
+    """Kill all decoder, WiFi, and Bluetooth processes."""
     global current_process, sensor_process, wifi_process, adsb_process, ais_process, acars_process
-    global aprs_process, aprs_rtl_process, dsc_process, dsc_rtl_process
+    global aprs_process, aprs_rtl_process, dsc_process, dsc_rtl_process, bt_process
 
     # Import adsb and ais modules to reset their state
     from routes import adsb as adsb_module
     from routes import ais as ais_module
+    from utils.bluetooth import reset_bluetooth_scanner
 
     killed = []
     processes_to_kill = [
         'rtl_fm', 'multimon-ng', 'rtl_433',
         'airodump-ng', 'aireplay-ng', 'airmon-ng',
-        'dump1090', 'acarsdec', 'direwolf', 'AIS-catcher'
+        'dump1090', 'acarsdec', 'direwolf', 'AIS-catcher',
+        'hcitool', 'bluetoothctl'
     ]
 
     for proc in processes_to_kill:
@@ -640,6 +718,30 @@ def kill_all() -> Response:
     with dsc_lock:
         dsc_process = None
         dsc_rtl_process = None
+
+    # Reset Bluetooth state (legacy)
+    with bt_lock:
+        if bt_process:
+            try:
+                bt_process.terminate()
+                bt_process.wait(timeout=2)
+            except Exception:
+                try:
+                    bt_process.kill()
+                except Exception:
+                    pass
+        bt_process = None
+
+    # Reset Bluetooth v2 scanner
+    try:
+        reset_bluetooth_scanner()
+        killed.append('bluetooth_scanner')
+    except Exception:
+        pass
+
+    # Clear SDR device registry
+    with sdr_device_registry_lock:
+        sdr_device_registry.clear()
 
     return jsonify({'status': 'killed', 'processes': killed})
 

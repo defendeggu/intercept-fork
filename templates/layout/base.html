@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme|default('dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}iNTERCEPT{% endblock %} // iNTERCEPT</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+
+    {# Fonts - Conditional CDN/Local loading #}
+    {% if offline_settings and offline_settings.fonts_source == 'local' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    {% else %}
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    {% endif %}
+
+    {# Core CSS (Design System) #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/core/layout.css') }}">
+
+    {# Responsive styles #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+
+    {# Page-specific CSS #}
+    {% block styles %}{% endblock %}
+
+    {# Page-specific head content #}
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-shell">
+        {# Global Header #}
+        {% block header %}
+        <header class="app-header">
+            <div class="app-header-left">
+                <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <a href="/" class="app-logo">
+                    <svg class="app-logo-icon" width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 30 Q5 50, 15 70" stroke="var(--accent-cyan)" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+                        <path d="M22 35 Q14 50, 22 65" stroke="var(--accent-cyan)" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+                        <path d="M29 40 Q23 50, 29 60" stroke="var(--accent-cyan)" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        <path d="M85 30 Q95 50, 85 70" stroke="var(--accent-cyan)" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+                        <path d="M78 35 Q86 50, 78 65" stroke="var(--accent-cyan)" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+                        <path d="M71 40 Q77 50, 71 60" stroke="var(--accent-cyan)" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        <circle cx="50" cy="22" r="6" fill="var(--accent-green)"/>
+                        <rect x="44" y="35" width="12" height="45" rx="2" fill="var(--accent-cyan)"/>
+                        <rect x="38" y="35" width="24" height="4" rx="1" fill="var(--accent-cyan)"/>
+                        <rect x="38" y="76" width="24" height="4" rx="1" fill="var(--accent-cyan)"/>
+                    </svg>
+                    <span class="app-logo-text">
+                        <span class="app-logo-title">iNTERCEPT</span>
+                        <span class="app-logo-tagline">// See the Invisible</span>
+                    </span>
+                </a>
+                {% if version %}
+                <span class="badge badge-primary">v{{ version }}</span>
+                {% endif %}
+            </div>
+            <div class="app-header-right">
+                {% block header_right %}
+                <div class="header-clock">
+                    <span class="header-clock-label">UTC</span>
+                    <span id="headerUtcTime">--:--:--</span>
+                </div>
+                {% endblock %}
+            </div>
+        </header>
+        {% endblock %}
+
+        {# Global Navigation - opt-in for pages that need it #}
+        {# Override this block and include 'partials/nav.html' in child templates #}
+        {% block navigation %}{% endblock %}
+
+        {# Main Content Area #}
+        <main class="app-main">
+            {% block main %}
+            <div class="content-wrapper">
+                {# Optional Sidebar #}
+                {% block sidebar %}{% endblock %}
+
+                {# Page Content #}
+                <div class="app-content">
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+            {% endblock %}
+        </main>
+
+        {# Toast/Notification Container #}
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    {# Core JavaScript #}
+    <script>
+        // UTC Clock
+        function updateUtcClock() {
+            const now = new Date();
+            const utc = now.toISOString().slice(11, 19);
+            const clockEl = document.getElementById('headerUtcTime');
+            if (clockEl) clockEl.textContent = utc;
+        }
+        setInterval(updateUtcClock, 1000);
+        updateUtcClock();
+
+        // Mobile menu toggle
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const drawerOverlay = document.getElementById('drawerOverlay');
+
+        if (hamburgerBtn) {
+            hamburgerBtn.addEventListener('click', function() {
+                this.classList.toggle('open');
+                document.querySelector('.app-sidebar')?.classList.toggle('open');
+                drawerOverlay?.classList.toggle('visible');
+            });
+        }
+
+        if (drawerOverlay) {
+            drawerOverlay.addEventListener('click', function() {
+                hamburgerBtn?.classList.remove('open');
+                document.querySelector('.app-sidebar')?.classList.remove('open');
+                this.classList.remove('visible');
+            });
+        }
+
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('intercept-theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        // Nav dropdown handling
+        function toggleNavDropdown(groupName) {
+            const group = document.querySelector(`.nav-group[data-group="${groupName}"]`);
+            if (!group) return;
+
+            // Close other dropdowns
+            document.querySelectorAll('.nav-group.open').forEach(g => {
+                if (g !== group) g.classList.remove('open');
+            });
+
+            group.classList.toggle('open');
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-group')) {
+                document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+            }
+        });
+    </script>
+
+    {# Page-specific JavaScript #}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

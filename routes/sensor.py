@@ -25,6 +25,9 @@ from utils.mqtt import mqtt_publish
 
 sensor_bp = Blueprint('sensor', __name__)
 
+# Track which device is being used
+sensor_active_device: int | None = None
+
 
 def stream_sensor_output(process: subprocess.Popen[bytes]) -> None:
     """Stream rtl_433 JSON output to queue."""
@@ -68,6 +71,8 @@ def stream_sensor_output(process: subprocess.Popen[bytes]) -> None:
 
 @sensor_bp.route('/start_sensor', methods=['POST'])
 def start_sensor() -> Response:
+    global sensor_active_device
+
     with app_module.sensor_lock:
         if app_module.sensor_process:
             return jsonify({'status': 'error', 'message': 'Sensor already running'}), 409
@@ -83,6 +88,22 @@ def start_sensor() -> Response:
         except ValueError as e:
             return jsonify({'status': 'error', 'message': str(e)}), 400
 
+        # Check for rtl_tcp (remote SDR) connection
+        rtl_tcp_host = data.get('rtl_tcp_host')
+        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
+        # Claim local device if not using remote rtl_tcp
+        if not rtl_tcp_host:
+            device_int = int(device)
+            error = app_module.claim_sdr_device(device_int, 'sensor')
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error
+                }), 409
+            sensor_active_device = device_int
+
         # Clear queue
         while not app_module.sensor_queue.empty():
             try:
@@ -96,10 +117,6 @@ def start_sensor() -> Response:
             sdr_type = SDRType(sdr_type_str)
         except ValueError:
             sdr_type = SDRType.RTL_SDR
-
-        # Check for rtl_tcp (remote SDR) connection
-        rtl_tcp_host = data.get('rtl_tcp_host')
-        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
 
         if rtl_tcp_host:
             # Validate and create network device
@@ -159,13 +176,23 @@ def start_sensor() -> Response:
             return jsonify({'status': 'started', 'command': full_cmd})
 
         except FileNotFoundError:
+            # Release device on failure
+            if sensor_active_device is not None:
+                app_module.release_sdr_device(sensor_active_device)
+                sensor_active_device = None
             return jsonify({'status': 'error', 'message': 'rtl_433 not found. Install with: brew install rtl_433'})
         except Exception as e:
+            # Release device on failure
+            if sensor_active_device is not None:
+                app_module.release_sdr_device(sensor_active_device)
+                sensor_active_device = None
             return jsonify({'status': 'error', 'message': str(e)})
 
 
 @sensor_bp.route('/stop_sensor', methods=['POST'])
 def stop_sensor() -> Response:
+    global sensor_active_device
+
     with app_module.sensor_lock:
         if app_module.sensor_process:
             app_module.sensor_process.terminate()
@@ -174,6 +201,12 @@ def stop_sensor() -> Response:
             except subprocess.TimeoutExpired:
                 app_module.sensor_process.kill()
             app_module.sensor_process = None
+
+            # Release device from registry
+            if sensor_active_device is not None:
+                app_module.release_sdr_device(sensor_active_device)
+                sensor_active_device = None
+
             return jsonify({'status': 'stopped'})
 
         return jsonify({'status': 'not_running'})

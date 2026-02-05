@@ -13,7 +13,7 @@ OFFLINE_DEFAULTS = {
     'offline.enabled': False,
     'offline.assets_source': 'cdn',
     'offline.fonts_source': 'cdn',
-    'offline.tile_provider': 'openstreetmap',
+    'offline.tile_provider': 'cartodb_dark_cyan',
     'offline.tile_server_url': ''
 }
 

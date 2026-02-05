@@ -1,0 +1,318 @@
+{#
+  Help Modal Partial
+  Provides consistent help modal across all pages
+#}
+
+<!-- Help Modal -->
+<div id="helpModal" class="help-modal" onclick="if(event.target === this) hideHelp()">
+    <div class="help-content">
+        <button class="help-close" onclick="hideHelp()">&times;</button>
+        <h2>iNTERCEPT Help</h2>
+
+        <div class="help-tabs">
+            <button class="help-tab active" data-tab="icons" onclick="switchHelpTab('icons')">Icons</button>
+            <button class="help-tab" data-tab="modes" onclick="switchHelpTab('modes')">Modes</button>
+            <button class="help-tab" data-tab="wifi" onclick="switchHelpTab('wifi')">WiFi</button>
+            <button class="help-tab" data-tab="tips" onclick="switchHelpTab('tips')">Tips</button>
+        </div>
+
+        <!-- Icons Section -->
+        <div id="help-icons" class="help-section active">
+            <h3>Stats Bar Icons</h3>
+            <div class="icon-grid">
+                <div class="icon-item"><span class="icon">&#128223;</span><span class="desc">POCSAG messages decoded</span></div>
+                <div class="icon-item"><span class="icon">&#128224;</span><span class="desc">FLEX messages decoded</span></div>
+                <div class="icon-item"><span class="icon">&#128232;</span><span class="desc">Total messages received</span></div>
+                <div class="icon-item"><span class="icon">&#127777;&#65039;</span><span class="desc">Unique sensors detected</span></div>
+                <div class="icon-item"><span class="icon">&#128202;</span><span class="desc">Device types found</span></div>
+                <div class="icon-item"><span class="icon">&#128752;&#65039;</span><span class="desc">Satellites monitored</span></div>
+                <div class="icon-item"><span class="icon">&#128225;</span><span class="desc">WiFi Access Points</span></div>
+                <div class="icon-item"><span class="icon">&#128100;</span><span class="desc">Connected WiFi clients</span></div>
+                <div class="icon-item"><span class="icon">&#129309;</span><span class="desc">Captured handshakes</span></div>
+                <div class="icon-item"><span class="icon">&#128641;</span><span class="desc">Detected drones (click for details)</span></div>
+                <div class="icon-item"><span class="icon">&#9888;&#65039;</span><span class="desc">Rogue APs (click for details)</span></div>
+                <div class="icon-item"><span class="icon">&#128309;</span><span class="desc">Bluetooth devices</span></div>
+                <div class="icon-item"><span class="icon">&#128205;</span><span class="desc">BLE beacons / APRS stations</span></div>
+            </div>
+
+            <h3>Mode Tab Icons</h3>
+            <div class="icon-grid">
+                <div class="icon-item"><span class="icon">&#128223;</span><span class="desc">Pager - POCSAG/FLEX decoder</span></div>
+                <div class="icon-item"><span class="icon">&#128225;</span><span class="desc">433MHz - Sensor decoder</span></div>
+                <div class="icon-item"><span class="icon">&#9889;</span><span class="desc">Meters - Utility meter decoder</span></div>
+                <div class="icon-item"><span class="icon">&#9992;&#65039;</span><span class="desc">Aircraft - ADS-B tracking &amp; history</span></div>
+                <div class="icon-item"><span class="icon">&#128674;</span><span class="desc">Vessels - AIS &amp; VHF DSC distress</span></div>
+                <div class="icon-item"><span class="icon">&#128251;</span><span class="desc">Spy Stations - Number stations database</span></div>
+                <div class="icon-item"><span class="icon">&#128205;</span><span class="desc">APRS - Amateur radio tracking</span></div>
+                <div class="icon-item"><span class="icon">&#128752;&#65039;</span><span class="desc">Satellite - Pass prediction</span></div>
+                <div class="icon-item"><span class="icon">&#128246;</span><span class="desc">WiFi - Network scanner</span></div>
+                <div class="icon-item"><span class="icon">&#128309;</span><span class="desc">Bluetooth - BT/BLE scanner</span></div>
+                <div class="icon-item"><span class="icon">&#128251;</span><span class="desc">Listening Post - SDR scanner</span></div>
+                <div class="icon-item"><span class="icon">&#128269;</span><span class="desc">TSCM - Counter-surveillance</span></div>
+            </div>
+        </div>
+
+        <!-- Modes Section -->
+        <div id="help-modes" class="help-section">
+            <h3>Pager Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes POCSAG and FLEX pager signals using RTL-SDR</li>
+                <li>Set frequency to local pager frequencies (common: 152-158 MHz)</li>
+                <li>Messages are displayed in real-time as they're decoded</li>
+                <li>Use presets for common pager frequencies</li>
+            </ul>
+
+            <h3>433MHz Sensor Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes wireless sensors on 433.92 MHz ISM band</li>
+                <li>Detects temperature, humidity, weather stations, tire pressure monitors</li>
+                <li>Supports many common protocols (Acurite, LaCrosse, Oregon Scientific, etc.)</li>
+                <li>Device intelligence builds profiles of recurring devices</li>
+            </ul>
+
+            <h3>Utility Meter Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes utility meter transmissions (water, gas, electric) using rtlamr</li>
+                <li>Supports ERT protocol on 912 MHz (North America) or 868 MHz (Europe)</li>
+                <li>Displays meter IDs and consumption data in real-time</li>
+                <li>Supports SCM, SCM+, IDM, NetIDM, and R900 message types</li>
+            </ul>
+
+            <h3>Aircraft (Dashboard)</h3>
+            <ul class="tip-list">
+                <li>Opens the dedicated ADS-B Dashboard for aircraft tracking</li>
+                <li>Features radar scope, map view, airband audio, and ACARS decoding</li>
+                <li>Optional history mode persists data to Postgres for long-term analysis</li>
+                <li>Access history dashboard at <code>/adsb/history</code></li>
+            </ul>
+
+            <h3>Vessels (Dashboard)</h3>
+            <ul class="tip-list">
+                <li>Opens the AIS Dashboard for maritime vessel tracking</li>
+                <li>Displays vessel name, MMSI, callsign, destination, and navigation data</li>
+                <li><strong>VHF DSC Channel 70:</strong> Monitors maritime distress frequency (156.525 MHz)</li>
+                <li>Decodes DSC messages: Distress, Urgency, Safety, and Routine calls</li>
+                <li>MMSI country identification via Maritime Identification Digits (MID)</li>
+                <li>Visual alerts for DISTRESS and URGENCY messages with map markers</li>
+            </ul>
+
+            <h3>Spy Stations</h3>
+            <ul class="tip-list">
+                <li>Database of number stations and diplomatic HF networks</li>
+                <li>Browse stations from priyom.org with frequencies and schedules</li>
+                <li>Filter by type (number/diplomatic), country, and mode</li>
+                <li>Famous stations: UVB-76 "The Buzzer", Cuban HM01, Israeli E17z</li>
+                <li>Click "Tune" to listen via Listening Post mode</li>
+            </ul>
+
+            <h3>APRS Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes APRS (Automatic Packet Reporting System) on VHF</li>
+                <li>Tracks amateur radio operators transmitting position data</li>
+                <li>Regional frequencies: 144.390 MHz (N. America), 144.800 MHz (Europe)</li>
+                <li>Uses Direwolf or multimon-ng for packet decoding</li>
+                <li>Interactive map shows station positions in real-time</li>
+            </ul>
+
+            <h3>Satellite Mode</h3>
+            <ul class="tip-list">
+                <li>Track satellites using TLE (Two-Line Element) data</li>
+                <li>Add satellites manually or fetch from Celestrak by category</li>
+                <li>Categories: Amateur, Weather, ISS, Starlink, GPS, and more</li>
+                <li>View next pass predictions with elevation and duration</li>
+            </ul>
+
+            <h3>WiFi Mode</h3>
+            <ul class="tip-list">
+                <li>Requires a WiFi adapter capable of monitor mode</li>
+                <li>Click "Enable Monitor" to put adapter in monitor mode</li>
+                <li>Scans all channels or lock to a specific channel</li>
+                <li>Detects drones by SSID patterns and manufacturer OUI</li>
+                <li>Rogue AP detection flags same SSID on multiple BSSIDs</li>
+                <li>Click network rows to target for deauth or handshake capture</li>
+            </ul>
+
+            <h3>Bluetooth Mode</h3>
+            <ul class="tip-list">
+                <li>Scans for classic Bluetooth and BLE devices</li>
+                <li>Shows device names, addresses, and signal strength</li>
+                <li>Manufacturer lookup from MAC address OUI</li>
+                <li>Radar visualization shows device proximity</li>
+            </ul>
+
+            <h3>Listening Post Mode</h3>
+            <ul class="tip-list">
+                <li>Wideband SDR scanner with spectrum visualization</li>
+                <li>Tune to any frequency supported by your SDR hardware</li>
+                <li>AM/FM/USB/LSB demodulation modes</li>
+                <li>Bookmark frequencies for quick recall</li>
+                <li>Quick tune presets for emergency and marine channels</li>
+            </ul>
+
+            <h3>TSCM Mode</h3>
+            <ul class="tip-list">
+                <li>Technical Surveillance Countermeasures sweep</li>
+                <li>Scans for unknown RF transmitters, WiFi devices, Bluetooth</li>
+                <li>Baseline comparison to detect new/anomalous devices</li>
+                <li>Threat classification: Critical, High, Medium, Low</li>
+                <li>Useful for security audits and bug sweeps</li>
+                <li><em style="color: var(--text-muted);">Note: This feature is in early development</em></li>
+            </ul>
+
+            <h3>Meshtastic Mode</h3>
+            <ul class="tip-list">
+                <li>Integrates with Meshtastic LoRa mesh network devices</li>
+                <li>Connect Heltec, T-Beam, RAK, or other compatible devices via USB</li>
+                <li>Real-time message streaming with RSSI and SNR metrics</li>
+                <li>Configure channels with encryption keys</li>
+                <li>View connected nodes and message history</li>
+                <li>Requires: Meshtastic device + <code>pip install meshtastic</code></li>
+            </ul>
+
+            <h3>Network Monitor</h3>
+            <ul class="tip-list">
+                <li>Aggregates data from multiple remote INTERCEPT agents</li>
+                <li>View all WiFi, Bluetooth, ADS-B, AIS data in one unified view</li>
+                <li>Real-time streaming via Server-Sent Events (SSE)</li>
+                <li>Location estimation using multi-agent trilateration</li>
+                <li>Manage agents at <code>/controller/manage</code></li>
+            </ul>
+        </div>
+
+        <!-- WiFi Section -->
+        <div id="help-wifi" class="help-section">
+            <h3>Monitor Mode</h3>
+            <ul class="tip-list">
+                <li><strong>Enable Monitor:</strong> Puts WiFi adapter in monitor mode for passive scanning</li>
+                <li><strong>Kill Processes:</strong> Optional - stops NetworkManager/wpa_supplicant (may drop other connections)</li>
+                <li>Some adapters rename when entering monitor mode (e.g., wlan0 &rarr; wlan0mon)</li>
+            </ul>
+
+            <h3>Handshake Capture</h3>
+            <ul class="tip-list">
+                <li>Click "Capture" on a network to start targeted handshake capture</li>
+                <li>Status panel shows capture progress and file location</li>
+                <li>Use deauth to force clients to reconnect (only on authorized networks!)</li>
+                <li>Handshake files saved to /tmp/intercept_handshake_*.cap</li>
+            </ul>
+
+            <h3>Drone Detection</h3>
+            <ul class="tip-list">
+                <li>Drones detected by SSID patterns (DJI, Parrot, Autel, etc.)</li>
+                <li>Also detected by manufacturer OUI in MAC address</li>
+                <li>Distance estimated from signal strength (approximate)</li>
+                <li>Click drone count in stats bar to see all detected drones</li>
+            </ul>
+
+            <h3>Rogue AP Detection</h3>
+            <ul class="tip-list">
+                <li>Flags networks where same SSID appears on multiple BSSIDs</li>
+                <li>Could indicate evil twin attack or legitimate multi-AP setup</li>
+                <li>Click rogue count to see which SSIDs are flagged</li>
+            </ul>
+
+            <h3>Proximity Alerts</h3>
+            <ul class="tip-list">
+                <li>Add MAC addresses to watch list for alerts when detected</li>
+                <li>Watch list persists in browser localStorage</li>
+                <li>Useful for tracking specific devices</li>
+            </ul>
+
+            <h3>Client Probe Analysis</h3>
+            <ul class="tip-list">
+                <li>Shows what networks client devices are looking for</li>
+                <li>Orange highlights indicate sensitive/private network names</li>
+                <li>Reveals user location history (home, work, hotels, airports)</li>
+                <li>Useful for security awareness and pen test reports</li>
+            </ul>
+        </div>
+
+        <!-- Tips Section -->
+        <div id="help-tips" class="help-section">
+            <h3>General Tips</h3>
+            <ul class="tip-list">
+                <li><strong>Collapsible sections:</strong> Click any section header (&nabla;) to collapse/expand</li>
+                <li><strong>Sound alerts:</strong> Toggle sound on/off in settings for each mode</li>
+                <li><strong>Export data:</strong> Use export buttons to save captured data as JSON</li>
+                <li><strong>Device Intelligence:</strong> Tracks device patterns over time</li>
+                <li><strong>Theme toggle:</strong> Click the theme button in header to switch dark/light mode</li>
+                <li><strong>Settings:</strong> Click the gear icon in the header to access settings</li>
+                <li><strong>Offline mode:</strong> Enable in Settings to use local assets without internet</li>
+            </ul>
+
+            <h3>Keyboard Shortcuts</h3>
+            <ul class="tip-list">
+                <li><strong>F1</strong> - Open this help page</li>
+                <li><strong>?</strong> - Open help (when not typing in a field)</li>
+                <li><strong>Escape</strong> - Close help and modal dialogs</li>
+            </ul>
+
+            <h3>Requirements</h3>
+            <ul class="tip-list">
+                <li><strong>Pager:</strong> RTL-SDR, rtl_fm, multimon-ng</li>
+                <li><strong>433MHz Sensors:</strong> RTL-SDR, rtl_433</li>
+                <li><strong>Utility Meters:</strong> RTL-SDR, rtl_tcp, rtlamr</li>
+                <li><strong>Aircraft (ADS-B):</strong> RTL-SDR, dump1090 or rtl_adsb</li>
+                <li><strong>Aircraft (ACARS):</strong> Second RTL-SDR, acarsdec</li>
+                <li><strong>Vessels (AIS):</strong> RTL-SDR, AIS-catcher</li>
+                <li><strong>APRS:</strong> RTL-SDR, direwolf or multimon-ng</li>
+                <li><strong>Satellite:</strong> Internet for Celestrak (optional), skyfield</li>
+                <li><strong>WiFi:</strong> Monitor-mode adapter, aircrack-ng suite</li>
+                <li><strong>Bluetooth:</strong> Bluetooth adapter, bluez (hcitool/bluetoothctl)</li>
+                <li><strong>Listening Post:</strong> RTL-SDR or SoapySDR-compatible hardware</li>
+                <li><strong>TSCM:</strong> WiFi adapter, Bluetooth adapter, RTL-SDR (all optional)</li>
+                <li>Run as root/sudo for full hardware access</li>
+            </ul>
+
+            <h3>Legal Notice</h3>
+            <ul class="tip-list">
+                <li>Only use on networks and devices you own or have authorization to test</li>
+                <li>Passive monitoring may be legal; active attacks require authorization</li>
+                <li>Check local laws regarding radio frequency monitoring</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+// Help modal functions - defined here so all pages have them
+(function() {
+    // Only define if not already defined (index.html defines its own)
+    if (typeof window.showHelp === 'undefined') {
+        window.showHelp = function() {
+            document.getElementById('helpModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        };
+    }
+
+    if (typeof window.hideHelp === 'undefined') {
+        window.hideHelp = function() {
+            document.getElementById('helpModal').classList.remove('active');
+            document.body.style.overflow = '';
+        };
+    }
+
+    if (typeof window.switchHelpTab === 'undefined') {
+        window.switchHelpTab = function(tab) {
+            document.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
+            document.querySelector('.help-tab[data-tab="' + tab + '"]').classList.add('active');
+            document.getElementById('help-' + tab).classList.add('active');
+        };
+    }
+
+    // Keyboard shortcuts for help (only add once)
+    if (!window._helpKeyboardSetup) {
+        window._helpKeyboardSetup = true;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') hideHelp();
+            // Open help with F1 or ? key (when not typing in an input)
+            var helpModal = document.getElementById('helpModal');
+            if (helpModal && (e.key === 'F1' || (e.key === '?' && !e.target.matches('input, textarea, select'))) && !helpModal.classList.contains('active')) {
+                e.preventDefault();
+                showHelp();
+            }
+        });
+    }
+})();
+</script>

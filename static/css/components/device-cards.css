@@ -53,7 +53,7 @@
 }
 
 .device-name {
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: var(--font-sans);
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary, #e0e0e0);
@@ -67,7 +67,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 
@@ -84,7 +84,7 @@
    PROTOCOL BADGES
    ============================================ */
 .signal-proto-badge.device-protocol {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
@@ -100,7 +100,7 @@
 .device-heuristic-badge {
     display: inline-flex;
     align-items: center;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 500;
     text-transform: uppercase;
@@ -159,7 +159,7 @@
 }
 
 .rssi-current {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary, #e0e0e0);
@@ -186,13 +186,13 @@
 }
 
 .rssi-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 500;
 }
 
 .rssi-current-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 500;
     margin-left: 6px;
@@ -221,7 +221,7 @@
 }
 
 .device-range-band .range-label {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     font-size: 11px;
     font-weight: 600;
     color: var(--range-color);
@@ -230,13 +230,13 @@
 }
 
 .device-range-band .range-estimate {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim, #666);
 }
 
 .device-range-band .range-confidence {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim, #666);
     padding: 1px 4px;
@@ -262,7 +262,7 @@
 }
 
 .device-manufacturer .mfr-name {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
 }
 
 /* ============================================
@@ -280,7 +280,7 @@
     display: flex;
     align-items: center;
     gap: 3px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .device-seen-count .seen-icon {
@@ -289,7 +289,7 @@
 }
 
 .device-timestamp {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 /* ============================================
@@ -302,7 +302,7 @@
 }
 
 .device-uuid {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     padding: 2px 6px;
     background: var(--bg-tertiary, #1a1a1a);
@@ -342,7 +342,7 @@
 }
 
 .heuristic-item .heuristic-status {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
 }
@@ -426,7 +426,7 @@
 }
 
 .message-card-title {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary, #e0e0e0);
@@ -440,7 +440,7 @@
 }
 
 .message-card-details {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim, #666);
     margin-top: 4px;
@@ -476,7 +476,7 @@
 }
 
 .message-action-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
@@ -623,7 +623,7 @@
 }
 
 .signal-details-modal-subtitle {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-dim, #666);
 }
@@ -635,7 +635,7 @@
 }
 
 .signal-details-copy-addr-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 8px 16px;
     background: var(--bg-secondary, #252525);
@@ -677,7 +677,7 @@
 }
 
 .modal-section-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -698,7 +698,7 @@
 }
 
 .modal-rssi-large {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 36px;
     font-weight: 700;
     color: var(--accent-cyan, #00d4ff);
@@ -744,7 +744,7 @@
 }
 
 .modal-signal-stats .stat-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary, #e0e0e0);
@@ -778,7 +778,7 @@
 }
 
 .modal-info-grid .info-value.mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--accent-cyan, #00d4ff);
 }
 
@@ -790,7 +790,7 @@
 }
 
 .modal-uuid {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 4px 8px;
     background: var(--bg-secondary, #1a1a1a);
@@ -822,7 +822,7 @@
 }
 
 .heuristic-indicator {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--text-dim, #666);

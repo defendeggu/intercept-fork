@@ -2,6 +2,68 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.13.1] - 2026-02-04
+
+### Added
+- **UI Overhaul** - Revamped styling with slate/cyan theme
+  - Switched app font to JetBrains Mono
+  - Global navigation bar across all dashboards
+  - Cyan-tinted map tiles as default
+- **Signal Scanner Rewrite** - Switched to rtl_power sweep for better coverage
+  - SNR column added to signal hits table
+  - SNR threshold control for power scan
+  - Improved sweep progress tracking and stability
+  - Frequency-based sweep display with range syncing
+- **Listening Post Audio** - WAV streaming with retry and fallback
+  - WebSocket audio fallback for listening
+  - User-initiated audio play prompt
+  - Audio pipeline restart for fresh stream headers
+
+### Fixed
+- WiFi connected clients panel now filters to selected AP instead of showing all clients
+- USB device contention when starting audio pipeline
+- Dual scrollbar issue on main dashboard
+- Controls bar alignment in dashboard pages
+- Mode query routing from dashboard nav
+
+---
+
+## [2.13.0] - 2026-02-04
+
+### Added
+- **WiFi Client Display** - Connected clients shown in AP detail drawer
+  - Real-time client updates via SSE streaming
+  - Probed SSID badges for connected clients
+  - Signal strength indicators and vendor identification
+- **Help Modal** - Keyboard shortcuts reference system
+- **Main Dashboard Button** - Quick navigation from any page
+- **Settings Modal** - Accessible from all dashboards
+
+### Changed
+- Dashboard CSS improvements and consistency fixes
+
+---
+
+## [2.12.1] - 2026-02-02
+
+### Added
+- **SDR Device Registry** - Prevents decoder conflicts between concurrent modes
+- **SDR Device Status Panel** - Shows connected SDR devices with ADS-B Bias-T toggle
+- **Real-time Doppler Tracking** - ISS SSTV reception with Doppler correction
+- **TCP Connection Support** - Meshtastic devices connectable over TCP
+- **Shared Observer Location** - Configurable shared location with auto-start options
+- **slowrx Source Build** - Fallback build for Debian/Ubuntu
+
+### Fixed
+- SDR device type not synced on page refresh
+- Meshtastic connection type not restored on page refresh
+- WiFi deep scan polling on agent with normalized scan_type value
+- Auto-detect RTL-SDR drivers and blacklist instead of prompting
+- TPMS pressure field mappings for 433MHz sensor display
+- Agent capabilities cache invalidation after monitor mode toggle
+
+---
+
 ## [2.12.0] - 2026-01-29
 
 ### Added

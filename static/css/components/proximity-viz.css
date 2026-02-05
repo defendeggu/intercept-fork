@@ -14,10 +14,18 @@
 
 .radar-device {
     transition: transform 0.2s ease;
+    transform-origin: center center;
+    cursor: pointer;
 }
 
 .radar-device:hover {
-    transform: scale(1.3);
+    transform: scale(1.2);
+}
+
+/* Invisible larger hit area to prevent hover flicker */
+.radar-device-hitarea {
+    fill: transparent;
+    pointer-events: all;
 }
 
 .radar-dot-pulse circle:first-child {

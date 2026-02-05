@@ -46,7 +46,7 @@
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
@@ -88,7 +88,7 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: pointer;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
     transition: all 0.15s ease;
@@ -143,7 +143,7 @@
 }
 
 .mesh-sidebar-toggle-text {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
@@ -242,14 +242,14 @@
 }
 
 .mesh-strip-status-text {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
     text-transform: uppercase;
 }
 
 .mesh-strip-select {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 4px 8px;
     background: var(--bg-primary);
@@ -260,7 +260,7 @@
 }
 
 .mesh-strip-input {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 4px 8px;
     background: var(--bg-primary);
@@ -281,7 +281,7 @@
 }
 
 .mesh-strip-btn {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 5px 12px;
     border: none;
@@ -325,7 +325,7 @@
 }
 
 .mesh-strip-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -349,7 +349,7 @@
 }
 
 .mesh-strip-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 8px;
     color: var(--text-dim);
     text-transform: uppercase;
@@ -408,7 +408,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -421,7 +421,7 @@
 .mesh-map-stats {
     display: flex;
     gap: 16px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
 }
@@ -459,7 +459,7 @@
 }
 
 .mesh-map .leaflet-popup-content {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     margin: 10px 12px;
 }
@@ -479,7 +479,7 @@
         0 0 20px 8px rgba(0, 255, 255, 0.7),  /* Strong outer glow */
         inset 0 0 8px rgba(255, 255, 255, 0.3);  /* Inner highlight */
     color: #000;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: bold;
     text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
@@ -573,7 +573,7 @@
 
 .mesh-node-value {
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .mesh-node-id {
@@ -612,7 +612,7 @@
 }
 
 .mesh-channel-index {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     color: var(--text-dim);
@@ -623,7 +623,7 @@
 }
 
 .mesh-channel-name {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 500;
     color: var(--text-primary);
@@ -640,7 +640,7 @@
 }
 
 .mesh-channel-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 8px;
     font-weight: 600;
     text-transform: uppercase;
@@ -715,7 +715,7 @@
 }
 
 .mesh-messages-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
@@ -735,7 +735,7 @@
 }
 
 .mesh-messages-filter select {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     padding: 6px 10px;
     background: var(--bg-primary);
@@ -800,7 +800,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 
@@ -829,7 +829,7 @@
 }
 
 .mesh-message-channel {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     background: var(--bg-secondary);
     padding: 2px 6px;
     border-radius: 3px;
@@ -838,7 +838,7 @@
 
 .mesh-message-time {
     color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .mesh-message-body {
@@ -849,7 +849,7 @@
 }
 
 .mesh-message-body.app-type {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
     background: var(--bg-secondary);
@@ -870,7 +870,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
 }
 
@@ -921,7 +921,7 @@
 }
 
 .mesh-message-status {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     padding: 2px 6px;
     border-radius: 3px;
@@ -986,7 +986,7 @@
 
 #meshChannelModal input[type="text"],
 #meshChannelModal select {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     padding: 10px;
     background: var(--bg-primary);
@@ -1020,7 +1020,7 @@
 }
 
 .mesh-compose-channel {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 6px 10px;
     background: var(--bg-primary);
@@ -1037,7 +1037,7 @@
 }
 
 .mesh-compose-to {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     padding: 6px 10px;
     background: var(--bg-primary);
@@ -1064,7 +1064,7 @@
 
 .mesh-compose-input {
     flex: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     padding: 10px 12px;
     background: var(--bg-primary);
@@ -1111,7 +1111,7 @@
 }
 
 .mesh-compose-hint {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     margin-top: 6px;
@@ -1232,7 +1232,7 @@
     border: none;
     border-radius: 4px;
     color: #000;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1289,7 +1289,7 @@
 }
 
 .mesh-traceroute-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     color: var(--text-dim);
@@ -1321,7 +1321,7 @@
 }
 
 .mesh-traceroute-hop-node {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--accent-cyan);
@@ -1329,14 +1329,14 @@
 }
 
 .mesh-traceroute-hop-id {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
     margin-bottom: 6px;
 }
 
 .mesh-traceroute-snr {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     padding: 2px 8px;
@@ -1371,7 +1371,7 @@
 
 .mesh-traceroute-timestamp {
     margin-top: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
     text-align: right;
@@ -1402,7 +1402,7 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1426,7 +1426,7 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     cursor: pointer;
@@ -1459,7 +1459,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
@@ -1494,7 +1494,7 @@
 }
 
 .mesh-chart-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     fill: var(--text-dim);
 }
@@ -1525,7 +1525,7 @@
 }
 
 .mesh-network-node-id {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     color: var(--accent-cyan);
@@ -1553,13 +1553,13 @@
 }
 
 .mesh-network-neighbor-id {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-secondary);
 }
 
 .mesh-network-neighbor-snr {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     padding: 2px 6px;
@@ -1592,7 +1592,7 @@
 .mesh-badge {
     display: inline-block;
     padding: 3px 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
     border-radius: 10px;

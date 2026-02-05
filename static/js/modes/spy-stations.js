@@ -84,7 +84,7 @@ const SpyStations = (function() {
             modeContainer.innerHTML = modes.map(m => `
                 <label class="inline-checkbox">
                     <input type="checkbox" data-mode="${m}" checked onchange="SpyStations.applyFilters()">
-                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px;">${m}</span>
+                    <span style="font-family: 'Space Mono', monospace; font-size: 10px;">${m}</span>
                 </label>
             `).join('');
         }

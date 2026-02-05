@@ -8,7 +8,7 @@ const Settings = {
         'offline.enabled': false,
         'offline.assets_source': 'cdn',
         'offline.fonts_source': 'cdn',
-        'offline.tile_provider': 'cartodb_dark',
+        'offline.tile_provider': 'cartodb_dark_cyan',
         'offline.tile_server_url': ''
     },
 
@@ -23,6 +23,14 @@ const Settings = {
             url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png',
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'abcd'
+        },
+        cartodb_dark_cyan: {
+            url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            options: {
+                className: 'tile-layer-cyan'
+            }
         },
         cartodb_light: {
             url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
@@ -213,7 +221,8 @@ const Settings = {
         const config = this.getTileConfig();
         const options = {
             attribution: config.attribution,
-            maxZoom: 19
+            maxZoom: 19,
+            ...(config.options || {})
         };
         if (config.subdomains) {
             options.subdomains = config.subdomains;
@@ -325,12 +334,12 @@ const Settings = {
             window.map,
             window.leafletMap,
             window.aprsMap,
-            window.adsbMap,
             window.radarMap,
             window.vesselMap,
             window.groundMap,
             window.groundTrackMap,
-            window.meshMap
+            window.meshMap,
+            window.issMap
         ].filter(m => m && typeof m.eachLayer === 'function');
 
         // Combine with registered maps, removing duplicates
@@ -351,7 +360,8 @@ const Settings = {
             // Add new tile layer
             const options = {
                 attribution: config.attribution,
-                maxZoom: 19
+                maxZoom: 19,
+                ...(config.options || {})
             };
             if (config.subdomains) {
                 options.subdomains = config.subdomains;
@@ -584,55 +594,90 @@ function loadObserverLocation() {
 }
 
 /**
- * Detect location using browser GPS
+ * Detect location using gpsd (USB GPS) or browser geolocation as fallback
  */
 function detectLocationGPS(btn) {
     const latInput = document.getElementById('observerLatInput');
     const lonInput = document.getElementById('observerLonInput');
 
-    if (!navigator.geolocation) {
-        if (typeof showNotification === 'function') {
-            showNotification('Location', 'GPS not available in this browser');
-        } else {
-            alert('GPS not available in this browser');
-        }
-        return;
+    // Show loading state with visual feedback
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="detecting-spinner"></span> Detecting...';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+
+    // Helper to restore button state
+    function restoreButton() {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.style.opacity = '';
     }
 
-    // Show loading state
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span style="opacity: 0.7;">Detecting...</span>';
-    btn.disabled = true;
+    // Helper to set location values
+    function setLocation(lat, lon, source) {
+        if (latInput) latInput.value = parseFloat(lat).toFixed(4);
+        if (lonInput) lonInput.value = parseFloat(lon).toFixed(4);
+        restoreButton();
+        if (typeof showNotification === 'function') {
+            showNotification('Location', `Coordinates set from ${source}`);
+        }
+    }
 
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            if (latInput) latInput.value = pos.coords.latitude.toFixed(4);
-            if (lonInput) lonInput.value = pos.coords.longitude.toFixed(4);
-
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-
-            if (typeof showNotification === 'function') {
-                showNotification('Location', 'GPS coordinates detected');
-            }
-        },
-        (err) => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-
-            let message = 'Failed to get location';
-            if (err.code === 1) message = 'Location access denied';
-            else if (err.code === 2) message = 'Location unavailable';
-            else if (err.code === 3) message = 'Location request timed out';
-
-            if (typeof showNotification === 'function') {
-                showNotification('Location', message);
+    // First, try gpsd (USB GPS device)
+    fetch('/gps/position')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok' && data.position && data.position.latitude != null) {
+                // Got valid position from gpsd
+                setLocation(data.position.latitude, data.position.longitude, 'GPS device');
+            } else if (data.status === 'waiting') {
+                // gpsd connected but no fix yet - show message and try browser
+                if (typeof showNotification === 'function') {
+                    showNotification('GPS', 'GPS device connected but no fix yet. Trying browser location...');
+                }
+                useBrowserGeolocation();
             } else {
-                alert(message);
+                // gpsd not available, try browser geolocation
+                useBrowserGeolocation();
             }
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+        })
+        .catch(() => {
+            // gpsd request failed, try browser geolocation
+            useBrowserGeolocation();
+        });
+
+    // Fallback to browser geolocation
+    function useBrowserGeolocation() {
+        if (!navigator.geolocation) {
+            restoreButton();
+            if (typeof showNotification === 'function') {
+                showNotification('Location', 'No GPS available (gpsd not running, browser GPS unavailable)');
+            } else {
+                alert('No GPS available');
+            }
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setLocation(pos.coords.latitude, pos.coords.longitude, 'browser');
+            },
+            (err) => {
+                restoreButton();
+                let message = 'Failed to get location';
+                if (err.code === 1) message = 'Location access denied';
+                else if (err.code === 2) message = 'Location unavailable';
+                else if (err.code === 3) message = 'Location request timed out';
+
+                if (typeof showNotification === 'function') {
+                    showNotification('Location', message);
+                } else {
+                    alert(message);
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
 }
 
 /**
@@ -778,11 +823,11 @@ function renderUpdateStatus(data) {
             <div style="display: grid; gap: 8px; font-size: 12px;">
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: var(--text-dim);">Current Version</span>
-                    <span style="font-family: 'JetBrains Mono', monospace; color: var(--text-primary);">v${data.current_version}</span>
+                    <span style="font-family: 'Space Mono', monospace; color: var(--text-primary);">v${data.current_version}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: var(--text-dim);">Latest Version</span>
-                    <span style="font-family: 'JetBrains Mono', monospace; color: ${data.update_available ? 'var(--accent-green)' : 'var(--text-primary)'};">v${data.latest_version}</span>
+                    <span style="font-family: 'Space Mono', monospace; color: ${data.update_available ? 'var(--accent-green)' : 'var(--text-primary)'};">v${data.latest_version}</span>
                 </div>
                 ${data.last_check ? `
                 <div style="display: flex; justify-content: space-between;">

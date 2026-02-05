@@ -159,7 +159,7 @@ const SSTV = (function() {
     /**
      * Initialize Leaflet map for ISS tracking
      */
-    function initMap() {
+    async function initMap() {
         const mapContainer = document.getElementById('sstvIssMap');
         if (!mapContainer || issMap) return;
 
@@ -173,14 +173,19 @@ const SSTV = (function() {
             attributionControl: false,
             worldCopyJump: true
         });
+        window.issMap = issMap;
 
         // Add tile layer using settings manager if available
-        if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+        if (typeof Settings !== 'undefined') {
+            // Wait for settings to load from server before applying tiles
+            await Settings.init();
             Settings.createTileLayer().addTo(issMap);
+            Settings.registerMap(issMap);
         } else {
             // Fallback to dark theme tiles
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19
+                maxZoom: 19,
+                className: 'tile-layer-cyan'
             }).addTo(issMap);
         }
 

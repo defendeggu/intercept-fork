@@ -7,10 +7,43 @@ with existing RTL-SDR installations. No SoapySDR dependency required.
 
 from __future__ import annotations
 
+import logging
+import subprocess
 from typing import Optional
 
 from .base import CommandBuilder, SDRCapabilities, SDRDevice, SDRType
 from utils.dependencies import get_tool_path
+
+logger = logging.getLogger('intercept.sdr.rtlsdr')
+
+
+def _get_dump1090_bias_t_flag(dump1090_path: str) -> Optional[str]:
+    """Detect the correct bias-t flag for the installed dump1090 variant.
+
+    Different dump1090 forks use different flags:
+    - dump1090-fa, readsb: --enable-biast (no hyphen before 't')
+    - dump1090-mutability, original dump1090: no bias-t support
+
+    Returns the correct flag string or None if bias-t is not supported.
+    """
+    try:
+        result = subprocess.run(
+            [dump1090_path, '--help'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        help_text = result.stdout + result.stderr
+
+        # Check for dump1090-fa/readsb style flag (no hyphen)
+        if '--enable-biast' in help_text:
+            return '--enable-biast'
+
+        # No bias-t support found
+        return None
+    except Exception as e:
+        logger.warning(f"Could not detect dump1090 bias-t support: {e}")
+        return None
 
 
 class RTLSDRCommandBuilder(CommandBuilder):
@@ -113,7 +146,14 @@ class RTLSDRCommandBuilder(CommandBuilder):
             cmd.extend(['--gain', str(int(gain))])
 
         if bias_t:
-            cmd.extend(['--enable-bias-t'])
+            bias_t_flag = _get_dump1090_bias_t_flag(dump1090_path)
+            if bias_t_flag:
+                cmd.append(bias_t_flag)
+            else:
+                logger.warning(
+                    f"Bias-t requested but {dump1090_path} does not support it. "
+                    "Consider using dump1090-fa or readsb for bias-t support."
+                )
 
         return cmd
 

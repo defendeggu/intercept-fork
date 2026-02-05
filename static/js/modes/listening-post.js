@@ -15,6 +15,11 @@ let scannerCycles = 0;
 let scannerStartFreq = 118;
 let scannerEndFreq = 137;
 let scannerSignalActive = false;
+let lastScanProgress = null;
+let scannerTotalSteps = 0;
+let scannerMethod = null;
+let scannerStepKhz = 25;
+let lastScanFreq = null;
 
 // Audio state
 let isAudioPlaying = false;
@@ -26,6 +31,9 @@ const MAX_AUDIO_RECONNECT = 3;
 let audioWebSocket = null;
 let audioQueue = [];
 let isWebSocketAudio = false;
+let audioFetchController = null;
+let audioUnlockRequested = false;
+let scannerSnrThreshold = 8;
 
 // Visualizer state
 let visualizerContext = null;
@@ -152,6 +160,7 @@ function startScanner() {
     const dwellSelect = document.getElementById('radioScanDwell');
     const dwell = dwellSelect ? parseInt(dwellSelect.value) : 10;
     const device = getSelectedDevice();
+    const snrThreshold = scannerSnrThreshold || 12;
 
     // Check if using agent mode
     const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
@@ -177,6 +186,10 @@ function startScanner() {
     scannerEndFreq = endFreq;
     scannerFreqsScanned = 0;
     scannerCycles = 0;
+    lastScanProgress = null;
+    scannerTotalSteps = Math.max(1, Math.round(((endFreq - startFreq) * 1000) / step));
+    scannerStepKhz = step;
+    lastScanFreq = null;
 
     // Update sidebar display
     updateScannerDisplay('STARTING...', 'var(--accent-orange)');
@@ -213,7 +226,9 @@ function startScanner() {
             gain: gain,
             dwell_time: dwell,
             device: device,
-            bias_t: typeof getBiasTEnabled === 'function' ? getBiasTEnabled() : false
+            bias_t: typeof getBiasTEnabled === 'function' ? getBiasTEnabled() : false,
+            snr_threshold: snrThreshold,
+            scan_method: 'power'
         })
     })
     .then(r => r.json())
@@ -226,6 +241,30 @@ function startScanner() {
             isScannerRunning = true;
             isScannerPaused = false;
             scannerSignalActive = false;
+            scannerMethod = (scanResult.config && scanResult.config.scan_method) ? scanResult.config.scan_method : 'power';
+            if (scanResult.config) {
+                const cfgStart = parseFloat(scanResult.config.start_freq);
+                const cfgEnd = parseFloat(scanResult.config.end_freq);
+                const cfgStep = parseFloat(scanResult.config.step);
+                if (Number.isFinite(cfgStart)) scannerStartFreq = cfgStart;
+                if (Number.isFinite(cfgEnd)) scannerEndFreq = cfgEnd;
+                if (Number.isFinite(cfgStep)) scannerStepKhz = cfgStep;
+                scannerTotalSteps = Math.max(1, Math.round(((scannerEndFreq - scannerStartFreq) * 1000) / (scannerStepKhz || 1)));
+
+                const startInput = document.getElementById('radioScanStart');
+                if (startInput && Number.isFinite(cfgStart)) startInput.value = cfgStart.toFixed(3);
+                const endInput = document.getElementById('radioScanEnd');
+                if (endInput && Number.isFinite(cfgEnd)) endInput.value = cfgEnd.toFixed(3);
+
+                const rangeStart = document.getElementById('scannerRangeStart');
+                if (rangeStart && Number.isFinite(cfgStart)) rangeStart.textContent = cfgStart.toFixed(1);
+                const rangeEnd = document.getElementById('scannerRangeEnd');
+                if (rangeEnd && Number.isFinite(cfgEnd)) rangeEnd.textContent = cfgEnd.toFixed(1);
+                const mainRangeStart = document.getElementById('mainRangeStart');
+                if (mainRangeStart && Number.isFinite(cfgStart)) mainRangeStart.textContent = cfgStart.toFixed(1) + ' MHz';
+                const mainRangeEnd = document.getElementById('mainRangeEnd');
+                if (mainRangeEnd && Number.isFinite(cfgEnd)) mainRangeEnd.textContent = cfgEnd.toFixed(1) + ' MHz';
+            }
 
             // Update controls (with null checks)
             const startBtn = document.getElementById('scannerStartBtn');
@@ -288,6 +327,12 @@ function stopScanner() {
             isScannerPaused = false;
             scannerSignalActive = false;
             currentSignalLevel = 0;
+            lastScanProgress = null;
+            scannerTotalSteps = 0;
+            scannerMethod = null;
+            scannerCycles = 0;
+            scannerFreqsScanned = 0;
+            lastScanFreq = null;
 
             // Re-enable listen button (will be in local mode after stop)
             updateListenButtonState(false);
@@ -553,6 +598,13 @@ function handleScannerEvent(data) {
         case 'log':
             if (data.entry && data.entry.type === 'scan_cycle') {
                 scannerCycles++;
+                lastScanProgress = null;
+                lastScanFreq = null;
+                if (scannerTotalSteps > 0) {
+                    scannerFreqsScanned = scannerCycles * scannerTotalSteps;
+                    const freqsEl = document.getElementById('mainFreqsScanned');
+                    if (freqsEl) freqsEl.textContent = scannerFreqsScanned;
+                }
                 const cyclesEl = document.getElementById('mainScanCycles');
                 if (cyclesEl) cyclesEl.textContent = scannerCycles;
             }
@@ -564,7 +616,89 @@ function handleScannerEvent(data) {
 }
 
 function handleFrequencyUpdate(data) {
-    const freqStr = data.frequency.toFixed(3);
+    if (data.range_start !== undefined && data.range_end !== undefined) {
+        const newStart = parseFloat(data.range_start);
+        const newEnd = parseFloat(data.range_end);
+        if (Number.isFinite(newStart) && Number.isFinite(newEnd) && newEnd > newStart) {
+            scannerStartFreq = newStart;
+            scannerEndFreq = newEnd;
+            scannerTotalSteps = Math.max(1, Math.round(((scannerEndFreq - scannerStartFreq) * 1000) / (scannerStepKhz || 1)));
+
+            const rangeStart = document.getElementById('scannerRangeStart');
+            if (rangeStart) rangeStart.textContent = newStart.toFixed(1);
+            const rangeEnd = document.getElementById('scannerRangeEnd');
+            if (rangeEnd) rangeEnd.textContent = newEnd.toFixed(1);
+            const mainRangeStart = document.getElementById('mainRangeStart');
+            if (mainRangeStart) mainRangeStart.textContent = newStart.toFixed(1) + ' MHz';
+            const mainRangeEnd = document.getElementById('mainRangeEnd');
+            if (mainRangeEnd) mainRangeEnd.textContent = newEnd.toFixed(1) + ' MHz';
+
+            const startInput = document.getElementById('radioScanStart');
+            if (startInput && document.activeElement !== startInput) {
+                startInput.value = newStart.toFixed(3);
+            }
+            const endInput = document.getElementById('radioScanEnd');
+            if (endInput && document.activeElement !== endInput) {
+                endInput.value = newEnd.toFixed(3);
+            }
+        }
+    }
+
+    const range = scannerEndFreq - scannerStartFreq;
+    if (range <= 0) {
+        return;
+    }
+
+    const effectiveRange = scannerEndFreq - scannerStartFreq;
+    if (effectiveRange <= 0) {
+        return;
+    }
+
+    const hasProgress = data.progress !== undefined && Number.isFinite(data.progress);
+    const freqValue = (typeof data.frequency === 'number' && Number.isFinite(data.frequency))
+        ? data.frequency
+        : null;
+    const stepMhz = Math.max(0.001, (scannerStepKhz || 1) / 1000);
+    const freqTolerance = stepMhz * 2;
+
+    let progressValue = null;
+    if (hasProgress) {
+        progressValue = data.progress;
+        const clamped = Math.max(0, Math.min(1, progressValue));
+        if (lastScanProgress !== null && clamped < lastScanProgress) {
+            const isCycleReset = lastScanProgress > 0.85 && clamped < 0.15;
+            if (!isCycleReset) {
+                return;
+            }
+        }
+        lastScanProgress = clamped;
+    } else if (freqValue !== null) {
+        if (lastScanFreq !== null && (freqValue + freqTolerance) < lastScanFreq) {
+            const nearEnd = lastScanFreq >= (scannerEndFreq - freqTolerance * 2);
+            const nearStart = freqValue <= (scannerStartFreq + freqTolerance * 2);
+            if (!nearEnd || !nearStart) {
+                return;
+            }
+        }
+        lastScanFreq = freqValue;
+        progressValue = (freqValue - scannerStartFreq) / effectiveRange;
+        lastScanProgress = Math.max(0, Math.min(1, progressValue));
+    } else {
+        if (scannerMethod === 'power') {
+            return;
+        }
+        progressValue = 0;
+        lastScanProgress = 0;
+    }
+
+    const clampedProgress = Math.max(0, Math.min(1, progressValue));
+
+    const displayFreq = (freqValue !== null
+        && freqValue >= (scannerStartFreq - freqTolerance)
+        && freqValue <= (scannerEndFreq + freqTolerance))
+        ? freqValue
+        : scannerStartFreq + (clampedProgress * effectiveRange);
+    const freqStr = displayFreq.toFixed(3);
 
     const currentFreq = document.getElementById('scannerCurrentFreq');
     if (currentFreq) currentFreq.textContent = freqStr + ' MHz';
@@ -572,17 +706,25 @@ function handleFrequencyUpdate(data) {
     const mainFreq = document.getElementById('mainScannerFreq');
     if (mainFreq) mainFreq.textContent = freqStr;
 
+    if (scannerTotalSteps > 0) {
+        const stepSize = Math.max(1, scannerStepKhz || 1);
+        const stepIndex = Math.max(0, Math.round(((displayFreq - scannerStartFreq) * 1000) / stepSize));
+        const nextScanned = (scannerCycles * scannerTotalSteps)
+            + Math.min(scannerTotalSteps, stepIndex);
+        scannerFreqsScanned = Math.max(scannerFreqsScanned, nextScanned);
+        const freqsEl = document.getElementById('mainFreqsScanned');
+        if (freqsEl) freqsEl.textContent = scannerFreqsScanned;
+    }
+
     // Update progress bar
-    const progress = ((data.frequency - scannerStartFreq) / (scannerEndFreq - scannerStartFreq)) * 100;
+    const progress = Math.max(0, Math.min(100, clampedProgress * 100));
     const progressBar = document.getElementById('scannerProgressBar');
     if (progressBar) progressBar.style.width = Math.max(0, Math.min(100, progress)) + '%';
 
     const mainProgressBar = document.getElementById('mainProgressBar');
     if (mainProgressBar) mainProgressBar.style.width = Math.max(0, Math.min(100, progress)) + '%';
 
-    scannerFreqsScanned++;
-    const freqsEl = document.getElementById('mainFreqsScanned');
-    if (freqsEl) freqsEl.textContent = scannerFreqsScanned;
+    // freqs scanned updated via progress above
 
     // Update level meter if present
     if (data.level !== undefined) {
@@ -613,6 +755,15 @@ function handleFrequencyUpdate(data) {
 }
 
 function handleSignalFound(data) {
+    // Only treat signals as "interesting" if they exceed threshold and match modulation
+    const threshold = data.threshold !== undefined ? data.threshold : signalLevelThreshold;
+    if (data.level !== undefined && threshold !== undefined && data.level < threshold) {
+        return;
+    }
+    if (data.modulation && currentModulation && data.modulation !== currentModulation) {
+        return;
+    }
+
     scannerSignalCount++;
     scannerSignalActive = true;
     const freqStr = data.frequency.toFixed(3);
@@ -650,6 +801,10 @@ function handleSignalFound(data) {
             const streamUrl = getStreamUrl(data.frequency, data.modulation);
             console.log('[SCANNER] Starting audio for signal:', data.frequency, 'MHz');
             scannerAudio.src = streamUrl;
+            scannerAudio.preload = 'auto';
+            scannerAudio.autoplay = true;
+            scannerAudio.muted = false;
+            scannerAudio.load();
             // Apply current volume from knob
             const volumeKnob = document.getElementById('radioVolumeKnob');
             if (volumeKnob && volumeKnob._knob) {
@@ -658,7 +813,7 @@ function handleSignalFound(data) {
                 const knobValue = parseFloat(volumeKnob.dataset.value) || 80;
                 scannerAudio.volume = knobValue / 100;
             }
-            scannerAudio.play().catch(e => console.warn('[SCANNER] Audio autoplay blocked:', e));
+            attemptAudioPlay(scannerAudio);
             // Initialize audio visualizer to feed signal levels to synthesizer
             initAudioVisualizer();
         }
@@ -830,11 +985,15 @@ function addSignalHit(data) {
     }
 
     const mod = data.modulation || 'fm';
+    const snr = data.snr != null ? data.snr : null;
+    const snrText = snr != null ? `${snr > 0 ? '+' : ''}${snr.toFixed(1)} dB` : '---';
+    const snrColor = snr != null ? (snr >= 10 ? 'var(--accent-green)' : snr >= 3 ? 'var(--accent-cyan)' : 'var(--accent-orange, #f0a030)') : 'var(--text-muted)';
     const row = document.createElement('tr');
     row.style.borderBottom = '1px solid var(--border-color)';
     row.innerHTML = `
         <td style="padding: 4px; color: var(--text-secondary); font-size: 9px;">${timestamp}</td>
         <td style="padding: 4px; color: var(--accent-green); font-weight: bold;">${data.frequency.toFixed(3)}</td>
+        <td style="padding: 4px; color: ${snrColor}; font-weight: bold; font-size: 9px;">${snrText}</td>
         <td style="padding: 4px; color: var(--text-secondary);">${mod.toUpperCase()}</td>
         <td style="padding: 4px; text-align: center;">
             <button class="preset-btn" onclick="tuneToFrequency(${data.frequency}, '${mod}')" style="padding: 2px 6px; font-size: 9px; background: var(--accent-green); border: none; color: #000; cursor: pointer; border-radius: 3px;">Listen</button>
@@ -1293,7 +1452,7 @@ function drawAudioVisualizer() {
             }
 
             ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.font = '8px JetBrains Mono';
+            ctx.font = '8px Space Mono';
             ctx.fillText('0', 2, canvas.height - 2);
             ctx.fillText('4kHz', canvas.width / 4, canvas.height - 2);
             ctx.fillText('8kHz', canvas.width / 2, canvas.height - 2);
@@ -1700,14 +1859,13 @@ function stopSynthesizer() {
 function getStreamUrl(freq, mod) {
     const frequency = freq || parseFloat(document.getElementById('radioScanStart')?.value) || 118.0;
     const modulation = mod || currentModulation || 'am';
-    const squelch = parseInt(document.getElementById('radioSquelchValue')?.textContent) || 30;
-    const gain = parseInt(document.getElementById('radioGainValue')?.textContent) || 40;
-    return `/listening/audio/stream?freq=${frequency}&mod=${modulation}&squelch=${squelch}&gain=${gain}&t=${Date.now()}`;
+    return `/listening/audio/stream?fresh=1&freq=${frequency}&mod=${modulation}&t=${Date.now()}`;
 }
 
 function initListeningPost() {
     checkScannerTools();
     checkAudioTools();
+    initSnrThresholdControl();
 
     // WebSocket audio disabled for now - using HTTP streaming
     // initWebSocketAudio();
@@ -1811,6 +1969,29 @@ function initListeningPost() {
     checkIncomingTuneRequest();
 }
 
+function initSnrThresholdControl() {
+    const slider = document.getElementById('snrThresholdSlider');
+    const valueEl = document.getElementById('snrThresholdValue');
+    if (!slider || !valueEl) return;
+
+    const stored = localStorage.getItem('scannerSnrThreshold');
+    if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!Number.isNaN(parsed)) {
+            scannerSnrThreshold = parsed;
+        }
+    }
+
+    slider.value = scannerSnrThreshold;
+    valueEl.textContent = String(scannerSnrThreshold);
+
+    slider.addEventListener('input', () => {
+        scannerSnrThreshold = parseInt(slider.value, 10);
+        valueEl.textContent = String(scannerSnrThreshold);
+        localStorage.setItem('scannerSnrThreshold', String(scannerSnrThreshold));
+    });
+}
+
 /**
  * Check for incoming tune request from Spy Stations or other pages
  */
@@ -1855,6 +2036,13 @@ function toggleDirectListen() {
     if (isDirectListening) {
         stopDirectListen();
     } else {
+        const audioPlayer = document.getElementById('scannerAudioPlayer');
+        if (audioPlayer) {
+            audioPlayer.muted = false;
+            audioPlayer.autoplay = true;
+            audioPlayer.preload = 'auto';
+        }
+        audioUnlockRequested = true;
         // First press - start immediately, don't debounce
         startDirectListenImmediate();
     }
@@ -2057,10 +2245,16 @@ async function _startDirectListenInternal() {
 
         const freqInput = document.getElementById('radioScanStart');
         const freq = freqInput ? parseFloat(freqInput.value) : 118.0;
-        const squelch = parseInt(document.getElementById('radioSquelchValue')?.textContent) || 30;
+        const squelchValue = parseInt(document.getElementById('radioSquelchValue')?.textContent);
+        const squelch = Number.isFinite(squelchValue) ? squelchValue : 0;
         const gain = parseInt(document.getElementById('radioGainValue')?.textContent) || 40;
+        const device = typeof getSelectedDevice === 'function' ? getSelectedDevice() : 0;
+        const sdrType = typeof getSelectedSDRType === 'function'
+            ? getSelectedSDRType()
+            : getSelectedSDRTypeForScanner();
+        const biasT = typeof getBiasTEnabled === 'function' ? getBiasTEnabled() : false;
 
-        console.log('[LISTEN] Tuning to:', freq, 'MHz', currentModulation);
+        console.log('[LISTEN] Tuning to:', freq, 'MHz', currentModulation, 'device', device, 'sdr', sdrType);
 
         const listenBtn = document.getElementById('radioListenBtn');
         if (listenBtn) {
@@ -2091,8 +2285,11 @@ async function _startDirectListenInternal() {
             body: JSON.stringify({
                 frequency: freq,
                 modulation: currentModulation,
-                squelch: squelch,
-                gain: gain
+                squelch: 0,
+                gain: gain,
+                device: device,
+                sdr_type: sdrType,
+                bias_t: biasT
             })
         });
 
@@ -2111,9 +2308,13 @@ async function _startDirectListenInternal() {
         await new Promise(r => setTimeout(r, 300));
 
         // Connect to new stream
-        const streamUrl = `/listening/audio/stream?t=${Date.now()}`;
+        const streamUrl = `/listening/audio/stream?fresh=1&t=${Date.now()}`;
         console.log('[LISTEN] Connecting to stream:', streamUrl);
         audioPlayer.src = streamUrl;
+        audioPlayer.preload = 'auto';
+        audioPlayer.autoplay = true;
+        audioPlayer.muted = false;
+        audioPlayer.load();
 
         // Apply current volume from knob
         const volumeKnob = document.getElementById('radioVolumeKnob');
@@ -2127,13 +2328,20 @@ async function _startDirectListenInternal() {
         // Wait for audio to be ready then play
         audioPlayer.oncanplay = () => {
             console.log('[LISTEN] Audio can play');
-            audioPlayer.play().catch(e => console.warn('[LISTEN] Autoplay blocked:', e));
+            attemptAudioPlay(audioPlayer);
         };
 
         // Also try to play immediately (some browsers need this)
-        audioPlayer.play().catch(e => {
-            console.log('[LISTEN] Initial play blocked, waiting for canplay');
-        });
+        attemptAudioPlay(audioPlayer);
+
+        // If stream is slow, retry play and prompt for manual unlock
+        setTimeout(async () => {
+            if (!isDirectListening || !audioPlayer) return;
+            if (audioPlayer.readyState > 0) return;
+            audioPlayer.load();
+            attemptAudioPlay(audioPlayer);
+            showAudioUnlock(audioPlayer);
+        }, 2500);
 
         // Initialize audio visualizer to feed signal levels to synthesizer
         initAudioVisualizer();
@@ -2150,6 +2358,153 @@ async function _startDirectListenInternal() {
     } finally {
         isRestarting = false;
     }
+}
+
+function attemptAudioPlay(audioPlayer) {
+    if (!audioPlayer) return;
+    audioPlayer.play().then(() => {
+        hideAudioUnlock();
+    }).catch(() => {
+        // Autoplay likely blocked; show manual unlock
+        showAudioUnlock(audioPlayer);
+    });
+}
+
+function showAudioUnlock(audioPlayer) {
+    const unlockBtn = document.getElementById('audioUnlockBtn');
+    if (!unlockBtn || !audioUnlockRequested) return;
+    unlockBtn.style.display = 'block';
+    unlockBtn.onclick = () => {
+        audioPlayer.muted = false;
+        audioPlayer.play().then(() => {
+            hideAudioUnlock();
+        }).catch(() => {});
+    };
+}
+
+function hideAudioUnlock() {
+    const unlockBtn = document.getElementById('audioUnlockBtn');
+    if (unlockBtn) {
+        unlockBtn.style.display = 'none';
+    }
+    audioUnlockRequested = false;
+}
+
+async function startFetchAudioStream(streamUrl, audioPlayer) {
+    if (!window.MediaSource) {
+        console.warn('[LISTEN] MediaSource not supported for fetch fallback');
+        return false;
+    }
+
+    // Abort any previous fetch stream
+    if (audioFetchController) {
+        audioFetchController.abort();
+    }
+    audioFetchController = new AbortController();
+
+    // Reset audio element for MediaSource
+    try {
+        audioPlayer.pause();
+    } catch (e) {}
+    audioPlayer.removeAttribute('src');
+    audioPlayer.load();
+
+    const mediaSource = new MediaSource();
+    audioPlayer.src = URL.createObjectURL(mediaSource);
+    audioPlayer.muted = false;
+    audioPlayer.autoplay = true;
+
+    return new Promise((resolve) => {
+        mediaSource.addEventListener('sourceopen', async () => {
+            let sourceBuffer;
+            try {
+                sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+            } catch (e) {
+                console.error('[LISTEN] Failed to create source buffer:', e);
+                resolve(false);
+                return;
+            }
+
+            try {
+                let attempts = 0;
+                while (attempts < 5) {
+                    attempts += 1;
+                    const response = await fetch(streamUrl, {
+                        cache: 'no-store',
+                        signal: audioFetchController.signal
+                    });
+
+                    if (response.status === 204) {
+                        console.warn('[LISTEN] Stream not ready (204), retrying...', attempts);
+                        await new Promise(r => setTimeout(r, 500));
+                        continue;
+                    }
+
+                    if (!response.ok || !response.body) {
+                        console.warn('[LISTEN] Fetch stream response invalid', response.status);
+                        resolve(false);
+                        return;
+                    }
+
+                    const reader = response.body.getReader();
+                    const appendChunk = async (chunk) => {
+                        if (!chunk || chunk.length === 0) return;
+                        if (!sourceBuffer.updating) {
+                            sourceBuffer.appendBuffer(chunk);
+                            return;
+                        }
+                        await new Promise(r => sourceBuffer.addEventListener('updateend', r, { once: true }));
+                        sourceBuffer.appendBuffer(chunk);
+                    };
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        await appendChunk(value);
+                    }
+
+                    resolve(true);
+                    return;
+                }
+
+                resolve(false);
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    console.error('[LISTEN] Fetch stream error:', e);
+                }
+                resolve(false);
+            }
+        }, { once: true });
+    });
+}
+
+async function startWebSocketListen(config, audioPlayer) {
+    const selectedType = typeof getSelectedSDRType === 'function'
+        ? getSelectedSDRType()
+        : getSelectedSDRTypeForScanner();
+    if (selectedType && selectedType !== 'rtlsdr') {
+        console.warn('[LISTEN] WebSocket audio supports RTL-SDR only');
+        return;
+    }
+
+    try {
+        // Stop HTTP audio stream before switching
+        await fetch('/listening/audio/stop', { method: 'POST' });
+    } catch (e) {}
+
+    // Reset audio element for MediaSource
+    try {
+        audioPlayer.pause();
+    } catch (e) {}
+    audioPlayer.removeAttribute('src');
+    audioPlayer.load();
+
+    const ws = initWebSocketAudio();
+    if (!ws) return;
+
+    // Ensure MediaSource is set up
+    setupMediaSource(audioPlayer);
+    sendWebSocketCommand('start', config);
 }
 
 /**
@@ -2179,6 +2534,10 @@ function stopDirectListen() {
         audioPlayer.src = '';
     }
     audioQueue = [];
+    if (audioFetchController) {
+        audioFetchController.abort();
+        audioFetchController = null;
+    }
 
     // Stop via WebSocket if connected
     if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
@@ -2207,12 +2566,10 @@ function updateDirectListenUI(isPlaying, freq) {
     if (listenBtn) {
         if (isPlaying) {
             listenBtn.innerHTML = Icons.stop('icon--sm') + ' STOP';
-            listenBtn.style.background = 'var(--accent-red)';
-            listenBtn.style.borderColor = 'var(--accent-red)';
+            listenBtn.classList.add('active');
         } else {
             listenBtn.innerHTML = Icons.headphones('icon--sm') + ' LISTEN';
-            listenBtn.style.background = 'var(--accent-purple)';
-            listenBtn.style.borderColor = 'var(--accent-purple)';
+            listenBtn.classList.remove('active');
         }
     }
 
@@ -2596,4 +2953,3 @@ window.removeBookmark = removeBookmark;
 window.tuneToFrequency = tuneToFrequency;
 window.clearScannerLog = clearScannerLog;
 window.exportScannerLog = exportScannerLog;
-

@@ -1,20 +1,8 @@
 /*
  * Agents Management CSS
  * Styles for the remote agent management interface
+ * Inherits CSS variables from core/variables.css
  */
-
-/* CSS Variables (inherited from main theme) */
-:root {
-    --bg-primary: #0a0a0f;
-    --bg-secondary: #12121a;
-    --text-primary: #e0e0e0;
-    --text-secondary: #888;
-    --border-color: #1a1a2e;
-    --accent-cyan: #00d4ff;
-    --accent-green: #00ff88;
-    --accent-red: #ff3366;
-    --accent-orange: #ff9f1c;
-}
 
 /* Agent indicator in navigation */
 .agent-indicator {
@@ -55,7 +43,7 @@
 .agent-indicator-label {
     font-size: 11px;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .agent-indicator-count {
@@ -178,7 +166,7 @@
 .agent-selector-item-url {
     font-size: 10px;
     color: var(--text-secondary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -203,7 +191,7 @@
     background: rgba(0, 212, 255, 0.1);
     color: var(--accent-cyan);
     border-radius: 10px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .agent-badge.local,

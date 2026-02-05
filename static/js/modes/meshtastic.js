@@ -97,7 +97,7 @@ const Meshtastic = (function() {
     /**
      * Initialize the Leaflet map
      */
-    function initMap() {
+    async function initMap() {
         if (meshMap) return;
 
         const mapContainer = document.getElementById('meshMap');
@@ -111,14 +111,17 @@ const Meshtastic = (function() {
         window.meshMap = meshMap;
 
         // Use settings manager for tile layer (allows runtime changes)
-        if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+        if (typeof Settings !== 'undefined') {
+            // Wait for settings to load from server before applying tiles
+            await Settings.init();
             Settings.createTileLayer().addTo(meshMap);
             Settings.registerMap(meshMap);
         } else {
             L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
                 maxZoom: 19,
-                subdomains: 'abcd'
+                subdomains: 'abcd',
+                className: 'tile-layer-cyan'
             }).addTo(meshMap);
         }
 
@@ -143,7 +146,7 @@ const Meshtastic = (function() {
 
             if (data.running) {
                 isConnected = true;
-                updateConnectionUI(true, data.device);
+                updateConnectionUI(true, data.device, data.connection_type);
                 if (data.node_info) {
                     updateNodeInfo(data.node_info);
                     localNodeId = data.node_info.num;

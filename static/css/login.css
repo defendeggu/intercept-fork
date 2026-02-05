@@ -37,7 +37,7 @@
 
 /* Typography */
 .landing-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 2.2rem;
     font-weight: 700;
     letter-spacing: 0.4em;
@@ -48,7 +48,7 @@
 }
 
 .landing-tagline {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--accent-cyan);
     font-size: 0.9rem;
     letter-spacing: 0.15em;
@@ -71,7 +71,7 @@
 
 /* Hacker Style Error */
 .flash-error {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-red);
     background: rgba(239, 68, 68, 0.1);
@@ -94,7 +94,7 @@
     color: var(--accent-cyan);
     padding: 12px;
     margin-bottom: 15px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     outline: none;
     box-sizing: border-box; /* Crucial for visibility */
@@ -106,7 +106,7 @@
     border: 2px solid var(--accent-cyan);
     color: var(--accent-cyan);
     padding: 15px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
     letter-spacing: 3px;
     cursor: pointer;
@@ -116,7 +116,7 @@
 
 .landing-version {
     margin-top: 25px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: rgba(255, 255, 255, 0.3);
     letter-spacing: 2px;

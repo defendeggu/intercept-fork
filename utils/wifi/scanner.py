@@ -19,7 +19,10 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Generator, Optional
+from typing import Callable, Generator, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .deauth_detector import DeauthDetector
 
 from .constants import (
     DEFAULT_QUICK_SCAN_TIMEOUT,
@@ -86,6 +89,9 @@ class UnifiedWiFiScanner:
         self._deep_scan_process: Optional[subprocess.Popen] = None
         self._deep_scan_thread: Optional[threading.Thread] = None
         self._deep_scan_stop_event = threading.Event()
+
+        # Deauth detector
+        self._deauth_detector: Optional['DeauthDetector'] = None
 
         # Event queue for SSE streaming
         self._event_queue: queue.Queue = queue.Queue(maxsize=1000)
@@ -623,6 +629,9 @@ class UnifiedWiFiScanner:
                 'interface': iface,
             })
 
+            # Auto-start deauth detector
+            self._start_deauth_detector(iface)
+
             return True
 
     def stop_deep_scan(self) -> bool:
@@ -635,6 +644,9 @@ class UnifiedWiFiScanner:
         with self._lock:
             if not self._status.is_scanning:
                 return True
+
+            # Stop deauth detector first
+            self._stop_deauth_detector()
 
             self._deep_scan_stop_event.set()
 
@@ -1147,6 +1159,107 @@ class UnifiedWiFiScanner:
         """
         with self._lock:
             return [ap.to_legacy_dict() for ap in self._access_points.values()]
+
+    # =========================================================================
+    # Deauth Detection Integration
+    # =========================================================================
+
+    def _start_deauth_detector(self, interface: str):
+        """Start deauth detector on the given interface."""
+        try:
+            from .deauth_detector import DeauthDetector
+        except ImportError as e:
+            logger.warning(f"Could not import DeauthDetector (scapy not installed?): {e}")
+            return
+
+        if self._deauth_detector and self._deauth_detector.is_running:
+            logger.debug("Deauth detector already running")
+            return
+
+        def event_callback(event: dict):
+            """Handle deauth events and forward to queue."""
+            self._queue_event(event)
+            # Also store in app-level DataStore if available
+            try:
+                import app as app_module
+                if hasattr(app_module, 'deauth_alerts') and event.get('type') == 'deauth_alert':
+                    alert_id = event.get('id', str(time.time()))
+                    app_module.deauth_alerts[alert_id] = event
+                if hasattr(app_module, 'deauth_detector_queue'):
+                    try:
+                        app_module.deauth_detector_queue.put_nowait(event)
+                    except queue.Full:
+                        pass
+            except Exception as e:
+                logger.debug(f"Error storing deauth alert: {e}")
+
+        def get_networks() -> dict:
+            """Get current networks for cross-reference."""
+            with self._lock:
+                return {bssid: ap.to_summary_dict() for bssid, ap in self._access_points.items()}
+
+        def get_clients() -> dict:
+            """Get current clients for cross-reference."""
+            with self._lock:
+                return {mac: client.to_dict() for mac, client in self._clients.items()}
+
+        try:
+            self._deauth_detector = DeauthDetector(
+                interface=interface,
+                event_callback=event_callback,
+                get_networks=get_networks,
+                get_clients=get_clients,
+            )
+            self._deauth_detector.start()
+            logger.info(f"Deauth detector started on {interface}")
+
+            self._queue_event({
+                'type': 'deauth_detector_started',
+                'interface': interface,
+            })
+        except Exception as e:
+            logger.error(f"Failed to start deauth detector: {e}")
+            self._queue_event({
+                'type': 'deauth_error',
+                'error': f"Failed to start deauth detector: {e}",
+            })
+
+    def _stop_deauth_detector(self):
+        """Stop the deauth detector."""
+        if self._deauth_detector:
+            try:
+                self._deauth_detector.stop()
+                logger.info("Deauth detector stopped")
+                self._queue_event({
+                    'type': 'deauth_detector_stopped',
+                })
+            except Exception as e:
+                logger.error(f"Error stopping deauth detector: {e}")
+            finally:
+                self._deauth_detector = None
+
+    @property
+    def deauth_detector(self) -> Optional['DeauthDetector']:
+        """Get the deauth detector instance."""
+        return self._deauth_detector
+
+    def get_deauth_alerts(self, limit: int = 100) -> list[dict]:
+        """Get recent deauth alerts."""
+        if self._deauth_detector:
+            return self._deauth_detector.get_alerts(limit)
+        return []
+
+    def clear_deauth_alerts(self):
+        """Clear deauth alert history."""
+        if self._deauth_detector:
+            self._deauth_detector.clear_alerts()
+        # Also clear from app-level store
+        try:
+            import app as app_module
+            if hasattr(app_module, 'deauth_alerts'):
+                app_module.deauth_alerts.clear()
+        except Exception:
+            pass
 
 
 # =============================================================================

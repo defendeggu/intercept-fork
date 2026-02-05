@@ -22,7 +22,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js for APRS map - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -39,6 +39,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/acars.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/aprs.css') }}">
@@ -290,7 +291,7 @@
 ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝╚══════╝╚═════╝</pre>
             <div style="margin: 25px 0; padding: 15px; background: #0a0a0a; border-left: 3px solid var(--accent-red);">
                 <p
-                    style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #888; text-align: left; margin: 0;">
+                    style="font-family: var(--font-mono); font-size: 11px; color: #888; text-align: left; margin: 0;">
                     <span style="color: var(--accent-red);">root@intercepted:</span><span
                         style="color: var(--accent-cyan);">~#</span> sudo access --grant-permission<br>
                     <span style="color: #666;">[sudo] password for user: ********</span><br>
@@ -348,109 +349,9 @@
     </header>
 
     <!-- Mode Navigation Bar -->
-    <nav class="mode-nav">
-        <div class="mode-nav-dropdown" data-group="sdr">
-            <button class="mode-nav-dropdown-btn" onclick="toggleNavDropdown('sdr')">
-                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>
-                <span class="nav-label">SDR / RF</span>
-                <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
-            </button>
-            <div class="mode-nav-dropdown-menu">
-                <button class="mode-nav-btn active" onclick="switchMode('pager')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg></span><span class="nav-label">Pager</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('sensor')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span><span class="nav-label">433MHz</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('rtlamr')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="nav-label">Meters</span></button>
-                <a href="/adsb/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span><span class="nav-label">Aircraft</span></a>
-                <a href="/ais/dashboard" class="mode-nav-btn" style="text-decoration: none;"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span><span class="nav-label">Vessels</span></a>
-                <button class="mode-nav-btn" onclick="switchMode('aprs')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="nav-label">APRS</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('listening')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span><span class="nav-label">Listening Post</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('spystations')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span><span class="nav-label">Spy Stations</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('meshtastic')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span><span class="nav-label">Meshtastic</span></button>
-            </div>
-        </div>
-        <div class="mode-nav-dropdown" data-group="wireless">
-            <button class="mode-nav-dropdown-btn" onclick="toggleNavDropdown('wireless')">
-                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span>
-                <span class="nav-label">Wireless</span>
-                <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
-            </button>
-            <div class="mode-nav-dropdown-menu">
-                <button class="mode-nav-btn" onclick="switchMode('wifi')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">WiFi</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('bluetooth')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span><span class="nav-label">Bluetooth</span></button>
-            </div>
-        </div>
-        <div class="mode-nav-dropdown" data-group="security">
-            <button class="mode-nav-dropdown-btn" onclick="toggleNavDropdown('security')">
-                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-                <span class="nav-label">Security</span>
-                <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
-            </button>
-            <div class="mode-nav-dropdown-menu">
-                <button class="mode-nav-btn" onclick="switchMode('tscm')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><span class="nav-label">TSCM</span></button>
-            </div>
-        </div>
-        <div class="mode-nav-dropdown" data-group="space">
-            <button class="mode-nav-dropdown-btn" onclick="toggleNavDropdown('space')">
-                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>
-                <span class="nav-label">Space</span>
-                <span class="dropdown-arrow icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
-            </button>
-            <div class="mode-nav-dropdown-menu">
-                <button class="mode-nav-btn" onclick="switchMode('satellite')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg></span><span class="nav-label">Satellite</span></button>
-                <button class="mode-nav-btn" onclick="switchMode('sstv')"><span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M3 9h2"/><path d="M19 9h2"/><path d="M3 15h2"/><path d="M19 15h2"/></svg></span><span class="nav-label">ISS SSTV</span></button>
-            </div>
-        </div>
-        <div class="mode-nav-actions">
-            <a href="/satellite/dashboard" target="_blank" class="nav-action-btn" id="satelliteDashboardBtn"
-                style="display: none;">
-                <span class="nav-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="nav-label">Full Dashboard</span>
-            </a>
-        </div>
-        <div class="nav-utilities">
-            <div class="nav-clock">
-                <span class="utc-label">UTC</span>
-                <span class="utc-time" id="headerUtcTime">--:--:--</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-tools">
-                <button class="nav-tool-btn" onclick="toggleAnimations()" title="Toggle Animations">
-                    <span class="icon-effects-on icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>
-                    <span class="icon-effects-off icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span>
-                </button>
-                <button class="nav-tool-btn" onclick="toggleTheme()" title="Toggle Light/Dark Theme">
-                    <span class="icon-moon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
-                    <span class="icon-sun icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
-                </button>
-                <button class="nav-tool-btn" onclick="showDependencies()" title="Check Tool Dependencies"
-                    id="depsBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
-                <button class="nav-tool-btn" onclick="showMqttSettings()" title="MQTT Settings" id="mqttBtn"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span></button>
-                <a href="/controller/monitor" class="nav-tool-btn" title="Network Monitor - Multi-Agent View" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span></a>
-                <a href="/controller/manage" class="nav-tool-btn" title="Manage Remote Agents" style="text-decoration: none;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></a>
-                <button class="nav-tool-btn" onclick="showSettings()" title="Settings"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
-                <button class="nav-tool-btn" onclick="showHelp()" title="Help & Documentation">?</button>
-                <button class="nav-tool-btn" onclick="logout(event)" title="Logout">
-                    <span class="power-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-                </button>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Mobile Navigation Bar (simplified mode switching) -->
-    <nav class="mobile-nav-bar" id="mobileNavBar">
-        <button class="mobile-nav-btn active" data-mode="pager" onclick="switchMode('pager')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg></span> Pager</button>
-        <button class="mobile-nav-btn" data-mode="sensor" onclick="switchMode('sensor')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg></span> 433MHz</button>
-        <button class="mobile-nav-btn" data-mode="rtlamr" onclick="switchMode('rtlamr')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span> Meters</button>
-        <a href="/adsb/dashboard" class="mobile-nav-btn" style="text-decoration: none;"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span> Aircraft</a>
-        <a href="/ais/dashboard" class="mobile-nav-btn" style="text-decoration: none;"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span> Vessels</a>
-        <button class="mobile-nav-btn" data-mode="aprs" onclick="switchMode('aprs')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span> APRS</button>
-        <button class="mobile-nav-btn" data-mode="wifi" onclick="switchMode('wifi')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span> WiFi</button>
-        <button class="mobile-nav-btn" data-mode="bluetooth" onclick="switchMode('bluetooth')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 22 12 2 17.5 6.5 6.5 17.5"/></svg></span> BT</button>
-        <button class="mobile-nav-btn" data-mode="tscm" onclick="switchMode('tscm')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span> TSCM</button>
-        <button class="mobile-nav-btn" data-mode="satellite" onclick="switchMode('satellite')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 7L9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4-6 6"/></svg></span> Sat</button>
-        <button class="mobile-nav-btn" data-mode="sstv" onclick="switchMode('sstv')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></span> SSTV</button>
-        <button class="mobile-nav-btn" data-mode="listening" onclick="switchMode('listening')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span> Scanner</button>
-        <button class="mobile-nav-btn" data-mode="spystations" onclick="switchMode('spystations')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span> Spy</button>
-        <button class="mobile-nav-btn" data-mode="meshtastic" onclick="switchMode('meshtastic')"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span> Mesh</button>
-    </nav>
+    {% set is_index_page = true %}
+    {% set active_mode = 'pager' %}
+    {% include 'partials/nav.html' with context %}
 
     <!-- Mobile Drawer Overlay -->
     <div class="drawer-overlay" id="drawerOverlay"></div>
@@ -510,8 +411,7 @@
                             {% if devices %}
                             {% for device in devices %}
                             <option value="{{ device.index }}"
-                                data-sdr-type="{{ device.sdr_type | default('rtlsdr') }}">{{ device.index }}: {{
-                                device.name }}</option>
+                                data-sdr-type="{{ device.sdr_type | default('rtlsdr') }}">{{ device.index }}: {{ device.name }}{% if device.serial and device.serial != 'N/A' and device.serial != 'Unknown' %} (SN: {{ device.serial }}){% endif %}</option>
                             {% endfor %}
                             {% else %}
                             <option value="0">No devices found</option>
@@ -539,6 +439,14 @@
                     <button class="preset-btn" onclick="refreshDevices()" style="width: 100%;">
                         Refresh Devices
                     </button>
+
+                    <!-- SDR Device Status -->
+                    <div id="sdrStatusPanel" style="margin-top: 10px; border: 1px solid var(--border-color); border-radius: 4px;">
+                        <div id="sdrStatusList" style="max-height: 150px; overflow-y: auto;"></div>
+                        <div style="padding: 6px 8px; background: var(--bg-tertiary); border-top: 1px solid var(--border-color); font-size: 10px; color: #666;">
+                            Auto-refreshes every 5s
+                        </div>
+                    </div>
 
                     <!-- Remote SDR (rtl_tcp) -->
                     <div class="form-group" style="margin-top: 10px;">
@@ -800,7 +708,7 @@
                                 </div>
                             </div>
                             <div class="wifi-detail-clients" id="wifiDetailClientList" style="display: none;">
-                                <h6>Connected Clients</h6>
+                                <h6>Connected Clients <span class="wifi-client-count-badge" id="wifiClientCountBadge"></span></h6>
                                 <div class="wifi-client-list"></div>
                             </div>
                         </div>
@@ -1082,7 +990,7 @@
                             style="color: var(--accent-orange); text-shadow: 0 0 10px var(--accent-orange); margin-bottom: 8px;">
                             PACKET LOG</h5>
                         <div id="aprsPacketLog"
-                            style="flex: 1; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">
+                            style="flex: 1; overflow-y: auto; font-family: var(--font-mono); font-size: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">
                             <div style="color: var(--text-muted);">Waiting for packets...</div>
                         </div>
                     </div>
@@ -1102,7 +1010,7 @@
                                     STOPPED</div>
                                 <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                                     <div class="freq-digits" id="mainScannerFreq"
-                                        style="font-size: 52px; font-weight: bold; color: var(--accent-cyan); text-shadow: 0 0 30px var(--accent-cyan); font-family: 'JetBrains Mono', monospace; letter-spacing: 3px;">
+                                        style="font-size: 52px; font-weight: bold; color: var(--accent-cyan); text-shadow: 0 0 30px var(--accent-cyan); font-family: var(--font-mono); letter-spacing: 3px;">
                                         118.000</div>
                                     <span class="freq-unit"
                                         style="font-size: 20px; color: var(--text-secondary); font-weight: 500;">MHz</span>
@@ -1148,6 +1056,10 @@
                                             Audio Output</div>
                                     </div>
                                     <audio id="scannerAudioPlayer" style="width: 100%; height: 28px;" controls></audio>
+                                    <button id="audioUnlockBtn" type="button"
+                                        style="display: none; margin-top: 8px; width: 100%; padding: 6px 10px; font-size: 10px; letter-spacing: 1px; background: var(--accent-cyan); color: #000; border: 1px solid var(--accent-cyan); border-radius: 4px; cursor: pointer;">
+                                        CLICK TO ENABLE AUDIO
+                                    </button>
                                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                                         <span style="font-size: 7px; color: var(--text-muted);">LEVEL</span>
                                         <div
@@ -1159,6 +1071,13 @@
                                         <span id="audioSignalDb"
                                             style="font-size: 8px; color: var(--text-muted); min-width: 40px; text-align: right;">--
                                             dB</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                        <span style="font-size: 7px; color: var(--text-muted); letter-spacing: 1px;">SNR THRESH</span>
+                                        <input type="range" id="snrThresholdSlider" min="6" max="20" step="1" value="8"
+                                            style="flex: 1;" />
+                                        <span id="snrThresholdValue"
+                                            style="font-size: 8px; color: var(--text-muted); min-width: 26px; text-align: right;">8</span>
                                     </div>
                                     <!-- Signal Alert inline -->
                                     <div id="mainSignalAlert"
@@ -1254,10 +1173,10 @@
                                 <!-- SQL, Gain, Vol Knobs -->
                                 <div style="display: flex; gap: 15px;">
                                     <div class="knob-container">
-                                        <div class="radio-knob" id="radioSquelchKnob" data-value="30" data-min="0"
+                                        <div class="radio-knob" id="radioSquelchKnob" data-value="0" data-min="0"
                                             data-max="100" data-step="1"></div>
                                         <div class="knob-label">SQL</div>
-                                        <div class="knob-value" id="radioSquelchValue">30</div>
+                                        <div class="knob-value" id="radioSquelchValue">0</div>
                                     </div>
                                     <div class="knob-container">
                                         <div class="radio-knob" id="radioGainKnob" data-value="40" data-min="0"
@@ -1330,7 +1249,7 @@
                                                 START</div>
                                             <input type="number" id="radioScanStart" value="118" step="0.1"
                                                 class="radio-input"
-                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: bold; color: var(--accent-cyan);">
+                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: var(--font-mono); font-weight: bold; color: var(--accent-cyan);">
                                         </div>
                                         <span
                                             style="color: var(--text-muted); font-size: 16px; padding-top: 12px;">→</span>
@@ -1339,15 +1258,17 @@
                                                 END</div>
                                             <input type="number" id="radioScanEnd" value="137" step="0.1"
                                                 class="radio-input"
-                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: bold; color: var(--accent-cyan);">
+                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: var(--font-mono); font-weight: bold; color: var(--accent-cyan);">
                                         </div>
                                     </div>
                                 </div>
                                 <!-- Action Buttons -->
-                                <button class="radio-action-btn scan" id="radioScanBtn" onclick="toggleScanner()"
-                                    style="padding: 12px; font-size: 13px; width: 100%; font-weight: bold;"><span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>SCAN</button>
-                                <button class="radio-action-btn" id="radioListenBtn" onclick="toggleDirectListen()"
-                                    style="padding: 10px; font-size: 12px; width: 100%; background: var(--accent-green); border: none; color: #fff;"><span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>LISTEN</button>
+                                <button class="radio-action-btn scan" id="radioScanBtn" onclick="toggleScanner()">
+                                    <span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>SCAN
+                                </button>
+                                <button class="radio-action-btn listen" id="radioListenBtn" onclick="toggleDirectListen()">
+                                    <span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>LISTEN
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1382,13 +1303,14 @@
                                     <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
                                         <th style="text-align: left; padding: 4px;">Time</th>
                                         <th style="text-align: left; padding: 4px;">Frequency</th>
+                                        <th style="text-align: left; padding: 4px;">SNR</th>
                                         <th style="text-align: left; padding: 4px;">Mod</th>
                                         <th style="text-align: center; padding: 4px; width: 60px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="scannerHitsBody">
                                     <tr style="color: var(--text-muted);">
-                                        <td colspan="4" style="padding: 15px; text-align: center; font-size: 10px;">No
+                                        <td colspan="5" style="padding: 15px; text-align: center; font-size: 10px;">No
                                             signals detected</td>
                                     </tr>
                                 </tbody>
@@ -1405,19 +1327,19 @@
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 9px; color: var(--text-muted);">SIGNALS</span>
                                 <span
-                                    style="color: var(--accent-green); font-size: 18px; font-weight: bold; font-family: 'JetBrains Mono', monospace;"
+                                    style="color: var(--accent-green); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
                                     id="mainSignalCount">0</span>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 9px; color: var(--text-muted);">SCANNED</span>
                                 <span
-                                    style="color: var(--accent-cyan); font-size: 18px; font-weight: bold; font-family: 'JetBrains Mono', monospace;"
+                                    style="color: var(--accent-cyan); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
                                     id="mainFreqsScanned">0</span>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 9px; color: var(--text-muted);">CYCLES</span>
                                 <span
-                                    style="color: var(--accent-orange); font-size: 18px; font-weight: bold; font-family: 'JetBrains Mono', monospace;"
+                                    style="color: var(--accent-orange); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
                                     id="mainScanCycles">0</span>
                             </div>
                         </div>
@@ -2112,13 +2034,60 @@
             // After fade out, hide welcome and switch to mode
             setTimeout(() => {
                 welcome.style.display = 'none';
-                switchMode(mode);
+                switchMode(mode, { updateUrl: true });
             }, 400);
         }
 
         // Disclaimer handling - show on page load if not accepted
         function showDisclaimer() {
             document.getElementById('disclaimerModal').style.display = 'flex';
+        }
+
+        // Mode from query string (e.g., /?mode=wifi)
+        let pendingStartMode = null;
+        const validModes = new Set([
+            'pager', 'sensor', 'rtlamr', 'aprs', 'listening',
+            'spystations', 'meshtastic', 'wifi', 'bluetooth',
+            'tscm', 'satellite', 'sstv'
+        ]);
+
+        function getModeFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            const mode = params.get('mode');
+            if (!mode || !validModes.has(mode)) return null;
+            return mode;
+        }
+
+        function applyModeFromQuery() {
+            const mode = getModeFromQuery();
+            if (!mode) return;
+            const accepted = localStorage.getItem('disclaimerAccepted') === 'true';
+            if (accepted) {
+                const welcome = document.getElementById('welcomePage');
+                if (welcome) welcome.style.display = 'none';
+                switchMode(mode, { updateUrl: false });
+                updateModeUrl(mode, true);
+            } else {
+                pendingStartMode = mode;
+            }
+        }
+
+        function applySettingsFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('settings') === '1') {
+                // Remove settings param from URL to avoid reopening on refresh
+                params.delete('settings');
+                const newUrl = params.toString()
+                    ? window.location.pathname + '?' + params.toString()
+                    : window.location.pathname;
+                window.history.replaceState({}, '', newUrl);
+                // Open settings modal after a brief delay to ensure page is ready
+                setTimeout(() => {
+                    if (typeof showSettings === 'function') {
+                        showSettings();
+                    }
+                }, 100);
+            }
         }
 
         function acceptDisclaimer() {
@@ -2132,7 +2101,14 @@
                 const gateStyle = document.getElementById('disclaimer-gate');
                 if (gateStyle) gateStyle.remove();
                 // Ensure welcome page is visible
-                document.getElementById('welcomePage').style.display = '';
+                const welcome = document.getElementById('welcomePage');
+                if (welcome) welcome.style.display = '';
+                if (pendingStartMode) {
+                    // Bypass welcome and jump to requested mode
+                    welcome.style.display = 'none';
+                switchMode(pendingStartMode, { updateUrl: true });
+                pendingStartMode = null;
+                }
             }, 300);
         }
 
@@ -2421,6 +2397,19 @@
             // Load bias-T setting from localStorage
             loadBiasTSetting();
 
+            // Initialize device list from server-provided data
+            // This ensures currentDeviceList is populated on page load (fixes #99)
+            if (typeof deviceList !== 'undefined' && deviceList.length > 0) {
+                currentDeviceList = deviceList;
+                const firstType = deviceList[0].sdr_type || 'rtlsdr';
+                const sdrTypeSelect = document.getElementById('sdrTypeSelect');
+                if (sdrTypeSelect) {
+                    sdrTypeSelect.value = firstType;
+                }
+                // Defer onSDRTypeChanged to ensure DOM is ready
+                setTimeout(onSDRTypeChanged, 0);
+            }
+
             // Initialize observer location input fields from saved location
             const obsLatInput = document.getElementById('obsLat');
             const obsLonInput = document.getElementById('obsLon');
@@ -2435,6 +2424,15 @@
 
             // Initialize dropdown nav active state
             updateDropdownActiveState();
+
+            // Start SDR device status polling
+            startSdrStatusPolling();
+
+            // Apply mode from URL query (e.g., /?mode=wifi)
+            applyModeFromQuery();
+
+            // Check for settings=1 query param (from dashboard settings button)
+            applySettingsFromQuery();
         });
 
         // Toggle section collapse
@@ -2490,8 +2488,20 @@
             }
         });
 
+        function updateModeUrl(mode, replace = false) {
+            if (!validModes.has(mode)) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('mode', mode);
+            if (replace) {
+                window.history.replaceState({ mode }, '', url);
+            } else {
+                window.history.pushState({ mode }, '', url);
+            }
+        }
+
         // Mode switching
-        function switchMode(mode) {
+        function switchMode(mode, options = {}) {
+            const { updateUrl = true } = options;
             // Only stop local scans if in local mode (not agent mode)
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
             if (!isAgentMode) {
@@ -2504,6 +2514,9 @@
             }
 
             currentMode = mode;
+            if (updateUrl) {
+                updateModeUrl(mode);
+            }
 
             // Sync mode state with current agent/local after switching
             if (isAgentMode && typeof syncAgentModeStates === 'function') {
@@ -2734,6 +2747,13 @@
         window.addEventListener('resize', function () {
             if (aprsMap) aprsMap.invalidateSize();
             if (typeof Meshtastic !== 'undefined') Meshtastic.invalidateMap();
+        });
+
+        window.addEventListener('popstate', function () {
+            const mode = getModeFromQuery();
+            if (mode && mode !== currentMode) {
+                switchMode(mode, { updateUrl: false });
+            }
         });
 
         // Also handle orientation changes explicitly for mobile
@@ -3674,9 +3694,10 @@
             if (filteredDevices.length === 0) {
                 select.innerHTML = `<option value="0">No ${sdrCapabilities[sdrType]?.name || sdrType} devices found</option>`;
             } else {
-                select.innerHTML = filteredDevices.map(d =>
-                    `<option value="${d.index}" data-sdr-type="${d.sdr_type || 'rtlsdr'}">${d.index}: ${d.name}</option>`
-                ).join('');
+                select.innerHTML = filteredDevices.map(d => {
+                    const serialSuffix = d.serial && d.serial !== 'N/A' && d.serial !== 'Unknown' ? ` (SN: ${d.serial})` : '';
+                    return `<option value="${d.index}" data-sdr-type="${d.sdr_type || 'rtlsdr'}">${d.index}: ${d.name}${serialSuffix}</option>`;
+                }).join('');
             }
 
             // Update capabilities display
@@ -3707,12 +3728,80 @@
 
                     // Trigger filter update
                     onSDRTypeChanged();
+
+                    // Also refresh SDR status panel
+                    fetchSdrStatus();
                 })
                 .catch(err => {
                     console.error('Failed to refresh devices:', err);
                     const select = document.getElementById('deviceSelect');
                     select.innerHTML = '<option value="0">Error loading devices</option>';
                 });
+        }
+
+        // SDR Device Status Panel
+        let sdrStatusPollingInterval = null;
+
+        function renderSdrStatus(devices) {
+            const container = document.getElementById('sdrStatusList');
+            if (!container) return;
+
+            if (!devices || devices.length === 0) {
+                container.innerHTML = '<div style="padding: 8px; color: #888; font-size: 11px; text-align: center;">No SDR devices detected</div>';
+                return;
+            }
+
+            const html = devices.map(d => {
+                const isActive = d.in_use;
+                const statusDot = isActive
+                    ? '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00ff88; box-shadow: 0 0 6px #00ff88; margin-right: 6px;"></span>'
+                    : '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #555; margin-right: 6px;"></span>';
+                const modeName = d.used_by ? d.used_by.toUpperCase() : 'IDLE';
+                const modeColor = isActive ? '#00ff88' : '#666';
+                const sdrType = (d.sdr_type || 'RTL').toUpperCase().replace('RTLSDR', 'RTL');
+
+                return `<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center;">
+                        ${statusDot}
+                        <span style="font-size: 11px;">#${d.index} ${d.name || 'Unknown'}${d.serial && d.serial !== 'N/A' && d.serial !== 'Unknown' ? ` (${d.serial})` : ''}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 10px; color: ${modeColor}; font-weight: bold;">${modeName}</span>
+                        <span style="font-size: 9px; padding: 1px 4px; background: var(--bg-tertiary); border-radius: 3px; color: #888;">${sdrType}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        function fetchSdrStatus() {
+            fetch('/devices/status')
+                .then(r => r.json())
+                .then(devices => {
+                    renderSdrStatus(devices);
+                })
+                .catch(err => {
+                    console.error('Failed to fetch SDR status:', err);
+                    const container = document.getElementById('sdrStatusList');
+                    if (container) {
+                        container.innerHTML = '<div style="padding: 8px; color: #ff6666; font-size: 11px; text-align: center;">Error loading status</div>';
+                    }
+                });
+        }
+
+        function startSdrStatusPolling() {
+            // Initial fetch
+            fetchSdrStatus();
+            // Poll every 5 seconds
+            sdrStatusPollingInterval = setInterval(fetchSdrStatus, 5000);
+        }
+
+        function stopSdrStatusPolling() {
+            if (sdrStatusPollingInterval) {
+                clearInterval(sdrStatusPollingInterval);
+                sdrStatusPollingInterval = null;
+            }
         }
 
         function getSelectedDevice() {
@@ -4193,7 +4282,7 @@
 
             const infoEl = document.createElement('div');
             infoEl.className = 'info-msg';
-            infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "JetBrains Mono", monospace; font-size: 11px; color: #888; word-break: break-all;';
+            infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "Space Mono", monospace; font-size: 11px; color: #888; word-break: break-all;';
             infoEl.textContent = text;
             output.insertBefore(infoEl, output.firstChild);
         }
@@ -4209,7 +4298,7 @@
 
             const errorEl = document.createElement('div');
             errorEl.className = 'error-msg';
-            errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "JetBrains Mono", monospace; font-size: 11px; color: #ff6688; word-break: break-all;';
+            errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "Space Mono", monospace; font-size: 11px; color: #ff6688; word-break: break-all;';
             errorEl.textContent = '⚠ ' + text;
             output.insertBefore(errorEl, output.firstChild);
         }
@@ -6825,7 +6914,7 @@
 
             // Draw total in center
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 16px JetBrains Mono';
+            ctx.font = 'bold 16px Space Mono';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(total, cx, cy);
@@ -7857,7 +7946,7 @@
                 });
         }
 
-        function initAprsMap() {
+        async function initAprsMap() {
             if (aprsMap) return;
 
             const mapContainer = document.getElementById('aprsMap');
@@ -7872,14 +7961,17 @@
             window.aprsMap = aprsMap;
 
             // Use settings manager for tile layer (allows runtime changes)
-            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+            if (typeof Settings !== 'undefined') {
+                // Wait for settings to load from server before applying tiles
+                await Settings.init();
                 Settings.createTileLayer().addTo(aprsMap);
                 Settings.registerMap(aprsMap);
             } else {
                 L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
                     maxZoom: 19,
-                    subdomains: 'abcd'
+                    subdomains: 'abcd',
+                    className: 'tile-layer-cyan'
                 }).addTo(aprsMap);
             }
 
@@ -8595,7 +8687,7 @@
                 // Label
                 if (el > 0) {
                     ctx.fillStyle = '#444';
-                    ctx.font = '10px JetBrains Mono';
+                    ctx.font = '10px Space Mono';
                     ctx.textAlign = 'center';
                     ctx.fillText(el + '°', cx, cy - r + 12);
                 }
@@ -8668,7 +8760,7 @@
 
                 // Label
                 ctx.fillStyle = '#fff';
-                ctx.font = '11px JetBrains Mono';
+                ctx.font = '11px Space Mono';
                 ctx.fillText(pass.satellite, maxX + 10, maxY - 5);
             }
         }
@@ -8780,7 +8872,7 @@
         let observerMarker = null;
         let satPositionInterval = null;
 
-        function initGroundTrackMap() {
+        async function initGroundTrackMap() {
             const mapContainer = document.getElementById('groundTrackMap');
             if (!mapContainer || groundTrackMap) return;
 
@@ -8793,14 +8885,17 @@
             window.groundTrackMap = groundTrackMap;
 
             // Use settings manager for tile layer (allows runtime changes)
-            if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+            if (typeof Settings !== 'undefined') {
+                // Wait for settings to load from server before applying tiles
+                await Settings.init();
                 Settings.createTileLayer().addTo(groundTrackMap);
                 Settings.registerMap(groundTrackMap);
             } else {
                 L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
                     maxZoom: 19,
-                    subdomains: 'abcd'
+                    subdomains: 'abcd',
+                    className: 'tile-layer-cyan'
                 }).addTo(groundTrackMap);
             }
 
@@ -9253,14 +9348,10 @@
         // Theme toggle functions
         function toggleTheme() {
             const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
+            const currentTheme = html.getAttribute('data-theme') || 'dark';
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 
-            if (newTheme === 'dark') {
-                html.removeAttribute('data-theme');
-            } else {
-                html.setAttribute('data-theme', newTheme);
-            }
+            html.setAttribute('data-theme', newTheme);
 
             // Save to localStorage for instant load on next visit
             localStorage.setItem('intercept-theme', newTheme);
@@ -9292,10 +9383,8 @@
         // Load saved theme and animations on page load
         (function () {
             // First apply localStorage theme for instant load (no flash)
-            const localTheme = localStorage.getItem('intercept-theme');
-            if (localTheme === 'light') {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
+            const localTheme = localStorage.getItem('intercept-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', localTheme);
 
             // Apply animations preference
             const localAnimations = localStorage.getItem('intercept-animations');
@@ -9311,11 +9400,7 @@
                         const serverTheme = data.value;
                         if (serverTheme !== localTheme) {
                             // Server has different theme, apply it
-                            if (serverTheme === 'light') {
-                                document.documentElement.setAttribute('data-theme', 'light');
-                            } else {
-                                document.documentElement.removeAttribute('data-theme');
-                            }
+                            document.documentElement.setAttribute('data-theme', serverTheme);
                             localStorage.setItem('intercept-theme', serverTheme);
                         }
                     }
@@ -12115,7 +12200,7 @@
                 <textarea id="tleInput" placeholder="ISS (ZARYA)
 1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9002
 2 25544  51.6400 208.9163 0006703 296.5855  63.4606 15.49995465478450"
-                    style="width: 100%; height: 150px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; resize: vertical;"></textarea>
+                    style="width: 100%; height: 150px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
                 <button class="preset-btn" onclick="addFromTLE()" style="margin-top: 10px; width: 100%;">Add
                     Satellite</button>
             </div>
@@ -12152,369 +12237,7 @@
         </div>
     </div>
 
-    <!-- MQTT Settings Modal -->
-    <div id="mqttModal" class="help-modal" onclick="if(event.target === this) hideMqttSettings()">
-        <div class="help-content" style="max-width: 600px;">
-            <button class="help-close" onclick="hideMqttSettings()">×</button>
-            <h2>MQTT Settings</h2>
-            <p style="color: var(--text-dim); margin-bottom: 15px;">Configure MQTT broker connection for publishing decoded data to Elasticsearch/Kibana.</p>
-
-            <!-- Connection Status -->
-            <div id="mqttStatus" style="background: var(--bg-tertiary); padding: 10px; border-radius: 6px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span style="font-weight: bold;">Status:</span>
-                    <span id="mqttStatusText" style="margin-left: 8px;">Checking...</span>
-                </div>
-                <div id="mqttStatusIndicator" style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-dim);"></div>
-            </div>
-
-            <!-- Enable/Disable Toggle -->
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="mqttEnabled" onchange="toggleMqttEnabled()">
-                    <span>Enable MQTT Publishing</span>
-                </label>
-            </div>
-
-            <!-- Broker Settings -->
-            <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px;">Broker Connection</h3>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 11px; color: var(--text-dim);">Host</label>
-                        <input type="text" id="mqttHost" placeholder="localhost" style="width: 100%;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 11px; color: var(--text-dim);">Port</label>
-                        <input type="number" id="mqttPort" placeholder="1883" style="width: 100%;">
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 11px; color: var(--text-dim);">Username (optional)</label>
-                        <input type="text" id="mqttUsername" placeholder="username" style="width: 100%;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 11px; color: var(--text-dim);">Password (optional)</label>
-                        <input type="password" id="mqttPassword" placeholder="password" style="width: 100%;">
-                    </div>
-                </div>
-                <div class="form-group" style="margin-bottom: 10px;">
-                    <label style="font-size: 11px; color: var(--text-dim);">Topic Prefix</label>
-                    <input type="text" id="mqttTopicPrefix" placeholder="intercept" style="width: 100%;">
-                </div>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px;">
-                    <input type="checkbox" id="mqttUseTls">
-                    <span>Use TLS/SSL</span>
-                </label>
-            </div>
-
-            <!-- Topic Settings -->
-            <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px;">Topics (per decoder)</h3>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicPocsag" checked>
-                        <span>Pager</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicAdsb" checked>
-                        <span>ADS-B</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicAcars" checked>
-                        <span>ACARS</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicAprs" checked>
-                        <span>APRS</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicSensor" checked>
-                        <span>433MHz</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
-                        <input type="checkbox" id="mqttTopicRtlamr" checked>
-                        <span>Meters</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div style="display: flex; gap: 10px;">
-                <button class="preset-btn" onclick="testMqttConnection()" style="flex: 1;">Test Connection</button>
-                <button class="preset-btn" onclick="saveMqttSettings()" style="flex: 1; background: var(--accent-green); color: #000;">Save Settings</button>
-            </div>
-
-            <!-- Test Result -->
-            <div id="mqttTestResult" style="margin-top: 10px; padding: 10px; border-radius: 4px; font-size: 12px; display: none;"></div>
-
-            <!-- Help Text -->
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-dim);">
-                <strong>Setup Mosquitto:</strong>
-                <code style="display: block; background: var(--bg-tertiary); padding: 8px; border-radius: 4px; margin-top: 5px;">
-                    sudo apt install mosquitto mosquitto-clients
-                </code>
-                <p style="margin-top: 10px;">Topics published: <code>{prefix}/pocsag</code>, <code>{prefix}/adsb</code>, <code>{prefix}/acars</code>, <code>{prefix}/aprs</code>, <code>{prefix}/sensor</code>, <code>{prefix}/rtlamr</code></p>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // MQTT Settings Functions
-        function showMqttSettings() {
-            document.getElementById('mqttModal').classList.add('active');
-            loadMqttSettings();
-        }
-
-        function hideMqttSettings() {
-            document.getElementById('mqttModal').classList.remove('active');
-        }
-
-        function loadMqttSettings() {
-            fetch('/mqtt/status')
-                .then(r => r.json())
-                .then(data => {
-                    // Update status indicator
-                    const statusText = document.getElementById('mqttStatusText');
-                    const statusIndicator = document.getElementById('mqttStatusIndicator');
-
-                    if (!data.available) {
-                        statusText.textContent = 'paho-mqtt not installed';
-                        statusIndicator.style.background = 'var(--accent-orange)';
-                    } else if (data.connected) {
-                        statusText.textContent = 'Connected';
-                        statusIndicator.style.background = 'var(--accent-green)';
-                    } else if (data.enabled) {
-                        statusText.textContent = 'Disconnected';
-                        statusIndicator.style.background = 'var(--accent-red)';
-                    } else {
-                        statusText.textContent = 'Disabled';
-                        statusIndicator.style.background = 'var(--text-dim)';
-                    }
-
-                    // Load config
-                    const config = data.config || {};
-                    document.getElementById('mqttEnabled').checked = config.enabled || false;
-                    document.getElementById('mqttHost').value = config.broker_host || 'localhost';
-                    document.getElementById('mqttPort').value = config.broker_port || 1883;
-                    document.getElementById('mqttUsername').value = config.username || '';
-                    document.getElementById('mqttPassword').value = '';
-                    document.getElementById('mqttTopicPrefix').value = config.topic_prefix || 'intercept';
-                    document.getElementById('mqttUseTls').checked = config.use_tls || false;
-
-                    // Load topic settings
-                    const topics = config.topics || {};
-                    document.getElementById('mqttTopicPocsag').checked = topics.pocsag !== false;
-                    document.getElementById('mqttTopicAdsb').checked = topics.adsb !== false;
-                    document.getElementById('mqttTopicAcars').checked = topics.acars !== false;
-                    document.getElementById('mqttTopicAprs').checked = topics.aprs !== false;
-                    document.getElementById('mqttTopicSensor').checked = topics.sensor !== false;
-                    document.getElementById('mqttTopicRtlamr').checked = topics.rtlamr !== false;
-                })
-                .catch(err => {
-                    console.error('Failed to load MQTT settings:', err);
-                    document.getElementById('mqttStatusText').textContent = 'Error loading settings';
-                    document.getElementById('mqttStatusIndicator').style.background = 'var(--accent-red)';
-                });
-        }
-
-        function toggleMqttEnabled() {
-            const enabled = document.getElementById('mqttEnabled').checked;
-            fetch('/mqtt/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: enabled })
-            })
-            .then(r => r.json())
-            .then(data => {
-                loadMqttSettings();
-            })
-            .catch(err => console.error('Failed to toggle MQTT:', err));
-        }
-
-        function saveMqttSettings() {
-            const config = {
-                enabled: document.getElementById('mqttEnabled').checked,
-                broker_host: document.getElementById('mqttHost').value,
-                broker_port: parseInt(document.getElementById('mqttPort').value) || 1883,
-                username: document.getElementById('mqttUsername').value,
-                topic_prefix: document.getElementById('mqttTopicPrefix').value || 'intercept',
-                use_tls: document.getElementById('mqttUseTls').checked,
-                topics: {
-                    pocsag: document.getElementById('mqttTopicPocsag').checked,
-                    adsb: document.getElementById('mqttTopicAdsb').checked,
-                    acars: document.getElementById('mqttTopicAcars').checked,
-                    aprs: document.getElementById('mqttTopicAprs').checked,
-                    sensor: document.getElementById('mqttTopicSensor').checked,
-                    rtlamr: document.getElementById('mqttTopicRtlamr').checked
-                }
-            };
-
-            // Only include password if it was entered
-            const password = document.getElementById('mqttPassword').value;
-            if (password) {
-                config.password = password;
-            }
-
-            fetch('/mqtt/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            })
-            .then(r => r.json())
-            .then(data => {
-                const resultDiv = document.getElementById('mqttTestResult');
-                if (data.status === 'success') {
-                    resultDiv.style.display = 'block';
-                    resultDiv.style.background = 'var(--accent-green)';
-                    resultDiv.style.color = '#000';
-                    resultDiv.textContent = 'Settings saved successfully!';
-                    loadMqttSettings();
-                } else {
-                    resultDiv.style.display = 'block';
-                    resultDiv.style.background = 'var(--accent-red)';
-                    resultDiv.style.color = '#fff';
-                    resultDiv.textContent = 'Error: ' + (data.message || 'Unknown error');
-                }
-                setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
-            })
-            .catch(err => {
-                const resultDiv = document.getElementById('mqttTestResult');
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = 'var(--accent-red)';
-                resultDiv.style.color = '#fff';
-                resultDiv.textContent = 'Error: ' + err.message;
-                setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
-            });
-        }
-
-        function testMqttConnection() {
-            const resultDiv = document.getElementById('mqttTestResult');
-            resultDiv.style.display = 'block';
-            resultDiv.style.background = 'var(--bg-tertiary)';
-            resultDiv.style.color = 'var(--text-primary)';
-            resultDiv.textContent = 'Testing connection...';
-
-            fetch('/mqtt/test', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        resultDiv.style.background = 'var(--accent-green)';
-                        resultDiv.style.color = '#000';
-                        resultDiv.textContent = 'Connection successful!';
-                    } else {
-                        resultDiv.style.background = 'var(--accent-red)';
-                        resultDiv.style.color = '#fff';
-                        resultDiv.textContent = 'Connection failed: ' + (data.message || 'Unknown error');
-                    }
-                })
-                .catch(err => {
-                    resultDiv.style.background = 'var(--accent-red)';
-                    resultDiv.style.color = '#fff';
-                    resultDiv.textContent = 'Test failed: ' + err.message;
-                });
-        }
-
-        function showDependencies() {
-            document.getElementById('depsModal').classList.add('active');
-            loadDependencies();
-        }
-
-        function hideDependencies() {
-            document.getElementById('depsModal').classList.remove('active');
-        }
-
-        function loadDependencies() {
-            const content = document.getElementById('depsContent');
-            content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-dim);">Loading dependencies...</div>';
-
-            fetch('/dependencies')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        content.innerHTML = '<div style="color: var(--accent-red);">Error loading dependencies</div>';
-                        return;
-                    }
-
-                    let html = '';
-                    let totalMissing = 0;
-
-                    for (const [modeKey, mode] of Object.entries(data.modes)) {
-                        const statusColor = mode.ready ? 'var(--accent-green)' : 'var(--accent-red)';
-                        const statusIcon = mode.ready ? '✓' : '✗';
-
-                        html += `
-                            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 3px solid ${statusColor};">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <h3 style="margin: 0; color: var(--accent-cyan);">${mode.name}</h3>
-                                    <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${mode.ready ? 'Ready' : 'Missing Required'}</span>
-                                </div>
-                                <div style="display: grid; gap: 8px;">
-                        `;
-
-                        for (const [toolName, tool] of Object.entries(mode.tools)) {
-                            const installed = tool.installed;
-                            const dotColor = installed ? 'var(--accent-green)' : 'var(--accent-red)';
-                            const requiredBadge = tool.required ? '<span style="background: var(--accent-orange); color: #000; padding: 1px 5px; border-radius: 3px; font-size: 9px; margin-left: 5px;">REQUIRED</span>' : '';
-
-                            if (!installed) totalMissing++;
-
-                            // Get install command for current OS
-                            let installCmd = '';
-                            if (tool.install) {
-                                if (tool.install.pip) {
-                                    installCmd = tool.install.pip;
-                                } else if (data.pkg_manager && tool.install[data.pkg_manager]) {
-                                    installCmd = tool.install[data.pkg_manager];
-                                } else if (tool.install.manual) {
-                                    installCmd = tool.install.manual;
-                                }
-                            }
-
-                            html += `
-                                <div style="display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg-secondary); border-radius: 4px;">
-                                    <span style="color: ${dotColor}; font-size: 16px;">●</span>
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: bold;">${toolName}${requiredBadge}</div>
-                                        <div style="font-size: 11px; color: var(--text-dim);">${tool.description}</div>
-                                    </div>
-                                    ${!installed && installCmd ? `
-                                        <code style="font-size: 10px; background: var(--bg-tertiary); padding: 4px 8px; border-radius: 3px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${installCmd}">${installCmd}</code>
-                                    ` : ''}
-                                    <span style="font-size: 11px; color: ${dotColor}; font-weight: bold;">${installed ? 'OK' : 'MISSING'}</span>
-                                </div>
-                            `;
-                        }
-
-                        html += '</div></div>';
-                    }
-
-                    // Summary at top
-                    const summaryHtml = `
-                        <div style="background: ${totalMissing > 0 ? 'rgba(255, 100, 0, 0.1)' : 'rgba(0, 255, 100, 0.1)'}; border: 1px solid ${totalMissing > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'}; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                            <div style="font-size: 16px; font-weight: bold; color: ${totalMissing > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'};">
-                                ${totalMissing > 0 ? '⚠️ ' + totalMissing + ' tool(s) not found' : '✓ All tools installed'}
-                            </div>
-                            <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
-                                OS: ${data.os} | Package Manager: ${data.pkg_manager}
-                            </div>
-                        </div>
-                    `;
-
-                    content.innerHTML = summaryHtml + html;
-
-                    // Update button indicator
-                    const btn = document.getElementById('depsBtn');
-                    if (btn) {
-                        btn.style.color = totalMissing > 0 ? 'var(--accent-orange)' : 'var(--accent-green)';
-                    }
-                })
-                .catch(err => {
-                    content.innerHTML = '<div style="color: var(--accent-red);">Error loading dependencies: ' + err.message + '</div>';
-                });
-        }
-
         // Check dependencies on page load
         document.addEventListener('DOMContentLoaded', function () {
             // Check if user dismissed the startup check
@@ -12628,6 +12351,9 @@
 
     <!-- Settings Modal -->
     {% include 'partials/settings-modal.html' %}
+
+    <!-- MQTT Modal -->
+    {% include 'partials/mqtt-modal.html' %}
 
     <!-- Toast Container -->
     <div id="toastContainer"></div>

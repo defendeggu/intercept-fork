@@ -30,7 +30,7 @@
     background: var(--timeline-bg);
     border: 1px solid var(--timeline-border);
     border-radius: 6px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 
@@ -497,7 +497,7 @@
     pointer-events: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 240px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .activity-timeline-tooltip-header {

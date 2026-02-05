@@ -7,10 +7,43 @@ import os
 import sys
 
 # Application version
-VERSION = "2.12.0"
+VERSION = "2.13.1"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.13.1",
+        "date": "February 2026",
+        "highlights": [
+            "UI overhaul with slate/cyan theme and JetBrains Mono font",
+            "Signal scanner rewritten with rtl_power sweep and SNR filtering",
+            "Listening Post audio streaming via WAV with retry/fallback",
+            "WiFi connected clients panel now filters to selected AP",
+            "Global navigation bar across all dashboards",
+            "Fixed USB device contention when starting audio pipeline",
+        ]
+    },
+    {
+        "version": "2.13.0",
+        "date": "February 2026",
+        "highlights": [
+            "WiFi client display in AP detail drawer with real-time SSE updates",
+            "Help modal system with keyboard shortcuts reference",
+            "Global navbar and settings modal accessible from all dashboards",
+            "Probed SSID badges for connected clients",
+        ]
+    },
+    {
+        "version": "2.12.1",
+        "date": "February 2026",
+        "highlights": [
+            "SDR device registry to prevent decoder conflicts",
+            "SDR device status panel and ADS-B Bias-T toggle",
+            "Real-time Doppler tracking for ISS SSTV reception",
+            "TCP connection support for Meshtastic",
+            "Shared observer location with auto-start options",
+        ]
+    },
     {
         "version": "2.12.0",
         "date": "January 2026",

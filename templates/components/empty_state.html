@@ -1,0 +1,38 @@
+{#
+  Empty State Component
+  Display when no data is available
+
+  Variables:
+    - icon: Optional SVG icon (default: generic empty icon)
+    - title: Main message (default: "No data")
+    - description: Optional helper text
+    - action_text: Optional button text
+    - action_onclick: Optional button onclick handler
+    - action_href: Optional button link
+#}
+
+<div class="empty-state">
+    <div class="empty-state-icon">
+        {% if icon %}
+        {{ icon|safe }}
+        {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 12h8"/>
+        </svg>
+        {% endif %}
+    </div>
+    <div class="empty-state-title">{{ title|default('No data') }}</div>
+    {% if description %}
+    <div class="empty-state-description">{{ description }}</div>
+    {% endif %}
+    {% if action_text %}
+    <div class="empty-state-action">
+        {% if action_href %}
+        <a href="{{ action_href }}" class="btn btn-primary btn-sm">{{ action_text }}</a>
+        {% elif action_onclick %}
+        <button class="btn btn-primary btn-sm" onclick="{{ action_onclick }}">{{ action_text }}</button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

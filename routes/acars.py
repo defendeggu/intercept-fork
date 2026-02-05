@@ -44,6 +44,9 @@ DEFAULT_ACARS_FREQUENCIES = [
 acars_message_count = 0
 acars_last_message_time = None
 
+# Track which device is being used
+acars_active_device: int | None = None
+
 
 def find_acarsdec():
     """Find acarsdec binary."""
@@ -179,7 +182,7 @@ def acars_status() -> Response:
 @acars_bp.route('/start', methods=['POST'])
 def start_acars() -> Response:
     """Start ACARS decoder."""
-    global acars_message_count, acars_last_message_time
+    global acars_message_count, acars_last_message_time, acars_active_device
 
     with app_module.acars_lock:
         if app_module.acars_process and app_module.acars_process.poll() is None:
@@ -205,6 +208,18 @@ def start_acars() -> Response:
         ppm = validate_ppm(data.get('ppm', '0'))
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+    # Check if device is available
+    device_int = int(device)
+    error = app_module.claim_sdr_device(device_int, 'acars')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error
+        }), 409
+
+    acars_active_device = device_int
 
     # Get frequencies - use provided or defaults
     frequencies = data.get('frequencies', DEFAULT_ACARS_FREQUENCIES)
@@ -286,7 +301,10 @@ def start_acars() -> Response:
         time.sleep(PROCESS_START_WAIT)
 
         if process.poll() is not None:
-            # Process died
+            # Process died - release device
+            if acars_active_device is not None:
+                app_module.release_sdr_device(acars_active_device)
+                acars_active_device = None
             stderr = ''
             if process.stderr:
                 stderr = process.stderr.read().decode('utf-8', errors='replace')
@@ -314,6 +332,10 @@ def start_acars() -> Response:
         })
 
     except Exception as e:
+        # Release device on failure
+        if acars_active_device is not None:
+            app_module.release_sdr_device(acars_active_device)
+            acars_active_device = None
         logger.error(f"Failed to start ACARS decoder: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -321,6 +343,8 @@ def start_acars() -> Response:
 @acars_bp.route('/stop', methods=['POST'])
 def stop_acars() -> Response:
     """Stop ACARS decoder."""
+    global acars_active_device
+
     with app_module.acars_lock:
         if not app_module.acars_process:
             return jsonify({
@@ -337,6 +361,11 @@ def stop_acars() -> Response:
             logger.error(f"Error stopping ACARS: {e}")
 
         app_module.acars_process = None
+
+    # Release device from registry
+    if acars_active_device is not None:
+        app_module.release_sdr_device(acars_active_device)
+        acars_active_device = None
 
     return jsonify({'status': 'stopped'})
 

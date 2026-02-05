@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADS-B History // INTERCEPT</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    {% if offline_settings.fonts_source == 'local' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    {% else %}
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/adsb_history.css') }}">
 </head>
 <body>
@@ -21,6 +28,9 @@
             <a href="/adsb/dashboard" class="back-link">Live Radar</a>
         </div>
     </header>
+
+    {% set active_mode = 'adsb' %}
+    {% include 'partials/nav.html' with context %}
 
     <main class="history-shell">
         <section class="summary-strip">
@@ -462,7 +472,7 @@
 
             if (!points.length) {
                 ctx.fillStyle = 'rgba(156, 163, 175, 0.6)';
-                ctx.font = '12px "JetBrains Mono", monospace';
+                ctx.font = '12px "Space Mono", monospace';
                 ctx.fillText(`No ${label.toLowerCase()} data`, 12, height / 2);
                 return;
             }
@@ -470,7 +480,7 @@
             const series = points.map(p => p[field]).filter(v => v !== null && v !== undefined);
             if (!series.length) {
                 ctx.fillStyle = 'rgba(156, 163, 175, 0.6)';
-                ctx.font = '12px "JetBrains Mono", monospace';
+                ctx.font = '12px "Space Mono", monospace';
                 ctx.fillText(`No ${label.toLowerCase()} data`, 12, height / 2);
                 return;
             }
@@ -511,7 +521,7 @@
             }
 
             ctx.fillStyle = 'rgba(226, 232, 240, 0.8)';
-            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.font = '11px "Space Mono", monospace';
             ctx.fillText(`${maxVal} ${unit}`, 12, padding);
             ctx.fillText(`${minVal} ${unit}`, 12, height - padding);
         }
@@ -558,11 +568,9 @@
             }
             devices.forEach((dev, idx) => {
                 const index = dev.index !== undefined ? dev.index : idx;
-                const type = (dev.sdr_type || dev.driver || 'RTL-SDR').toUpperCase();
-                const serial = dev.serial ? ` (${dev.serial.slice(-4)})` : '';
                 const opt = document.createElement('option');
                 opt.value = index;
-                opt.textContent = `${type} #${index}${serial}`;
+                opt.textContent = `SDR ${index}: ${dev.name}`;
                 sessionDeviceSelect.appendChild(opt);
             });
             sessionDeviceSelect.disabled = false;
@@ -763,5 +771,14 @@
             }
         });
     </script>
+
+    <!-- Settings Modal -->
+    {% include 'partials/settings-modal.html' %}
+
+    <!-- Help Modal -->
+    {% include 'partials/help-modal.html' %}
+
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/global-nav.js') }}"></script>
 </body>
 </html>

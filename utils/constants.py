@@ -254,3 +254,23 @@ MAX_DSC_MESSAGE_AGE_SECONDS = 3600  # 1 hour
 
 # DSC process termination timeout
 DSC_TERMINATE_TIMEOUT = 3
+
+
+# =============================================================================
+# DEAUTH ATTACK DETECTION
+# =============================================================================
+
+# Time window for grouping deauth packets (seconds)
+DEAUTH_DETECTION_WINDOW = 5
+
+# Number of deauth packets in window to trigger alert
+DEAUTH_ALERT_THRESHOLD = 10
+
+# Number of deauth packets in window for critical severity
+DEAUTH_CRITICAL_THRESHOLD = 50
+
+# Maximum age for deauth alerts in DataStore (seconds)
+MAX_DEAUTH_ALERTS_AGE_SECONDS = 300  # 5 minutes
+
+# Deauth detector sniff timeout (seconds)
+DEAUTH_SNIFF_TIMEOUT = 0.5

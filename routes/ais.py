@@ -370,6 +370,16 @@ def start_ais():
         app_module.ais_process = None
         logger.info("Killed existing AIS process")
 
+    # Check if device is available
+    device_int = int(device)
+    error = app_module.claim_sdr_device(device_int, 'ais')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error
+        }), 409
+
     # Build command using SDR abstraction
     sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
     builder = SDRFactory.get_builder(sdr_type)
@@ -400,6 +410,8 @@ def start_ais():
         time.sleep(2.0)
 
         if app_module.ais_process.poll() is not None:
+            # Release device on failure
+            app_module.release_sdr_device(device_int)
             stderr_output = ''
             if app_module.ais_process.stderr:
                 try:
@@ -425,6 +437,8 @@ def start_ais():
             'port': tcp_port
         })
     except Exception as e:
+        # Release device on failure
+        app_module.release_sdr_device(device_int)
         logger.error(f"Failed to start AIS-catcher: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -448,6 +462,11 @@ def stop_ais():
                     pass
             app_module.ais_process = None
             logger.info("AIS process stopped")
+
+        # Release device from registry
+        if ais_active_device is not None:
+            app_module.release_sdr_device(ais_active_device)
+
         ais_running = False
         ais_active_device = None
 

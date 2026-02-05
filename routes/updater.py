@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify, request
 
 from utils.logging import get_logger
 from utils.updater import (
     check_for_updates,
-    get_update_status,
     dismiss_update,
+    get_update_status,
     perform_update,
+    restart_application,
 )
 
 logger = get_logger('intercept.routes.updater')
@@ -137,3 +138,42 @@ def dismiss_notification() -> Response:
             'success': False,
             'error': str(e)
         }), 500
+
+
+@updater_bp.route('/restart', methods=['POST'])
+def restart_app() -> Response:
+    """
+    Restart the application.
+
+    This endpoint triggers a graceful restart of the application:
+    1. Stops all running decoder processes
+    2. Cleans up global state
+    3. Replaces the current process with a fresh instance
+
+    The response may not be received by the client since the process
+    is replaced immediately. Clients should poll /health until the
+    server responds again.
+
+    Returns:
+        JSON with restart status (may not be delivered)
+    """
+    import threading
+
+    logger.info("Restart requested via API")
+
+    # Send response before restarting
+    # Use a short delay to allow the response to be sent
+    def delayed_restart():
+        import time
+        time.sleep(0.5)  # Allow response to be sent
+        restart_application()
+
+    # Start restart in a background thread so we can return a response
+    restart_thread = threading.Thread(target=delayed_restart, daemon=False)
+    restart_thread.start()
+
+    return jsonify({
+        'success': True,
+        'message': 'Application is restarting. Please wait...',
+        'action': 'restart'
+    })

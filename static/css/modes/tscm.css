@@ -167,7 +167,7 @@
 }
 .tscm-privilege-warning .warning-action {
     margin-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-cyan);
     background: rgba(0, 0, 0, 0.3);
@@ -972,7 +972,7 @@
 .known-device-id {
     font-size: 10px;
     color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 .known-device-actions {
     display: flex;
@@ -1211,7 +1211,7 @@
     color: var(--text-muted);
     display: block;
     margin-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 .cap-can-list, .cap-cannot-list {
     list-style: none;

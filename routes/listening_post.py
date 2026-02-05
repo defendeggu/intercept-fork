@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import select
@@ -16,6 +17,7 @@ from typing import Generator, Optional, List, Dict
 
 from flask import Blueprint, jsonify, request, Response
 
+import app as app_module
 from utils.logging import get_logger
 from utils.sse import format_sse
 from utils.constants import (
@@ -47,18 +49,23 @@ scanner_running = False
 scanner_lock = threading.Lock()
 scanner_paused = False
 scanner_current_freq = 0.0
+scanner_active_device: Optional[int] = None
+listening_active_device: Optional[int] = None
+scanner_power_process: Optional[subprocess.Popen] = None
 scanner_config = {
     'start_freq': 88.0,
     'end_freq': 108.0,
     'step': 0.1,
     'modulation': 'wfm',
-    'squelch': 20,
+    'squelch': 0,
     'dwell_time': 10.0,  # Seconds to stay on active frequency
     'scan_delay': 0.1,  # Seconds between frequency hops (keep low for fast scanning)
     'device': 0,
     'gain': 40,
     'bias_t': False,  # Bias-T power for external LNA
     'sdr_type': 'rtlsdr',  # SDR type: rtlsdr, hackrf, airspy, limesdr, sdrplay
+    'scan_method': 'power',  # power (rtl_power) or classic (rtl_fm hop)
+    'snr_threshold': 8,
 }
 
 # Activity log
@@ -77,6 +84,11 @@ scanner_queue: queue.Queue = queue.Queue(maxsize=100)
 def find_rtl_fm() -> str | None:
     """Find rtl_fm binary."""
     return shutil.which('rtl_fm')
+
+
+def find_rtl_power() -> str | None:
+    """Find rtl_power binary."""
+    return shutil.which('rtl_power')
 
 
 def find_rx_fm() -> str | None:
@@ -161,7 +173,9 @@ def scanner_loop():
                 scanner_queue.put_nowait({
                     'type': 'freq_change',
                     'frequency': current_freq,
-                    'scanning': not signal_detected
+                    'scanning': not signal_detected,
+                    'range_start': scanner_config['start_freq'],
+                    'range_end': scanner_config['end_freq']
                 })
             except queue.Full:
                 pass
@@ -238,11 +252,14 @@ def scanner_loop():
                     if mod == 'wfm':
                         # WFM: threshold 500-10000 based on squelch
                         threshold = 500 + (squelch * 95)
+                        min_threshold = 1500
                     else:
                         # AM/NFM: threshold 300-6500 based on squelch
                         threshold = 300 + (squelch * 62)
+                        min_threshold = 900
 
-                    audio_detected = rms > threshold
+                    effective_threshold = max(threshold, min_threshold)
+                    audio_detected = rms > effective_threshold
 
                 # Send level info to clients
                 try:
@@ -250,8 +267,10 @@ def scanner_loop():
                         'type': 'scan_update',
                         'frequency': current_freq,
                         'level': int(rms),
-                        'threshold': int(threshold) if 'threshold' in dir() else 0,
-                        'detected': audio_detected
+                        'threshold': int(effective_threshold) if 'effective_threshold' in dir() else 0,
+                        'detected': audio_detected,
+                        'range_start': scanner_config['start_freq'],
+                        'range_end': scanner_config['end_freq']
                     })
                 except queue.Full:
                     pass
@@ -268,15 +287,21 @@ def scanner_loop():
                         # Start audio streaming for user
                         _start_audio_stream(current_freq, mod)
 
-                        try:
-                            scanner_queue.put_nowait({
-                                'type': 'signal_found',
-                                'frequency': current_freq,
-                                'modulation': mod,
-                                'audio_streaming': True
-                            })
-                        except queue.Full:
-                            pass
+                    try:
+                        snr_db = round(10 * math.log10(rms / effective_threshold), 1) if rms > 0 and effective_threshold > 0 else 0.0
+                        scanner_queue.put_nowait({
+                            'type': 'signal_found',
+                            'frequency': current_freq,
+                            'modulation': mod,
+                            'audio_streaming': True,
+                            'level': int(rms),
+                            'threshold': int(effective_threshold),
+                            'snr': snr_db,
+                            'range_start': scanner_config['start_freq'],
+                            'range_end': scanner_config['end_freq']
+                        })
+                    except queue.Full:
+                        pass
 
                     # Check for skip signal
                     if scanner_skip_signal:
@@ -304,6 +329,26 @@ def scanner_loop():
                         time.sleep(0.2)
 
                     last_signal_time = time.time()
+
+                    # After dwell, move on to keep scanning
+                    if scanner_running and not scanner_skip_signal:
+                        signal_detected = False
+                        _stop_audio_stream()
+                        try:
+                            scanner_queue.put_nowait({
+                                'type': 'signal_lost',
+                                'frequency': current_freq,
+                                'range_start': scanner_config['start_freq'],
+                                'range_end': scanner_config['end_freq']
+                            })
+                        except queue.Full:
+                            pass
+
+                        current_freq += step_mhz
+                        if current_freq > scanner_config['end_freq']:
+                            current_freq = scanner_config['start_freq']
+                            add_activity_log('scan_cycle', current_freq, 'Scan cycle complete')
+                        time.sleep(scanner_config['scan_delay'])
 
                 else:
                     # No signal at this frequency
@@ -344,6 +389,242 @@ def scanner_loop():
         _stop_audio_stream()
         add_activity_log('scanner_stop', scanner_current_freq, 'Scanner stopped')
         logger.info("Scanner thread stopped")
+
+
+def scanner_loop_power():
+    """Power sweep scanner using rtl_power to detect peaks."""
+    global scanner_running, scanner_paused, scanner_current_freq, scanner_power_process
+
+    logger.info("Power sweep scanner thread started")
+    add_activity_log('scanner_start', scanner_config['start_freq'],
+                     f"Power sweep {scanner_config['start_freq']}-{scanner_config['end_freq']} MHz")
+
+    rtl_power_path = find_rtl_power()
+    if not rtl_power_path:
+        logger.error("rtl_power not found")
+        add_activity_log('error', 0, 'rtl_power not found')
+        scanner_running = False
+        return
+
+    try:
+        while scanner_running:
+            if scanner_paused:
+                time.sleep(0.1)
+                continue
+
+            start_mhz = scanner_config['start_freq']
+            end_mhz = scanner_config['end_freq']
+            step_khz = scanner_config['step']
+            gain = scanner_config['gain']
+            device = scanner_config['device']
+            squelch = scanner_config['squelch']
+            mod = scanner_config['modulation']
+
+            # Configure sweep
+            bin_hz = max(1000, int(step_khz * 1000))
+            start_hz = int(start_mhz * 1e6)
+            end_hz = int(end_mhz * 1e6)
+            # Integration time per sweep (seconds)
+            integration = max(0.3, min(1.0, scanner_config.get('scan_delay', 0.5)))
+
+            cmd = [
+                rtl_power_path,
+                '-f', f'{start_hz}:{end_hz}:{bin_hz}',
+                '-i', f'{integration}',
+                '-1',
+                '-g', str(gain),
+                '-d', str(device),
+            ]
+
+            try:
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                scanner_power_process = proc
+                stdout, _ = proc.communicate(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout = b''
+            finally:
+                scanner_power_process = None
+
+            if not scanner_running:
+                break
+
+            if not stdout:
+                add_activity_log('error', start_mhz, 'Power sweep produced no data')
+                try:
+                    scanner_queue.put_nowait({
+                        'type': 'scan_update',
+                        'frequency': end_mhz,
+                        'level': 0,
+                        'threshold': int(float(scanner_config.get('snr_threshold', 12)) * 100),
+                        'detected': False,
+                        'range_start': scanner_config['start_freq'],
+                        'range_end': scanner_config['end_freq']
+                    })
+                except queue.Full:
+                    pass
+                time.sleep(0.2)
+                continue
+
+            lines = stdout.decode(errors='ignore').splitlines()
+            segments = []
+            for line in lines:
+                if not line or line.startswith('#'):
+                    continue
+
+                parts = [p.strip() for p in line.split(',')]
+                # Find start_hz token
+                start_idx = None
+                for i, tok in enumerate(parts):
+                    try:
+                        val = float(tok)
+                    except ValueError:
+                        continue
+                    if val > 1e5:
+                        start_idx = i
+                        break
+                if start_idx is None or len(parts) < start_idx + 6:
+                    continue
+
+                try:
+                    sweep_start = float(parts[start_idx])
+                    sweep_end = float(parts[start_idx + 1])
+                    sweep_bin = float(parts[start_idx + 2])
+                    raw_values = []
+                    for v in parts[start_idx + 3:]:
+                        try:
+                            raw_values.append(float(v))
+                        except ValueError:
+                            continue
+                    # rtl_power may include a samples field before the power list
+                    if raw_values and raw_values[0] >= 0 and any(val < 0 for val in raw_values[1:]):
+                        raw_values = raw_values[1:]
+                    bin_values = raw_values
+                except ValueError:
+                    continue
+
+                if not bin_values:
+                    continue
+
+                segments.append((sweep_start, sweep_end, sweep_bin, bin_values))
+
+            if not segments:
+                add_activity_log('error', start_mhz, 'Power sweep bins missing')
+                try:
+                    scanner_queue.put_nowait({
+                        'type': 'scan_update',
+                        'frequency': end_mhz,
+                        'level': 0,
+                        'threshold': int(float(scanner_config.get('snr_threshold', 12)) * 100),
+                        'detected': False,
+                        'range_start': scanner_config['start_freq'],
+                        'range_end': scanner_config['end_freq']
+                    })
+                except queue.Full:
+                    pass
+                time.sleep(0.2)
+                continue
+
+            # Process segments in ascending frequency order to avoid backtracking in UI
+            segments.sort(key=lambda s: s[0])
+            total_bins = sum(len(seg[3]) for seg in segments)
+            if total_bins <= 0:
+                time.sleep(0.2)
+                continue
+            segment_offset = 0
+
+            for sweep_start, sweep_end, sweep_bin, bin_values in segments:
+                # Noise floor (median)
+                sorted_vals = sorted(bin_values)
+                mid = len(sorted_vals) // 2
+                noise_floor = sorted_vals[mid]
+
+                # SNR threshold (dB)
+                snr_threshold = float(scanner_config.get('snr_threshold', 12))
+
+                # Emit progress updates (throttled)
+                emit_stride = max(1, len(bin_values) // 60)
+                for idx, val in enumerate(bin_values):
+                    if idx % emit_stride != 0 and idx != len(bin_values) - 1:
+                        continue
+                    freq_hz = sweep_start + sweep_bin * idx
+                    scanner_current_freq = freq_hz / 1e6
+                    snr = val - noise_floor
+                    level = int(max(0, snr) * 100)
+                    threshold = int(snr_threshold * 100)
+                    progress = min(1.0, (segment_offset + idx) / max(1, total_bins - 1))
+                    try:
+                        scanner_queue.put_nowait({
+                            'type': 'scan_update',
+                            'frequency': scanner_current_freq,
+                            'level': level,
+                            'threshold': threshold,
+                            'detected': snr >= snr_threshold,
+                            'progress': progress,
+                            'range_start': scanner_config['start_freq'],
+                            'range_end': scanner_config['end_freq']
+                        })
+                    except queue.Full:
+                        pass
+                segment_offset += len(bin_values)
+
+                # Detect peaks (clusters above threshold)
+                peaks = []
+                in_cluster = False
+                peak_idx = None
+                peak_val = None
+                for idx, val in enumerate(bin_values):
+                    snr = val - noise_floor
+                    if snr >= snr_threshold:
+                        if not in_cluster:
+                            in_cluster = True
+                            peak_idx = idx
+                            peak_val = val
+                        else:
+                            if val > peak_val:
+                                peak_val = val
+                                peak_idx = idx
+                    else:
+                        if in_cluster and peak_idx is not None:
+                            peaks.append((peak_idx, peak_val))
+                        in_cluster = False
+                        peak_idx = None
+                        peak_val = None
+                if in_cluster and peak_idx is not None:
+                    peaks.append((peak_idx, peak_val))
+
+                for idx, val in peaks:
+                    freq_hz = sweep_start + sweep_bin * (idx + 0.5)
+                    freq_mhz = freq_hz / 1e6
+                    snr = val - noise_floor
+                    level = int(max(0, snr) * 100)
+                    threshold = int(snr_threshold * 100)
+                    add_activity_log('signal_found', freq_mhz,
+                                     f'Peak detected at {freq_mhz:.3f} MHz ({mod.upper()})')
+                    try:
+                        scanner_queue.put_nowait({
+                            'type': 'signal_found',
+                            'frequency': freq_mhz,
+                            'modulation': mod,
+                            'audio_streaming': False,
+                            'level': level,
+                            'threshold': threshold,
+                            'snr': round(snr, 1),
+                            'range_start': scanner_config['start_freq'],
+                            'range_end': scanner_config['end_freq']
+                        })
+                    except queue.Full:
+                        pass
+
+            add_activity_log('scan_cycle', start_mhz, 'Power sweep complete')
+            time.sleep(max(0.1, scanner_config.get('scan_delay', 0.5)))
+
+    except Exception as e:
+        logger.error(f"Power sweep scanner error: {e}")
+    finally:
+        scanner_running = False
+        add_activity_log('scanner_stop', scanner_current_freq, 'Scanner stopped')
+        logger.info("Power sweep scanner thread stopped")
 
 
 def _start_audio_stream(frequency: float, modulation: str):
@@ -428,14 +709,17 @@ def _start_audio_stream(frequency: float, modulation: str):
             ffmpeg_path,
             '-hide_banner',
             '-loglevel', 'error',
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+            '-probesize', '32',
+            '-analyzeduration', '0',
             '-f', 's16le',
             '-ar', str(resample_rate),
             '-ac', '1',
             '-i', 'pipe:0',
-            '-acodec', 'libmp3lame',
-            '-b:a', '128k',
+            '-acodec', 'pcm_s16le',
             '-ar', '44100',
-            '-f', 'mp3',
+            '-f', 'wav',
             'pipe:1'
         ]
 
@@ -447,35 +731,56 @@ def _start_audio_stream(frequency: float, modulation: str):
             shell_cmd = f"{' '.join(sdr_cmd)} 2>{rtl_stderr_log} | {' '.join(encoder_cmd)} 2>{ffmpeg_stderr_log}"
             logger.info(f"Starting audio: {frequency} MHz, mod={modulation}, device={scanner_config['device']}")
 
-            audio_rtl_process = None  # Not used in shell mode
-            audio_process = subprocess.Popen(
-                shell_cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=0,
-                start_new_session=True  # Create new process group for clean shutdown
-            )
+            # Retry loop for USB device contention (device may not be
+            # released immediately after a previous process exits)
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                audio_rtl_process = None  # Not used in shell mode
+                audio_process = subprocess.Popen(
+                    shell_cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=0,
+                    start_new_session=True  # Create new process group for clean shutdown
+                )
 
-            # Brief delay to check if process started successfully
-            time.sleep(0.3)
+                # Brief delay to check if process started successfully
+                time.sleep(0.3)
 
-            if audio_process.poll() is not None:
-                # Read stderr from temp files
-                rtl_stderr = ''
-                ffmpeg_stderr = ''
-                try:
-                    with open(rtl_stderr_log, 'r') as f:
-                        rtl_stderr = f.read().strip()
-                except:
-                    pass
-                try:
-                    with open(ffmpeg_stderr_log, 'r') as f:
-                        ffmpeg_stderr = f.read().strip()
-                except:
-                    pass
-                logger.error(f"Audio pipeline exited immediately. rtl_fm stderr: {rtl_stderr}, ffmpeg stderr: {ffmpeg_stderr}")
-                return
+                if audio_process.poll() is not None:
+                    # Read stderr from temp files
+                    rtl_stderr = ''
+                    ffmpeg_stderr = ''
+                    try:
+                        with open(rtl_stderr_log, 'r') as f:
+                            rtl_stderr = f.read().strip()
+                    except Exception:
+                        pass
+                    try:
+                        with open(ffmpeg_stderr_log, 'r') as f:
+                            ffmpeg_stderr = f.read().strip()
+                    except Exception:
+                        pass
+
+                    if 'usb_claim_interface' in rtl_stderr and attempt < max_attempts - 1:
+                        logger.warning(f"USB device busy (attempt {attempt + 1}/{max_attempts}), waiting for release...")
+                        time.sleep(1.0)
+                        continue
+
+                    logger.error(f"Audio pipeline exited immediately. rtl_fm stderr: {rtl_stderr}, ffmpeg stderr: {ffmpeg_stderr}")
+                    return
+
+                # Pipeline started successfully
+                break
+
+            # Validate that audio is producing data quickly
+            try:
+                ready, _, _ = select.select([audio_process.stdout], [], [], 4.0)
+                if not ready:
+                    logger.warning("Audio pipeline produced no data in startup window")
+            except Exception as e:
+                logger.warning(f"Audio startup check failed: {e}")
 
             audio_running = True
             audio_frequency = frequency
@@ -515,18 +820,19 @@ def _stop_audio_stream_internal():
     audio_process = None
     audio_rtl_process = None
 
-    # Kill any orphaned rtl_fm and ffmpeg processes
-    try:
-        subprocess.run(['pkill', '-9', 'rtl_fm'], capture_output=True, timeout=0.5)
-    except:
-        pass
+    # Kill any orphaned rtl_fm, rtl_power, and ffmpeg processes
+    for proc_pattern in ['rtl_fm', 'rtl_power']:
+        try:
+            subprocess.run(['pkill', '-9', proc_pattern], capture_output=True, timeout=0.5)
+        except Exception:
+            pass
     try:
         subprocess.run(['pkill', '-9', '-f', 'ffmpeg.*pipe:0'], capture_output=True, timeout=0.5)
-    except:
+    except Exception:
         pass
 
-    # Pause for SDR device to be released (important for frequency/modulation changes)
-    time.sleep(0.7)
+    # Pause for SDR device USB interface to be released by kernel
+    time.sleep(1.0)
 
 
 # ============================================
@@ -537,6 +843,7 @@ def _stop_audio_stream_internal():
 def check_tools() -> Response:
     """Check for required tools."""
     rtl_fm = find_rtl_fm()
+    rtl_power = find_rtl_power()
     rx_fm = find_rx_fm()
     ffmpeg = find_ffmpeg()
 
@@ -550,6 +857,7 @@ def check_tools() -> Response:
 
     return jsonify({
         'rtl_fm': rtl_fm is not None,
+        'rtl_power': rtl_power is not None,
         'rx_fm': rx_fm is not None,
         'ffmpeg': ffmpeg is not None,
         'available': (rtl_fm is not None or rx_fm is not None) and ffmpeg is not None,
@@ -560,7 +868,7 @@ def check_tools() -> Response:
 @listening_post_bp.route('/scanner/start', methods=['POST'])
 def start_scanner() -> Response:
     """Start the frequency scanner."""
-    global scanner_thread, scanner_running, scanner_config
+    global scanner_thread, scanner_running, scanner_config, scanner_active_device, listening_active_device
 
     with scanner_lock:
         if scanner_running:
@@ -568,6 +876,13 @@ def start_scanner() -> Response:
                 'status': 'error',
                 'message': 'Scanner already running'
             }), 409
+
+    # Clear stale queue entries so UI updates immediately
+    try:
+        while True:
+            scanner_queue.get_nowait()
+    except queue.Empty:
+        pass
 
     data = request.json or {}
 
@@ -577,13 +892,16 @@ def start_scanner() -> Response:
         scanner_config['end_freq'] = float(data.get('end_freq', 108.0))
         scanner_config['step'] = float(data.get('step', 0.1))
         scanner_config['modulation'] = str(data.get('modulation', 'wfm')).lower()
-        scanner_config['squelch'] = int(data.get('squelch', 20))
+        scanner_config['squelch'] = int(data.get('squelch', 0))
         scanner_config['dwell_time'] = float(data.get('dwell_time', 3.0))
         scanner_config['scan_delay'] = float(data.get('scan_delay', 0.5))
         scanner_config['device'] = int(data.get('device', 0))
         scanner_config['gain'] = int(data.get('gain', 40))
         scanner_config['bias_t'] = bool(data.get('bias_t', False))
         scanner_config['sdr_type'] = str(data.get('sdr_type', 'rtlsdr')).lower()
+        scanner_config['scan_method'] = str(data.get('scan_method', '')).lower().strip()
+        if data.get('snr_threshold') is not None:
+            scanner_config['snr_threshold'] = float(data.get('snr_threshold'))
     except (ValueError, TypeError) as e:
         return jsonify({
             'status': 'error',
@@ -597,25 +915,68 @@ def start_scanner() -> Response:
             'message': 'start_freq must be less than end_freq'
         }), 400
 
-    # Check tools based on SDR type
-    sdr_type = scanner_config['sdr_type']
-    if sdr_type == 'rtlsdr':
-        if not find_rtl_fm():
-            return jsonify({
-                'status': 'error',
-                'message': 'rtl_fm not found. Install rtl-sdr tools.'
-            }), 503
-    else:
-        if not find_rx_fm():
-            return jsonify({
-                'status': 'error',
-                'message': f'rx_fm not found. Install SoapySDR utilities for {sdr_type}.'
-            }), 503
+    # Decide scan method
+    if not scanner_config['scan_method']:
+        scanner_config['scan_method'] = 'power' if find_rtl_power() else 'classic'
 
-    # Start scanner thread
-    scanner_running = True
-    scanner_thread = threading.Thread(target=scanner_loop, daemon=True)
-    scanner_thread.start()
+    sdr_type = scanner_config['sdr_type']
+
+    # Power scan only supports RTL-SDR for now
+    if scanner_config['scan_method'] == 'power':
+        if sdr_type != 'rtlsdr' or not find_rtl_power():
+            scanner_config['scan_method'] = 'classic'
+
+    # Check tools based on chosen method
+    if scanner_config['scan_method'] == 'power':
+        if not find_rtl_power():
+            return jsonify({
+                'status': 'error',
+                'message': 'rtl_power not found. Install rtl-sdr tools.'
+            }), 503
+        # Release listening device if active
+        if listening_active_device is not None:
+            app_module.release_sdr_device(listening_active_device)
+            listening_active_device = None
+        # Claim device for scanner
+        error = app_module.claim_sdr_device(scanner_config['device'], 'scanner')
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+        scanner_active_device = scanner_config['device']
+        scanner_running = True
+        scanner_thread = threading.Thread(target=scanner_loop_power, daemon=True)
+        scanner_thread.start()
+    else:
+        if sdr_type == 'rtlsdr':
+            if not find_rtl_fm():
+                return jsonify({
+                    'status': 'error',
+                    'message': 'rtl_fm not found. Install rtl-sdr tools.'
+                }), 503
+        else:
+            if not find_rx_fm():
+                return jsonify({
+                    'status': 'error',
+                    'message': f'rx_fm not found. Install SoapySDR utilities for {sdr_type}.'
+                }), 503
+        if listening_active_device is not None:
+            app_module.release_sdr_device(listening_active_device)
+            listening_active_device = None
+        error = app_module.claim_sdr_device(scanner_config['device'], 'scanner')
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+        scanner_active_device = scanner_config['device']
+
+        scanner_running = True
+        scanner_thread = threading.Thread(target=scanner_loop, daemon=True)
+        scanner_thread.start()
 
     return jsonify({
         'status': 'started',
@@ -626,10 +987,23 @@ def start_scanner() -> Response:
 @listening_post_bp.route('/scanner/stop', methods=['POST'])
 def stop_scanner() -> Response:
     """Stop the frequency scanner."""
-    global scanner_running
+    global scanner_running, scanner_active_device, scanner_power_process
 
     scanner_running = False
     _stop_audio_stream()
+    if scanner_power_process and scanner_power_process.poll() is None:
+        try:
+            scanner_power_process.terminate()
+            scanner_power_process.wait(timeout=1)
+        except Exception:
+            try:
+                scanner_power_process.kill()
+            except Exception:
+                pass
+        scanner_power_process = None
+    if scanner_active_device is not None:
+        app_module.release_sdr_device(scanner_active_device)
+        scanner_active_device = None
 
     return jsonify({'status': 'stopped'})
 
@@ -790,11 +1164,33 @@ def get_presets() -> Response:
 @listening_post_bp.route('/audio/start', methods=['POST'])
 def start_audio() -> Response:
     """Start audio at specific frequency (manual mode)."""
-    global scanner_running
+    global scanner_running, scanner_active_device, listening_active_device, scanner_power_process, scanner_thread
 
     # Stop scanner if running
     if scanner_running:
         scanner_running = False
+        if scanner_active_device is not None:
+            app_module.release_sdr_device(scanner_active_device)
+            scanner_active_device = None
+        if scanner_thread and scanner_thread.is_alive():
+            try:
+                scanner_thread.join(timeout=2.0)
+            except Exception:
+                pass
+        if scanner_power_process and scanner_power_process.poll() is None:
+            try:
+                scanner_power_process.terminate()
+                scanner_power_process.wait(timeout=1)
+            except Exception:
+                try:
+                    scanner_power_process.kill()
+                except Exception:
+                    pass
+            scanner_power_process = None
+        try:
+            subprocess.run(['pkill', '-9', 'rtl_power'], capture_output=True, timeout=0.5)
+        except Exception:
+            pass
         time.sleep(0.5)
 
     data = request.json or {}
@@ -838,6 +1234,19 @@ def start_audio() -> Response:
     scanner_config['device'] = device
     scanner_config['sdr_type'] = sdr_type
 
+    # Claim device for listening audio
+    if listening_active_device is None or listening_active_device != device:
+        if listening_active_device is not None:
+            app_module.release_sdr_device(listening_active_device)
+        error = app_module.claim_sdr_device(device, 'listening')
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+        listening_active_device = device
+
     _start_audio_stream(frequency, modulation)
 
     if audio_running:
@@ -856,7 +1265,11 @@ def start_audio() -> Response:
 @listening_post_bp.route('/audio/stop', methods=['POST'])
 def stop_audio() -> Response:
     """Stop audio."""
+    global listening_active_device
     _stop_audio_stream()
+    if listening_active_device is not None:
+        app_module.release_sdr_device(listening_active_device)
+        listening_active_device = None
     return jsonify({'status': 'stopped'})
 
 
@@ -870,9 +1283,71 @@ def audio_status() -> Response:
     })
 
 
+@listening_post_bp.route('/audio/debug')
+def audio_debug() -> Response:
+    """Get audio debug status and recent stderr logs."""
+    rtl_log_path = '/tmp/rtl_fm_stderr.log'
+    ffmpeg_log_path = '/tmp/ffmpeg_stderr.log'
+    sample_path = '/tmp/audio_probe.bin'
+
+    def _read_log(path: str) -> str:
+        try:
+            with open(path, 'r') as handle:
+                return handle.read().strip()
+        except Exception:
+            return ''
+
+    return jsonify({
+        'running': audio_running,
+        'frequency': audio_frequency,
+        'modulation': audio_modulation,
+        'sdr_type': scanner_config.get('sdr_type', 'rtlsdr'),
+        'device': scanner_config.get('device', 0),
+        'gain': scanner_config.get('gain', 0),
+        'squelch': scanner_config.get('squelch', 0),
+        'audio_process_alive': bool(audio_process and audio_process.poll() is None),
+        'rtl_fm_stderr': _read_log(rtl_log_path),
+        'ffmpeg_stderr': _read_log(ffmpeg_log_path),
+        'audio_probe_bytes': os.path.getsize(sample_path) if os.path.exists(sample_path) else 0,
+    })
+
+
+@listening_post_bp.route('/audio/probe')
+def audio_probe() -> Response:
+    """Grab a small chunk of audio bytes from the pipeline for debugging."""
+    global audio_process
+
+    if not audio_process or not audio_process.stdout:
+        return jsonify({'status': 'error', 'message': 'audio process not running'}), 400
+
+    sample_path = '/tmp/audio_probe.bin'
+    size = 0
+    try:
+        ready, _, _ = select.select([audio_process.stdout], [], [], 2.0)
+        if not ready:
+            return jsonify({'status': 'error', 'message': 'no data available'}), 504
+        data = audio_process.stdout.read(4096)
+        if not data:
+            return jsonify({'status': 'error', 'message': 'no data read'}), 504
+        with open(sample_path, 'wb') as handle:
+            handle.write(data)
+        size = len(data)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    return jsonify({'status': 'ok', 'bytes': size})
+
+
 @listening_post_bp.route('/audio/stream')
 def stream_audio() -> Response:
-    """Stream MP3 audio."""
+    """Stream WAV audio."""
+    # Optionally restart pipeline so the stream starts with a fresh header
+    if request.args.get('fresh') == '1' and audio_running:
+        try:
+            _start_audio_stream(audio_frequency or 0.0, audio_modulation or 'fm')
+        except Exception as e:
+            logger.error(f"Audio stream restart failed: {e}")
+
     # Wait for audio to be ready (up to 2 seconds for modulation/squelch changes)
     for _ in range(40):
         if audio_running and audio_process:
@@ -888,6 +1363,8 @@ def stream_audio() -> Response:
         if not proc or not proc.stdout:
             return
         try:
+            # First byte timeout to avoid hanging clients forever
+            first_chunk_deadline = time.time() + 3.0
             while audio_running and proc.poll() is None:
                 # Use select to avoid blocking forever
                 ready, _, _ = select.select([proc.stdout], [], [], 2.0)
@@ -898,6 +1375,10 @@ def stream_audio() -> Response:
                     else:
                         break
                 else:
+                    # If no data arrives shortly after start, exit so caller can retry
+                    if time.time() > first_chunk_deadline:
+                        logger.warning("Audio stream timed out waiting for first chunk")
+                        break
                     # Timeout - check if process died
                     if proc.poll() is not None:
                         break
@@ -908,9 +1389,9 @@ def stream_audio() -> Response:
 
     return Response(
         generate(),
-        mimetype='audio/mpeg',
+        mimetype='audio/wav',
         headers={
-            'Content-Type': 'audio/mpeg',
+            'Content-Type': 'audio/wav',
             'Cache-Control': 'no-cache, no-store',
             'X-Accel-Buffering': 'no',
             'Transfer-Encoding': 'chunked',

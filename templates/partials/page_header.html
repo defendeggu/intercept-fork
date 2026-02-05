@@ -1,0 +1,37 @@
+{#
+  Page Header Partial
+  Consistent page title with optional description and actions
+
+  Variables:
+    - title: Page title (required)
+    - description: Optional description text
+    - back_url: Optional back link URL
+    - back_text: Optional back link text (default: "Back")
+#}
+
+<div class="page-header">
+    {% if back_url %}
+    <a href="{{ back_url }}" class="back-link mb-4">
+        <span class="icon icon--sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+        </span>
+        {{ back_text|default('Back') }}
+    </a>
+    {% endif %}
+
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="page-title">{{ title }}</h1>
+            {% if description %}
+            <p class="page-description">{{ description }}</p>
+            {% endif %}
+        </div>
+        {% if caller is defined %}
+        <div class="page-actions">
+            {{ caller() }}
+        </div>
+        {% endif %}
+    </div>
+</div>

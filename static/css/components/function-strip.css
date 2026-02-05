@@ -1,0 +1,371 @@
+/* Function Strip (Action Bar) - Shared across modes
+ * Based on APRS strip pattern, reusable for Pager, Sensor, Bluetooth, WiFi, TSCM, etc.
+ */
+
+.function-strip {
+    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    overflow: visible;
+    min-height: 44px;
+}
+
+.function-strip-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: max-content;
+}
+
+/* Stats */
+.function-strip .strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(74, 158, 255, 0.05);
+    border: 1px solid rgba(74, 158, 255, 0.15);
+    border-radius: 4px;
+    min-width: 55px;
+}
+
+.function-strip .strip-stat:hover {
+    background: rgba(74, 158, 255, 0.1);
+    border-color: rgba(74, 158, 255, 0.3);
+}
+
+.function-strip .strip-value {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    line-height: 1.2;
+}
+
+.function-strip .strip-label {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 1px;
+}
+
+.function-strip .strip-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* Signal stat coloring */
+.function-strip .signal-stat.good .strip-value { color: var(--accent-green); }
+.function-strip .signal-stat.warning .strip-value { color: var(--accent-yellow); }
+.function-strip .signal-stat.poor .strip-value { color: var(--accent-red); }
+
+/* Controls */
+.function-strip .strip-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.function-strip .strip-select {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.function-strip .strip-select:hover {
+    border-color: var(--accent-cyan);
+}
+
+.function-strip .strip-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.function-strip .strip-input-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.function-strip .strip-input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    width: 50px;
+    text-align: center;
+}
+
+.function-strip .strip-input:hover,
+.function-strip .strip-input:focus {
+    border-color: var(--accent-cyan);
+    outline: none;
+}
+
+.function-strip .strip-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Wider input for frequency values */
+.function-strip .strip-input.wide {
+    width: 70px;
+}
+
+/* Tool Status Indicators */
+.function-strip .strip-tools {
+    display: flex;
+    gap: 4px;
+}
+
+.function-strip .strip-tool {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: 3px;
+    background: rgba(255, 59, 48, 0.2);
+    color: var(--accent-red);
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.function-strip .strip-tool.ok {
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--accent-green);
+    border-color: rgba(0, 255, 136, 0.3);
+}
+
+.function-strip .strip-tool.warn {
+    background: rgba(255, 193, 7, 0.2);
+    color: var(--accent-yellow);
+    border-color: rgba(255, 193, 7, 0.3);
+}
+
+/* Buttons */
+.function-strip .strip-btn {
+    background: rgba(74, 158, 255, 0.1);
+    border: 1px solid rgba(74, 158, 255, 0.2);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.function-strip .strip-btn:hover:not(:disabled) {
+    background: rgba(74, 158, 255, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
+}
+
+.function-strip .strip-btn.primary {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #10b981 100%);
+    border: none;
+    color: #000;
+}
+
+.function-strip .strip-btn.primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.function-strip .strip-btn.stop {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%);
+    border: none;
+    color: #fff;
+}
+
+.function-strip .strip-btn.stop:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.function-strip .strip-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status indicator */
+.function-strip .strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.function-strip .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.function-strip .status-dot.inactive {
+    background: var(--text-muted);
+}
+
+.function-strip .status-dot.active,
+.function-strip .status-dot.scanning,
+.function-strip .status-dot.decoding {
+    background: var(--accent-cyan);
+    animation: strip-pulse 1.5s ease-in-out infinite;
+}
+
+.function-strip .status-dot.listening,
+.function-strip .status-dot.tracking,
+.function-strip .status-dot.receiving {
+    background: var(--accent-green);
+    animation: strip-pulse 1.5s ease-in-out infinite;
+}
+
+.function-strip .status-dot.sweeping {
+    background: var(--accent-orange);
+    animation: strip-pulse 1s ease-in-out infinite;
+}
+
+.function-strip .status-dot.error {
+    background: var(--accent-red);
+}
+
+@keyframes strip-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px 2px currentColor; }
+    50% { opacity: 0.6; box-shadow: none; }
+}
+
+/* Time display */
+.function-strip .strip-time {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* Mode-specific accent colors */
+.function-strip.pager-strip .strip-stat {
+    background: rgba(255, 193, 7, 0.05);
+    border-color: rgba(255, 193, 7, 0.15);
+}
+.function-strip.pager-strip .strip-stat:hover {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.3);
+}
+.function-strip.pager-strip .strip-value {
+    color: var(--accent-yellow);
+}
+
+.function-strip.sensor-strip .strip-stat {
+    background: rgba(0, 255, 136, 0.05);
+    border-color: rgba(0, 255, 136, 0.15);
+}
+.function-strip.sensor-strip .strip-stat:hover {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: rgba(0, 255, 136, 0.3);
+}
+.function-strip.sensor-strip .strip-value {
+    color: var(--accent-green);
+}
+
+.function-strip.bt-strip .strip-stat {
+    background: rgba(0, 122, 255, 0.05);
+    border-color: rgba(0, 122, 255, 0.15);
+}
+.function-strip.bt-strip .strip-stat:hover {
+    background: rgba(0, 122, 255, 0.1);
+    border-color: rgba(0, 122, 255, 0.3);
+}
+.function-strip.bt-strip .strip-value {
+    color: #0a84ff;
+}
+
+.function-strip.wifi-strip .strip-stat {
+    background: rgba(255, 149, 0, 0.05);
+    border-color: rgba(255, 149, 0, 0.15);
+}
+.function-strip.wifi-strip .strip-stat:hover {
+    background: rgba(255, 149, 0, 0.1);
+    border-color: rgba(255, 149, 0, 0.3);
+}
+.function-strip.wifi-strip .strip-value {
+    color: var(--accent-orange);
+}
+
+.function-strip.tscm-strip {
+    margin-top: 4px; /* Extra clearance to prevent top clipping */
+}
+
+.function-strip.tscm-strip .strip-stat {
+    background: rgba(255, 59, 48, 0.15);
+    border: 1px solid rgba(255, 59, 48, 0.4);
+}
+.function-strip.tscm-strip .strip-stat:hover {
+    background: rgba(255, 59, 48, 0.25);
+    border-color: rgba(255, 59, 48, 0.6);
+}
+.function-strip.tscm-strip .strip-value {
+    color: #ef4444; /* Explicit red color */
+}
+.function-strip.tscm-strip .strip-label {
+    color: #9ca3af; /* Explicit light gray */
+}
+.function-strip.tscm-strip .strip-select {
+    color: #e8eaed; /* Explicit white for selects */
+    background: rgba(0, 0, 0, 0.4);
+}
+.function-strip.tscm-strip .strip-btn {
+    color: #e8eaed; /* Explicit white for buttons */
+}
+.function-strip.tscm-strip .strip-tool {
+    color: #e8eaed; /* Explicit white for tool indicators */
+}
+.function-strip.tscm-strip .strip-time,
+.function-strip.tscm-strip .strip-status span {
+    color: #9ca3af; /* Explicit gray for status/time */
+}
+
+.function-strip.rtlamr-strip .strip-stat {
+    background: rgba(175, 82, 222, 0.05);
+    border-color: rgba(175, 82, 222, 0.15);
+}
+.function-strip.rtlamr-strip .strip-stat:hover {
+    background: rgba(175, 82, 222, 0.1);
+    border-color: rgba(175, 82, 222, 0.3);
+}
+.function-strip.rtlamr-strip .strip-value {
+    color: #af52de;
+}
+
+.function-strip.listening-strip .strip-stat {
+    background: rgba(74, 158, 255, 0.05);
+    border-color: rgba(74, 158, 255, 0.15);
+}
+.function-strip.listening-strip .strip-stat:hover {
+    background: rgba(74, 158, 255, 0.1);
+    border-color: rgba(74, 158, 255, 0.3);
+}
+.function-strip.listening-strip .strip-value {
+    color: var(--accent-cyan);
+}
+
+/* Threat-colored stats for TSCM */
+.function-strip .strip-stat.threat-high .strip-value { color: var(--accent-red); }
+.function-strip .strip-stat.threat-review .strip-value { color: var(--accent-orange); }
+.function-strip .strip-stat.threat-info .strip-value { color: var(--accent-cyan); }

@@ -30,6 +30,9 @@ from utils.mqtt import mqtt_publish
 
 pager_bp = Blueprint('pager', __name__)
 
+# Track which device is being used
+pager_active_device: int | None = None
+
 
 def parse_multimon_output(line: str) -> dict[str, str] | None:
     """Parse multimon-ng output line."""
@@ -158,6 +161,8 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
 
 @pager_bp.route('/start', methods=['POST'])
 def start_decoding() -> Response:
+    global pager_active_device
+
     with app_module.process_lock:
         if app_module.current_process:
             return jsonify({'status': 'error', 'message': 'Already running'}), 409
@@ -181,10 +186,29 @@ def start_decoding() -> Response:
         except (ValueError, TypeError):
             return jsonify({'status': 'error', 'message': 'Invalid squelch value'}), 400
 
+        # Check for rtl_tcp (remote SDR) connection
+        rtl_tcp_host = data.get('rtl_tcp_host')
+        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
+        # Claim local device if not using remote rtl_tcp
+        if not rtl_tcp_host:
+            device_int = int(device)
+            error = app_module.claim_sdr_device(device_int, 'pager')
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error
+                }), 409
+            pager_active_device = device_int
+
         # Validate protocols
         valid_protocols = ['POCSAG512', 'POCSAG1200', 'POCSAG2400', 'FLEX']
         protocols = data.get('protocols', valid_protocols)
         if not isinstance(protocols, list):
+            if pager_active_device is not None:
+                app_module.release_sdr_device(pager_active_device)
+                pager_active_device = None
             return jsonify({'status': 'error', 'message': 'Protocols must be a list'}), 400
         protocols = [p for p in protocols if p in valid_protocols]
         if not protocols:
@@ -215,10 +239,6 @@ def start_decoding() -> Response:
             sdr_type = SDRType(sdr_type_str)
         except ValueError:
             sdr_type = SDRType.RTL_SDR
-
-        # Check for rtl_tcp (remote SDR) connection
-        rtl_tcp_host = data.get('rtl_tcp_host')
-        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
 
         if rtl_tcp_host:
             # Validate and create network device
@@ -305,13 +325,23 @@ def start_decoding() -> Response:
             return jsonify({'status': 'started', 'command': full_cmd})
 
         except FileNotFoundError as e:
+            # Release device on failure
+            if pager_active_device is not None:
+                app_module.release_sdr_device(pager_active_device)
+                pager_active_device = None
             return jsonify({'status': 'error', 'message': f'Tool not found: {e.filename}'})
         except Exception as e:
+            # Release device on failure
+            if pager_active_device is not None:
+                app_module.release_sdr_device(pager_active_device)
+                pager_active_device = None
             return jsonify({'status': 'error', 'message': str(e)})
 
 
 @pager_bp.route('/stop', methods=['POST'])
 def stop_decoding() -> Response:
+    global pager_active_device
+
     with app_module.process_lock:
         if app_module.current_process:
             # Kill rtl_fm process first
@@ -340,6 +370,12 @@ def stop_decoding() -> Response:
                 app_module.current_process.kill()
 
             app_module.current_process = None
+
+            # Release device from registry
+            if pager_active_device is not None:
+                app_module.release_sdr_device(pager_active_device)
+                pager_active_device = None
+
             return jsonify({'status': 'stopped'})
 
         return jsonify({'status': 'not_running'})

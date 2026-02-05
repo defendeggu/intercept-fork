@@ -47,6 +47,9 @@ dsc_bp = Blueprint('dsc', __name__, url_prefix='/dsc')
 # Module state (track if running independent of process state)
 dsc_running = False
 
+# Track which device is being used
+dsc_active_device: int | None = None
+
 
 def _get_dsc_decoder_path() -> str | None:
     """Get path to DSC decoder."""
@@ -309,21 +312,18 @@ def start_decoding() -> Response:
                 'message': str(e)
             }), 400
 
-        # Check if device is in use by AIS
-        try:
-            from routes import ais as ais_module
-            if hasattr(ais_module, 'ais_running') and ais_module.ais_running:
-                # AIS is running - check if same device
-                if hasattr(ais_module, 'ais_device') and str(ais_module.ais_device) == str(device):
-                    return jsonify({
-                        'status': 'error',
-                        'error_type': 'DEVICE_BUSY',
-                        'message': f'SDR device {device} is in use by AIS tracking',
-                        'suggestion': 'Use a different SDR device or stop AIS tracking first',
-                        'in_use_by': 'ais'
-                    }), 409
-        except ImportError:
-            pass
+        # Check if device is available using centralized registry
+        global dsc_active_device
+        device_int = int(device)
+        error = app_module.claim_sdr_device(device_int, 'dsc')
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+
+        dsc_active_device = device_int
 
         # Clear queue
         while not app_module.dsc_queue.empty():
@@ -408,11 +408,19 @@ def start_decoding() -> Response:
             })
 
         except FileNotFoundError as e:
+            # Release device on failure
+            if dsc_active_device is not None:
+                app_module.release_sdr_device(dsc_active_device)
+                dsc_active_device = None
             return jsonify({
                 'status': 'error',
                 'message': f'Tool not found: {e.filename}'
             }), 400
         except Exception as e:
+            # Release device on failure
+            if dsc_active_device is not None:
+                app_module.release_sdr_device(dsc_active_device)
+                dsc_active_device = None
             logger.error(f"Failed to start DSC decoder: {e}")
             return jsonify({
                 'status': 'error',
@@ -423,7 +431,7 @@ def start_decoding() -> Response:
 @dsc_bp.route('/stop', methods=['POST'])
 def stop_decoding() -> Response:
     """Stop DSC decoder."""
-    global dsc_running
+    global dsc_running, dsc_active_device
 
     with app_module.dsc_lock:
         if not app_module.dsc_process:
@@ -459,6 +467,11 @@ def stop_decoding() -> Response:
 
         app_module.dsc_process = None
         app_module.dsc_rtl_process = None
+
+        # Release device from registry
+        if dsc_active_device is not None:
+            app_module.release_sdr_device(dsc_active_device)
+            dsc_active_device = None
 
         return jsonify({'status': 'stopped'})
 

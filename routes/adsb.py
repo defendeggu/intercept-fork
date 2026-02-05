@@ -689,6 +689,16 @@ def start_adsb():
         app_module.adsb_process = None
         logger.info("Killed stale ADS-B process")
 
+    # Check if device is available before starting local dump1090
+    device_int = int(device)
+    error = app_module.claim_sdr_device(device_int, 'adsb')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error
+        }), 409
+
     # Create device object and build command via abstraction layer
     sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
     builder = SDRFactory.get_builder(sdr_type)
@@ -717,23 +727,51 @@ def start_adsb():
         time.sleep(DUMP1090_START_WAIT)
 
         if app_module.adsb_process.poll() is not None:
-            # Process exited - try to get error message
+            # Process exited - release device and get error message
+            app_module.release_sdr_device(device_int)
             stderr_output = ''
             if app_module.adsb_process.stderr:
                 try:
                     stderr_output = app_module.adsb_process.stderr.read().decode('utf-8', errors='ignore').strip()
                 except Exception:
                     pass
-            if sdr_type == SDRType.RTL_SDR:
-                error_msg = 'dump1090 failed to start. Check RTL-SDR device permissions or if another process is using it.'
-                if stderr_output:
-                    error_msg += f' Error: {stderr_output[:200]}'
-                return jsonify({'status': 'error', 'message': error_msg})
+
+            # Parse stderr to provide specific guidance
+            error_type = 'START_FAILED'
+            stderr_lower = stderr_output.lower()
+
+            if 'usb_claim_interface' in stderr_lower or 'libusb_error_busy' in stderr_lower or 'device or resource busy' in stderr_lower:
+                error_msg = 'SDR device is busy. Another process may be using it.'
+                suggestion = 'Try: 1) Stop other SDR applications, 2) Run "pkill -f rtl_" to kill stale processes, or 3) Remove and reinsert the SDR device.'
+                error_type = 'DEVICE_BUSY'
+            elif 'no supported devices' in stderr_lower or 'no rtl-sdr' in stderr_lower or 'failed to open' in stderr_lower:
+                error_msg = 'RTL-SDR device not found.'
+                suggestion = 'Ensure the device is connected. Try removing and reinserting the SDR.'
+                error_type = 'DEVICE_NOT_FOUND'
+            elif 'kernel driver is active' in stderr_lower or 'dvb' in stderr_lower:
+                error_msg = 'Kernel DVB-T driver is blocking the device.'
+                suggestion = 'Blacklist the DVB drivers: Go to Settings > Hardware > "Blacklist DVB Drivers" or run "sudo rmmod dvb_usb_rtl28xxu".'
+                error_type = 'KERNEL_DRIVER'
+            elif 'permission' in stderr_lower or 'access' in stderr_lower:
+                error_msg = 'Permission denied accessing RTL-SDR device.'
+                suggestion = 'Run Intercept with sudo, or add udev rules for RTL-SDR devices.'
+                error_type = 'PERMISSION_DENIED'
+            elif sdr_type == SDRType.RTL_SDR:
+                error_msg = 'dump1090 failed to start.'
+                suggestion = 'Try removing and reinserting the SDR device, or check if another application is using it.'
             else:
-                error_msg = f'ADS-B decoder failed to start for {sdr_type.value}. Ensure readsb is installed with SoapySDR support and the device is connected.'
-                if stderr_output:
-                    error_msg += f' Error: {stderr_output[:200]}'
-                return jsonify({'status': 'error', 'message': error_msg})
+                error_msg = f'ADS-B decoder failed to start for {sdr_type.value}.'
+                suggestion = 'Ensure readsb is installed with SoapySDR support and the device is connected.'
+
+            full_msg = f'{error_msg} {suggestion}'
+            if stderr_output and len(stderr_output) < 300:
+                full_msg += f' (Details: {stderr_output})'
+
+            return jsonify({
+                'status': 'error',
+                'error_type': error_type,
+                'message': full_msg
+            })
 
         adsb_using_service = True
         adsb_active_device = device  # Track which device is being used
@@ -755,6 +793,8 @@ def start_adsb():
             'session': session
         })
     except Exception as e:
+        # Release device on failure
+        app_module.release_sdr_device(device_int)
         return jsonify({'status': 'error', 'message': str(e)})
 
 
@@ -782,6 +822,11 @@ def stop_adsb():
                     pass
             app_module.adsb_process = None
             logger.info("ADS-B process stopped")
+
+        # Release device from registry
+        if adsb_active_device is not None:
+            app_module.release_sdr_device(adsb_active_device)
+
         adsb_using_service = False
         adsb_active_device = None
 

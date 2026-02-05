@@ -259,7 +259,7 @@
 }
 
 .update-version-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 18px;
     font-weight: 600;
     color: var(--text-secondary, #9ca3af);
@@ -328,7 +328,7 @@
 }
 
 .update-release-notes code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     background: var(--bg-tertiary, #151a23);
     padding: 2px 6px;
@@ -444,7 +444,7 @@
 }
 
 .update-result-text code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     background: rgba(0, 0, 0, 0.2);
     padding: 2px 6px;

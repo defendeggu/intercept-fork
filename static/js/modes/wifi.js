@@ -887,6 +887,9 @@ const WiFiMode = (function() {
         clients.set(client.mac, client);
         updateStats();
 
+        // Update client display if this client belongs to the selected network
+        updateClientInList(client);
+
         if (onClientUpdate) onClientUpdate(client);
     }
 
@@ -1135,6 +1138,9 @@ const WiFiMode = (function() {
 
         // Show the drawer
         elements.detailDrawer.classList.add('open');
+
+        // Fetch and display clients for this network
+        fetchClientsForNetwork(network.bssid);
     }
 
     function closeDetail() {
@@ -1145,6 +1151,130 @@ const WiFiMode = (function() {
         elements.networkTableBody?.querySelectorAll('.wifi-network-row').forEach(row => {
             row.classList.remove('selected');
         });
+    }
+
+    // ==========================================================================
+    // Client Display
+    // ==========================================================================
+
+    async function fetchClientsForNetwork(bssid) {
+        if (!elements.detailClientList) return;
+
+        try {
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            let response;
+
+            if (isAgentMode) {
+                // Route through agent proxy
+                response = await fetch(`/controller/agents/${currentAgent}/wifi/v2/clients?bssid=${encodeURIComponent(bssid)}&associated=true`);
+            } else {
+                response = await fetch(`${CONFIG.apiBase}/clients?bssid=${encodeURIComponent(bssid)}&associated=true`);
+            }
+
+            if (!response.ok) {
+                // Hide client list on error
+                elements.detailClientList.style.display = 'none';
+                return;
+            }
+
+            const data = await response.json();
+            // Handle agent response format (may be nested in 'result')
+            const result = isAgentMode && data.result ? data.result : data;
+            const clientList = result.clients || [];
+
+            if (clientList.length > 0) {
+                renderClientList(clientList, bssid);
+                elements.detailClientList.style.display = 'block';
+            } else {
+                elements.detailClientList.style.display = 'none';
+            }
+        } catch (error) {
+            console.debug('[WiFiMode] Error fetching clients:', error);
+            elements.detailClientList.style.display = 'none';
+        }
+    }
+
+    function renderClientList(clientList, bssid) {
+        const container = elements.detailClientList?.querySelector('.wifi-client-list');
+        const countBadge = document.getElementById('wifiClientCountBadge');
+
+        if (!container) return;
+
+        // Update count badge
+        if (countBadge) {
+            countBadge.textContent = clientList.length;
+        }
+
+        // Render client cards
+        container.innerHTML = clientList.map(client => {
+            const rssi = client.rssi_current;
+            const signalClass = rssi >= -50 ? 'signal-strong' :
+                               rssi >= -70 ? 'signal-medium' :
+                               rssi >= -85 ? 'signal-weak' : 'signal-very-weak';
+
+            // Format last seen time
+            const lastSeen = client.last_seen ? formatTime(client.last_seen) : '--';
+
+            // Build probed SSIDs badges
+            let probesHtml = '';
+            if (client.probed_ssids && client.probed_ssids.length > 0) {
+                const probes = client.probed_ssids.slice(0, 5); // Show max 5
+                probesHtml = `
+                    <div class="wifi-client-probes">
+                        ${probes.map(ssid => `<span class="wifi-client-probe-badge">${escapeHtml(ssid)}</span>`).join('')}
+                        ${client.probed_ssids.length > 5 ? `<span class="wifi-client-probe-badge">+${client.probed_ssids.length - 5}</span>` : ''}
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="wifi-client-card" data-mac="${escapeHtml(client.mac)}">
+                    <div class="wifi-client-identity">
+                        <span class="wifi-client-mac">${escapeHtml(client.mac)}</span>
+                        <span class="wifi-client-vendor">${escapeHtml(client.vendor || 'Unknown vendor')}</span>
+                        ${probesHtml}
+                    </div>
+                    <div class="wifi-client-signal">
+                        <span class="wifi-client-rssi ${signalClass}">${rssi !== null && rssi !== undefined ? rssi + ' dBm' : '--'}</span>
+                        <span class="wifi-client-lastseen">${lastSeen}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateClientInList(client) {
+        // Check if this client belongs to the currently selected network
+        if (!selectedNetwork || client.associated_bssid !== selectedNetwork) {
+            return;
+        }
+
+        const container = elements.detailClientList?.querySelector('.wifi-client-list');
+        if (!container) return;
+
+        const existingCard = container.querySelector(`[data-mac="${client.mac}"]`);
+
+        if (existingCard) {
+            // Update existing card's RSSI and last seen
+            const rssiEl = existingCard.querySelector('.wifi-client-rssi');
+            const lastSeenEl = existingCard.querySelector('.wifi-client-lastseen');
+
+            if (rssiEl && client.rssi_current !== null && client.rssi_current !== undefined) {
+                const rssi = client.rssi_current;
+                const signalClass = rssi >= -50 ? 'signal-strong' :
+                                   rssi >= -70 ? 'signal-medium' :
+                                   rssi >= -85 ? 'signal-weak' : 'signal-very-weak';
+                rssiEl.textContent = rssi + ' dBm';
+                rssiEl.className = 'wifi-client-rssi ' + signalClass;
+            }
+
+            if (lastSeenEl && client.last_seen) {
+                lastSeenEl.textContent = formatTime(client.last_seen);
+            }
+        } else {
+            // New client for this network - re-fetch the full list
+            fetchClientsForNetwork(selectedNetwork);
+        }
     }
 
     // ==========================================================================
