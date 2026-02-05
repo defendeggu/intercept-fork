@@ -368,25 +368,21 @@ def _check_available_devices(wifi: bool, bt: bool, rf: bool) -> dict:
     # Check WiFi
     if wifi:
         if platform.system() == 'Darwin':
-            # macOS: Check for airport utility
-            airport_path = '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport'
-            if os.path.exists(airport_path):
-                try:
-                    result = subprocess.run(
-                        [airport_path, '-I'],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.returncode == 0:
-                        available['wifi'] = True
-                        available['wifi_reason'] = 'macOS WiFi available'
-                    else:
-                        available['wifi_reason'] = 'WiFi interface not active'
-                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
-                    available['wifi_reason'] = 'Cannot access WiFi interface'
-            else:
-                available['wifi_reason'] = 'macOS airport utility not found'
+            # macOS: Use networksetup to detect WiFi interfaces (same as /tscm/devices endpoint)
+            try:
+                result = subprocess.run(
+                    ['networksetup', '-listallhardwareports'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and ('Wi-Fi' in result.stdout or 'AirPort' in result.stdout):
+                    available['wifi'] = True
+                    available['wifi_reason'] = 'macOS WiFi available'
+                else:
+                    available['wifi_reason'] = 'No WiFi hardware port found'
+            except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+                available['wifi_reason'] = 'Cannot detect WiFi interfaces'
         else:
             # Linux: Check for wireless tools
             if shutil.which('airodump-ng') or shutil.which('iwlist') or shutil.which('iw'):
@@ -1981,8 +1977,8 @@ def _run_sweep(
 
             time.sleep(2)  # Update every 2 seconds
 
-        # Complete sweep
-        if _sweep_running and _current_sweep_id:
+        # Complete sweep (run even if stopped by user so correlations/clusters are computed)
+        if _current_sweep_id:
             # Run cross-protocol correlation analysis
             correlations = correlation.correlate_devices()
             findings = correlation.get_all_findings()

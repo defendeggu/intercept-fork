@@ -69,11 +69,6 @@
     min-height: 200px;
     height: 200px;
 }
-/* Full-width panels (like Detected Threats) get more height */
-.tscm-panel[style*="grid-column: span 2"] {
-    min-height: 150px;
-    height: 150px;
-}
 .tscm-panel-header {
     padding: 10px 12px;
     background: rgba(0,0,0,0.3);

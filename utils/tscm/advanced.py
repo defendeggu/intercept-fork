@@ -372,8 +372,10 @@ def _detect_rf_capabilities(caps: SweepCapabilities, sdr_device: Any) -> None:
         if devices:
             device = devices[0]  # Use first device
             rf_cap.available = True
-            rf_cap.device_type = device.get('type', 'unknown')
-            rf_cap.driver = device.get('driver', '')
+            rf_cap.device_type = getattr(device, 'sdr_type', 'unknown')
+            if hasattr(rf_cap.device_type, 'value'):
+                rf_cap.device_type = rf_cap.device_type.value
+            rf_cap.driver = getattr(device, 'driver', '')
 
             # Set frequency ranges based on device type
             if 'rtl' in rf_cap.device_type.lower():
