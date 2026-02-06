@@ -101,6 +101,17 @@ def find_ffmpeg() -> str | None:
     return shutil.which('ffmpeg')
 
 
+VALID_MODULATIONS = ['fm', 'wfm', 'am', 'usb', 'lsb']
+
+
+def normalize_modulation(value: str) -> str:
+    """Normalize and validate modulation string."""
+    mod = str(value or '').lower().strip()
+    if mod not in VALID_MODULATIONS:
+        raise ValueError(f'Invalid modulation. Use: {", ".join(VALID_MODULATIONS)}')
+    return mod
+
+
 
 
 def add_activity_log(event_type: str, frequency: float, details: str = ''):
@@ -724,31 +735,52 @@ def _start_audio_stream(frequency: float, modulation: str):
         ]
 
         try:
-            # Use shell pipe for reliable streaming
-            # Log stderr to temp files for error diagnosis
+            # Use subprocess piping for reliable streaming.
+            # Log stderr to temp files for error diagnosis.
             rtl_stderr_log = '/tmp/rtl_fm_stderr.log'
             ffmpeg_stderr_log = '/tmp/ffmpeg_stderr.log'
-            shell_cmd = f"{' '.join(sdr_cmd)} 2>{rtl_stderr_log} | {' '.join(encoder_cmd)} 2>{ffmpeg_stderr_log}"
             logger.info(f"Starting audio: {frequency} MHz, mod={modulation}, device={scanner_config['device']}")
 
             # Retry loop for USB device contention (device may not be
             # released immediately after a previous process exits)
             max_attempts = 3
             for attempt in range(max_attempts):
-                audio_rtl_process = None  # Not used in shell mode
-                audio_process = subprocess.Popen(
-                    shell_cmd,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    bufsize=0,
-                    start_new_session=True  # Create new process group for clean shutdown
-                )
+                audio_rtl_process = None
+                audio_process = None
+                rtl_err_handle = None
+                ffmpeg_err_handle = None
+                try:
+                    rtl_err_handle = open(rtl_stderr_log, 'w')
+                    ffmpeg_err_handle = open(ffmpeg_stderr_log, 'w')
+                    audio_rtl_process = subprocess.Popen(
+                        sdr_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=rtl_err_handle,
+                        bufsize=0,
+                        start_new_session=True  # Create new process group for clean shutdown
+                    )
+                    audio_process = subprocess.Popen(
+                        encoder_cmd,
+                        stdin=audio_rtl_process.stdout,
+                        stdout=subprocess.PIPE,
+                        stderr=ffmpeg_err_handle,
+                        bufsize=0,
+                        start_new_session=True  # Create new process group for clean shutdown
+                    )
+                    if audio_rtl_process.stdout:
+                        audio_rtl_process.stdout.close()
+                finally:
+                    if rtl_err_handle:
+                        rtl_err_handle.close()
+                    if ffmpeg_err_handle:
+                        ffmpeg_err_handle.close()
 
                 # Brief delay to check if process started successfully
                 time.sleep(0.3)
 
-                if audio_process.poll() is not None:
+                if (audio_rtl_process and audio_rtl_process.poll() is not None) or (
+                    audio_process and audio_process.poll() is not None
+                ):
                     # Read stderr from temp files
                     rtl_stderr = ''
                     ffmpeg_stderr = ''
@@ -765,10 +797,39 @@ def _start_audio_stream(frequency: float, modulation: str):
 
                     if 'usb_claim_interface' in rtl_stderr and attempt < max_attempts - 1:
                         logger.warning(f"USB device busy (attempt {attempt + 1}/{max_attempts}), waiting for release...")
+                        if audio_process:
+                            try:
+                                audio_process.terminate()
+                                audio_process.wait(timeout=0.5)
+                            except Exception:
+                                pass
+                        if audio_rtl_process:
+                            try:
+                                audio_rtl_process.terminate()
+                                audio_rtl_process.wait(timeout=0.5)
+                            except Exception:
+                                pass
                         time.sleep(1.0)
                         continue
 
-                    logger.error(f"Audio pipeline exited immediately. rtl_fm stderr: {rtl_stderr}, ffmpeg stderr: {ffmpeg_stderr}")
+                    if audio_process and audio_process.poll() is None:
+                        try:
+                            audio_process.terminate()
+                            audio_process.wait(timeout=0.5)
+                        except Exception:
+                            pass
+                    if audio_rtl_process and audio_rtl_process.poll() is None:
+                        try:
+                            audio_rtl_process.terminate()
+                            audio_rtl_process.wait(timeout=0.5)
+                        except Exception:
+                            pass
+                    audio_process = None
+                    audio_rtl_process = None
+
+                    logger.error(
+                        f"Audio pipeline exited immediately. rtl_fm stderr: {rtl_stderr}, ffmpeg stderr: {ffmpeg_stderr}"
+                    )
                     return
 
                 # Pipeline started successfully
@@ -805,16 +866,26 @@ def _stop_audio_stream_internal():
     audio_running = False
     audio_frequency = 0.0
 
-    # Kill the shell process and its children
+    # Kill the pipeline processes and their groups
     if audio_process:
         try:
-            # Kill entire process group (rtl_fm, ffmpeg, shell)
+            # Kill entire process group (SDR demod + ffmpeg)
             try:
                 os.killpg(os.getpgid(audio_process.pid), signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 audio_process.kill()
             audio_process.wait(timeout=0.5)
-        except:
+        except Exception:
+            pass
+
+    if audio_rtl_process:
+        try:
+            try:
+                os.killpg(os.getpgid(audio_rtl_process.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                audio_rtl_process.kill()
+            audio_rtl_process.wait(timeout=0.5)
+        except Exception:
             pass
 
     audio_process = None
@@ -891,7 +962,7 @@ def start_scanner() -> Response:
         scanner_config['start_freq'] = float(data.get('start_freq', 88.0))
         scanner_config['end_freq'] = float(data.get('end_freq', 108.0))
         scanner_config['step'] = float(data.get('step', 0.1))
-        scanner_config['modulation'] = str(data.get('modulation', 'wfm')).lower()
+        scanner_config['modulation'] = normalize_modulation(data.get('modulation', 'wfm'))
         scanner_config['squelch'] = int(data.get('squelch', 0))
         scanner_config['dwell_time'] = float(data.get('dwell_time', 3.0))
         scanner_config['scan_delay'] = float(data.get('scan_delay', 0.5))
@@ -1074,8 +1145,14 @@ def update_scanner_config() -> Response:
         updated.append(f"dwell={data['dwell_time']}s")
 
     if 'modulation' in data:
-        scanner_config['modulation'] = str(data['modulation']).lower()
-        updated.append(f"mod={data['modulation']}")
+        try:
+            scanner_config['modulation'] = normalize_modulation(data['modulation'])
+            updated.append(f"mod={data['modulation']}")
+        except (ValueError, TypeError) as e:
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 400
 
     if updated:
         logger.info(f"Scanner config updated: {', '.join(updated)}")
@@ -1197,7 +1274,7 @@ def start_audio() -> Response:
 
     try:
         frequency = float(data.get('frequency', 0))
-        modulation = str(data.get('modulation', 'wfm')).lower()
+        modulation = normalize_modulation(data.get('modulation', 'wfm'))
         squelch = int(data.get('squelch', 0))
         gain = int(data.get('gain', 40))
         device = int(data.get('device', 0))
@@ -1212,13 +1289,6 @@ def start_audio() -> Response:
         return jsonify({
             'status': 'error',
             'message': 'frequency is required'
-        }), 400
-
-    valid_mods = ['fm', 'wfm', 'am', 'usb', 'lsb']
-    if modulation not in valid_mods:
-        return jsonify({
-            'status': 'error',
-            'message': f'Invalid modulation. Use: {", ".join(valid_mods)}'
         }), 400
 
     valid_sdr_types = ['rtlsdr', 'hackrf', 'airspy', 'limesdr', 'sdrplay']
