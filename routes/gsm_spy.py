@@ -1080,23 +1080,12 @@ def scanner_thread(process):
     except Exception as e:
         logger.error(f"Scanner thread error: {e}")
     finally:
-        # Reap the process to prevent zombie
+        # Reap the process to prevent zombie (don't terminate, just wait)
         try:
-            if process.poll() is None:
-                # Process still running, terminate it
-                process.terminate()
-                process.wait(timeout=5)
-            else:
-                # Process already terminated, just collect exit status
-                process.wait()
-            logger.info(f"Scanner process terminated with exit code {process.returncode}")
+            process.wait()
+            logger.info(f"Scanner process exited with code {process.returncode}")
         except Exception as e:
-            logger.error(f"Error cleaning up scanner process: {e}")
-            try:
-                process.kill()
-                process.wait()
-            except Exception:
-                pass
+            logger.error(f"Error waiting for scanner process: {e}")
         logger.info("Scanner thread terminated")
 
 
@@ -1202,21 +1191,10 @@ def monitor_thread(process):
     except Exception as e:
         logger.error(f"Monitor thread error: {e}")
     finally:
-        # Reap the process to prevent zombie
+        # Reap the process to prevent zombie (don't terminate, just wait)
         try:
-            if process.poll() is None:
-                # Process still running, terminate it
-                process.terminate()
-                process.wait(timeout=5)
-            else:
-                # Process already terminated, just collect exit status
-                process.wait()
-            logger.info(f"Monitor process terminated with exit code {process.returncode}")
+            process.wait()
+            logger.info(f"Monitor process exited with code {process.returncode}")
         except Exception as e:
-            logger.error(f"Error cleaning up monitor process: {e}")
-            try:
-                process.kill()
-                process.wait()
-            except Exception:
-                pass
+            logger.error(f"Error waiting for monitor process: {e}")
         logger.info("Monitor thread terminated")
