@@ -225,9 +225,12 @@ function initDmrSynthesizer() {
     dmrSynthCanvas = document.getElementById('dmrSynthCanvas');
     if (!dmrSynthCanvas) return;
 
-    const rect = dmrSynthCanvas.parentElement.getBoundingClientRect();
-    dmrSynthCanvas.width = rect.width - 20;
-    dmrSynthCanvas.height = 70;
+    // Use the canvas element's own rendered size for the backing buffer
+    const rect = dmrSynthCanvas.getBoundingClientRect();
+    const w = Math.round(rect.width) || 600;
+    const h = Math.round(rect.height) || 70;
+    dmrSynthCanvas.width = w;
+    dmrSynthCanvas.height = h;
 
     dmrSynthCtx = dmrSynthCanvas.getContext('2d');
 
@@ -427,10 +430,10 @@ function updateDmrSynthStatus() {
 
 function resizeDmrSynthesizer() {
     if (!dmrSynthCanvas) return;
-    const rect = dmrSynthCanvas.parentElement.getBoundingClientRect();
+    const rect = dmrSynthCanvas.getBoundingClientRect();
     if (rect.width > 0) {
-        dmrSynthCanvas.width = rect.width - 20;
-        dmrSynthCanvas.height = 70;
+        dmrSynthCanvas.width = Math.round(rect.width);
+        dmrSynthCanvas.height = Math.round(rect.height) || 70;
     }
 }
 
