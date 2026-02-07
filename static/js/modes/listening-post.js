@@ -2248,10 +2248,10 @@ async function _startDirectListenInternal() {
             await stopScanner();
         }
 
-        if (isWaterfallRunning && waterfallMode === 'rf') {
-            resumeRfWaterfallAfterListening = true;
-            stopWaterfall();
-        }
+    if (isWaterfallRunning && waterfallMode === 'rf') {
+        resumeRfWaterfallAfterListening = true;
+        await stopWaterfall();
+    }
 
         const freqInput = document.getElementById('radioScanStart');
         const freq = freqInput ? parseFloat(freqInput.value) : 118.0;
@@ -3365,6 +3365,12 @@ function startWaterfall() {
         return;
     }
 
+    setWaterfallMode('rf');
+    const spanMhz = Math.max(0.1, waterfallEndFreq - waterfallStartFreq);
+    const segments = Math.max(1, Math.ceil(spanMhz / 2.4));
+    const targetSweepSeconds = 0.8;
+    const interval = Math.max(0.05, Math.min(0.3, targetSweepSeconds / segments));
+
     fetch('/listening/waterfall/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3375,7 +3381,7 @@ function startWaterfall() {
             gain: gain,
             device: device,
             max_bins: maxBins,
-            interval: 0.4,
+            interval: interval,
         })
     })
     .then(r => r.json())
@@ -3396,7 +3402,7 @@ function startWaterfall() {
     .catch(err => console.error('[WATERFALL] Start error:', err));
 }
 
-function stopWaterfall() {
+async function stopWaterfall() {
     if (waterfallMode === 'audio') {
         stopAudioWaterfall();
         isWaterfallRunning = false;
@@ -3405,15 +3411,15 @@ function stopWaterfall() {
         return;
     }
 
-    fetch('/listening/waterfall/stop', { method: 'POST' })
-    .then(r => r.json())
-    .then(() => {
+    try {
+        await fetch('/listening/waterfall/stop', { method: 'POST' });
         isWaterfallRunning = false;
         if (waterfallEventSource) { waterfallEventSource.close(); waterfallEventSource = null; }
         document.getElementById('startWaterfallBtn').style.display = 'block';
         document.getElementById('stopWaterfallBtn').style.display = 'none';
-    })
-    .catch(err => console.error('[WATERFALL] Stop error:', err));
+    } catch (err) {
+        console.error('[WATERFALL] Stop error:', err);
+    }
 }
 
 function connectWaterfallSSE() {
