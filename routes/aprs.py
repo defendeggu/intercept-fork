@@ -1487,7 +1487,7 @@ def start_aprs() -> Response:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
     # Reserve SDR device to prevent conflicts with other modes
-    error = app_module.reserve_sdr_device(device, 'APRS')
+    error = app_module.claim_sdr_device(device, 'aprs')
     if error:
         return jsonify({
             'status': 'error',
