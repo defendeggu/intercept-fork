@@ -353,6 +353,34 @@ def init_db() -> None:
         ''')
 
         # =====================================================================
+        # Pager Messages Table
+        # =====================================================================
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS pager_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                protocol TEXT NOT NULL,
+                address TEXT NOT NULL,
+                function TEXT,
+                msg_type TEXT,
+                message TEXT,
+                frequency REAL,
+                device_index INTEGER
+            )
+        ''')
+
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_pager_messages_address
+            ON pager_messages(address, received_at)
+        ''')
+
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_pager_messages_received_at
+            ON pager_messages(received_at DESC)
+        ''')
+
+        # =====================================================================
         # DSC (Digital Selective Calling) Tables
         # =====================================================================
 
@@ -1826,6 +1854,115 @@ def cleanup_old_dsc_alerts(max_age_days: int = 30) -> int:
             DELETE FROM dsc_alerts
             WHERE acknowledged = 1
               AND received_at < datetime('now', ?)
+        ''', (f'-{max_age_days} days',))
+        return cursor.rowcount
+
+
+# =============================================================================
+# Pager Message Functions
+# =============================================================================
+
+def store_pager_message(
+    protocol: str,
+    address: str,
+    message: str,
+    function: str | None = None,
+    msg_type: str | None = None,
+    frequency: float | None = None,
+    device_index: int | None = None
+) -> int:
+    """
+    Store a decoded pager message.
+
+    Returns:
+        The ID of the created message
+    """
+    with get_db() as conn:
+        cursor = conn.execute('''
+            INSERT INTO pager_messages
+            (protocol, address, function, msg_type, message, frequency, device_index)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (protocol, address, function, msg_type, message, frequency, device_index))
+        return cursor.lastrowid
+
+
+def get_pager_messages(
+    address: str | None = None,
+    limit: int = 100,
+    offset: int = 0
+) -> list[dict]:
+    """
+    Get stored pager messages with optional filtering.
+
+    Args:
+        address: Filter by pager address
+        limit: Maximum number of results
+        offset: Offset for pagination
+
+    Returns:
+        List of pager message records (newest first)
+    """
+    conditions = []
+    params = []
+
+    if address is not None:
+        conditions.append('address = ?')
+        params.append(address)
+
+    where_clause = f'WHERE {" AND ".join(conditions)}' if conditions else ''
+    params.extend([limit, offset])
+
+    with get_db() as conn:
+        cursor = conn.execute(f'''
+            SELECT * FROM pager_messages
+            {where_clause}
+            ORDER BY received_at DESC
+            LIMIT ? OFFSET ?
+        ''', params)
+
+        results = []
+        for row in cursor:
+            results.append({
+                'id': row['id'],
+                'received_at': row['received_at'],
+                'protocol': row['protocol'],
+                'address': row['address'],
+                'function': row['function'],
+                'msg_type': row['msg_type'],
+                'message': row['message'],
+                'frequency': row['frequency'],
+                'device_index': row['device_index']
+            })
+        return results
+
+
+def get_pager_message_count(address: str | None = None) -> int:
+    """Get total count of stored pager messages."""
+    with get_db() as conn:
+        if address:
+            cursor = conn.execute(
+                'SELECT COUNT(*) FROM pager_messages WHERE address = ?',
+                (address,)
+            )
+        else:
+            cursor = conn.execute('SELECT COUNT(*) FROM pager_messages')
+        return cursor.fetchone()[0]
+
+
+def cleanup_old_pager_messages(max_age_days: int = 30) -> int:
+    """
+    Remove old pager messages.
+
+    Args:
+        max_age_days: Maximum age in days
+
+    Returns:
+        Number of deleted messages
+    """
+    with get_db() as conn:
+        cursor = conn.execute('''
+            DELETE FROM pager_messages
+            WHERE received_at < datetime('now', ?)
         ''', (f'-{max_age_days} days',))
         return cursor.rowcount
 

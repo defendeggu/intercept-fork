@@ -26,11 +26,14 @@ from utils.sse import format_sse
 from utils.process import safe_terminate, register_process
 from utils.sdr import SDRFactory, SDRType, SDRValidationError
 from utils.dependencies import get_tool_path
+from utils.database import store_pager_message, get_pager_messages, get_pager_message_count
 
 pager_bp = Blueprint('pager', __name__)
 
 # Track which device is being used
 pager_active_device: int | None = None
+# Track the current decoding frequency (MHz) for DB storage
+pager_active_frequency: float | None = None
 
 
 def parse_multimon_output(line: str) -> dict[str, str] | None:
@@ -135,6 +138,18 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
                             parsed['timestamp'] = datetime.now().strftime('%H:%M:%S')
                             app_module.output_queue.put({'type': 'message', **parsed})
                             log_message(parsed)
+                            try:
+                                store_pager_message(
+                                    protocol=parsed['protocol'],
+                                    address=parsed['address'],
+                                    message=parsed.get('message', ''),
+                                    function=parsed.get('function'),
+                                    msg_type=parsed.get('msg_type'),
+                                    frequency=pager_active_frequency,
+                                    device_index=pager_active_device,
+                                )
+                            except Exception as e:
+                                logger.error(f"Failed to store pager message: {e}")
                         else:
                             app_module.output_queue.put({'type': 'raw', 'text': line})
                 except OSError:
@@ -158,7 +173,7 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
 
 @pager_bp.route('/start', methods=['POST'])
 def start_decoding() -> Response:
-    global pager_active_device
+    global pager_active_device, pager_active_frequency
 
     with app_module.process_lock:
         if app_module.current_process:
@@ -174,6 +189,8 @@ def start_decoding() -> Response:
             device = validate_device_index(data.get('device', '0'))
         except ValueError as e:
             return jsonify({'status': 'error', 'message': str(e)}), 400
+
+        pager_active_frequency = freq
 
         squelch = data.get('squelch', '0')
         try:
@@ -445,3 +462,21 @@ def stream() -> Response:
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'
     return response
+
+
+@pager_bp.route('/history')
+def get_history() -> Response:
+    """Get stored pager messages from database."""
+    address = request.args.get('address')
+    limit = min(int(request.args.get('limit', 100)), 1000)
+    offset = int(request.args.get('offset', 0))
+
+    messages = get_pager_messages(address=address, limit=limit, offset=offset)
+    total = get_pager_message_count(address=address)
+
+    return jsonify({
+        'messages': messages,
+        'total': total,
+        'limit': limit,
+        'offset': offset
+    })
