@@ -196,14 +196,42 @@ function handleDmrMessage(msg) {
         // Raw DSD output — update last line display for diagnostics
         const rawEl = document.getElementById('dmrRawOutput');
         if (rawEl) rawEl.textContent = msg.text || '';
+    } else if (msg.type === 'heartbeat') {
+        // Decoder is alive and listening — keep synthesizer in listening state
+        if (isDmrRunning && dmrSynthInitialized) {
+            if (dmrEventType === 'idle' || dmrEventType === 'raw') {
+                dmrEventType = 'raw';
+                dmrActivityTarget = Math.max(dmrActivityTarget, 0.15);
+                dmrLastEventTime = Date.now();
+                updateDmrSynthStatus();
+            }
+        }
     } else if (msg.type === 'status') {
         const statusEl = document.getElementById('dmrStatus');
-        if (statusEl) {
-            statusEl.textContent = msg.text === 'started' ? 'DECODING' : 'IDLE';
-        }
-        if (msg.text === 'stopped') {
+        if (msg.text === 'started') {
+            if (statusEl) statusEl.textContent = 'DECODING';
+        } else if (msg.text === 'crashed') {
             isDmrRunning = false;
             updateDmrUI();
+            dmrEventType = 'stopped';
+            dmrActivityTarget = 0;
+            updateDmrSynthStatus();
+            if (statusEl) statusEl.textContent = 'CRASHED';
+            if (typeof releaseDevice === 'function') releaseDevice('dmr');
+            const detail = msg.detail || `Decoder exited (code ${msg.exit_code})`;
+            if (typeof showNotification === 'function') {
+                showNotification('DMR Error', detail);
+            }
+            const rawEl = document.getElementById('dmrRawOutput');
+            if (rawEl) rawEl.textContent = detail;
+        } else if (msg.text === 'stopped') {
+            isDmrRunning = false;
+            updateDmrUI();
+            dmrEventType = 'stopped';
+            dmrActivityTarget = 0;
+            updateDmrSynthStatus();
+            if (statusEl) statusEl.textContent = 'STOPPED';
+            if (typeof releaseDevice === 'function') releaseDevice('dmr');
         }
     }
 }
@@ -287,7 +315,7 @@ function drawDmrSynthesizer() {
     if (timeSinceEvent > 2000) {
         // No events for 2s — decay target toward idle
         dmrActivityTarget = Math.max(0, dmrActivityTarget - DMR_DECAY_RATE);
-        if (dmrActivityTarget < 0.05 && dmrEventType !== 'stopped') {
+        if (dmrActivityTarget < 0.1 && dmrEventType !== 'stopped') {
             dmrEventType = 'idle';
             updateDmrSynthStatus();
         }
@@ -300,9 +328,9 @@ function drawDmrSynthesizer() {
     let effectiveActivity = dmrActivityLevel;
     if (dmrEventType === 'stopped') {
         effectiveActivity = 0;
-    } else if (effectiveActivity < 0.05 && isDmrRunning) {
-        // Gentle idle breathing
-        effectiveActivity = 0.05 + Math.sin(now / 800) * 0.035;
+    } else if (effectiveActivity < 0.1 && isDmrRunning) {
+        // Visible idle breathing — shows decoder is alive and listening
+        effectiveActivity = 0.12 + Math.sin(now / 1000) * 0.06;
     }
 
     // Ripple timing for sync events

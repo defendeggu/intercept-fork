@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import queue
 import re
+import select
 import shutil
 import subprocess
 import threading
@@ -169,49 +170,88 @@ def parse_dsd_output(line: str) -> dict | None:
     }
 
 
+_HEARTBEAT_INTERVAL = 3.0  # seconds between heartbeats when decoder is idle
+
+
+def _queue_put(event: dict):
+    """Put an event on the DMR queue, dropping oldest if full."""
+    try:
+        dmr_queue.put_nowait(event)
+    except queue.Full:
+        try:
+            dmr_queue.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            dmr_queue.put_nowait(event)
+        except queue.Full:
+            pass
+
+
 def stream_dsd_output(rtl_process: subprocess.Popen, dsd_process: subprocess.Popen):
-    """Read DSD stderr output and push parsed events to the queue."""
+    """Read DSD stderr output and push parsed events to the queue.
+
+    Uses select() with a timeout so we can send periodic heartbeat
+    events while readline() would otherwise block indefinitely during
+    silence (no signal being decoded).
+    """
     global dmr_running
 
     try:
-        dmr_queue.put_nowait({'type': 'status', 'text': 'started'})
+        _queue_put({'type': 'status', 'text': 'started'})
+        last_heartbeat = time.time()
 
         while dmr_running:
             if dsd_process.poll() is not None:
                 break
 
-            line = dsd_process.stderr.readline()
-            if not line:
-                if dsd_process.poll() is not None:
-                    break
-                continue
+            # Wait up to 1s for data on stderr instead of blocking forever
+            ready, _, _ = select.select([dsd_process.stderr], [], [], 1.0)
 
-            text = line.decode('utf-8', errors='replace').strip()
-            if not text:
-                continue
+            if ready:
+                line = dsd_process.stderr.readline()
+                if not line:
+                    if dsd_process.poll() is not None:
+                        break
+                    continue
 
-            parsed = parse_dsd_output(text)
-            if parsed:
-                try:
-                    dmr_queue.put_nowait(parsed)
-                except queue.Full:
-                    try:
-                        dmr_queue.get_nowait()
-                    except queue.Empty:
-                        pass
-                    try:
-                        dmr_queue.put_nowait(parsed)
-                    except queue.Full:
-                        pass
+                text = line.decode('utf-8', errors='replace').strip()
+                if not text:
+                    continue
+
+                parsed = parse_dsd_output(text)
+                if parsed:
+                    _queue_put(parsed)
+                last_heartbeat = time.time()
+            else:
+                # No stderr output — send heartbeat so frontend knows
+                # decoder is still alive and listening
+                now = time.time()
+                if now - last_heartbeat >= _HEARTBEAT_INTERVAL:
+                    _queue_put({
+                        'type': 'heartbeat',
+                        'timestamp': datetime.now().strftime('%H:%M:%S'),
+                    })
+                    last_heartbeat = now
 
     except Exception as e:
         logger.error(f"DSD stream error: {e}")
     finally:
         dmr_running = False
-        try:
-            dmr_queue.put_nowait({'type': 'status', 'text': 'stopped'})
-        except queue.Full:
-            pass
+        # Capture exit info for diagnostics
+        rc = dsd_process.poll()
+        reason = 'stopped'
+        detail = ''
+        if rc is not None and rc != 0:
+            reason = 'crashed'
+            try:
+                remaining = dsd_process.stderr.read(1024)
+                if remaining:
+                    detail = remaining.decode('utf-8', errors='replace').strip()[:200]
+            except Exception:
+                pass
+            logger.warning(f"DSD process exited with code {rc}: {detail}")
+        _queue_put({'type': 'status', 'text': reason, 'exit_code': rc, 'detail': detail})
         logger.info("DSD stream thread stopped")
 
 
