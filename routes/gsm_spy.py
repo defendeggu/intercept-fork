@@ -1096,43 +1096,40 @@ def traffic_correlation():
 def parse_grgsm_scanner_output(line: str) -> dict[str, Any] | None:
     """Parse grgsm_scanner output line.
 
-    Actual output format is a table:
-      ARFCN   | Freq (MHz) | CID     | LAC    | MCC | MNC | Power (dB)
-      --------------------------------------------------------------------
-      23      | 940.6      | 31245   | 1234   | 214 | 01  | -48
+    Actual output format (comma-separated key-value pairs):
+      ARFCN: 975, Freq: 925.2M, CID: 13522, LAC: 38722, MCC: 262, MNC: 1, Pwr: -58
     """
     try:
-        # Skip progress, header, and separator lines
-        if 'Scanning:' in line or 'ARFCN' in line or '---' in line or 'Found' in line:
+        line = line.strip()
+
+        # Skip non-data lines (progress, config, neighbour info, blank)
+        if not line or 'ARFCN:' not in line:
             return None
 
-        # Parse table row: "  23      | 940.6      | 31245   | 1234   | 214 | 01  | -48"
-        # Split by pipe and clean whitespace
-        parts = [p.strip() for p in line.split('|')]
+        # Parse "ARFCN: 975, Freq: 925.2M, CID: 13522, LAC: 38722, MCC: 262, MNC: 1, Pwr: -58"
+        fields = {}
+        for part in line.split(','):
+            part = part.strip()
+            if ':' in part:
+                key, _, value = part.partition(':')
+                fields[key.strip()] = value.strip()
 
-        if len(parts) >= 7:
-            arfcn = parts[0]
-            freq = parts[1]
-            cid = parts[2]
-            lac = parts[3]
-            mcc = parts[4]
-            mnc = parts[5]
-            power = parts[6]
+        if 'ARFCN' in fields and 'CID' in fields:
+            # Freq may have 'M' suffix (e.g. "925.2M")
+            freq_str = fields.get('Freq', '0').rstrip('Mm')
 
-            # Validate that we have numeric data (not header line)
-            if arfcn.isdigit():
-                data = {
-                    'type': 'tower',
-                    'arfcn': int(arfcn),
-                    'frequency': float(freq),
-                    'cid': int(cid),
-                    'lac': int(lac),
-                    'mcc': int(mcc),
-                    'mnc': int(mnc),
-                    'signal_strength': float(power),
-                    'timestamp': datetime.now().isoformat()
-                }
-                return data
+            data = {
+                'type': 'tower',
+                'arfcn': int(fields['ARFCN']),
+                'frequency': float(freq_str),
+                'cid': int(fields.get('CID', 0)),
+                'lac': int(fields.get('LAC', 0)),
+                'mcc': int(fields.get('MCC', 0)),
+                'mnc': int(fields.get('MNC', 0)),
+                'signal_strength': float(fields.get('Pwr', -999)),
+                'timestamp': datetime.now().isoformat()
+            }
+            return data
 
     except Exception as e:
         logger.debug(f"Failed to parse scanner line: {line} - {e}")

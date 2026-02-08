@@ -13,9 +13,9 @@ from routes.gsm_spy import (
 class TestParseGrgsmScannerOutput:
     """Tests for parse_grgsm_scanner_output()."""
 
-    def test_valid_table_row(self):
-        """Test parsing a valid scanner output table row."""
-        line = "  23      | 940.6      | 31245   | 1234   | 214 | 01  | -48"
+    def test_valid_output_line(self):
+        """Test parsing a valid grgsm_scanner output line."""
+        line = "ARFCN: 23, Freq: 940.6M, CID: 31245, LAC: 1234, MCC: 214, MNC: 01, Pwr: -48"
         result = parse_grgsm_scanner_output(line)
 
         assert result is not None
@@ -29,33 +29,34 @@ class TestParseGrgsmScannerOutput:
         assert result['signal_strength'] == -48.0
         assert 'timestamp' in result
 
-    def test_header_line(self):
-        """Test that header lines are skipped."""
-        line = "ARFCN   | Freq (MHz) | CID     | LAC    | MCC | MNC | Power (dB)"
+    def test_freq_without_suffix(self):
+        """Test parsing frequency without M suffix."""
+        line = "ARFCN: 975, Freq: 925.2, CID: 13522, LAC: 38722, MCC: 262, MNC: 1, Pwr: -58"
+        result = parse_grgsm_scanner_output(line)
+        assert result is not None
+        assert result['frequency'] == 925.2
+
+    def test_config_line(self):
+        """Test that configuration lines are skipped."""
+        line = "  Configuration: 1 CCCH, not combined"
         result = parse_grgsm_scanner_output(line)
         assert result is None
 
-    def test_separator_line(self):
-        """Test that separator lines are skipped."""
-        line = "--------------------------------------------------------------------"
+    def test_neighbour_line(self):
+        """Test that neighbour cell lines are skipped."""
+        line = "  Neighbour Cells: 57, 61, 70, 71, 72, 86"
+        result = parse_grgsm_scanner_output(line)
+        assert result is None
+
+    def test_cell_arfcn_line(self):
+        """Test that cell ARFCN lines are skipped."""
+        line = "  Cell ARFCNs: 63, 76"
         result = parse_grgsm_scanner_output(line)
         assert result is None
 
     def test_progress_line(self):
-        """Test that progress lines are skipped."""
-        line = "Scanning: 50% complete"
-        result = parse_grgsm_scanner_output(line)
-        assert result is None
-
-    def test_found_line(self):
-        """Test that 'Found X towers' lines are skipped."""
-        line = "Found 5 towers"
-        result = parse_grgsm_scanner_output(line)
-        assert result is None
-
-    def test_invalid_data(self):
-        """Test handling of invalid data."""
-        line = "  abc     | xyz        | invalid | data   | bad | bad | bad"
+        """Test that progress/status lines are skipped."""
+        line = "Scanning GSM900 band..."
         result = parse_grgsm_scanner_output(line)
         assert result is None
 
@@ -64,9 +65,9 @@ class TestParseGrgsmScannerOutput:
         result = parse_grgsm_scanner_output("")
         assert result is None
 
-    def test_partial_data(self):
-        """Test handling of incomplete table rows."""
-        line = "  23      | 940.6      | 31245"  # Missing fields
+    def test_invalid_data(self):
+        """Test handling of non-numeric values."""
+        line = "ARFCN: abc, Freq: xyz, CID: bad, LAC: data, MCC: bad, MNC: bad, Pwr: bad"
         result = parse_grgsm_scanner_output(line)
         assert result is None
 
