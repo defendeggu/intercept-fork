@@ -9,6 +9,9 @@ LABEL description="Signal Intelligence Platform for SDR monitoring"
 # Set working directory
 WORKDIR /app
 
+# Pre-accept tshark non-root capture prompt for non-interactive install
+RUN echo 'wireshark-common wireshark-common/install-setuid boolean true' | debconf-set-selections
+
 # Install system dependencies for SDR tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # RTL-SDR tools
@@ -45,9 +48,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     airspy \
     limesuite \
     hackrf \
+    # GSM Intelligence (tshark for packet parsing)
+    tshark \
     # Utilities
     curl \
     procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# GSM Intelligence: gr-gsm (grgsm_scanner, grgsm_livemon)
+# Install from apt if available, otherwise build from source
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       gnuradio gr-osmosdr gr-gsm 2>/dev/null \
+    || ( \
+       apt-get install -y --no-install-recommends \
+         gnuradio gnuradio-dev gr-osmosdr \
+         git cmake libboost-all-dev libcppunit-dev swig \
+         doxygen liblog4cpp5-dev python3-scipy python3-numpy \
+         libvolk-dev libfftw3-dev build-essential \
+       && cd /tmp \
+       && git clone --depth 1 https://github.com/ptrkrysik/gr-gsm.git \
+       && cd gr-gsm \
+       && mkdir build && cd build \
+       && cmake .. \
+       && make -j$(nproc) \
+       && make install \
+       && ldconfig \
+       && rm -rf /tmp/gr-gsm \
+       && apt-get remove -y gnuradio-dev libcppunit-dev swig doxygen \
+          liblog4cpp5-dev libvolk-dev build-essential git cmake \
+       && apt-get autoremove -y \
+    ) \
     && rm -rf /var/lib/apt/lists/*
 
 # Build dump1090-fa and acarsdec from source (packages not available in slim repos)

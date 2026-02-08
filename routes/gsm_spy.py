@@ -6,6 +6,7 @@ import json
 import logging
 import queue
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -361,6 +362,11 @@ def start_scanner():
 
         # Build grgsm_scanner command
         # Example: grgsm_scanner --args="rtl=0" -b GSM900
+        if not shutil.which('grgsm_scanner'):
+            from app import release_sdr_device
+            release_sdr_device(device_index)
+            return jsonify({'error': 'grgsm_scanner not found. Please install gr-gsm.'}), 500
+
         try:
             cmd = ['grgsm_scanner']
 
@@ -1324,6 +1330,22 @@ def scanner_thread(cmd, device_index):
                     process.wait()  # Reap zombie
 
                 logger.info(f"Scan #{scan_count} complete")
+
+            except FileNotFoundError:
+                logger.error(
+                    "grgsm_scanner not found. Please install gr-gsm: "
+                    "https://github.com/ptrkrysik/gr-gsm"
+                )
+                # Send error to SSE stream so the UI knows
+                try:
+                    app_module.gsm_spy_queue.put({
+                        'type': 'error',
+                        'message': 'grgsm_scanner not found. Please install gr-gsm.',
+                        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S')
+                    })
+                except Exception:
+                    pass
+                break  # Don't retry - binary won't appear
 
             except Exception as e:
                 logger.error(f"Scanner scan error: {e}", exc_info=True)
