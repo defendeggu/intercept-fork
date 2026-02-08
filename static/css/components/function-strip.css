@@ -19,6 +19,17 @@
     min-width: max-content;
 }
 
+/* Strip title badge */
+.function-strip .strip-title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    padding: 4px 0;
+}
+
 /* Stats */
 .function-strip .strip-stat {
     display: flex;
