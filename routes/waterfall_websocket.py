@@ -1,6 +1,7 @@
 """WebSocket-based waterfall streaming with I/Q capture and server-side FFT."""
 
 import json
+import queue
 import subprocess
 import threading
 import time
@@ -85,9 +86,23 @@ def init_waterfall_websocket(app: Flask):
         reader_thread = None
         stop_event = threading.Event()
         claimed_device = None
+        # Queue for outgoing messages — only the main loop touches ws.send()
+        send_queue = queue.Queue(maxsize=120)
 
         try:
             while True:
+                # Drain send queue first (non-blocking)
+                while True:
+                    try:
+                        outgoing = send_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                    try:
+                        ws.send(outgoing)
+                    except Exception:
+                        stop_event.set()
+                        break
+
                 try:
                     msg = ws.receive(timeout=0.1)
                 except TimeoutError:
@@ -124,6 +139,12 @@ def init_waterfall_websocket(app: Flask):
                         app_module.release_sdr_device(claimed_device)
                         claimed_device = None
                     stop_event.clear()
+                    # Flush stale frames from previous capture
+                    while not send_queue.empty():
+                        try:
+                            send_queue.get_nowait()
+                        except queue.Empty:
+                            break
 
                     # Parse config
                     center_freq = float(data.get('center_freq', 100.0))
@@ -229,13 +250,13 @@ def init_waterfall_websocket(app: Flask):
                         'sample_rate': sample_rate,
                     }))
 
-                    # Start reader thread
+                    # Start reader thread — puts frames on queue, never calls ws.send()
                     def fft_reader(
-                        proc, ws_ref, stop_evt,
+                        proc, _send_q, stop_evt,
                         _fft_size, _avg_count, _fps,
                         _start_freq, _end_freq,
                     ):
-                        """Read I/Q from subprocess, compute FFT, send binary frames."""
+                        """Read I/Q from subprocess, compute FFT, enqueue binary frames."""
                         bytes_per_frame = _fft_size * _avg_count * 2
                         frame_interval = 1.0 / _fps
 
@@ -272,9 +293,10 @@ def init_waterfall_websocket(app: Flask):
                                 )
 
                                 try:
-                                    ws_ref.send(frame)
-                                except Exception:
-                                    break
+                                    _send_q.put_nowait(frame)
+                                except queue.Full:
+                                    # Drop frame if main loop can't keep up
+                                    pass
 
                                 # Pace to target FPS
                                 elapsed = time.monotonic() - frame_start
@@ -288,7 +310,7 @@ def init_waterfall_websocket(app: Flask):
                     reader_thread = threading.Thread(
                         target=fft_reader,
                         args=(
-                            iq_process, ws, stop_event,
+                            iq_process, send_queue, stop_event,
                             fft_size, avg_count, fps,
                             start_freq, end_freq,
                         ),
