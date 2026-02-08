@@ -1018,8 +1018,16 @@ function addSignalHit(data) {
         <td style="padding: 4px; color: var(--accent-green); font-weight: bold;">${data.frequency.toFixed(3)}</td>
         <td style="padding: 4px; color: ${snrColor}; font-weight: bold; font-size: 9px;">${snrText}</td>
         <td style="padding: 4px; color: var(--text-secondary);">${mod.toUpperCase()}</td>
-        <td style="padding: 4px; text-align: center;">
+        <td style="padding: 4px; text-align: center; white-space: nowrap;">
             <button class="preset-btn" onclick="tuneToFrequency(${data.frequency}, '${mod}')" style="padding: 2px 6px; font-size: 9px; background: var(--accent-green); border: none; color: #000; cursor: pointer; border-radius: 3px;">Listen</button>
+            <span style="position:relative;display:inline-block;">
+                <button class="preset-btn" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'" style="padding:2px 5px; font-size:9px; background:var(--accent-cyan); border:none; color:#000; cursor:pointer; border-radius:3px; margin-left:3px;" title="Send frequency to decoder">&#9654;</button>
+                <div style="display:none; position:absolute; right:0; top:100%; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; z-index:100; min-width:90px; padding:2px; box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+                    <div onclick="sendFrequencyToMode(${data.frequency}, 'pager'); this.parentElement.style.display='none'" style="padding:3px 8px; cursor:pointer; font-size:9px; color:var(--text-primary); border-radius:3px;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">Pager</div>
+                    <div onclick="sendFrequencyToMode(${data.frequency}, 'sensor'); this.parentElement.style.display='none'" style="padding:3px 8px; cursor:pointer; font-size:9px; color:var(--text-primary); border-radius:3px;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">433 Sensor</div>
+                    <div onclick="sendFrequencyToMode(${data.frequency}, 'rtlamr'); this.parentElement.style.display='none'" style="padding:3px 8px; cursor:pointer; font-size:9px; color:var(--text-primary); border-radius:3px;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">RTLAMR</div>
+                </div>
+            </span>
         </td>
     `;
     tbody.insertBefore(row, tbody.firstChild);
@@ -3056,6 +3064,27 @@ function renderSignalGuess(result) {
             altsEl.innerHTML = '';
         }
     }
+
+    const sendToEl = document.getElementById('signalGuessSendTo');
+    if (sendToEl) {
+        const freqInput = document.getElementById('signalGuessFreqInput');
+        const freq = freqInput ? parseFloat(freqInput.value) : NaN;
+        if (!isNaN(freq) && freq > 0) {
+            const tags = (result.tags || []).map(t => t.toLowerCase());
+            const modes = [
+                { key: 'pager', label: 'Pager', highlight: tags.some(t => t.includes('pager') || t.includes('pocsag') || t.includes('flex')) },
+                { key: 'sensor', label: '433 Sensor', highlight: tags.some(t => t.includes('ism') || t.includes('433') || t.includes('sensor') || t.includes('iot')) },
+                { key: 'rtlamr', label: 'RTLAMR', highlight: tags.some(t => t.includes('meter') || t.includes('amr') || t.includes('utility')) }
+            ];
+            sendToEl.style.display = 'block';
+            sendToEl.innerHTML = '<div style="font-size:9px; color:var(--text-muted); margin-bottom:4px;">Send to:</div><div style="display:flex; gap:4px;">' +
+                modes.map(m =>
+                    `<button class="preset-btn" onclick="sendFrequencyToMode(${freq}, '${m.key}')" style="padding:2px 8px; font-size:9px; border:none; color:#000; cursor:pointer; border-radius:3px; background:${m.highlight ? 'var(--accent-green)' : 'var(--accent-cyan)'}; ${m.highlight ? 'font-weight:bold;' : ''}">${m.label}</button>`
+                ).join('') + '</div>';
+        } else {
+            sendToEl.style.display = 'none';
+        }
+    }
 }
 
 function manualSignalGuess() {
@@ -4023,21 +4052,88 @@ function bindWaterfallInteraction() {
         tooltip.style.display = 'none';
     };
 
+    // Right-click context menu for "Send to" decoder
+    let ctxMenu = document.getElementById('waterfallCtxMenu');
+    if (!ctxMenu) {
+        ctxMenu = document.createElement('div');
+        ctxMenu.id = 'waterfallCtxMenu';
+        ctxMenu.style.cssText = 'position:fixed;display:none;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;z-index:10000;min-width:120px;padding:4px 0;box-shadow:0 4px 12px rgba(0,0,0,0.5);font-size:11px;';
+        document.body.appendChild(ctxMenu);
+        document.addEventListener('click', () => { ctxMenu.style.display = 'none'; });
+    }
+
+    const contextHandler = (event) => {
+        if (waterfallMode === 'audio') return;
+        event.preventDefault();
+        const canvas = event.currentTarget;
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const ratio = Math.max(0, Math.min(1, x / rect.width));
+        const freq = waterfallStartFreq + ratio * (waterfallEndFreq - waterfallStartFreq);
+
+        const modes = [
+            { key: 'pager', label: 'Pager' },
+            { key: 'sensor', label: '433 Sensor' },
+            { key: 'rtlamr', label: 'RTLAMR' }
+        ];
+
+        ctxMenu.innerHTML = `<div style="padding:4px 10px; color:var(--text-muted); font-size:9px; border-bottom:1px solid var(--border-color); margin-bottom:2px;">${freq.toFixed(3)} MHz &rarr;</div>` +
+            modes.map(m =>
+                `<div onclick="sendFrequencyToMode(${freq}, '${m.key}')" style="padding:4px 10px; cursor:pointer; color:var(--text-primary);" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">Send to ${m.label}</div>`
+            ).join('');
+
+        ctxMenu.style.left = event.clientX + 'px';
+        ctxMenu.style.top = event.clientY + 'px';
+        ctxMenu.style.display = 'block';
+    };
+
     if (waterfallCanvas) {
         waterfallCanvas.style.cursor = 'crosshair';
         waterfallCanvas.addEventListener('click', handler);
         waterfallCanvas.addEventListener('mousemove', hoverHandler);
         waterfallCanvas.addEventListener('mouseleave', leaveHandler);
+        waterfallCanvas.addEventListener('contextmenu', contextHandler);
     }
     if (spectrumCanvas) {
         spectrumCanvas.style.cursor = 'crosshair';
         spectrumCanvas.addEventListener('click', handler);
         spectrumCanvas.addEventListener('mousemove', hoverHandler);
         spectrumCanvas.addEventListener('mouseleave', leaveHandler);
+        spectrumCanvas.addEventListener('contextmenu', contextHandler);
     }
 }
 
 
+// ============== CROSS-MODULE FREQUENCY ROUTING ==============
+
+function sendFrequencyToMode(freqMhz, targetMode) {
+    const inputMap = {
+        pager: 'frequency',
+        sensor: 'sensorFrequency',
+        rtlamr: 'rtlamrFrequency'
+    };
+
+    const inputId = inputMap[targetMode];
+    if (!inputId) return;
+
+    if (typeof switchMode === 'function') {
+        switchMode(targetMode);
+    }
+
+    setTimeout(() => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.value = freqMhz.toFixed(4);
+        }
+    }, 300);
+
+    if (typeof showNotification === 'function') {
+        const modeLabels = { pager: 'Pager', sensor: '433 Sensor', rtlamr: 'RTLAMR' };
+        showNotification('Frequency Sent', `${freqMhz.toFixed(3)} MHz → ${modeLabels[targetMode] || targetMode}`);
+    }
+}
+
+window.sendFrequencyToMode = sendFrequencyToMode;
 window.stopDirectListen = stopDirectListen;
 window.toggleScanner = toggleScanner;
 window.startScanner = startScanner;
