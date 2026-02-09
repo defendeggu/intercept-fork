@@ -7,10 +7,23 @@ import os
 import sys
 
 # Application version
-VERSION = "2.14.0"
+VERSION = "2.15.0"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.15.0",
+        "date": "February 2026",
+        "highlights": [
+            "Real-time WebSocket waterfall with I/Q capture and server-side FFT",
+            "Cross-module frequency routing from Listening Post to decoders",
+            "Pure Python SSTV decoder replacing broken slowrx dependency",
+            "Real-time signal scope for pager, sensor, and SSTV modes",
+            "USB-level device probe to prevent cryptic rtl_fm crashes",
+            "DMR dsd-fme protocol fixes, tuning controls, and state sync",
+            "SDR device lock-up fix from unreleased device registry on crash",
+        ]
+    },
     {
         "version": "2.14.0",
         "date": "February 2026",
