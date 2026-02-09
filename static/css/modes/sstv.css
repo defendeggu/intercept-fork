@@ -388,12 +388,12 @@
 }
 
 .sstv-image-card {
+    position: relative;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     overflow: hidden;
     transition: all 0.15s ease;
-    cursor: pointer;
 }
 
 .sstv-image-card:hover {
@@ -402,12 +402,58 @@
     box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
 }
 
+.sstv-image-card-inner {
+    cursor: pointer;
+}
+
 .sstv-image-preview {
     width: 100%;
     aspect-ratio: 4/3;
     object-fit: cover;
     background: #000;
     display: block;
+}
+
+.sstv-image-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 6px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.sstv-image-card:hover .sstv-image-actions {
+    opacity: 1;
+}
+
+.sstv-image-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sstv-image-actions button:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.sstv-image-actions button:last-child:hover {
+    background: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
 }
 
 .sstv-image-info {
@@ -737,6 +783,96 @@
 }
 
 /* ============================================
+   SIGNAL MONITOR
+   ============================================ */
+.sstv-signal-monitor {
+    width: 100%;
+    max-width: 320px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.sstv-signal-monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+}
+
+.sstv-signal-monitor-header svg {
+    color: var(--accent-cyan);
+}
+
+.sstv-signal-level-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.sstv-signal-level-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.sstv-signal-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.sstv-signal-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s ease;
+    background: var(--text-dim);
+}
+
+.sstv-signal-level-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 24px;
+    text-align: right;
+}
+
+.sstv-signal-status-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+.sstv-signal-vis-state {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sstv-signal-vis-state.active {
+    color: var(--accent-cyan);
+}
+
+/* ============================================
    IMAGE MODAL
    ============================================ */
 .sstv-image-modal {
@@ -764,6 +900,40 @@
     border-radius: 4px;
 }
 
+.sstv-modal-toolbar {
+    position: absolute;
+    top: 20px;
+    right: 60px;
+    display: flex;
+    gap: 8px;
+    z-index: 1;
+}
+
+.sstv-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+}
+
+.sstv-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sstv-modal-btn.delete:hover {
+    background: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
+}
+
 .sstv-modal-close {
     position: absolute;
     top: 20px;
@@ -775,10 +945,31 @@
     cursor: pointer;
     opacity: 0.7;
     transition: opacity 0.15s;
+    z-index: 1;
 }
 
 .sstv-modal-close:hover {
     opacity: 1;
+}
+
+/* Clear All button */
+.sstv-gallery-clear-btn {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-left: 8px;
+}
+
+.sstv-gallery-clear-btn:hover {
+    color: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
 }
 
 /* ============================================

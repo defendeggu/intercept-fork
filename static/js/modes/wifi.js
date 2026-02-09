@@ -69,6 +69,40 @@ const WiFiMode = (function() {
         return true;
     }
 
+    function getChannelPresetList(preset) {
+        switch (preset) {
+            case '2.4-common':
+                return '1,6,11';
+            case '2.4-all':
+                return '1,2,3,4,5,6,7,8,9,10,11,12,13';
+            case '5-low':
+                return '36,40,44,48';
+            case '5-mid':
+                return '52,56,60,64';
+            case '5-high':
+                return '149,153,157,161,165';
+            default:
+                return '';
+        }
+    }
+
+    function buildChannelConfig() {
+        const preset = document.getElementById('wifiChannelPreset')?.value || '';
+        const listInput = document.getElementById('wifiChannelList')?.value || '';
+        const singleInput = document.getElementById('wifiChannel')?.value || '';
+
+        const listValue = listInput.trim();
+        const presetValue = getChannelPresetList(preset);
+
+        const channels = listValue || presetValue || '';
+        const channel = channels ? null : (singleInput.trim() ? parseInt(singleInput.trim()) : null);
+
+        return {
+            channels: channels || null,
+            channel: Number.isFinite(channel) ? channel : null,
+        };
+    }
+
     // ==========================================================================
     // State
     // ==========================================================================
@@ -463,7 +497,7 @@ const WiFiMode = (function() {
         try {
             const iface = elements.interfaceSelect?.value || null;
             const band = document.getElementById('wifiBand')?.value || 'all';
-            const channel = document.getElementById('wifiChannel')?.value || null;
+            const channelConfig = buildChannelConfig();
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
             let response;
@@ -476,7 +510,8 @@ const WiFiMode = (function() {
                         interface: iface,
                         scan_type: 'deep',
                         band: band === 'abg' ? 'all' : band === 'bg' ? '2.4' : '5',
-                        channel: channel ? parseInt(channel) : null,
+                        channel: channelConfig.channel,
+                        channels: channelConfig.channels,
                     }),
                 });
             } else {
@@ -486,7 +521,8 @@ const WiFiMode = (function() {
                     body: JSON.stringify({
                         interface: iface,
                         band: band === 'abg' ? 'all' : band === 'bg' ? '2.4' : '5',
-                        channel: channel ? parseInt(channel) : null,
+                        channel: channelConfig.channel,
+                        channels: channelConfig.channels,
                     }),
                 });
             }
@@ -879,6 +915,7 @@ const WiFiMode = (function() {
         updateNetworkRow(network);
         updateStats();
         updateProximityRadar();
+        updateChannelChart();
 
         if (onNetworkUpdate) onNetworkUpdate(network);
     }
@@ -1420,8 +1457,14 @@ const WiFiMode = (function() {
         return Object.values(stats).filter(s => s.ap_count > 0 || [1, 6, 11, 36, 40, 44, 48, 149, 153, 157, 161, 165].includes(s.channel));
     }
 
-    function updateChannelChart(band = '2.4') {
+    function updateChannelChart(band) {
         if (typeof ChannelChart === 'undefined') return;
+
+        // Use the currently active band tab if no band specified
+        if (!band) {
+            const activeTab = elements.channelBandTabs && elements.channelBandTabs.querySelector('.channel-band-tab.active');
+            band = activeTab ? activeTab.dataset.band : '2.4';
+        }
 
         // Recalculate channel stats from networks if needed
         if (channelStats.length === 0 && networks.size > 0) {

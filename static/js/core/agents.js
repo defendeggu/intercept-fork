@@ -868,11 +868,8 @@ function connectAgentStream(mode, onMessage) {
     if (currentAgent === 'local') {
         streamUrl = `/${mode}/stream`;
     } else {
-        // For remote agents, we could either:
-        // 1. Use the multi-agent stream: /controller/stream/all
-        // 2. Or proxy through controller (not implemented yet)
-        // For now, use multi-agent stream which includes agent_name tagging
-        streamUrl = '/controller/stream/all';
+        // For remote agents, proxy SSE through controller
+        streamUrl = `/controller/agents/${currentAgent}/${mode}/stream`;
     }
 
     agentEventSource = new EventSource(streamUrl);
@@ -880,14 +877,6 @@ function connectAgentStream(mode, onMessage) {
     agentEventSource.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-
-            // If using multi-agent stream, filter by current agent if needed
-            if (streamUrl === '/controller/stream/all' && currentAgent !== 'local') {
-                const agent = agents.find(a => a.id == currentAgent);
-                if (agent && data.agent_name && data.agent_name !== agent.name) {
-                    return; // Skip messages from other agents
-                }
-            }
 
             onMessage(data);
         } catch (e) {

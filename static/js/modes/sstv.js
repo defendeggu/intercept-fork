@@ -21,6 +21,18 @@ const SSTV = (function() {
     // ISS frequency
     const ISS_FREQ = 145.800;
 
+    // Signal scope state
+    let sstvScopeCtx = null;
+    let sstvScopeAnim = null;
+    let sstvScopeHistory = [];
+    const SSTV_SCOPE_LEN = 200;
+    let sstvScopeRms = 0;
+    let sstvScopePeak = 0;
+    let sstvScopeTargetRms = 0;
+    let sstvScopeTargetPeak = 0;
+    let sstvScopeMsgBurst = 0;
+    let sstvScopeTone = null;
+
     /**
      * Initialize the SSTV mode
      */
@@ -491,7 +503,7 @@ const SSTV = (function() {
 
             if (!data.available) {
                 updateStatusUI('unavailable', 'Decoder not installed');
-                showStatusMessage('SSTV decoder not available. Install slowrx: apt install slowrx', 'warning');
+                showStatusMessage('SSTV decoder not available. Install numpy and Pillow: pip install numpy Pillow', 'warning');
                 return;
             }
 
@@ -521,6 +533,11 @@ const SSTV = (function() {
         const frequency = parseFloat(freqInput?.value || ISS_FREQ);
         const device = parseInt(deviceSelect?.value || '0', 10);
 
+        // Check if device is available
+        if (typeof checkDeviceAvailability === 'function' && !checkDeviceAvailability('sstv')) {
+            return;
+        }
+
         updateStatusUI('connecting', 'Starting...');
 
         try {
@@ -534,6 +551,9 @@ const SSTV = (function() {
 
             if (data.status === 'started' || data.status === 'already_running') {
                 isRunning = true;
+                if (typeof reserveDevice === 'function') {
+                    reserveDevice(device, 'sstv');
+                }
                 updateStatusUI('listening', `${frequency} MHz`);
                 startStream();
                 showNotification('SSTV', `Listening on ${frequency} MHz`);
@@ -555,6 +575,9 @@ const SSTV = (function() {
         try {
             await fetch('/sstv/stop', { method: 'POST' });
             isRunning = false;
+            if (typeof releaseDevice === 'function') {
+                releaseDevice('sstv');
+            }
             stopStream();
             updateStatusUI('idle', 'Stopped');
             showNotification('SSTV', 'Decoder stopped');
@@ -624,12 +647,147 @@ const SSTV = (function() {
     }
 
     /**
+     * Initialize signal scope canvas
+     */
+    function initSstvScope() {
+        const canvas = document.getElementById('sstvScopeCanvas');
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * (window.devicePixelRatio || 1);
+        canvas.height = rect.height * (window.devicePixelRatio || 1);
+        sstvScopeCtx = canvas.getContext('2d');
+        sstvScopeHistory = new Array(SSTV_SCOPE_LEN).fill(0);
+        sstvScopeRms = 0;
+        sstvScopePeak = 0;
+        sstvScopeTargetRms = 0;
+        sstvScopeTargetPeak = 0;
+        sstvScopeMsgBurst = 0;
+        sstvScopeTone = null;
+        drawSstvScope();
+    }
+
+    /**
+     * Draw signal scope animation frame
+     */
+    function drawSstvScope() {
+        const ctx = sstvScopeCtx;
+        if (!ctx) return;
+        const W = ctx.canvas.width;
+        const H = ctx.canvas.height;
+        const midY = H / 2;
+
+        // Phosphor persistence
+        ctx.fillStyle = 'rgba(5, 5, 16, 0.3)';
+        ctx.fillRect(0, 0, W, H);
+
+        // Smooth towards target
+        sstvScopeRms += (sstvScopeTargetRms - sstvScopeRms) * 0.25;
+        sstvScopePeak += (sstvScopeTargetPeak - sstvScopePeak) * 0.15;
+
+        // Push to history
+        sstvScopeHistory.push(Math.min(sstvScopeRms / 32768, 1.0));
+        if (sstvScopeHistory.length > SSTV_SCOPE_LEN) sstvScopeHistory.shift();
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(60, 40, 80, 0.4)';
+        ctx.lineWidth = 0.5;
+        for (let i = 1; i < 4; i++) {
+            const y = (H / 4) * i;
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+        }
+        for (let i = 1; i < 8; i++) {
+            const x = (W / 8) * i;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        }
+
+        // Waveform
+        const stepX = W / (SSTV_SCOPE_LEN - 1);
+        ctx.strokeStyle = '#c080ff';
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = '#c080ff';
+        ctx.shadowBlur = 4;
+
+        // Upper half
+        ctx.beginPath();
+        for (let i = 0; i < sstvScopeHistory.length; i++) {
+            const x = i * stepX;
+            const amp = sstvScopeHistory[i] * midY * 0.9;
+            const y = midY - amp;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Lower half (mirror)
+        ctx.beginPath();
+        for (let i = 0; i < sstvScopeHistory.length; i++) {
+            const x = i * stepX;
+            const amp = sstvScopeHistory[i] * midY * 0.9;
+            const y = midY + amp;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Peak indicator
+        const peakNorm = Math.min(sstvScopePeak / 32768, 1.0);
+        if (peakNorm > 0.01) {
+            const peakY = midY - peakNorm * midY * 0.9;
+            ctx.strokeStyle = 'rgba(255, 68, 68, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(0, peakY); ctx.lineTo(W, peakY); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Image decode flash
+        if (sstvScopeMsgBurst > 0.01) {
+            ctx.fillStyle = `rgba(0, 255, 100, ${sstvScopeMsgBurst * 0.15})`;
+            ctx.fillRect(0, 0, W, H);
+            sstvScopeMsgBurst *= 0.88;
+        }
+
+        // Update labels
+        const rmsLabel = document.getElementById('sstvScopeRmsLabel');
+        const peakLabel = document.getElementById('sstvScopePeakLabel');
+        const toneLabel = document.getElementById('sstvScopeToneLabel');
+        const statusLabel = document.getElementById('sstvScopeStatusLabel');
+        if (rmsLabel) rmsLabel.textContent = Math.round(sstvScopeRms);
+        if (peakLabel) peakLabel.textContent = Math.round(sstvScopePeak);
+        if (toneLabel) {
+            if (sstvScopeTone === 'leader') { toneLabel.textContent = 'LEADER'; toneLabel.style.color = '#0f0'; }
+            else if (sstvScopeTone === 'sync') { toneLabel.textContent = 'SYNC'; toneLabel.style.color = '#0ff'; }
+            else if (sstvScopeTone === 'decoding') { toneLabel.textContent = 'DECODING'; toneLabel.style.color = '#fa0'; }
+            else if (sstvScopeTone === 'noise') { toneLabel.textContent = 'NOISE'; toneLabel.style.color = '#555'; }
+            else { toneLabel.textContent = 'QUIET'; toneLabel.style.color = '#444'; }
+        }
+        if (statusLabel) {
+            if (sstvScopeRms > 500) { statusLabel.textContent = 'SIGNAL'; statusLabel.style.color = '#0f0'; }
+            else { statusLabel.textContent = 'MONITORING'; statusLabel.style.color = '#555'; }
+        }
+
+        sstvScopeAnim = requestAnimationFrame(drawSstvScope);
+    }
+
+    /**
+     * Stop signal scope
+     */
+    function stopSstvScope() {
+        if (sstvScopeAnim) { cancelAnimationFrame(sstvScopeAnim); sstvScopeAnim = null; }
+        sstvScopeCtx = null;
+    }
+
+    /**
      * Start SSE stream
      */
     function startStream() {
         if (eventSource) {
             eventSource.close();
         }
+
+        // Show and init scope
+        const scopePanel = document.getElementById('sstvScopePanel');
+        if (scopePanel) scopePanel.style.display = 'block';
+        initSstvScope();
 
         eventSource = new EventSource('/sstv/stream');
 
@@ -638,6 +796,10 @@ const SSTV = (function() {
                 const data = JSON.parse(e.data);
                 if (data.type === 'sstv_progress') {
                     handleProgress(data);
+                } else if (data.type === 'sstv_scope') {
+                    sstvScopeTargetRms = data.rms;
+                    sstvScopeTargetPeak = data.peak;
+                    if (data.tone !== undefined) sstvScopeTone = data.tone;
                 }
             } catch (err) {
                 console.error('Failed to parse SSE message:', err);
@@ -660,6 +822,9 @@ const SSTV = (function() {
             eventSource.close();
             eventSource = null;
         }
+        stopSstvScope();
+        const scopePanel = document.getElementById('sstvScopePanel');
+        if (scopePanel) scopePanel.style.display = 'none';
     }
 
     /**
@@ -680,8 +845,97 @@ const SSTV = (function() {
             renderGallery();
             showNotification('SSTV', 'New image decoded!');
             updateStatusUI('listening', 'Listening...');
+            sstvScopeMsgBurst = 1.0;
+            // Clear decode progress so signal monitor can take over
+            const liveContent = document.getElementById('sstvLiveContent');
+            if (liveContent) liveContent.innerHTML = '';
         } else if (data.status === 'detecting') {
+            // Ignore detecting events if currently decoding (e.g. Doppler updates)
+            const dot = document.getElementById('sstvStripDot');
+            if (dot && dot.classList.contains('decoding')) return;
+
             updateStatusUI('listening', data.message || 'Listening...');
+            if (data.signal_level !== undefined) {
+                renderSignalMonitor(data);
+            }
+        }
+    }
+
+    /**
+     * Render signal monitor in live area during detecting mode
+     */
+    function renderSignalMonitor(data) {
+        const container = document.getElementById('sstvLiveContent');
+        if (!container) return;
+
+        const level = data.signal_level || 0;
+        const tone = data.sstv_tone;
+
+        let barColor, statusText;
+        if (tone === 'leader') {
+            barColor = 'var(--accent-green)';
+            statusText = 'SSTV leader tone detected';
+        } else if (tone === 'sync') {
+            barColor = 'var(--accent-cyan)';
+            statusText = 'SSTV sync pulse detected';
+        } else if (tone === 'noise') {
+            barColor = 'var(--text-dim)';
+            statusText = 'Audio signal present';
+        } else if (level > 10) {
+            barColor = 'var(--text-dim)';
+            statusText = 'Audio signal present';
+        } else {
+            barColor = 'var(--text-dim)';
+            statusText = 'No signal';
+        }
+
+        let monitor = container.querySelector('.sstv-signal-monitor');
+        if (!monitor) {
+            container.innerHTML = `
+                <div class="sstv-signal-monitor">
+                    <div class="sstv-signal-monitor-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M2 12L5 12M5 12C5 12 6 3 12 3C18 3 19 12 19 12M19 12L22 12"/>
+                            <circle cx="12" cy="18" r="2"/>
+                            <path d="M12 16V12"/>
+                        </svg>
+                        Signal Monitor
+                    </div>
+                    <div class="sstv-signal-level-row">
+                        <span class="sstv-signal-level-label">LEVEL</span>
+                        <div class="sstv-signal-bar-track">
+                            <div class="sstv-signal-bar-fill" style="width: 0%"></div>
+                        </div>
+                        <span class="sstv-signal-level-value">0</span>
+                    </div>
+                    <div class="sstv-signal-status-text">No signal</div>
+                    <div class="sstv-signal-vis-state">VIS: idle</div>
+                </div>`;
+            monitor = container.querySelector('.sstv-signal-monitor');
+        }
+
+        const fill = monitor.querySelector('.sstv-signal-bar-fill');
+        fill.style.width = level + '%';
+        fill.style.background = barColor;
+        monitor.querySelector('.sstv-signal-status-text').textContent = statusText;
+        monitor.querySelector('.sstv-signal-level-value').textContent = level;
+
+        const visStateEl = monitor.querySelector('.sstv-signal-vis-state');
+        if (visStateEl && data.vis_state) {
+            const stateLabels = {
+                'idle': 'Idle',
+                'leader_1': 'Leader',
+                'break': 'Break',
+                'leader_2': 'Leader 2',
+                'start_bit': 'Start bit',
+                'data_bits': 'Data bits',
+                'parity': 'Parity',
+                'stop_bit': 'Stop bit',
+            };
+            const label = stateLabels[data.vis_state] || data.vis_state;
+            visStateEl.textContent = 'VIS: ' + label;
+            visStateEl.className = 'sstv-signal-vis-state' +
+                (data.vis_state !== 'idle' ? ' active' : '');
         }
     }
 
@@ -692,18 +946,33 @@ const SSTV = (function() {
         const liveContent = document.getElementById('sstvLiveContent');
         if (!liveContent) return;
 
-        liveContent.innerHTML = `
-            <div class="sstv-canvas-container">
-                <canvas id="sstvCanvas" width="320" height="256"></canvas>
-            </div>
-            <div class="sstv-decode-info">
-                <div class="sstv-mode-label">${data.mode || 'Detecting mode...'}</div>
-                <div class="sstv-progress-bar">
-                    <div class="progress" style="width: ${data.progress || 0}%"></div>
+        let container = liveContent.querySelector('.sstv-decode-container');
+        if (!container) {
+            liveContent.innerHTML = `
+                <div class="sstv-decode-container">
+                    <div class="sstv-canvas-container">
+                        <img id="sstvDecodeImg" width="320" height="256" alt="Decoding..." style="display:block;background:#000;">
+                    </div>
+                    <div class="sstv-decode-info">
+                        <div class="sstv-mode-label"></div>
+                        <div class="sstv-progress-bar">
+                            <div class="progress" style="width: 0%"></div>
+                        </div>
+                        <div class="sstv-status-message"></div>
+                    </div>
                 </div>
-                <div class="sstv-status-message">${data.message || 'Decoding...'}</div>
-            </div>
-        `;
+            `;
+            container = liveContent.querySelector('.sstv-decode-container');
+        }
+
+        container.querySelector('.sstv-mode-label').textContent = data.mode || 'Detecting mode...';
+        container.querySelector('.progress').style.width = (data.progress || 0) + '%';
+        container.querySelector('.sstv-status-message').textContent = data.message || 'Decoding...';
+
+        if (data.partial_image) {
+            const img = container.querySelector('#sstvDecodeImg');
+            if (img) img.src = data.partial_image;
+        }
     }
 
     /**
@@ -757,11 +1026,21 @@ const SSTV = (function() {
         }
 
         gallery.innerHTML = images.map(img => `
-            <div class="sstv-image-card" onclick="SSTV.showImage('${escapeHtml(img.url)}')">
-                <img src="${escapeHtml(img.url)}" alt="SSTV Image" class="sstv-image-preview" loading="lazy">
+            <div class="sstv-image-card">
+                <div class="sstv-image-card-inner" onclick="SSTV.showImage('${escapeHtml(img.url)}', '${escapeHtml(img.filename)}')">
+                    <img src="${escapeHtml(img.url)}" alt="SSTV Image" class="sstv-image-preview" loading="lazy">
+                </div>
                 <div class="sstv-image-info">
                     <div class="sstv-image-mode">${escapeHtml(img.mode || 'Unknown')}</div>
                     <div class="sstv-image-timestamp">${formatTimestamp(img.timestamp)}</div>
+                </div>
+                <div class="sstv-image-actions">
+                    <button onclick="event.stopPropagation(); SSTV.downloadImage('${escapeHtml(img.url)}', '${escapeHtml(img.filename)}')" title="Download">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onclick="event.stopPropagation(); SSTV.deleteImage('${escapeHtml(img.filename)}')" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -894,18 +1173,44 @@ const SSTV = (function() {
     /**
      * Show full-size image in modal
      */
-    function showImage(url) {
+    let currentModalUrl = null;
+    let currentModalFilename = null;
+
+    function showImage(url, filename) {
+        currentModalUrl = url;
+        currentModalFilename = filename || null;
+
         let modal = document.getElementById('sstvImageModal');
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'sstvImageModal';
             modal.className = 'sstv-image-modal';
             modal.innerHTML = `
+                <div class="sstv-modal-toolbar">
+                    <button class="sstv-modal-btn" id="sstvModalDownload" title="Download">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download
+                    </button>
+                    <button class="sstv-modal-btn delete" id="sstvModalDelete" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                        Delete
+                    </button>
+                </div>
                 <button class="sstv-modal-close" onclick="SSTV.closeImage()">&times;</button>
                 <img src="" alt="SSTV Image">
             `;
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) closeImage();
+            });
+            modal.querySelector('#sstvModalDownload').addEventListener('click', () => {
+                if (currentModalUrl && currentModalFilename) {
+                    downloadImage(currentModalUrl, currentModalFilename);
+                }
+            });
+            modal.querySelector('#sstvModalDelete').addEventListener('click', () => {
+                if (currentModalFilename) {
+                    deleteImage(currentModalFilename);
+                }
             });
             document.body.appendChild(modal);
         }
@@ -946,6 +1251,55 @@ const SSTV = (function() {
     }
 
     /**
+     * Delete a single image
+     */
+    async function deleteImage(filename) {
+        if (!confirm('Delete this image?')) return;
+        try {
+            const response = await fetch(`/sstv/images/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (data.status === 'ok') {
+                images = images.filter(img => img.filename !== filename);
+                updateImageCount(images.length);
+                renderGallery();
+                closeImage();
+                showNotification('SSTV', 'Image deleted');
+            }
+        } catch (err) {
+            console.error('Failed to delete image:', err);
+        }
+    }
+
+    /**
+     * Delete all images
+     */
+    async function deleteAllImages() {
+        if (!confirm('Delete all decoded images?')) return;
+        try {
+            const response = await fetch('/sstv/images', { method: 'DELETE' });
+            const data = await response.json();
+            if (data.status === 'ok') {
+                images = [];
+                updateImageCount(0);
+                renderGallery();
+                showNotification('SSTV', `${data.deleted} image${data.deleted !== 1 ? 's' : ''} deleted`);
+            }
+        } catch (err) {
+            console.error('Failed to delete images:', err);
+        }
+    }
+
+    /**
+     * Download an image
+     */
+    function downloadImage(url, filename) {
+        const a = document.createElement('a');
+        a.href = url + '/download';
+        a.download = filename;
+        a.click();
+    }
+
+    /**
      * Show status message
      */
     function showStatusMessage(message, type) {
@@ -965,6 +1319,9 @@ const SSTV = (function() {
         loadIssSchedule,
         showImage,
         closeImage,
+        deleteImage,
+        deleteAllImages,
+        downloadImage,
         useGPS,
         updateTLE,
         stopIssTracking,

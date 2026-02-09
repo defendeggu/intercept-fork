@@ -421,7 +421,20 @@ def get_vendor_from_mac(mac: str) -> str | None:
     # Normalize MAC format
     mac_upper = mac.upper().replace('-', ':')
     oui = mac_upper[:8]
-    return VENDOR_OUIS.get(oui)
+    vendor = VENDOR_OUIS.get(oui)
+    if vendor:
+        return vendor
+
+    # Fallback to expanded OUI database if available
+    try:
+        from data.oui import get_manufacturer
+        manufacturer = get_manufacturer(mac_upper)
+        if manufacturer and manufacturer != 'Unknown':
+            return manufacturer
+    except Exception:
+        return None
+
+    return None
 
 
 # =============================================================================

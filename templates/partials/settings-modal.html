@@ -15,6 +15,8 @@
             <button class="settings-tab" data-tab="display" onclick="switchSettingsTab('display')">Display</button>
             <button class="settings-tab" data-tab="updates" onclick="switchSettingsTab('updates')">Updates</button>
             <button class="settings-tab" data-tab="tools" onclick="switchSettingsTab('tools')">Tools</button>
+            <button class="settings-tab" data-tab="alerts" onclick="switchSettingsTab('alerts')">Alerts</button>
+            <button class="settings-tab" data-tab="recording" onclick="switchSettingsTab('recording')">Recording</button>
             <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">About</button>
         </div>
 
@@ -276,6 +278,83 @@
                 <div style="margin-top: 10px; font-size: 11px; color: var(--text-dim);">
                     <strong>Note:</strong> ACARS decoding requires <code>acarsdec</code> which must be built from source.
                     See <a href="https://github.com/TLeconte/acarsdec" target="_blank" style="color: var(--accent-cyan);">github.com/TLeconte/acarsdec</a> or run <code>./setup.sh</code> for automated installation.
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div id="settings-alerts" class="settings-section">
+            <div class="settings-group">
+                <div class="settings-group-title">Alert Feed <span id="alertsFeedCount" style="color: var(--text-dim); font-weight: 500;"></span></div>
+                <div id="alertsFeedList" class="settings-feed">
+                    <div class="settings-feed-empty">No alerts yet</div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Quick Rules</div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="check-assets-btn" onclick="AlertCenter.enableTrackerAlerts()">Enable Tracker Alerts</button>
+                    <button class="check-assets-btn" onclick="AlertCenter.disableTrackerAlerts()">Disable Tracker Alerts</button>
+                </div>
+                <div class="settings-info" style="margin-top: 10px;">
+                    Use Bluetooth device details to add specific device watchlist alerts.
+                </div>
+            </div>
+        </div>
+
+        <!-- Recording Section -->
+        <div id="settings-recording" class="settings-section">
+            <div class="settings-group">
+                <div class="settings-group-title">Start Recording</div>
+                <div class="settings-row" style="border-bottom: none; padding-top: 0;">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Mode</span>
+                        <span class="settings-label-desc">Record live events for a mode</span>
+                    </div>
+                    <select id="recordingModeSelect" class="settings-select" style="width: 200px;">
+                        <option value="pager">Pager</option>
+                        <option value="sensor">433 Sensors</option>
+                        <option value="wifi">WiFi</option>
+                        <option value="bluetooth">Bluetooth</option>
+                        <option value="adsb">ADS-B</option>
+                        <option value="ais">AIS</option>
+                        <option value="dsc">DSC</option>
+                        <option value="acars">ACARS</option>
+                        <option value="aprs">APRS</option>
+                        <option value="rtlamr">RTLAMR</option>
+                        <option value="dmr">DMR</option>
+                        <option value="tscm">TSCM</option>
+                        <option value="sstv">SSTV</option>
+                        <option value="sstv_general">SSTV General</option>
+                        <option value="listening_scanner">Listening Post</option>
+                        <option value="waterfall">Waterfall</option>
+                    </select>
+                </div>
+                <div class="settings-row" style="border-bottom: none;">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Label</span>
+                        <span class="settings-label-desc">Optional note for the session</span>
+                    </div>
+                    <input type="text" id="recordingLabelInput" class="settings-input" placeholder="Morning sweep" style="width: 200px;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="check-assets-btn" onclick="RecordingUI.start()">Start</button>
+                    <button class="check-assets-btn" onclick="RecordingUI.stop()">Stop</button>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Active Sessions</div>
+                <div id="recordingActiveList" class="settings-feed">
+                    <div class="settings-feed-empty">No active recordings</div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Recent Recordings</div>
+                <div id="recordingList" class="settings-feed">
+                    <div class="settings-feed-empty">No recordings yet</div>
                 </div>
             </div>
         </div>

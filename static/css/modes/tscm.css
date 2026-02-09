@@ -45,6 +45,7 @@
     padding: 12px;
     background: rgba(0,0,0,0.3);
     border-radius: 8px;
+    flex-wrap: wrap;
 }
 .tscm-threat-banner .threat-card {
     flex: 1;
@@ -67,11 +68,6 @@
     overflow: hidden;
     min-height: 200px;
     height: 200px;
-}
-/* Full-width panels (like Detected Threats) get more height */
-.tscm-panel[style*="grid-column: span 2"] {
-    min-height: 150px;
-    height: 150px;
 }
 .tscm-panel-header {
     padding: 10px 12px;
@@ -199,6 +195,39 @@
 .audio-badge {
     margin-left: 6px;
     font-size: 10px;
+}
+.tracker-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(255, 51, 102, 0.2);
+    color: #ff3366;
+    border: 1px solid rgba(255, 51, 102, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.client-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(74, 158, 255, 0.2);
+    color: #4a9eff;
+    border: 1px solid rgba(74, 158, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.known-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 .tscm-device-header {
     display: flex;
@@ -464,6 +493,18 @@
 .device-detail-table td:first-child {
     color: var(--text-dim);
     width: 40%;
+}
+.device-detail-id {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.tscm-more-hint {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
 }
 .indicator-list {
     display: flex;
@@ -880,6 +921,42 @@
     color: var(--text-muted);
     font-size: 10px;
     margin-left: auto;
+}
+
+/* Filters */
+.tscm-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    align-items: flex-end;
+}
+.tscm-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.tscm-filter-group label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+.tscm-filter-group select {
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 10px;
+}
+.tscm-filter-status {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
 }
 
 /* Advanced Modal Styles */
@@ -1460,4 +1537,157 @@
 .anomaly-flag .icon {
     width: 10px;
     height: 10px;
+}
+
+/* Meeting banner actions */
+.tscm-meeting-banner {
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.tscm-meeting-banner .meeting-actions {
+    margin-left: auto;
+}
+
+/* Case linking */
+.tscm-case-link-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    background: rgba(74, 158, 255, 0.12);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+    border-radius: 6px;
+    font-size: 11px;
+}
+.case-actions {
+    margin-top: 8px;
+}
+.tscm-case-link-btn {
+    margin-left: auto;
+    font-size: 9px;
+    padding: 2px 6px;
+    background: rgba(74, 158, 255, 0.2);
+    color: #9ed0ff;
+    border: 1px solid rgba(74, 158, 255, 0.4);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+/* Schedules */
+.tscm-schedule-form {
+    display: grid;
+    gap: 10px;
+}
+.tscm-schedule-list {
+    display: grid;
+    gap: 10px;
+}
+.tscm-schedule-item {
+    padding: 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+}
+.tscm-schedule-item.enabled {
+    border-color: rgba(0, 255, 136, 0.35);
+}
+.tscm-schedule-item.disabled {
+    opacity: 0.7;
+}
+.tscm-schedule-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.tscm-schedule-status {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+.tscm-schedule-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.tscm-schedule-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+/* Meeting summary */
+.tscm-summary-list {
+    display: grid;
+    gap: 8px;
+}
+.tscm-summary-item {
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+.tscm-summary-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.tscm-summary-risk {
+    font-size: 10px;
+    color: #ff9933;
+    margin-top: 4px;
+}
+
+/* Case notes */
+.tscm-case-notes {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.tscm-case-note {
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+.tscm-case-note-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.tscm-case-note-type {
+    color: var(--accent-cyan);
+}
+.tscm-case-note-content {
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+.tscm-case-note-author {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.tscm-case-note-form {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+}
+.tscm-case-note-form textarea {
+    min-height: 80px;
+}
+.tscm-case-note-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
 }

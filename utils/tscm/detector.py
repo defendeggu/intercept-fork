@@ -122,6 +122,10 @@ class ThreatDetector:
                     if 'mac' in client:
                         self.baseline_wifi_macs.add(client['mac'].upper())
 
+        for client in baseline.get('wifi_clients', []):
+            if 'mac' in client:
+                self.baseline_wifi_macs.add(client['mac'].upper())
+
         # Bluetooth devices
         for device in baseline.get('bt_devices', []):
             if 'mac' in device:
@@ -479,6 +483,7 @@ class ThreatDetector:
         manufacturer = device.get('manufacturer', '')
         device_type = device.get('type', '')
         manufacturer_data = device.get('manufacturer_data')
+        tracker_data = device.get('tracker', {}) or {}
 
         threats = []
 
@@ -490,7 +495,20 @@ class ThreatDetector:
                 'reason': 'Device not present in baseline',
             })
 
-        # Check for known trackers
+        # Check for known trackers (v2 tracker data if available)
+        if tracker_data.get('is_tracker'):
+            tracker_label = tracker_data.get('name') or tracker_data.get('type') or 'Tracker'
+            confidence = str(tracker_data.get('confidence') or '').lower()
+            severity = 'high' if confidence in ('high', 'medium') else 'medium'
+            threats.append({
+                'type': 'tracker',
+                'severity': severity,
+                'reason': f"Tracker detected: {tracker_label}",
+                'tracker_type': tracker_label,
+                'details': tracker_data.get('evidence', []),
+            })
+
+        # Check for known trackers (legacy patterns)
         tracker_info = is_known_tracker(name, manufacturer_data)
         if tracker_info:
             threats.append({

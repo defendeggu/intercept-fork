@@ -19,7 +19,8 @@ from utils.validation import (
     validate_rtl_tcp_host, validate_rtl_tcp_port
 )
 from utils.sse import format_sse
-from utils.process import safe_terminate, register_process
+from utils.event_pipeline import process_event
+from utils.process import safe_terminate, register_process, unregister_process
 from utils.sdr import SDRFactory, SDRType
 from utils.mqtt import mqtt_publish
 
@@ -48,6 +49,21 @@ def stream_sensor_output(process: subprocess.Popen[bytes]) -> None:
                 # Publish to MQTT
                 mqtt_publish('sensor', data)
 
+                # Push scope event when signal level data is present
+                rssi = data.get('rssi')
+                snr = data.get('snr')
+                noise = data.get('noise')
+                if rssi is not None or snr is not None:
+                    try:
+                        app_module.sensor_queue.put_nowait({
+                            'type': 'scope',
+                            'rssi': rssi if rssi is not None else 0,
+                            'snr': snr if snr is not None else 0,
+                            'noise': noise if noise is not None else 0,
+                        })
+                    except queue.Full:
+                        pass
+
                 # Log if enabled
                 if app_module.logging_enabled:
                     try:
@@ -63,10 +79,32 @@ def stream_sensor_output(process: subprocess.Popen[bytes]) -> None:
     except Exception as e:
         app_module.sensor_queue.put({'type': 'error', 'text': str(e)})
     finally:
-        process.wait()
+        global sensor_active_device
+        # Ensure process is terminated
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        unregister_process(process)
         app_module.sensor_queue.put({'type': 'status', 'text': 'stopped'})
         with app_module.sensor_lock:
             app_module.sensor_process = None
+        # Release SDR device
+        if sensor_active_device is not None:
+            app_module.release_sdr_device(sensor_active_device)
+            sensor_active_device = None
+
+
+@sensor_bp.route('/sensor/status')
+def sensor_status() -> Response:
+    """Check if sensor decoder is currently running."""
+    with app_module.sensor_lock:
+        running = app_module.sensor_process is not None and app_module.sensor_process.poll() is None
+    return jsonify({'running': running})
 
 
 @sensor_bp.route('/start_sensor', methods=['POST'])
@@ -147,12 +185,17 @@ def start_sensor() -> Response:
         full_cmd = ' '.join(cmd)
         logger.info(f"Running: {full_cmd}")
 
+        # Add signal level metadata so the frontend scope can display RSSI/SNR
+        # Disable stats reporting to suppress "row count limit 50 reached" warnings
+        cmd.extend(['-M', 'level', '-M', 'stats:0'])
+
         try:
             app_module.sensor_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(app_module.sensor_process)
 
             # Start output thread
             thread = threading.Thread(target=stream_sensor_output, args=(app_module.sensor_process,))
@@ -222,6 +265,10 @@ def stream_sensor() -> Response:
             try:
                 msg = app_module.sensor_queue.get(timeout=1)
                 last_keepalive = time.time()
+                try:
+                    process_event('sensor', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

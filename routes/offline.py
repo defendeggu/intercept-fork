@@ -44,6 +44,9 @@ ASSET_PATHS = {
         'static/vendor/leaflet/images/marker-shadow.png',
         'static/vendor/leaflet/images/layers.png',
         'static/vendor/leaflet/images/layers-2x.png'
+    ],
+    'leaflet_heat': [
+        'static/vendor/leaflet-heat/leaflet-heat.js'
     ]
 }
 

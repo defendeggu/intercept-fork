@@ -35,6 +35,7 @@ htmlcov/
 
 # Local Postgres data
 pgdata/
+pgdata.bak/
 
 # Captured files (don't include in image)
 *.cap

@@ -9,6 +9,9 @@ LABEL description="Signal Intelligence Platform for SDR monitoring"
 # Set working directory
 WORKDIR /app
 
+# Pre-accept tshark non-root capture prompt for non-interactive install
+RUN echo 'wireshark-common wireshark-common/install-setuid boolean true' | debconf-set-selections
+
 # Install system dependencies for SDR tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # RTL-SDR tools
@@ -41,6 +44,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     soapysdr-module-rtlsdr \
     soapysdr-module-hackrf \
     soapysdr-module-lms7 \
+    soapysdr-module-airspy \
+    airspy \
     limesuite \
     hackrf \
     # Utilities
@@ -63,6 +68,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     zlib1g-dev \
     libzmq3-dev \
+    libpulse-dev \
+    libfftw3-dev \
+    liblapack-dev \
+    libcodec2-dev \
     # Build dump1090
     && cd /tmp \
     && git clone --depth 1 https://github.com/flightaware/dump1090.git \
@@ -109,6 +118,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && make \
     && cp acarsdec /usr/bin/acarsdec \
     && rm -rf /tmp/acarsdec \
+    # Build mbelib (required by DSD)
+    && cd /tmp \
+    && git clone https://github.com/lwvmobile/mbelib.git \
+    && cd mbelib \
+    && (git checkout ambe_tones || true) \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/mbelib \
+    # Build DSD-FME (Digital Speech Decoder for DMR/P25)
+    && cd /tmp \
+    && git clone --depth 1 https://github.com/lwvmobile/dsd-fme.git \
+    && cd dsd-fme \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/dsd-fme \
     # Cleanup build tools to reduce image size
     && apt-get remove -y \
     build-essential \
@@ -124,6 +154,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     zlib1g-dev \
     libzmq3-dev \
+    libpulse-dev \
+    libfftw3-dev \
+    liblapack-dev \
+    libcodec2-dev \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 

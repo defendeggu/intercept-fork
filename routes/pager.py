@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import os
 import pathlib
 import re
 import pty
 import queue
 import select
+import struct
 import subprocess
 import threading
 import time
@@ -23,7 +25,8 @@ from utils.validation import (
     validate_rtl_tcp_host, validate_rtl_tcp_port
 )
 from utils.sse import format_sse
-from utils.process import safe_terminate, register_process
+from utils.event_pipeline import process_event
+from utils.process import safe_terminate, register_process, unregister_process
 from utils.sdr import SDRFactory, SDRType, SDRValidationError
 from utils.dependencies import get_tool_path
 from utils.mqtt import mqtt_publish
@@ -106,6 +109,62 @@ def log_message(msg: dict[str, Any]) -> None:
         logger.error(f"Failed to log message: {e}")
 
 
+def audio_relay_thread(
+    rtl_stdout,
+    multimon_stdin,
+    output_queue: queue.Queue,
+    stop_event: threading.Event,
+) -> None:
+    """Relay audio from rtl_fm to multimon-ng while computing signal levels.
+
+    Reads raw 16-bit LE PCM from *rtl_stdout*, writes every chunk straight
+    through to *multimon_stdin*, and every ~100 ms pushes an RMS / peak scope
+    event onto *output_queue*.
+    """
+    CHUNK = 4096  # bytes – 2048 samples at 16-bit mono
+    INTERVAL = 0.1  # seconds between scope updates
+    last_scope = time.monotonic()
+
+    try:
+        while not stop_event.is_set():
+            data = rtl_stdout.read(CHUNK)
+            if not data:
+                break
+
+            # Forward audio untouched
+            try:
+                multimon_stdin.write(data)
+                multimon_stdin.flush()
+            except (BrokenPipeError, OSError):
+                break
+
+            # Compute scope levels every ~100 ms
+            now = time.monotonic()
+            if now - last_scope >= INTERVAL:
+                last_scope = now
+                try:
+                    n_samples = len(data) // 2
+                    if n_samples == 0:
+                        continue
+                    samples = struct.unpack(f'<{n_samples}h', data[:n_samples * 2])
+                    peak = max(abs(s) for s in samples)
+                    rms = int(math.sqrt(sum(s * s for s in samples) / n_samples))
+                    output_queue.put_nowait({
+                        'type': 'scope',
+                        'rms': rms,
+                        'peak': peak,
+                    })
+                except (struct.error, ValueError, queue.Full):
+                    pass
+    except Exception as e:
+        logger.debug(f"Audio relay error: {e}")
+    finally:
+        try:
+            multimon_stdin.close()
+        except OSError:
+            pass
+
+
 def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
     """Stream decoder output to queue using PTY for unbuffered output."""
     try:
@@ -149,14 +208,37 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
     except Exception as e:
         app_module.output_queue.put({'type': 'error', 'text': str(e)})
     finally:
+        global pager_active_device
         try:
             os.close(master_fd)
         except OSError:
             pass
-        process.wait()
+        # Signal relay thread to stop
+        with app_module.process_lock:
+            stop_relay = getattr(app_module.current_process, '_stop_relay', None)
+        if stop_relay:
+            stop_relay.set()
+        # Cleanup companion rtl_fm process and decoder
+        with app_module.process_lock:
+            rtl_proc = getattr(app_module.current_process, '_rtl_process', None)
+        for proc in [rtl_proc, process]:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                unregister_process(proc)
         app_module.output_queue.put({'type': 'status', 'text': 'stopped'})
         with app_module.process_lock:
             app_module.current_process = None
+        # Release SDR device
+        if pager_active_device is not None:
+            app_module.release_sdr_device(pager_active_device)
+            pager_active_device = None
 
 
 @pager_bp.route('/start', methods=['POST'])
@@ -284,6 +366,7 @@ def start_decoding() -> Response:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(rtl_process)
 
             # Start a thread to monitor rtl_fm stderr for errors
             def monitor_rtl_stderr():
@@ -302,18 +385,30 @@ def start_decoding() -> Response:
 
             multimon_process = subprocess.Popen(
                 multimon_cmd,
-                stdin=rtl_process.stdout,
+                stdin=subprocess.PIPE,
                 stdout=slave_fd,
                 stderr=slave_fd,
                 close_fds=True
             )
+            register_process(multimon_process)
 
             os.close(slave_fd)
-            rtl_process.stdout.close()
+
+            # Spawn audio relay thread between rtl_fm and multimon-ng
+            stop_relay = threading.Event()
+            relay = threading.Thread(
+                target=audio_relay_thread,
+                args=(rtl_process.stdout, multimon_process.stdin,
+                      app_module.output_queue, stop_relay),
+            )
+            relay.daemon = True
+            relay.start()
 
             app_module.current_process = multimon_process
             app_module.current_process._rtl_process = rtl_process
             app_module.current_process._master_fd = master_fd
+            app_module.current_process._stop_relay = stop_relay
+            app_module.current_process._relay_thread = relay
 
             # Start output thread with PTY master fd
             thread = threading.Thread(target=stream_decoder, args=(master_fd, multimon_process))
@@ -325,12 +420,30 @@ def start_decoding() -> Response:
             return jsonify({'status': 'started', 'command': full_cmd})
 
         except FileNotFoundError as e:
+            # Kill orphaned rtl_fm process
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if pager_active_device is not None:
                 app_module.release_sdr_device(pager_active_device)
                 pager_active_device = None
             return jsonify({'status': 'error', 'message': f'Tool not found: {e.filename}'})
         except Exception as e:
+            # Kill orphaned rtl_fm process if it was started
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if pager_active_device is not None:
                 app_module.release_sdr_device(pager_active_device)
@@ -344,6 +457,10 @@ def stop_decoding() -> Response:
 
     with app_module.process_lock:
         if app_module.current_process:
+            # Signal audio relay thread to stop
+            if hasattr(app_module.current_process, '_stop_relay'):
+                app_module.current_process._stop_relay.set()
+
             # Kill rtl_fm process first
             if hasattr(app_module.current_process, '_rtl_process'):
                 try:
@@ -436,6 +553,10 @@ def stream() -> Response:
             try:
                 msg = app_module.output_queue.get(timeout=1)
                 last_keepalive = time.time()
+                try:
+                    process_event('pager', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

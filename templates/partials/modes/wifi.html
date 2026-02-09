@@ -69,7 +69,22 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Channel (empty = hop)</label>
+                            <label>Channel Preset</label>
+                            <select id="wifiChannelPreset">
+                                <option value="">Auto hop (all)</option>
+                                <option value="2.4-common">2.4 GHz Common (1,6,11)</option>
+                                <option value="2.4-all">2.4 GHz All (1-13)</option>
+                                <option value="5-low">5 GHz Low (36-48)</option>
+                                <option value="5-mid">5 GHz Mid/DFS (52-64)</option>
+                                <option value="5-high">5 GHz High (149-165)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Channel List (overrides preset)</label>
+                            <input type="text" id="wifiChannelList" placeholder="e.g., 1,6,11 or 36,40,44,48">
+                        </div>
+                        <div class="form-group">
+                            <label>Channel (single)</label>
                             <input type="text" id="wifiChannel" placeholder="e.g., 6 or 36">
                         </div>
                     </div>

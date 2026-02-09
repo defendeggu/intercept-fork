@@ -21,6 +21,7 @@ import app as app_module
 from utils.logging import sensor_logger as logger
 from utils.validation import validate_device_index, validate_gain, validate_ppm
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.constants import (
     PROCESS_TERMINATE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
@@ -28,6 +29,7 @@ from utils.constants import (
     PROCESS_START_WAIT,
 )
 from utils.mqtt import mqtt_publish
+from utils.process import register_process, unregister_process
 
 acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
@@ -148,9 +150,24 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
         logger.error(f"ACARS stream error: {e}")
         app_module.acars_queue.put({'type': 'error', 'message': str(e)})
     finally:
+        global acars_active_device
+        # Ensure process is terminated
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        unregister_process(process)
         app_module.acars_queue.put({'type': 'status', 'status': 'stopped'})
         with app_module.acars_lock:
             app_module.acars_process = None
+        # Release SDR device
+        if acars_active_device is not None:
+            app_module.release_sdr_device(acars_active_device)
+            acars_active_device = None
 
 
 @acars_bp.route('/tools')
@@ -315,6 +332,7 @@ def start_acars() -> Response:
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         app_module.acars_process = process
+        register_process(process)
 
         # Start output streaming thread
         thread = threading.Thread(
@@ -380,6 +398,10 @@ def stream_acars() -> Response:
             try:
                 msg = app_module.acars_queue.get(timeout=SSE_QUEUE_TIMEOUT)
                 last_keepalive = time.time()
+                try:
+                    process_event('acars', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

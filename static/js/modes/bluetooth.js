@@ -367,6 +367,9 @@ const BluetoothMode = (function() {
         const badgesEl = document.getElementById('btDetailBadges');
         let badgesHtml = `<span class="bt-detail-badge ${protocol}">${protocol.toUpperCase()}</span>`;
         badgesHtml += `<span class="bt-detail-badge ${device.in_baseline ? 'baseline' : 'new'}">${device.in_baseline ? '✓ KNOWN' : '● NEW'}</span>`;
+        if (device.seen_before) {
+            badgesHtml += `<span class="bt-detail-badge flag">SEEN BEFORE</span>`;
+        }
 
         // Tracker badge
         if (device.is_tracker) {
@@ -455,6 +458,8 @@ const BluetoothMode = (function() {
             ? new Date(device.last_seen).toLocaleTimeString()
             : '--';
 
+        updateWatchlistButton(device);
+
         // Services
         const servicesContainer = document.getElementById('btDetailServices');
         const servicesList = document.getElementById('btDetailServicesList');
@@ -471,6 +476,22 @@ const BluetoothMode = (function() {
 
         // Highlight selected device in list
         highlightSelectedDevice(deviceId);
+    }
+
+    /**
+     * Update watchlist button state
+     */
+    function updateWatchlistButton(device) {
+        const btn = document.getElementById('btDetailWatchBtn');
+        if (!btn) return;
+        if (typeof AlertCenter === 'undefined') {
+            btn.style.display = 'none';
+            return;
+        }
+        btn.style.display = '';
+        const watchlisted = AlertCenter.isWatchlisted(device.address);
+        btn.textContent = watchlisted ? 'Watching' : 'Watchlist';
+        btn.classList.toggle('active', watchlisted);
     }
 
     /**
@@ -531,7 +552,7 @@ const BluetoothMode = (function() {
         if (!device) return;
 
         navigator.clipboard.writeText(device.address).then(() => {
-            const btn = document.querySelector('.bt-detail-btn');
+            const btn = document.getElementById('btDetailCopyBtn');
             if (btn) {
                 const originalText = btn.textContent;
                 btn.textContent = 'Copied!';
@@ -542,6 +563,25 @@ const BluetoothMode = (function() {
                 }, 1500);
             }
         });
+    }
+
+    /**
+     * Toggle Bluetooth watchlist for selected device
+     */
+    function toggleWatchlist() {
+        if (!selectedDeviceId) return;
+        const device = devices.get(selectedDeviceId);
+        if (!device || typeof AlertCenter === 'undefined') return;
+
+        if (AlertCenter.isWatchlisted(device.address)) {
+            AlertCenter.removeBluetoothWatchlist(device.address);
+            showInfo('Removed from watchlist');
+        } else {
+            AlertCenter.addBluetoothWatchlist(device.address, device.name || device.address);
+            showInfo('Added to watchlist');
+        }
+
+        setTimeout(() => updateWatchlistButton(device), 200);
     }
 
     /**
@@ -1094,6 +1134,7 @@ const BluetoothMode = (function() {
         const trackerConfidence = device.tracker_confidence;
         const riskScore = device.risk_score || 0;
         const agentName = device._agent || 'Local';
+        const seenBefore = device.seen_before === true;
 
         // Calculate RSSI bar width (0-100%)
         // RSSI typically ranges from -100 (weak) to -30 (very strong)
@@ -1147,6 +1188,7 @@ const BluetoothMode = (function() {
         let secondaryParts = [addr];
         if (mfr) secondaryParts.push(mfr);
         secondaryParts.push('Seen ' + seenCount + '×');
+        if (seenBefore) secondaryParts.push('<span class="bt-history-badge">SEEN BEFORE</span>');
         // Add agent name if not Local
         if (agentName !== 'Local') {
             secondaryParts.push('<span class="agent-badge agent-remote" style="font-size:8px;padding:1px 4px;">' + escapeHtml(agentName) + '</span>');
@@ -1361,6 +1403,7 @@ const BluetoothMode = (function() {
         selectDevice,
         clearSelection,
         copyAddress,
+        toggleWatchlist,
 
         // Agent handling
         handleAgentChange,

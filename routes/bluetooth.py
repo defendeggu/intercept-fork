@@ -21,6 +21,7 @@ import app as app_module
 from utils.dependencies import check_tool
 from utils.logging import bluetooth_logger as logger
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.validation import validate_bluetooth_interface
 from data.oui import OUI_DATABASE, load_oui_database, get_manufacturer
 from data.patterns import AIRTAG_PREFIXES, TILE_PREFIXES, SAMSUNG_TRACKER
@@ -563,6 +564,10 @@ def stream_bt():
             try:
                 msg = app_module.bt_queue.get(timeout=1)
                 last_keepalive = time.time()
+                try:
+                    process_event('bluetooth', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

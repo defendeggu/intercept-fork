@@ -1,0 +1,87 @@
+<!-- DMR / DIGITAL VOICE MODE -->
+                <div id="dmrMode" class="mode-content">
+                    <div class="section">
+                        <h3>Digital Voice</h3>
+
+                        <!-- Dependency Warning -->
+                        <div id="dmrToolsWarning" style="display: none; background: rgba(255, 100, 100, 0.1); border: 1px solid var(--accent-red); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                            <p style="color: var(--accent-red); margin: 0; font-size: 0.85em;">
+                                <strong>Missing:</strong><br>
+                                <span id="dmrToolsWarningText"></span>
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Frequency (MHz)</label>
+                            <input type="number" id="dmrFrequency" value="462.5625" step="0.0001" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Protocol</label>
+                            <select id="dmrProtocol">
+                                <option value="auto" selected>Auto Detect</option>
+                                <option value="dmr">DMR</option>
+                                <option value="p25">P25</option>
+                                <option value="nxdn">NXDN</option>
+                                <option value="dstar">D-STAR</option>
+                                <option value="provoice">ProVoice</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gain</label>
+                            <input type="number" id="dmrGain" value="40" min="0" max="50" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>PPM Correction</label>
+                            <input type="number" id="dmrPPM" value="0" min="-200" max="200" step="1" style="width: 100%;"
+                                   title="Frequency error correction for your RTL-SDR dongle. Digital voice is very sensitive to frequency offset.">
+                        </div>
+
+                        <div class="form-group" style="margin-top: 4px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="dmrRelaxCrc" style="width: auto; accent-color: var(--accent-cyan);">
+                                <span>Relax CRC (weak signals)</span>
+                            </label>
+                            <span style="font-size: 0.75em; color: var(--text-muted); display: block; margin-top: 2px;">
+                                Allows more frames through on marginal signals at the cost of occasional errors
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <button class="run-btn" id="startDmrBtn" onclick="startDmr()" style="margin-top: 12px;">
+                        Start Decoder
+                    </button>
+                    <button class="stop-btn" id="stopDmrBtn" onclick="stopDmr()" style="display: none; margin-top: 12px;">
+                        Stop Decoder
+                    </button>
+
+                    <!-- Current Call -->
+                    <div class="section" style="margin-top: 12px;">
+                        <h3>Current Call</h3>
+                        <div id="dmrCurrentCall" style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; font-size: 11px;">
+                            <div style="color: var(--text-muted); text-align: center;">No active call</div>
+                        </div>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="section" style="margin-top: 12px;">
+                        <h3>Status</h3>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Status</span>
+                                <span id="dmrStatus" style="font-size: 11px; color: var(--accent-cyan);">IDLE</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Protocol</span>
+                                <span id="dmrActiveProtocol" style="font-size: 11px; color: var(--text-primary);">--</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Calls</span>
+                                <span id="dmrCallCount" style="font-size: 14px; font-weight: bold; color: var(--accent-green);">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>

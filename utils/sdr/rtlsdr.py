@@ -231,6 +231,45 @@ class RTLSDRCommandBuilder(CommandBuilder):
 
         return cmd
 
+    def build_iq_capture_command(
+        self,
+        device: SDRDevice,
+        frequency_mhz: float,
+        sample_rate: int = 2048000,
+        gain: Optional[float] = None,
+        ppm: Optional[int] = None,
+        bias_t: bool = False,
+        output_format: str = 'cu8',
+    ) -> list[str]:
+        """
+        Build rtl_sdr command for raw I/Q capture.
+
+        Outputs unsigned 8-bit I/Q pairs to stdout for waterfall display.
+        """
+        rtl_sdr_path = get_tool_path('rtl_sdr') or 'rtl_sdr'
+        freq_hz = int(frequency_mhz * 1e6)
+
+        cmd = [
+            rtl_sdr_path,
+            '-d', self._get_device_arg(device),
+            '-f', str(freq_hz),
+            '-s', str(sample_rate),
+        ]
+
+        if gain is not None and gain > 0:
+            cmd.extend(['-g', str(gain)])
+
+        if ppm is not None and ppm != 0:
+            cmd.extend(['-p', str(ppm)])
+
+        if bias_t:
+            cmd.append('-T')
+
+        # Output to stdout
+        cmd.append('-')
+
+        return cmd
+
     def get_capabilities(self) -> SDRCapabilities:
         """Return RTL-SDR capabilities."""
         return self.CAPABILITIES

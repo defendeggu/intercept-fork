@@ -372,8 +372,10 @@ def _detect_rf_capabilities(caps: SweepCapabilities, sdr_device: Any) -> None:
         if devices:
             device = devices[0]  # Use first device
             rf_cap.available = True
-            rf_cap.device_type = device.get('type', 'unknown')
-            rf_cap.driver = device.get('driver', '')
+            rf_cap.device_type = getattr(device, 'sdr_type', 'unknown')
+            if hasattr(rf_cap.device_type, 'value'):
+                rf_cap.device_type = rf_cap.device_type.value
+            rf_cap.driver = getattr(device, 'driver', '')
 
             # Set frequency ranges based on device type
             if 'rtl' in rf_cap.device_type.lower():
@@ -524,6 +526,7 @@ class BaselineDiff:
 def calculate_baseline_diff(
     baseline: dict,
     current_wifi: list[dict],
+    current_wifi_clients: list[dict],
     current_bt: list[dict],
     current_rf: list[dict],
     sweep_id: int
@@ -534,6 +537,7 @@ def calculate_baseline_diff(
     Args:
         baseline: Baseline dict from database
         current_wifi: Current WiFi devices
+        current_wifi_clients: Current WiFi clients
         current_bt: Current Bluetooth devices
         current_rf: Current RF signals
         sweep_id: Current sweep ID
@@ -567,6 +571,11 @@ def calculate_baseline_diff(
         for d in baseline.get('wifi_networks', [])
         if d.get('bssid') or d.get('mac')
     }
+    baseline_wifi_clients = {
+        d.get('mac', d.get('address', '')).upper(): d
+        for d in baseline.get('wifi_clients', [])
+        if d.get('mac') or d.get('address')
+    }
     baseline_bt = {
         d.get('mac', d.get('address', '')).upper(): d
         for d in baseline.get('bt_devices', [])
@@ -580,6 +589,9 @@ def calculate_baseline_diff(
 
     # Compare WiFi
     _compare_wifi(diff, baseline_wifi, current_wifi)
+
+    # Compare WiFi clients
+    _compare_wifi_clients(diff, baseline_wifi_clients, current_wifi_clients)
 
     # Compare Bluetooth
     _compare_bluetooth(diff, baseline_bt, current_bt)
@@ -627,6 +639,47 @@ def _compare_wifi(diff: BaselineDiff, baseline: dict, current: list[dict]) -> No
                     'ssid': ssid,
                     'channel': device.get('channel'),
                     'rssi': device.get('power', device.get('signal')),
+                }
+            ))
+
+
+def _compare_wifi_clients(diff: BaselineDiff, baseline: dict, current: list[dict]) -> None:
+    """Compare WiFi clients between baseline and current."""
+    current_macs = {
+        d.get('mac', d.get('address', '')).upper(): d
+        for d in current
+        if d.get('mac') or d.get('address')
+    }
+
+    # Find new clients
+    for mac, device in current_macs.items():
+        if mac not in baseline:
+            name = device.get('vendor', 'WiFi Client')
+            diff.new_devices.append(DeviceChange(
+                identifier=mac,
+                protocol='wifi_client',
+                change_type='new',
+                description=f'New WiFi client: {name}',
+                expected=False,
+                details={
+                    'vendor': name,
+                    'rssi': device.get('rssi'),
+                    'associated_bssid': device.get('associated_bssid'),
+                }
+            ))
+
+    # Find missing clients
+    for mac, device in baseline.items():
+        if mac not in current_macs:
+            name = device.get('vendor', 'WiFi Client')
+            diff.missing_devices.append(DeviceChange(
+                identifier=mac,
+                protocol='wifi_client',
+                change_type='missing',
+                description=f'Missing WiFi client: {name}',
+                expected=True,
+                details={
+                    'vendor': name,
                 }
             ))
         else:
@@ -796,6 +849,7 @@ def _calculate_baseline_health(diff: BaselineDiff, baseline: dict) -> None:
     # Device churn penalty
     total_baseline = (
         len(baseline.get('wifi_networks', [])) +
+        len(baseline.get('wifi_clients', [])) +
         len(baseline.get('bt_devices', [])) +
         len(baseline.get('rf_frequencies', []))
     )

@@ -301,6 +301,73 @@ class UnifiedWiFiScanner:
 
         return False
 
+    def _ensure_interface_up(self, interface: str) -> bool:
+        """
+        Ensure a WiFi interface is up before scanning.
+
+        Attempts to bring the interface up using 'ip link set <iface> up',
+        falling back to 'ifconfig <iface> up'.
+
+        Args:
+            interface: Network interface name.
+
+        Returns:
+            True if the interface was brought up (or was already up),
+            False if we failed to bring it up.
+        """
+        # Check current state via /sys/class/net
+        operstate_path = f"/sys/class/net/{interface}/operstate"
+        try:
+            with open(operstate_path) as f:
+                state = f.read().strip()
+            if state == "up":
+                return True
+            logger.info(f"Interface {interface} is '{state}', attempting to bring up")
+        except FileNotFoundError:
+            # Interface might not exist or /sys not available (non-Linux)
+            return True
+        except Exception:
+            pass
+
+        # Try ip link set up
+        if shutil.which('ip'):
+            try:
+                result = subprocess.run(
+                    ['ip', 'link', 'set', interface, 'up'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.info(f"Brought interface {interface} up via ip link")
+                    time.sleep(1)  # Brief settle time
+                    return True
+                else:
+                    logger.warning(f"ip link set {interface} up failed: {result.stderr.strip()}")
+            except Exception as e:
+                logger.warning(f"Failed to run ip link: {e}")
+
+        # Fallback to ifconfig
+        if shutil.which('ifconfig'):
+            try:
+                result = subprocess.run(
+                    ['ifconfig', interface, 'up'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.info(f"Brought interface {interface} up via ifconfig")
+                    time.sleep(1)
+                    return True
+                else:
+                    logger.warning(f"ifconfig {interface} up failed: {result.stderr.strip()}")
+            except Exception as e:
+                logger.warning(f"Failed to run ifconfig: {e}")
+
+        logger.error(f"Could not bring interface {interface} up")
+        return False
+
     # =========================================================================
     # Quick Scan
     # =========================================================================
@@ -362,6 +429,9 @@ class UnifiedWiFiScanner:
                     result.is_complete = True
                     return result
             else:  # Linux - try tools in order with fallback
+                # Ensure interface is up before scanning
+                self._ensure_interface_up(iface)
+
                 tools_to_try = []
                 if self._capabilities.has_nmcli:
                     tools_to_try.append(('nmcli', self._scan_with_nmcli))
@@ -375,6 +445,7 @@ class UnifiedWiFiScanner:
                     result.is_complete = True
                     return result
 
+                interface_was_down = False
                 for tool_name, scan_func in tools_to_try:
                     try:
                         logger.info(f"Attempting quick scan with {tool_name} on {iface}")
@@ -386,7 +457,27 @@ class UnifiedWiFiScanner:
                         error_msg = f"{tool_name}: {str(e)}"
                         errors_encountered.append(error_msg)
                         logger.warning(f"Quick scan with {tool_name} failed: {e}")
+                        if 'is down' in str(e):
+                            interface_was_down = True
                         continue  # Try next tool
+
+                # If all tools failed because interface was down, try bringing it up and retry
+                if not tool_used and interface_was_down:
+                    logger.info(f"Interface {iface} appears down, attempting to bring up and retry scan")
+                    if self._ensure_interface_up(iface):
+                        errors_encountered.clear()
+                        for tool_name, scan_func in tools_to_try:
+                            try:
+                                logger.info(f"Retrying scan with {tool_name} on {iface} after bringing interface up")
+                                observations = scan_func(iface, timeout)
+                                tool_used = tool_name
+                                logger.info(f"Retry scan with {tool_name} found {len(observations)} networks")
+                                break
+                            except Exception as e:
+                                error_msg = f"{tool_name}: {str(e)}"
+                                errors_encountered.append(error_msg)
+                                logger.warning(f"Retry scan with {tool_name} failed: {e}")
+                                continue
 
                 if not tool_used:
                     # All tools failed
@@ -576,6 +667,7 @@ class UnifiedWiFiScanner:
         interface: Optional[str] = None,
         band: str = 'all',
         channel: Optional[int] = None,
+        channels: Optional[list[int]] = None,
     ) -> bool:
         """
         Start continuous deep scan with airodump-ng.
@@ -611,7 +703,7 @@ class UnifiedWiFiScanner:
             self._deep_scan_stop_event.clear()
             self._deep_scan_thread = threading.Thread(
                 target=self._run_deep_scan,
-                args=(iface, band, channel),
+                args=(iface, band, channel, channels),
                 daemon=True,
             )
             self._deep_scan_thread.start()
@@ -675,7 +767,13 @@ class UnifiedWiFiScanner:
 
             return True
 
-    def _run_deep_scan(self, interface: str, band: str, channel: Optional[int]):
+    def _run_deep_scan(
+        self,
+        interface: str,
+        band: str,
+        channel: Optional[int],
+        channels: Optional[list[int]],
+    ):
         """Background thread for running airodump-ng."""
         from .parsers.airodump import parse_airodump_csv
 
@@ -688,7 +786,9 @@ class UnifiedWiFiScanner:
             # Build command
             cmd = ['airodump-ng', '-w', output_prefix, '--output-format', 'csv']
 
-            if channel:
+            if channels:
+                cmd.extend(['-c', ','.join(str(c) for c in channels)])
+            elif channel:
                 cmd.extend(['-c', str(channel)])
             elif band == '2.4':
                 cmd.extend(['--band', 'bg'])

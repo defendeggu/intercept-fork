@@ -7,10 +7,36 @@ import os
 import sys
 
 # Application version
-VERSION = "2.13.1"
+VERSION = "2.15.0"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.15.0",
+        "date": "February 2026",
+        "highlights": [
+            "Real-time WebSocket waterfall with I/Q capture and server-side FFT",
+            "Cross-module frequency routing from Listening Post to decoders",
+            "Pure Python SSTV decoder replacing broken slowrx dependency",
+            "Real-time signal scope for pager, sensor, and SSTV modes",
+            "USB-level device probe to prevent cryptic rtl_fm crashes",
+            "DMR dsd-fme protocol fixes, tuning controls, and state sync",
+            "SDR device lock-up fix from unreleased device registry on crash",
+        ]
+    },
+    {
+        "version": "2.14.0",
+        "date": "February 2026",
+        "highlights": [
+            "DMR/P25/NXDN/D-STAR digital voice decoder with dsd-fme",
+            "DMR visual synthesizer with event-driven spring-physics bars",
+            "HF SSTV general mode with predefined shortwave frequencies",
+            "WebSDR integration for remote HF/shortwave listening",
+            "Listening Post signal scanner and audio pipeline improvements",
+            "TSCM sweep resilience, WiFi detection, and correlation fixes",
+            "APRS rtl_fm startup and SDR device conflict fixes",
+        ]
+    },
     {
         "version": "2.13.1",
         "date": "February 2026",
@@ -196,9 +222,15 @@ GITHUB_REPO = _get_env('GITHUB_REPO', 'smittix/intercept')
 UPDATE_CHECK_ENABLED = _get_env_bool('UPDATE_CHECK_ENABLED', True)
 UPDATE_CHECK_INTERVAL_HOURS = _get_env_int('UPDATE_CHECK_INTERVAL_HOURS', 6)
 
+# Alerting
+ALERT_WEBHOOK_URL = _get_env('ALERT_WEBHOOK_URL', '')
+ALERT_WEBHOOK_SECRET = _get_env('ALERT_WEBHOOK_SECRET', '')
+ALERT_WEBHOOK_TIMEOUT = _get_env_int('ALERT_WEBHOOK_TIMEOUT', 5)
+
 # Admin credentials
 ADMIN_USERNAME = _get_env('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = _get_env('ADMIN_PASSWORD', 'admin')
+
 
 def configure_logging() -> None:
     """Configure application logging."""

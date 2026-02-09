@@ -151,6 +151,7 @@ class BTDeviceAggregate:
     # Baseline tracking
     in_baseline: bool = False
     baseline_id: Optional[int] = None
+    seen_before: bool = False
 
     # Tracker detection fields
     is_tracker: bool = False
@@ -277,6 +278,7 @@ class BTDeviceAggregate:
             # Baseline
             'in_baseline': self.in_baseline,
             'baseline_id': self.baseline_id,
+            'seen_before': self.seen_before,
 
             # Tracker detection
             'tracker': {
@@ -327,6 +329,7 @@ class BTDeviceAggregate:
             'seen_count': self.seen_count,
             'heuristic_flags': self.heuristic_flags,
             'in_baseline': self.in_baseline,
+            'seen_before': self.seen_before,
             # Tracker info for list view
             'is_tracker': self.is_tracker,
             'tracker_type': self.tracker_type,

@@ -443,7 +443,7 @@ TOOL_DEPENDENCIES = {
                 }
             }
         }
-    }
+    },
 }
 
 

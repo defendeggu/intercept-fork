@@ -36,9 +36,11 @@ from utils.database import (
 )
 from utils.dsc.parser import parse_dsc_message
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.validation import validate_device_index, validate_gain
 from utils.sdr import SDRFactory, SDRType
 from utils.dependencies import get_tool_path
+from utils.process import register_process, unregister_process
 
 logger = logging.getLogger('intercept.dsc')
 
@@ -169,17 +171,34 @@ def stream_dsc_decoder(master_fd: int, decoder_process: subprocess.Popen) -> Non
             'error': str(e)
         })
     finally:
+        global dsc_active_device
         try:
             os.close(master_fd)
         except OSError:
             pass
-        decoder_process.wait()
         dsc_running = False
+        # Cleanup both processes
+        with app_module.dsc_lock:
+            rtl_proc = app_module.dsc_rtl_process
+        for proc in [rtl_proc, decoder_process]:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                unregister_process(proc)
         app_module.dsc_queue.put({'type': 'status', 'status': 'stopped'})
-
         with app_module.dsc_lock:
             app_module.dsc_process = None
             app_module.dsc_rtl_process = None
+        # Release SDR device
+        if dsc_active_device is not None:
+            app_module.release_sdr_device(dsc_active_device)
+            dsc_active_device = None
 
 
 def _store_critical_alert(msg: dict) -> None:
@@ -362,6 +381,7 @@ def start_decoding() -> Response:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(rtl_process)
 
             # Start stderr monitor thread
             stderr_thread = threading.Thread(
@@ -382,6 +402,7 @@ def start_decoding() -> Response:
                 stderr=slave_fd,
                 close_fds=True
             )
+            register_process(decoder_process)
 
             os.close(slave_fd)
             rtl_process.stdout.close()
@@ -408,6 +429,15 @@ def start_decoding() -> Response:
             })
 
         except FileNotFoundError as e:
+            # Kill orphaned rtl_fm process
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if dsc_active_device is not None:
                 app_module.release_sdr_device(dsc_active_device)
@@ -417,6 +447,15 @@ def start_decoding() -> Response:
                 'message': f'Tool not found: {e.filename}'
             }), 400
         except Exception as e:
+            # Kill orphaned rtl_fm process if it was started
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if dsc_active_device is not None:
                 app_module.release_sdr_device(dsc_active_device)
@@ -487,6 +526,10 @@ def stream() -> Response:
             try:
                 msg = app_module.dsc_queue.get(timeout=1)
                 last_keepalive = time.time()
+                try:
+                    process_event('dsc', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

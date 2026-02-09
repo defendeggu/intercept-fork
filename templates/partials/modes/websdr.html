@@ -1,0 +1,70 @@
+<!-- WEBSDR MODE -->
+                <div id="websdrMode" class="mode-content">
+                    <div class="section">
+                        <h3>WebSDR</h3>
+
+                        <div class="form-group">
+                            <label>Frequency (kHz)</label>
+                            <input type="number" id="websdrFrequency" value="6500" step="1" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Mode</label>
+                            <select id="websdrMode_select">
+                                <option value="usb">USB</option>
+                                <option value="lsb">LSB</option>
+                                <option value="am" selected>AM</option>
+                                <option value="cw">CW</option>
+                            </select>
+                        </div>
+
+                        <button class="run-btn" onclick="searchReceivers()" style="width: 100%; margin-top: 8px;">
+                            Find Receivers
+                        </button>
+                        <button class="preset-btn" onclick="searchReceivers(true)" style="width: 100%; margin-top: 4px; font-size: 10px;">
+                            Refresh List
+                        </button>
+                    </div>
+
+                    <!-- Audio Player -->
+                    <div class="section" style="margin-top: 12px;">
+                        <h3>Audio Player</h3>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Status</span>
+                                <span id="kiwiStatus" style="font-size: 11px; color: var(--text-muted);">DISCONNECTED</span>
+                            </div>
+                            <div id="kiwiReceiverName" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 6px; display: none; word-break: break-word;"></div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Frequency</span>
+                                <span id="kiwiFreqDisplay" style="font-size: 14px; font-family: var(--font-mono); color: var(--text-primary);">--- kHz</span>
+                            </div>
+                            <!-- S-meter -->
+                            <div style="margin-bottom: 8px;">
+                                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">S-Meter</span>
+                                <div style="height: 8px; background: rgba(0,0,0,0.5); border-radius: 4px; margin-top: 3px; overflow: hidden;">
+                                    <div id="kiwiSmeterBar" style="height: 100%; width: 0%; background: linear-gradient(to right, var(--accent-green), var(--accent-orange), var(--accent-red)); transition: width 0.2s; border-radius: 4px;"></div>
+                                </div>
+                                <div style="text-align: right; font-size: 9px; color: var(--text-muted); margin-top: 2px;">
+                                    <span id="kiwiSmeterValue">S0</span>
+                                </div>
+                            </div>
+                            <!-- Volume -->
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <span style="font-size: 10px; color: var(--text-muted);">VOL</span>
+                                <input type="range" id="kiwiVolume" min="0" max="100" value="80" style="flex: 1;" oninput="setKiwiVolume(this.value)">
+                            </div>
+                            <button id="kiwiDisconnectBtn" class="stop-btn" onclick="disconnectFromReceiver()" style="width: 100%; display: none;">
+                                Disconnect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Spy Station Presets -->
+                    <div class="section" style="margin-top: 12px;">
+                        <h3>Spy Station Presets</h3>
+                        <div id="websdrSpyPresets" style="max-height: 250px; overflow-y: auto; font-size: 11px;">
+                            <div style="color: var(--text-muted); text-align: center; padding: 10px;">Loading...</div>
+                        </div>
+                    </div>
+                </div>

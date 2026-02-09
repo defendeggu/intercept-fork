@@ -11,6 +11,8 @@ import csv
 import io
 import json
 import logging
+import threading
+import time
 from datetime import datetime
 from typing import Generator
 
@@ -28,11 +30,17 @@ from utils.bluetooth import (
 )
 from utils.database import get_db
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 
 logger = logging.getLogger('intercept.bluetooth_v2')
 
 # Blueprint
 bluetooth_v2_bp = Blueprint('bluetooth_v2', __name__, url_prefix='/api/bluetooth')
+
+# Seen-before tracking
+_bt_seen_cache: set[str] = set()
+_bt_session_seen: set[str] = set()
+_bt_seen_lock = threading.Lock()
 
 # =============================================================================
 # DATABASE FUNCTIONS
@@ -173,6 +181,13 @@ def save_observation_history(device: BTDeviceAggregate) -> None:
         ''', (device.device_id, device.rssi_current, device.seen_count))
 
 
+def load_seen_device_ids() -> set[str]:
+    """Load distinct device IDs from history for seen-before tracking."""
+    with get_db() as conn:
+        cursor = conn.execute('SELECT DISTINCT device_id FROM bt_observation_history')
+        return {row['device_id'] for row in cursor}
+
+
 # =============================================================================
 # API ENDPOINTS
 # =============================================================================
@@ -221,6 +236,28 @@ def start_scan():
     # Get scanner instance
     scanner = get_bluetooth_scanner(adapter_id)
 
+    # Initialize database tables if needed
+    init_bt_tables()
+
+    def _handle_seen_before(device: BTDeviceAggregate) -> None:
+        try:
+            with _bt_seen_lock:
+                device.seen_before = device.device_id in _bt_seen_cache
+                if device.device_id not in _bt_session_seen:
+                    save_observation_history(device)
+                    _bt_session_seen.add(device.device_id)
+        except Exception as e:
+            logger.debug(f"BT seen-before update failed: {e}")
+
+    # Setup seen-before callback
+    if scanner._on_device_updated is None:
+        scanner._on_device_updated = _handle_seen_before
+
+    # Ensure cache is initialized
+    with _bt_seen_lock:
+        if not _bt_seen_cache:
+            _bt_seen_cache.update(load_seen_device_ids())
+
     # Check if already scanning
     if scanner.is_scanning:
         return jsonify({
@@ -228,8 +265,11 @@ def start_scan():
             'scan_status': scanner.get_status().to_dict()
         })
 
-    # Initialize database tables if needed
-    init_bt_tables()
+    # Refresh seen-before cache and reset session set for a new scan
+    with _bt_seen_lock:
+        _bt_seen_cache.clear()
+        _bt_seen_cache.update(load_seen_device_ids())
+        _bt_session_seen.clear()
 
     # Load active baseline if exists
     baseline_id = get_active_baseline_id()
@@ -860,6 +900,10 @@ def stream_events():
         """Generate SSE events from scanner."""
         for event in scanner.stream_events(timeout=1.0):
             event_name, event_data = map_event_type(event)
+            try:
+                process_event('bluetooth', event_data, event_name)
+            except Exception:
+                pass
             yield format_sse(event_data, event=event_name)
 
     return Response(
@@ -947,6 +991,17 @@ def get_tscm_bluetooth_snapshot(duration: int = 8) -> list[dict]:
     # Convert to TSCM format with tracker detection data
     tscm_devices = []
     for device in devices:
+        manufacturer_name = device.manufacturer_name
+        if (not manufacturer_name) or str(manufacturer_name).lower().startswith('unknown'):
+            if device.address and not device.is_randomized_mac:
+                try:
+                    from data.oui import get_manufacturer
+                    oui_vendor = get_manufacturer(device.address)
+                    if oui_vendor and oui_vendor != 'Unknown':
+                        manufacturer_name = oui_vendor
+                except Exception:
+                    pass
+
         device_data = {
             'mac': device.address,
             'address_type': device.address_type,
@@ -956,7 +1011,7 @@ def get_tscm_bluetooth_snapshot(duration: int = 8) -> list[dict]:
             'rssi_median': device.rssi_median,
             'rssi_ema': round(device.rssi_ema, 1) if device.rssi_ema else None,
             'type': _classify_device_type(device),
-            'manufacturer': device.manufacturer_name,
+            'manufacturer': manufacturer_name,
             'manufacturer_id': device.manufacturer_id,
             'manufacturer_data': device.manufacturer_bytes.hex() if device.manufacturer_bytes else None,
             'protocol': device.protocol,
@@ -1178,6 +1233,30 @@ def _classify_device_type(device: BTDeviceAggregate) -> str:
     """Classify device type from available data."""
     name_lower = (device.name or '').lower()
     manufacturer_lower = (device.manufacturer_name or '').lower()
+    service_uuids = device.service_uuids or []
+
+    if (not manufacturer_lower) or manufacturer_lower.startswith('unknown'):
+        if device.address and not device.is_randomized_mac:
+            try:
+                from data.oui import get_manufacturer
+                oui_vendor = get_manufacturer(device.address)
+                if oui_vendor and oui_vendor != 'Unknown':
+                    manufacturer_lower = oui_vendor.lower()
+            except Exception:
+                pass
+
+    def normalize_uuid(uuid: str) -> str:
+        if not uuid:
+            return ''
+        value = str(uuid).lower().strip()
+        if value.startswith('0x'):
+            value = value[2:]
+        # Bluetooth Base UUID normalization (16-bit UUIDs)
+        if value.endswith('-0000-1000-8000-00805f9b34fb') and len(value) >= 8:
+            return value[4:8]
+        if len(value) == 4:
+            return value
+        return value
 
     # Check by name patterns
     if any(x in name_lower for x in ['airpods', 'headphone', 'earbuds', 'buds', 'beats']):
@@ -1196,6 +1275,29 @@ def _classify_device_type(device: BTDeviceAggregate) -> str:
         return 'speaker'
     if any(x in name_lower for x in ['tv', 'chromecast', 'roku', 'firestick']):
         return 'media'
+
+    # Tracker signals (metadata or Find My service)
+    if getattr(device, 'is_tracker', False) or getattr(device, 'tracker_type', None):
+        return 'tracker'
+
+    normalized_uuids = {normalize_uuid(u) for u in service_uuids if u}
+    if 'fd6f' in normalized_uuids:
+        return 'tracker'
+
+    # Service UUIDs (GATT / classic)
+    audio_uuids = {'110b', '110a', '111e', '111f', '1108', '1203'}
+    wearable_uuids = {'180d', '1814', '1816'}
+    hid_uuids = {'1812'}
+    beacon_uuids = {'feaa', 'feab', 'feb1', 'febe'}
+
+    if normalized_uuids & audio_uuids:
+        return 'audio'
+    if normalized_uuids & hid_uuids:
+        return 'peripheral'
+    if normalized_uuids & wearable_uuids:
+        return 'wearable'
+    if normalized_uuids & beacon_uuids:
+        return 'beacon'
 
     # Check by manufacturer
     if 'apple' in manufacturer_lower:

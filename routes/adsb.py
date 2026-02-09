@@ -43,6 +43,7 @@ from utils.validation import (
     validate_rtl_tcp_host, validate_rtl_tcp_port
 )
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.sdr import SDRFactory, SDRType
 from utils.constants import (
     ADSB_SBS_PORT,
@@ -846,6 +847,10 @@ def stream_adsb():
             try:
                 msg = app_module.adsb_queue.get(timeout=SSE_QUEUE_TIMEOUT)
                 last_keepalive = time.time()
+                try:
+                    process_event('adsb', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

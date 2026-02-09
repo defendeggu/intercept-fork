@@ -173,6 +173,12 @@ dsc_rtl_process = None
 dsc_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 dsc_lock = threading.Lock()
 
+# DMR / Digital Voice
+dmr_process = None
+dmr_rtl_process = None
+dmr_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+dmr_lock = threading.Lock()
+
 # TSCM (Technical Surveillance Countermeasures)
 tscm_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 tscm_lock = threading.Lock()
@@ -239,6 +245,10 @@ sdr_device_registry_lock = threading.Lock()
 def claim_sdr_device(device_index: int, mode_name: str) -> str | None:
     """Claim an SDR device for a mode.
 
+    Checks the in-app registry first, then probes the USB device to
+    catch stale handles held by external processes (e.g. a leftover
+    rtl_fm from a previous crash).
+
     Args:
         device_index: The SDR device index to claim
         mode_name: Name of the mode claiming the device (e.g., 'sensor', 'rtlamr')
@@ -250,6 +260,16 @@ def claim_sdr_device(device_index: int, mode_name: str) -> str | None:
         if device_index in sdr_device_registry:
             in_use_by = sdr_device_registry[device_index]
             return f'SDR device {device_index} is in use by {in_use_by}. Stop {in_use_by} first or use a different device.'
+
+        # Probe the USB device to catch external processes holding the handle
+        try:
+            from utils.sdr.detection import probe_rtlsdr_device
+            usb_error = probe_rtlsdr_device(device_index)
+            if usb_error:
+                return usb_error
+        except Exception:
+            pass  # If probe fails, let the caller proceed normally
+
         sdr_device_registry[device_index] = mode_name
         return None
 
@@ -285,6 +305,10 @@ def require_login():
 
     # Allow audio streaming endpoints without session auth
     if request.path.startswith('/listening/audio/'):
+        return None
+
+    # Allow WebSocket upgrade requests (page load already required auth)
+    if request.path.startswith('/ws/'):
         return None
 
     # Controller API endpoints use API key auth, not session auth
@@ -646,6 +670,7 @@ def health_check() -> Response:
             'wifi': wifi_process is not None and (wifi_process.poll() is None if wifi_process else False),
             'bluetooth': bt_process is not None and (bt_process.poll() is None if bt_process else False),
             'dsc': dsc_process is not None and (dsc_process.poll() is None if dsc_process else False),
+            'dmr': dmr_process is not None and (dmr_process.poll() is None if dmr_process else False),
         },
         'data': {
             'aircraft_count': len(adsb_aircraft),
@@ -664,6 +689,7 @@ def kill_all() -> Response:
     """Kill all decoder, WiFi, and Bluetooth processes."""
     global current_process, sensor_process, wifi_process, adsb_process, ais_process, acars_process
     global aprs_process, aprs_rtl_process, dsc_process, dsc_rtl_process, bt_process
+    global dmr_process, dmr_rtl_process
 
     # Import adsb and ais modules to reset their state
     from routes import adsb as adsb_module
@@ -675,7 +701,8 @@ def kill_all() -> Response:
         'rtl_fm', 'multimon-ng', 'rtl_433',
         'airodump-ng', 'aireplay-ng', 'airmon-ng',
         'dump1090', 'acarsdec', 'direwolf', 'AIS-catcher',
-        'hcitool', 'bluetoothctl'
+        'hcitool', 'bluetoothctl', 'dsd',
+        'rtl_tcp', 'rtl_power', 'rtlamr', 'ffmpeg'
     ]
 
     for proc in processes_to_kill:
@@ -719,6 +746,11 @@ def kill_all() -> Response:
         dsc_process = None
         dsc_rtl_process = None
 
+    # Reset DMR state
+    with dmr_lock:
+        dmr_process = None
+        dmr_rtl_process = None
+
     # Reset Bluetooth state (legacy)
     with bt_lock:
         if bt_process:
@@ -735,7 +767,7 @@ def kill_all() -> Response:
     # Reset Bluetooth v2 scanner
     try:
         reset_bluetooth_scanner()
-        killed.append('bluetooth_scanner')
+        killed.append('bluetooth')
     except Exception:
         pass
 
@@ -828,6 +860,18 @@ def main() -> None:
     from utils.database import init_db
     init_db()
 
+    # Register database cleanup functions
+    from utils.database import (
+        cleanup_old_signal_history,
+        cleanup_old_timeline_entries,
+        cleanup_old_dsc_alerts,
+        cleanup_old_payloads
+    )
+    cleanup_manager.register_db_cleanup(cleanup_old_signal_history, interval_multiplier=1440)  # Every 24 hours
+    cleanup_manager.register_db_cleanup(cleanup_old_timeline_entries, interval_multiplier=1440)  # Every 24 hours
+    cleanup_manager.register_db_cleanup(cleanup_old_dsc_alerts, interval_multiplier=1440)  # Every 24 hours
+    cleanup_manager.register_db_cleanup(cleanup_old_payloads, interval_multiplier=1440)  # Every 24 hours
+
     # Start automatic cleanup of stale data entries
     cleanup_manager.start()
 
@@ -871,6 +915,22 @@ def main() -> None:
         print("WebSocket audio streaming enabled")
     except ImportError as e:
         print(f"WebSocket audio disabled (install flask-sock): {e}")
+
+    # Initialize KiwiSDR WebSocket audio proxy
+    try:
+        from routes.websdr import init_websdr_audio
+        init_websdr_audio(app)
+        print("KiwiSDR audio proxy enabled")
+    except ImportError as e:
+        print(f"KiwiSDR audio proxy disabled: {e}")
+
+    # Initialize WebSocket for waterfall streaming
+    try:
+        from routes.waterfall_websocket import init_waterfall_websocket
+        init_waterfall_websocket(app)
+        print("WebSocket waterfall streaming enabled")
+    except ImportError as e:
+        print(f"WebSocket waterfall disabled: {e}")
 
     print(f"Open http://localhost:{args.port} in your browser")
     print()

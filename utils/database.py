@@ -102,6 +102,98 @@ def init_db() -> None:
             )
         ''')
 
+        # Alert rules
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS alert_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                mode TEXT,
+                event_type TEXT,
+                match TEXT,
+                severity TEXT DEFAULT 'medium',
+                enabled BOOLEAN DEFAULT 1,
+                notify TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Alert events
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS alert_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_id INTEGER,
+                mode TEXT,
+                event_type TEXT,
+                severity TEXT DEFAULT 'medium',
+                title TEXT,
+                message TEXT,
+                payload TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL
+            )
+        ''')
+
+        # Session recordings
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS recording_sessions (
+                id TEXT PRIMARY KEY,
+                mode TEXT NOT NULL,
+                label TEXT,
+                started_at TIMESTAMP NOT NULL,
+                stopped_at TIMESTAMP,
+                file_path TEXT NOT NULL,
+                event_count INTEGER DEFAULT 0,
+                size_bytes INTEGER DEFAULT 0,
+                metadata TEXT
+            )
+        ''')
+
+        # Alert rules
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS alert_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                mode TEXT,
+                event_type TEXT,
+                match TEXT,
+                severity TEXT DEFAULT 'medium',
+                enabled BOOLEAN DEFAULT 1,
+                notify TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Alert events
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS alert_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_id INTEGER,
+                mode TEXT,
+                event_type TEXT,
+                severity TEXT DEFAULT 'medium',
+                title TEXT,
+                message TEXT,
+                payload TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL
+            )
+        ''')
+
+        # Session recordings
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS recording_sessions (
+                id TEXT PRIMARY KEY,
+                mode TEXT NOT NULL,
+                label TEXT,
+                started_at TIMESTAMP NOT NULL,
+                stopped_at TIMESTAMP,
+                file_path TEXT NOT NULL,
+                event_count INTEGER DEFAULT 0,
+                size_bytes INTEGER DEFAULT 0,
+                metadata TEXT
+            )
+        ''')
+
         # Users table for authentication
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -139,12 +231,21 @@ def init_db() -> None:
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 wifi_networks TEXT,
+                wifi_clients TEXT,
                 bt_devices TEXT,
                 rf_frequencies TEXT,
                 gps_coords TEXT,
                 is_active BOOLEAN DEFAULT 0
             )
         ''')
+
+        # Ensure new columns exist for older databases
+        try:
+            columns = {row['name'] for row in conn.execute("PRAGMA table_info(tscm_baselines)")}
+            if 'wifi_clients' not in columns:
+                conn.execute('ALTER TABLE tscm_baselines ADD COLUMN wifi_clients TEXT')
+        except Exception as e:
+            logger.debug(f"Schema update skipped for tscm_baselines: {e}")
 
         # TSCM Sweeps - Individual sweep sessions
         conn.execute('''
@@ -690,6 +791,7 @@ def create_tscm_baseline(
     location: str | None = None,
     description: str | None = None,
     wifi_networks: list | None = None,
+    wifi_clients: list | None = None,
     bt_devices: list | None = None,
     rf_frequencies: list | None = None,
     gps_coords: dict | None = None
@@ -703,13 +805,14 @@ def create_tscm_baseline(
     with get_db() as conn:
         cursor = conn.execute('''
             INSERT INTO tscm_baselines
-            (name, location, description, wifi_networks, bt_devices, rf_frequencies, gps_coords)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (name, location, description, wifi_networks, wifi_clients, bt_devices, rf_frequencies, gps_coords)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             name,
             location,
             description,
             json.dumps(wifi_networks) if wifi_networks else None,
+            json.dumps(wifi_clients) if wifi_clients else None,
             json.dumps(bt_devices) if bt_devices else None,
             json.dumps(rf_frequencies) if rf_frequencies else None,
             json.dumps(gps_coords) if gps_coords else None
@@ -735,6 +838,7 @@ def get_tscm_baseline(baseline_id: int) -> dict | None:
             'description': row['description'],
             'created_at': row['created_at'],
             'wifi_networks': json.loads(row['wifi_networks']) if row['wifi_networks'] else [],
+            'wifi_clients': json.loads(row['wifi_clients']) if row['wifi_clients'] else [],
             'bt_devices': json.loads(row['bt_devices']) if row['bt_devices'] else [],
             'rf_frequencies': json.loads(row['rf_frequencies']) if row['rf_frequencies'] else [],
             'gps_coords': json.loads(row['gps_coords']) if row['gps_coords'] else None,
@@ -784,6 +888,7 @@ def set_active_tscm_baseline(baseline_id: int) -> bool:
 def update_tscm_baseline(
     baseline_id: int,
     wifi_networks: list | None = None,
+    wifi_clients: list | None = None,
     bt_devices: list | None = None,
     rf_frequencies: list | None = None
 ) -> bool:
@@ -794,6 +899,9 @@ def update_tscm_baseline(
     if wifi_networks is not None:
         updates.append('wifi_networks = ?')
         params.append(json.dumps(wifi_networks))
+    if wifi_clients is not None:
+        updates.append('wifi_clients = ?')
+        params.append(json.dumps(wifi_clients))
     if bt_devices is not None:
         updates.append('bt_devices = ?')
         params.append(json.dumps(bt_devices))
@@ -1211,6 +1319,112 @@ def delete_known_device(identifier: str) -> bool:
         cursor = conn.execute(
             'DELETE FROM tscm_known_devices WHERE identifier = ?',
             (identifier.upper(),)
+        )
+        return cursor.rowcount > 0
+
+
+# =============================================================================
+# TSCM Schedule Functions
+# =============================================================================
+
+def create_tscm_schedule(
+    name: str,
+    cron_expression: str,
+    sweep_type: str = 'standard',
+    baseline_id: int | None = None,
+    zone_name: str | None = None,
+    enabled: bool = True,
+    notify_on_threat: bool = True,
+    notify_email: str | None = None,
+    last_run: str | None = None,
+    next_run: str | None = None,
+) -> int:
+    """Create a new TSCM sweep schedule."""
+    with get_db() as conn:
+        cursor = conn.execute('''
+            INSERT INTO tscm_schedules
+            (name, baseline_id, zone_name, cron_expression, sweep_type,
+             enabled, last_run, next_run, notify_on_threat, notify_email)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            name,
+            baseline_id,
+            zone_name,
+            cron_expression,
+            sweep_type,
+            1 if enabled else 0,
+            last_run,
+            next_run,
+            1 if notify_on_threat else 0,
+            notify_email,
+        ))
+        return cursor.lastrowid
+
+
+def get_tscm_schedule(schedule_id: int) -> dict | None:
+    """Get a TSCM schedule by ID."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            'SELECT * FROM tscm_schedules WHERE id = ?',
+            (schedule_id,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_all_tscm_schedules(
+    enabled: bool | None = None,
+    limit: int = 200
+) -> list[dict]:
+    """Get all TSCM schedules."""
+    conditions = []
+    params = []
+
+    if enabled is not None:
+        conditions.append('enabled = ?')
+        params.append(1 if enabled else 0)
+
+    where_clause = f'WHERE {" AND ".join(conditions)}' if conditions else ''
+    params.append(limit)
+
+    with get_db() as conn:
+        cursor = conn.execute(f'''
+            SELECT * FROM tscm_schedules
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT ?
+        ''', params)
+        return [dict(row) for row in cursor]
+
+
+def update_tscm_schedule(schedule_id: int, **fields) -> bool:
+    """Update a TSCM schedule."""
+    if not fields:
+        return False
+
+    updates = []
+    params = []
+
+    for key, value in fields.items():
+        updates.append(f'{key} = ?')
+        params.append(value)
+
+    params.append(schedule_id)
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            f'UPDATE tscm_schedules SET {", ".join(updates)} WHERE id = ?',
+            params
+        )
+        return cursor.rowcount > 0
+
+
+def delete_tscm_schedule(schedule_id: int) -> bool:
+    """Delete a TSCM schedule."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            'DELETE FROM tscm_schedules WHERE id = ?',
+            (schedule_id,)
         )
         return cursor.rowcount > 0
 
@@ -1955,3 +2169,4 @@ def cleanup_old_payloads(max_age_hours: int = 24) -> int:
             WHERE received_at < datetime('now', ?)
         ''', (f'-{max_age_hours} hours',))
         return cursor.rowcount
+

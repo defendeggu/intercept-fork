@@ -162,6 +162,41 @@ class LimeSDRCommandBuilder(CommandBuilder):
 
         return cmd
 
+    def build_iq_capture_command(
+        self,
+        device: SDRDevice,
+        frequency_mhz: float,
+        sample_rate: int = 2048000,
+        gain: Optional[float] = None,
+        ppm: Optional[int] = None,
+        bias_t: bool = False,
+        output_format: str = 'cu8',
+    ) -> list[str]:
+        """
+        Build rx_sdr command for raw I/Q capture with LimeSDR.
+
+        Outputs unsigned 8-bit I/Q pairs to stdout for waterfall display.
+        Note: LimeSDR does not support bias-T, parameter is ignored.
+        """
+        device_str = self._build_device_string(device)
+        freq_hz = int(frequency_mhz * 1e6)
+
+        cmd = [
+            'rx_sdr',
+            '-d', device_str,
+            '-f', str(freq_hz),
+            '-s', str(sample_rate),
+            '-F', 'CU8',
+        ]
+
+        if gain is not None and gain > 0:
+            cmd.extend(['-g', f'LNAH={int(gain)}'])
+
+        # Output to stdout
+        cmd.append('-')
+
+        return cmd
+
     def get_capabilities(self) -> SDRCapabilities:
         """Return LimeSDR capabilities."""
         return self.CAPABILITIES

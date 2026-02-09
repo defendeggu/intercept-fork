@@ -12,7 +12,7 @@ import logging
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
@@ -23,17 +23,24 @@ from data.tscm_frequencies import (
     get_sweep_preset,
 )
 from utils.database import (
+    add_device_timeline_entry,
     add_tscm_threat,
     acknowledge_tscm_threat,
+    cleanup_old_timeline_entries,
+    create_tscm_schedule,
     create_tscm_sweep,
     delete_tscm_baseline,
+    delete_tscm_schedule,
     get_active_tscm_baseline,
     get_all_tscm_baselines,
+    get_all_tscm_schedules,
     get_tscm_baseline,
+    get_tscm_schedule,
     get_tscm_sweep,
     get_tscm_threat_summary,
     get_tscm_threats,
     set_active_tscm_baseline,
+    update_tscm_schedule,
     update_tscm_sweep,
 )
 from utils.tscm.baseline import (
@@ -53,6 +60,7 @@ from utils.tscm.device_identity import (
     ingest_ble_dict,
     ingest_wifi_dict,
 )
+from utils.event_pipeline import process_event
 
 # Import unified Bluetooth scanner helper for TSCM integration
 try:
@@ -64,6 +72,11 @@ except ImportError:
 logger = logging.getLogger('intercept.tscm')
 
 tscm_bp = Blueprint('tscm', __name__, url_prefix='/tscm')
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover - fallback for older Python
+    ZoneInfo = None
 
 # =============================================================================
 # Global State (will be initialized from app.py)
@@ -78,6 +91,8 @@ _sweep_thread: threading.Thread | None = None
 _sweep_running = False
 _current_sweep_id: int | None = None
 _baseline_recorder = BaselineRecorder()
+_schedule_thread: threading.Thread | None = None
+_schedule_running = False
 
 
 def init_tscm_state(tscm_q: queue.Queue, lock: threading.Lock) -> None:
@@ -85,6 +100,7 @@ def init_tscm_state(tscm_q: queue.Queue, lock: threading.Lock) -> None:
     global tscm_queue, tscm_lock
     tscm_queue = tscm_q
     tscm_lock = lock
+    start_tscm_scheduler()
 
 
 def _emit_event(event_type: str, data: dict) -> None:
@@ -98,6 +114,236 @@ def _emit_event(event_type: str, data: dict) -> None:
             })
         except queue.Full:
             logger.warning("TSCM queue full, dropping event")
+
+
+# =============================================================================
+# Schedule Helpers
+# =============================================================================
+
+def _get_schedule_timezone(zone_name: str | None) -> Any:
+    """Resolve schedule timezone from a zone name or fallback to local."""
+    if zone_name and ZoneInfo:
+        try:
+            return ZoneInfo(zone_name)
+        except Exception:
+            logger.warning(f"Invalid timezone '{zone_name}', using local time")
+    return datetime.now().astimezone().tzinfo or timezone.utc
+
+
+def _parse_cron_field(field: str, min_value: int, max_value: int) -> set[int]:
+    """Parse a single cron field into a set of valid integers."""
+    field = field.strip()
+    if not field:
+        raise ValueError("Empty cron field")
+
+    values: set[int] = set()
+    parts = field.split(',')
+    for part in parts:
+        part = part.strip()
+        if part == '*':
+            values.update(range(min_value, max_value + 1))
+            continue
+        if part.startswith('*/'):
+            step = int(part[2:])
+            if step <= 0:
+                raise ValueError("Invalid step value")
+            values.update(range(min_value, max_value + 1, step))
+            continue
+        range_part = part
+        step = 1
+        if '/' in part:
+            range_part, step_str = part.split('/', 1)
+            step = int(step_str)
+            if step <= 0:
+                raise ValueError("Invalid step value")
+        if '-' in range_part:
+            start_str, end_str = range_part.split('-', 1)
+            start = int(start_str)
+            end = int(end_str)
+            if start > end:
+                start, end = end, start
+            values.update(range(start, end + 1, step))
+        else:
+            values.add(int(range_part))
+
+    return {v for v in values if min_value <= v <= max_value}
+
+
+def _parse_cron_expression(expr: str) -> tuple[dict[str, set[int]], dict[str, bool]]:
+    """Parse a cron expression into value sets and wildcard flags."""
+    fields = (expr or '').split()
+    if len(fields) != 5:
+        raise ValueError("Cron expression must have 5 fields")
+
+    minute_field, hour_field, dom_field, month_field, dow_field = fields
+
+    sets = {
+        'minute': _parse_cron_field(minute_field, 0, 59),
+        'hour': _parse_cron_field(hour_field, 0, 23),
+        'dom': _parse_cron_field(dom_field, 1, 31),
+        'month': _parse_cron_field(month_field, 1, 12),
+        'dow': _parse_cron_field(dow_field, 0, 7),
+    }
+
+    # Normalize Sunday (7 -> 0)
+    if 7 in sets['dow']:
+        sets['dow'].add(0)
+        sets['dow'].discard(7)
+
+    wildcards = {
+        'dom': dom_field.strip() == '*',
+        'dow': dow_field.strip() == '*',
+    }
+    return sets, wildcards
+
+
+def _cron_matches(dt: datetime, sets: dict[str, set[int]], wildcards: dict[str, bool]) -> bool:
+    """Check if a datetime matches cron sets."""
+    if dt.minute not in sets['minute']:
+        return False
+    if dt.hour not in sets['hour']:
+        return False
+    if dt.month not in sets['month']:
+        return False
+
+    dom_match = dt.day in sets['dom']
+    # Cron DOW: Sunday=0
+    cron_dow = (dt.weekday() + 1) % 7
+    dow_match = cron_dow in sets['dow']
+
+    if wildcards['dom'] and wildcards['dow']:
+        return True
+    if wildcards['dom']:
+        return dow_match
+    if wildcards['dow']:
+        return dom_match
+    return dom_match or dow_match
+
+
+def _next_run_from_cron(expr: str, after_dt: datetime) -> datetime | None:
+    """Calculate next run time from cron expression after a given datetime."""
+    sets, wildcards = _parse_cron_expression(expr)
+    # Round to next minute
+    candidate = after_dt.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    # Search up to 366 days ahead
+    for _ in range(366 * 24 * 60):
+        if _cron_matches(candidate, sets, wildcards):
+            return candidate
+        candidate += timedelta(minutes=1)
+    return None
+
+
+def _parse_schedule_timestamp(value: Any) -> datetime | None:
+    """Parse stored schedule timestamp to aware datetime."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(value))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _schedule_loop() -> None:
+    """Background loop to trigger scheduled sweeps."""
+    global _schedule_running
+
+    while _schedule_running:
+        try:
+            schedules = get_all_tscm_schedules(enabled=True, limit=200)
+            now_utc = datetime.now(timezone.utc)
+
+            for schedule in schedules:
+                schedule_id = schedule.get('id')
+                cron_expr = schedule.get('cron_expression') or ''
+                tz = _get_schedule_timezone(schedule.get('zone_name'))
+                now_local = datetime.now(tz)
+
+                next_run = _parse_schedule_timestamp(schedule.get('next_run'))
+
+                if not next_run:
+                    try:
+                        computed = _next_run_from_cron(cron_expr, now_local)
+                    except Exception as e:
+                        logger.error(f"Schedule {schedule_id} cron parse error: {e}")
+                        continue
+                    if computed:
+                        update_tscm_schedule(
+                            schedule_id,
+                            next_run=computed.astimezone(timezone.utc).isoformat()
+                        )
+                    continue
+
+                if next_run <= now_utc:
+                    if _sweep_running:
+                        logger.info(f"Schedule {schedule_id} due but sweep running; skipping")
+                        try:
+                            computed = _next_run_from_cron(cron_expr, now_local)
+                        except Exception as e:
+                            logger.error(f"Schedule {schedule_id} cron parse error: {e}")
+                            continue
+                        if computed:
+                            update_tscm_schedule(
+                                schedule_id,
+                                next_run=computed.astimezone(timezone.utc).isoformat()
+                            )
+                        continue
+
+                    # Trigger sweep
+                    result = _start_sweep_internal(
+                        sweep_type=schedule.get('sweep_type') or 'standard',
+                        baseline_id=schedule.get('baseline_id'),
+                        wifi_enabled=True,
+                        bt_enabled=True,
+                        rf_enabled=True,
+                        wifi_interface='',
+                        bt_interface='',
+                        sdr_device=None,
+                        verbose_results=False
+                    )
+
+                    if result.get('status') == 'success':
+                        try:
+                            computed = _next_run_from_cron(cron_expr, now_local)
+                        except Exception as e:
+                            logger.error(f"Schedule {schedule_id} cron parse error: {e}")
+                            computed = None
+
+                        update_tscm_schedule(
+                            schedule_id,
+                            last_run=now_utc.isoformat(),
+                            next_run=computed.astimezone(timezone.utc).isoformat() if computed else None
+                        )
+                        logger.info(f"Scheduled sweep started for schedule {schedule_id}")
+                    else:
+                        try:
+                            computed = _next_run_from_cron(cron_expr, now_local)
+                        except Exception as e:
+                            logger.error(f"Schedule {schedule_id} cron parse error: {e}")
+                            computed = None
+                        if computed:
+                            update_tscm_schedule(
+                                schedule_id,
+                                next_run=computed.astimezone(timezone.utc).isoformat()
+                            )
+                        logger.warning(f"Scheduled sweep failed for schedule {schedule_id}: {result.get('message')}")
+
+        except Exception as e:
+            logger.error(f"TSCM schedule loop error: {e}")
+
+        time.sleep(30)
+
+
+def start_tscm_scheduler() -> None:
+    """Start background scheduler thread for TSCM sweeps."""
+    global _schedule_thread, _schedule_running
+    if _schedule_thread and _schedule_thread.is_alive():
+        return
+    _schedule_running = True
+    _schedule_thread = threading.Thread(target=_schedule_loop, daemon=True)
+    _schedule_thread.start()
 
 
 # =============================================================================
@@ -120,91 +366,19 @@ def _check_available_devices(wifi: bool, bt: bool, rf: bool) -> dict:
         'rf_reason': 'Not checked',
     }
 
-    # Check WiFi
+    # Check WiFi - use the same scanner singleton that performs actual scans
     if wifi:
-        if platform.system() == 'Darwin':
-            # macOS: Check for airport utility
-            airport_path = '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport'
-            if os.path.exists(airport_path):
-                try:
-                    result = subprocess.run(
-                        [airport_path, '-I'],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.returncode == 0:
-                        available['wifi'] = True
-                        available['wifi_reason'] = 'macOS WiFi available'
-                    else:
-                        available['wifi_reason'] = 'WiFi interface not active'
-                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
-                    available['wifi_reason'] = 'Cannot access WiFi interface'
+        try:
+            from utils.wifi.scanner import get_wifi_scanner
+            scanner = get_wifi_scanner()
+            interfaces = scanner._detect_interfaces()
+            if interfaces:
+                available['wifi'] = True
+                available['wifi_reason'] = f'WiFi available ({interfaces[0]["name"]})'
             else:
-                available['wifi_reason'] = 'macOS airport utility not found'
-        else:
-            # Linux: Check for wireless tools
-            if shutil.which('airodump-ng') or shutil.which('iwlist') or shutil.which('iw'):
-                try:
-                    result = subprocess.run(
-                        ['iwconfig'],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if 'no wireless extensions' not in result.stderr.lower() and result.stdout.strip():
-                        available['wifi'] = True
-                        available['wifi_reason'] = 'Wireless interface detected'
-                    else:
-                        available['wifi_reason'] = 'No wireless interfaces found'
-                except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-                    # Try iw as fallback
-                    try:
-                        result = subprocess.run(
-                            ['iw', 'dev'],
-                            capture_output=True,
-                            text=True,
-                            timeout=5
-                        )
-                        if 'Interface' in result.stdout:
-                            available['wifi'] = True
-                            available['wifi_reason'] = 'Wireless interface detected'
-                        else:
-                            # Check /sys/class/net for wireless interfaces
-                            try:
-                                import glob
-                                wireless_devs = glob.glob('/sys/class/net/*/wireless')
-                                if wireless_devs:
-                                    available['wifi'] = True
-                                    available['wifi_reason'] = 'Wireless interface detected'
-                                else:
-                                    available['wifi_reason'] = 'No wireless interfaces found'
-                            except Exception:
-                                available['wifi_reason'] = 'No wireless interfaces found'
-                    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-                        # Last resort: check /sys/class/net
-                        try:
-                            import glob
-                            wireless_devs = glob.glob('/sys/class/net/*/wireless')
-                            if wireless_devs:
-                                available['wifi'] = True
-                                available['wifi_reason'] = 'Wireless interface detected'
-                            else:
-                                available['wifi_reason'] = 'Cannot detect wireless interfaces'
-                        except Exception:
-                            available['wifi_reason'] = 'Cannot detect wireless interfaces'
-            else:
-                # Fallback: check /sys/class/net even without tools
-                try:
-                    import glob
-                    wireless_devs = glob.glob('/sys/class/net/*/wireless')
-                    if wireless_devs:
-                        available['wifi'] = True
-                        available['wifi_reason'] = 'Wireless interface detected (no scan tools)'
-                    else:
-                        available['wifi_reason'] = 'WiFi tools not installed (wireless-tools)'
-                except Exception:
-                    available['wifi_reason'] = 'WiFi tools not installed (wireless-tools)'
+                available['wifi_reason'] = 'No wireless interfaces found'
+        except Exception as e:
+            available['wifi_reason'] = f'WiFi detection error: {e}'
 
     # Check Bluetooth
     if bt:
@@ -304,26 +478,22 @@ def _check_available_devices(wifi: bool, bt: bool, rf: bool) -> dict:
     return available
 
 
-@tscm_bp.route('/sweep/start', methods=['POST'])
-def start_sweep():
-    """Start a TSCM sweep."""
+def _start_sweep_internal(
+    sweep_type: str,
+    baseline_id: int | None,
+    wifi_enabled: bool,
+    bt_enabled: bool,
+    rf_enabled: bool,
+    wifi_interface: str = '',
+    bt_interface: str = '',
+    sdr_device: int | None = None,
+    verbose_results: bool = False,
+) -> dict:
+    """Start a TSCM sweep without request context."""
     global _sweep_running, _sweep_thread, _current_sweep_id
 
     if _sweep_running:
-        return jsonify({'status': 'error', 'message': 'Sweep already running'})
-
-    data = request.get_json() or {}
-    sweep_type = data.get('sweep_type', 'standard')
-    baseline_id = data.get('baseline_id')
-    wifi_enabled = data.get('wifi', True)
-    bt_enabled = data.get('bluetooth', True)
-    rf_enabled = data.get('rf', True)
-    verbose_results = bool(data.get('verbose_results', False))
-
-    # Get interface selections
-    wifi_interface = data.get('wifi_interface', '')
-    bt_interface = data.get('bt_interface', '')
-    sdr_device = data.get('sdr_device')
+        return {'status': 'error', 'message': 'Sweep already running', 'http_status': 409}
 
     # Check for available devices
     devices = _check_available_devices(wifi_enabled, bt_enabled, rf_enabled)
@@ -338,11 +508,12 @@ def start_sweep():
 
     # If no devices available at all, return error
     if not any([devices['wifi'], devices['bluetooth'], devices['rf']]):
-        return jsonify({
+        return {
             'status': 'error',
             'message': 'No scanning devices available',
-            'details': warnings
-        }), 400
+            'details': warnings,
+            'http_status': 400,
+        }
 
     # Create sweep record
     _current_sweep_id = create_tscm_sweep(
@@ -366,7 +537,7 @@ def start_sweep():
 
     logger.info(f"Started TSCM sweep: type={sweep_type}, id={_current_sweep_id}")
 
-    return jsonify({
+    return {
         'status': 'success',
         'message': 'Sweep started',
         'sweep_id': _current_sweep_id,
@@ -377,7 +548,46 @@ def start_sweep():
             'bluetooth': devices['bluetooth'],
             'rf': devices['rf']
         }
-    })
+    }
+
+
+@tscm_bp.route('/status')
+def tscm_status():
+    """Check if any TSCM operation is currently running."""
+    return jsonify({'running': _sweep_running})
+
+
+@tscm_bp.route('/sweep/start', methods=['POST'])
+def start_sweep():
+    """Start a TSCM sweep."""
+    data = request.get_json() or {}
+    sweep_type = data.get('sweep_type', 'standard')
+    baseline_id = data.get('baseline_id')
+    if baseline_id in ('', None):
+        baseline_id = None
+    wifi_enabled = data.get('wifi', True)
+    bt_enabled = data.get('bluetooth', True)
+    rf_enabled = data.get('rf', True)
+    verbose_results = bool(data.get('verbose_results', False))
+
+    # Get interface selections
+    wifi_interface = data.get('wifi_interface', '')
+    bt_interface = data.get('bt_interface', '')
+    sdr_device = data.get('sdr_device')
+
+    result = _start_sweep_internal(
+        sweep_type=sweep_type,
+        baseline_id=baseline_id,
+        wifi_enabled=wifi_enabled,
+        bt_enabled=bt_enabled,
+        rf_enabled=rf_enabled,
+        wifi_interface=wifi_interface,
+        bt_interface=bt_interface,
+        sdr_device=sdr_device,
+        verbose_results=verbose_results,
+    )
+    http_status = result.pop('http_status', 200)
+    return jsonify(result), http_status
 
 
 @tscm_bp.route('/sweep/stop', methods=['POST'])
@@ -424,6 +634,10 @@ def sweep_stream():
             try:
                 if tscm_queue:
                     msg = tscm_queue.get(timeout=1)
+                    try:
+                        process_event('tscm', msg, msg.get('type'))
+                    except Exception:
+                        pass
                     yield f"data: {json.dumps(msg)}\n\n"
                 else:
                     time.sleep(1)
@@ -440,6 +654,166 @@ def sweep_stream():
             'X-Accel-Buffering': 'no'
         }
     )
+
+
+# =============================================================================
+# Schedule Endpoints
+# =============================================================================
+
+@tscm_bp.route('/schedules', methods=['GET'])
+def list_schedules():
+    """List all TSCM sweep schedules."""
+    enabled_param = request.args.get('enabled')
+    enabled = None
+    if enabled_param is not None:
+        enabled = enabled_param.lower() in ('1', 'true', 'yes')
+
+    schedules = get_all_tscm_schedules(enabled=enabled, limit=200)
+    return jsonify({
+        'status': 'success',
+        'count': len(schedules),
+        'schedules': schedules,
+    })
+
+
+@tscm_bp.route('/schedules', methods=['POST'])
+def create_schedule():
+    """Create a new sweep schedule."""
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    cron_expression = (data.get('cron_expression') or '').strip()
+    sweep_type = data.get('sweep_type', 'standard')
+    baseline_id = data.get('baseline_id')
+    zone_name = data.get('zone_name')
+    enabled = bool(data.get('enabled', True))
+    notify_on_threat = bool(data.get('notify_on_threat', True))
+    notify_email = data.get('notify_email')
+
+    if not name:
+        return jsonify({'status': 'error', 'message': 'Schedule name required'}), 400
+    if not cron_expression:
+        return jsonify({'status': 'error', 'message': 'cron_expression required'}), 400
+
+    next_run = None
+    if enabled:
+        try:
+            tz = _get_schedule_timezone(zone_name)
+            next_local = _next_run_from_cron(cron_expression, datetime.now(tz))
+            next_run = next_local.astimezone(timezone.utc).isoformat() if next_local else None
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': f'Invalid cron: {e}'}), 400
+
+    schedule_id = create_tscm_schedule(
+        name=name,
+        cron_expression=cron_expression,
+        sweep_type=sweep_type,
+        baseline_id=baseline_id,
+        zone_name=zone_name,
+        enabled=enabled,
+        notify_on_threat=notify_on_threat,
+        notify_email=notify_email,
+        next_run=next_run,
+    )
+    schedule = get_tscm_schedule(schedule_id)
+    return jsonify({
+        'status': 'success',
+        'message': 'Schedule created',
+        'schedule': schedule
+    })
+
+
+@tscm_bp.route('/schedules/<int:schedule_id>', methods=['PUT', 'PATCH'])
+def update_schedule(schedule_id: int):
+    """Update a sweep schedule."""
+    schedule = get_tscm_schedule(schedule_id)
+    if not schedule:
+        return jsonify({'status': 'error', 'message': 'Schedule not found'}), 404
+
+    data = request.get_json() or {}
+    updates: dict[str, Any] = {}
+
+    for key in ('name', 'cron_expression', 'sweep_type', 'baseline_id', 'zone_name', 'notify_email'):
+        if key in data:
+            updates[key] = data[key]
+
+    if 'baseline_id' in updates and updates['baseline_id'] in ('', None):
+        updates['baseline_id'] = None
+
+    if 'enabled' in data:
+        updates['enabled'] = 1 if data['enabled'] else 0
+    if 'notify_on_threat' in data:
+        updates['notify_on_threat'] = 1 if data['notify_on_threat'] else 0
+
+    # Recalculate next_run when cron/zone/enabled changes
+    if any(k in updates for k in ('cron_expression', 'zone_name', 'enabled')):
+        if updates.get('enabled', schedule.get('enabled', 1)):
+            cron_expr = updates.get('cron_expression', schedule.get('cron_expression', ''))
+            zone_name = updates.get('zone_name', schedule.get('zone_name'))
+            try:
+                tz = _get_schedule_timezone(zone_name)
+                next_local = _next_run_from_cron(cron_expr, datetime.now(tz))
+                updates['next_run'] = next_local.astimezone(timezone.utc).isoformat() if next_local else None
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': f'Invalid cron: {e}'}), 400
+        else:
+            updates['next_run'] = None
+
+    if not updates:
+        return jsonify({'status': 'error', 'message': 'No updates provided'}), 400
+
+    update_tscm_schedule(schedule_id, **updates)
+    schedule = get_tscm_schedule(schedule_id)
+    return jsonify({'status': 'success', 'schedule': schedule})
+
+
+@tscm_bp.route('/schedules/<int:schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id: int):
+    """Delete a sweep schedule."""
+    success = delete_tscm_schedule(schedule_id)
+    if not success:
+        return jsonify({'status': 'error', 'message': 'Schedule not found'}), 404
+    return jsonify({'status': 'success', 'message': 'Schedule deleted'})
+
+
+@tscm_bp.route('/schedules/<int:schedule_id>/run', methods=['POST'])
+def run_schedule_now(schedule_id: int):
+    """Trigger a scheduled sweep immediately."""
+    schedule = get_tscm_schedule(schedule_id)
+    if not schedule:
+        return jsonify({'status': 'error', 'message': 'Schedule not found'}), 404
+
+    result = _start_sweep_internal(
+        sweep_type=schedule.get('sweep_type') or 'standard',
+        baseline_id=schedule.get('baseline_id'),
+        wifi_enabled=True,
+        bt_enabled=True,
+        rf_enabled=True,
+        wifi_interface='',
+        bt_interface='',
+        sdr_device=None,
+        verbose_results=False,
+    )
+
+    if result.get('status') != 'success':
+        status_code = result.pop('http_status', 400)
+        return jsonify(result), status_code
+
+    # Update schedule run timestamps
+    cron_expr = schedule.get('cron_expression') or ''
+    tz = _get_schedule_timezone(schedule.get('zone_name'))
+    now_utc = datetime.now(timezone.utc)
+    try:
+        next_local = _next_run_from_cron(cron_expr, datetime.now(tz))
+    except Exception:
+        next_local = None
+
+    update_tscm_schedule(
+        schedule_id,
+        last_run=now_utc.isoformat(),
+        next_run=next_local.astimezone(timezone.utc).isoformat() if next_local else None,
+    )
+
+    return jsonify(result)
 
 
 @tscm_bp.route('/devices')
@@ -709,6 +1083,32 @@ def _scan_wifi_networks(interface: str) -> list[dict]:
         return []
 
 
+def _scan_wifi_clients(interface: str) -> list[dict]:
+    """
+    Get WiFi client observations from the unified WiFi scanner.
+
+    Clients are only available when monitor-mode scanning is active.
+    """
+    try:
+        from utils.wifi import get_wifi_scanner
+
+        scanner = get_wifi_scanner()
+        if interface:
+            try:
+                if not scanner._is_monitor_mode_interface(interface):
+                    return []
+            except Exception:
+                return []
+
+        return [client.to_dict() for client in scanner.clients]
+    except ImportError as e:
+        logger.error(f"Failed to import wifi scanner: {e}")
+        return []
+    except Exception as e:
+        logger.exception(f"WiFi client scan failed: {e}")
+        return []
+
+
 def _scan_bluetooth_devices(interface: str, duration: int = 10) -> list[dict]:
     """
     Scan for Bluetooth devices with manufacturer data detection.
@@ -944,7 +1344,12 @@ def _scan_bluetooth_devices(interface: str, duration: int = 10) -> list[dict]:
     return devices
 
 
-def _scan_rf_signals(sdr_device: int | None, duration: int = 30, stop_check: callable | None = None) -> list[dict]:
+def _scan_rf_signals(
+    sdr_device: int | None,
+    duration: int = 30,
+    stop_check: callable | None = None,
+    sweep_ranges: list[dict] | None = None
+) -> list[dict]:
     """
     Scan for RF signals using SDR (rtl_power).
 
@@ -962,6 +1367,7 @@ def _scan_rf_signals(sdr_device: int | None, duration: int = 30, stop_check: cal
         duration: Scan duration per band
         stop_check: Optional callable that returns True if scan should stop.
                    Defaults to checking module-level _sweep_running.
+        sweep_ranges: Optional preset ranges (MHz) from SWEEP_PRESETS.
     """
     # Default stop check uses module-level _sweep_running
     if stop_check is None:
@@ -1008,17 +1414,39 @@ def _scan_rf_signals(sdr_device: int | None, duration: int = 30, stop_check: cal
         except Exception as e:
             logger.debug(f"rtl_test check failed: {e}")
 
-    # Define frequency bands to scan (in Hz) - focus on common bug frequencies
+    # Define frequency bands to scan (in Hz)
     # Format: (start_freq, end_freq, bin_size, description)
-    scan_bands = [
-        (88000000, 108000000, 100000, 'FM Broadcast'),       # FM bugs
-        (315000000, 316000000, 10000, '315 MHz ISM'),        # US ISM
-        (433000000, 434000000, 10000, '433 MHz ISM'),        # EU ISM
-        (868000000, 869000000, 10000, '868 MHz ISM'),        # EU ISM
-        (902000000, 928000000, 100000, '915 MHz ISM'),       # US ISM
-        (1200000000, 1300000000, 100000, '1.2 GHz Video'),   # Video TX
-        (2400000000, 2500000000, 500000, '2.4 GHz ISM'),     # WiFi/BT/Video
-    ]
+    scan_bands: list[tuple[int, int, int, str]] = []
+
+    if sweep_ranges:
+        for rng in sweep_ranges:
+            try:
+                start_mhz = float(rng.get('start', 0))
+                end_mhz = float(rng.get('end', 0))
+                step_mhz = float(rng.get('step', 0.1))
+                name = rng.get('name') or f"{start_mhz:.1f}-{end_mhz:.1f} MHz"
+                if start_mhz > 0 and end_mhz > start_mhz:
+                    bin_size = max(1000, int(step_mhz * 1_000_000))
+                    scan_bands.append((
+                        int(start_mhz * 1_000_000),
+                        int(end_mhz * 1_000_000),
+                        bin_size,
+                        name
+                    ))
+            except (TypeError, ValueError):
+                continue
+
+    if not scan_bands:
+        # Fallback: focus on common bug frequencies
+        scan_bands = [
+            (88000000, 108000000, 100000, 'FM Broadcast'),       # FM bugs
+            (315000000, 316000000, 10000, '315 MHz ISM'),        # US ISM
+            (433000000, 434000000, 10000, '433 MHz ISM'),        # EU ISM
+            (868000000, 869000000, 10000, '868 MHz ISM'),        # EU ISM
+            (902000000, 928000000, 100000, '915 MHz ISM'),       # US ISM
+            (1200000000, 1300000000, 100000, '1.2 GHz Video'),   # Video TX
+            (2400000000, 2500000000, 500000, '2.4 GHz ISM'),     # WiFi/BT/Video
+        ]
 
     # Create temp file for output
     with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp:
@@ -1169,11 +1597,53 @@ def _run_sweep(
         # Initialize device identity engine for MAC-randomization resistant detection
         identity_engine = get_identity_engine()
         identity_engine.clear()  # Start fresh for this sweep
+        from utils.tscm.advanced import get_timeline_manager
+        timeline_manager = get_timeline_manager()
+        try:
+            cleanup_old_timeline_entries(72)
+        except Exception as e:
+            logger.debug(f"TSCM timeline cleanup skipped: {e}")
+
+        last_timeline_write: dict[str, float] = {}
+        timeline_bucket = getattr(timeline_manager, 'bucket_seconds', 30)
+
+        def _maybe_store_timeline(
+            identifier: str,
+            protocol: str,
+            rssi: int | None = None,
+            channel: int | None = None,
+            frequency: float | None = None,
+            attributes: dict | None = None
+        ) -> None:
+            if not identifier:
+                return
+
+            identifier_norm = identifier.upper() if isinstance(identifier, str) else str(identifier)
+            key = f"{protocol}:{identifier_norm}"
+            now_ts = time.time()
+            last_ts = last_timeline_write.get(key)
+            if last_ts and (now_ts - last_ts) < timeline_bucket:
+                return
+
+            last_timeline_write[key] = now_ts
+            try:
+                add_device_timeline_entry(
+                    device_identifier=identifier_norm,
+                    protocol=protocol,
+                    sweep_id=_current_sweep_id,
+                    rssi=rssi,
+                    channel=channel,
+                    frequency=frequency,
+                    attributes=attributes
+                )
+            except Exception as e:
+                logger.debug(f"TSCM timeline store error: {e}")
 
         # Collect and analyze data
         threats_found = 0
         severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         all_wifi = {}  # Use dict for deduplication by BSSID
+        all_wifi_clients = {}  # Use dict for deduplication by client MAC
         all_bt = {}    # Use dict for deduplication by MAC
         all_rf = []
 
@@ -1192,59 +1662,171 @@ def _run_sweep(
             if wifi_enabled and (current_time - last_wifi_scan) >= wifi_scan_interval:
                 try:
                     wifi_networks = _scan_wifi_networks(wifi_interface)
+                    last_wifi_scan = current_time
+                    if not wifi_networks and not all_wifi:
+                        logger.warning("TSCM WiFi scan returned 0 networks")
+                    _emit_event('sweep_progress', {
+                        'progress': min(95, int(((current_time - start_time) / duration) * 100)),
+                        'status': f'Scanning WiFi... ({len(wifi_networks)} found)',
+                        'wifi_count': len(all_wifi) + len([n for n in wifi_networks if n.get('bssid') and n.get('bssid') not in all_wifi]),
+                        'bt_count': len(all_bt),
+                        'rf_count': len(all_rf),
+                    })
                     for network in wifi_networks:
-                        bssid = network.get('bssid', '')
-                        if bssid and bssid not in all_wifi:
-                            all_wifi[bssid] = network
-                            # Emit device event for frontend
-                            is_threat = False
-                            # Analyze for threats
-                            threat = detector.analyze_wifi_device(network)
-                            if threat:
-                                _handle_threat(threat)
-                                threats_found += 1
-                                is_threat = True
-                                sev = threat.get('severity', 'low').lower()
-                                if sev in severity_counts:
-                                    severity_counts[sev] += 1
-                            # Classify device and get correlation profile
-                            classification = detector.classify_wifi_device(network)
-                            profile = correlation.analyze_wifi_device(network)
+                        try:
+                            bssid = network.get('bssid', '')
+                            ssid = network.get('essid', network.get('ssid'))
+                            try:
+                                rssi_val = int(network.get('power', network.get('signal')))
+                            except (ValueError, TypeError):
+                                rssi_val = None
+                            if bssid:
+                                try:
+                                    timeline_manager.add_observation(
+                                        identifier=bssid,
+                                        protocol='wifi',
+                                        rssi=rssi_val,
+                                        channel=network.get('channel'),
+                                        name=ssid,
+                                        attributes={'ssid': ssid, 'encryption': network.get('privacy')}
+                                    )
+                                except Exception as e:
+                                    logger.debug(f"WiFi timeline observation error: {e}")
+                                _maybe_store_timeline(
+                                    identifier=bssid,
+                                    protocol='wifi',
+                                    rssi=rssi_val,
+                                    channel=network.get('channel'),
+                                    attributes={'ssid': ssid, 'encryption': network.get('privacy')}
+                                )
+                            if bssid and bssid not in all_wifi:
+                                all_wifi[bssid] = network
+                                # Emit device event for frontend
+                                is_threat = False
+                                # Analyze for threats
+                                threat = detector.analyze_wifi_device(network)
+                                if threat:
+                                    _handle_threat(threat)
+                                    threats_found += 1
+                                    is_threat = True
+                                    sev = threat.get('severity', 'low').lower()
+                                    if sev in severity_counts:
+                                        severity_counts[sev] += 1
+                                # Classify device and get correlation profile
+                                classification = detector.classify_wifi_device(network)
+                                profile = correlation.analyze_wifi_device(network)
+
+                                # Feed to identity engine for MAC-randomization resistant clustering
+                                # Note: WiFi APs don't typically use randomized MACs, but clients do
+                                try:
+                                    wifi_obs = {
+                                        'timestamp': datetime.now().isoformat(),
+                                        'src_mac': bssid,
+                                        'bssid': bssid,
+                                        'ssid': network.get('essid'),
+                                        'rssi': network.get('power'),
+                                        'channel': network.get('channel'),
+                                        'encryption': network.get('privacy'),
+                                        'frame_type': 'beacon',
+                                    }
+                                    ingest_wifi_dict(wifi_obs)
+                                except Exception as e:
+                                    logger.debug(f"Identity engine WiFi ingest error: {e}")
+
+                                # Send device to frontend
+                                _emit_event('wifi_device', {
+                                    'bssid': bssid,
+                                    'ssid': network.get('essid', 'Hidden'),
+                                    'channel': network.get('channel', ''),
+                                    'signal': network.get('power', ''),
+                                    'security': network.get('privacy', ''),
+                                    'vendor': network.get('vendor'),
+                                    'is_threat': is_threat,
+                                    'is_new': not classification.get('in_baseline', False),
+                                    'classification': profile.risk_level.value,
+                                    'reasons': classification.get('reasons', []),
+                                    'score': profile.total_score,
+                                    'score_modifier': profile.score_modifier,
+                                    'known_device': profile.known_device,
+                                    'known_device_name': profile.known_device_name,
+                                    'indicators': [{'type': i.type.value, 'desc': i.description} for i in profile.indicators],
+                                    'recommended_action': profile.recommended_action,
+                                })
+                        except Exception as e:
+                            logger.error(f"WiFi device processing error for {network.get('bssid', '?')}: {e}")
+
+                    # WiFi clients (monitor mode only)
+                    try:
+                        wifi_clients = _scan_wifi_clients(wifi_interface)
+                        for client in wifi_clients:
+                            mac = (client.get('mac') or '').upper()
+                            if not mac or mac in all_wifi_clients:
+                                continue
+                            all_wifi_clients[mac] = client
+
+                            rssi_val = client.get('rssi_current')
+                            if rssi_val is None:
+                                rssi_val = client.get('rssi_median') or client.get('rssi_ema')
+
+                            client_device = {
+                                'mac': mac,
+                                'vendor': client.get('vendor'),
+                                'name': client.get('vendor') or 'WiFi Client',
+                                'rssi': rssi_val,
+                                'associated_bssid': client.get('associated_bssid'),
+                                'probed_ssids': client.get('probed_ssids', []),
+                                'probe_count': client.get('probe_count', len(client.get('probed_ssids', []))),
+                                'is_client': True,
+                            }
+
+                            try:
+                                timeline_manager.add_observation(
+                                    identifier=mac,
+                                    protocol='wifi',
+                                    rssi=rssi_val,
+                                    name=client_device.get('vendor') or f'WiFi Client {mac[-5:]}',
+                                    attributes={'client': True, 'associated_bssid': client_device.get('associated_bssid')}
+                                )
+                            except Exception as e:
+                                logger.debug(f"WiFi client timeline observation error: {e}")
+                            _maybe_store_timeline(
+                                identifier=mac,
+                                protocol='wifi',
+                                rssi=rssi_val,
+                                attributes={'client': True, 'associated_bssid': client_device.get('associated_bssid')}
+                            )
+
+                            profile = correlation.analyze_wifi_device(client_device)
+                            client_device['classification'] = profile.risk_level.value
+                            client_device['score'] = profile.total_score
+                            client_device['score_modifier'] = profile.score_modifier
+                            client_device['known_device'] = profile.known_device
+                            client_device['known_device_name'] = profile.known_device_name
+                            client_device['indicators'] = [
+                                {'type': i.type.value, 'desc': i.description}
+                                for i in profile.indicators
+                            ]
+                            client_device['recommended_action'] = profile.recommended_action
 
                             # Feed to identity engine for MAC-randomization resistant clustering
-                            # Note: WiFi APs don't typically use randomized MACs, but clients do
                             try:
                                 wifi_obs = {
                                     'timestamp': datetime.now().isoformat(),
-                                    'src_mac': bssid,
-                                    'bssid': bssid,
-                                    'ssid': network.get('essid'),
-                                    'rssi': network.get('power'),
-                                    'channel': network.get('channel'),
-                                    'encryption': network.get('privacy'),
-                                    'frame_type': 'beacon',
+                                    'src_mac': mac,
+                                    'bssid': client_device.get('associated_bssid'),
+                                    'rssi': rssi_val,
+                                    'frame_type': 'probe_request',
+                                    'probed_ssids': client_device.get('probed_ssids', []),
                                 }
                                 ingest_wifi_dict(wifi_obs)
                             except Exception as e:
-                                logger.debug(f"Identity engine WiFi ingest error: {e}")
+                                logger.debug(f"Identity engine WiFi client ingest error: {e}")
 
-                            # Send device to frontend
-                            _emit_event('wifi_device', {
-                                'bssid': bssid,
-                                'ssid': network.get('essid', 'Hidden'),
-                                'channel': network.get('channel', ''),
-                                'signal': network.get('power', ''),
-                                'security': network.get('privacy', ''),
-                                'is_threat': is_threat,
-                                'is_new': not classification.get('in_baseline', False),
-                                'classification': profile.risk_level.value,
-                                'reasons': classification.get('reasons', []),
-                                'score': profile.total_score,
-                                'indicators': [{'type': i.type.value, 'desc': i.description} for i in profile.indicators],
-                                'recommended_action': profile.recommended_action,
-                            })
-                    last_wifi_scan = current_time
+                            _emit_event('wifi_client', client_device)
+                    except Exception as e:
+                        logger.debug(f"WiFi client scan error: {e}")
                 except Exception as e:
+                    last_wifi_scan = current_time
                     logger.error(f"WiFi scan error: {e}")
 
             # Perform Bluetooth scan
@@ -1259,56 +1841,87 @@ def _run_sweep(
                         logger.info(f"TSCM: Using legacy BT scanner on {bt_interface}")
                         bt_devices = _scan_bluetooth_devices(bt_interface, duration=8)
                         logger.info(f"TSCM: Legacy scanner returned {len(bt_devices)} devices")
-                    for device in bt_devices:
-                        mac = device.get('mac', '')
-                        if mac and mac not in all_bt:
-                            all_bt[mac] = device
-                            is_threat = False
-                            # Analyze for threats
-                            threat = detector.analyze_bt_device(device)
-                            if threat:
-                                _handle_threat(threat)
-                                threats_found += 1
-                                is_threat = True
-                                sev = threat.get('severity', 'low').lower()
-                                if sev in severity_counts:
-                                    severity_counts[sev] += 1
-                            # Classify device and get correlation profile
-                            classification = detector.classify_bt_device(device)
-                            profile = correlation.analyze_bluetooth_device(device)
-
-                            # Feed to identity engine for MAC-randomization resistant clustering
-                            try:
-                                ble_obs = {
-                                    'timestamp': datetime.now().isoformat(),
-                                    'addr': mac,
-                                    'rssi': device.get('rssi'),
-                                    'manufacturer_id': device.get('manufacturer_id') or device.get('company_id'),
-                                    'manufacturer_data': device.get('manufacturer_data'),
-                                    'service_uuids': device.get('services', []),
-                                    'local_name': device.get('name'),
-                                }
-                                ingest_ble_dict(ble_obs)
-                            except Exception as e:
-                                logger.debug(f"Identity engine BLE ingest error: {e}")
-
-                            # Send device to frontend
-                            _emit_event('bt_device', {
-                                'mac': mac,
-                                'name': device.get('name', 'Unknown'),
-                                'device_type': device.get('type', ''),
-                                'rssi': device.get('rssi', ''),
-                                'is_threat': is_threat,
-                                'is_new': not classification.get('in_baseline', False),
-                                'classification': profile.risk_level.value,
-                                'reasons': classification.get('reasons', []),
-                                'is_audio_capable': classification.get('is_audio_capable', False),
-                                'score': profile.total_score,
-                                'indicators': [{'type': i.type.value, 'desc': i.description} for i in profile.indicators],
-                                'recommended_action': profile.recommended_action,
-                            })
                     last_bt_scan = current_time
+                    for device in bt_devices:
+                        try:
+                            mac = device.get('mac', '')
+                            try:
+                                rssi_val = int(device.get('rssi', device.get('signal')))
+                            except (ValueError, TypeError):
+                                rssi_val = None
+                            if mac:
+                                try:
+                                    timeline_manager.add_observation(
+                                        identifier=mac,
+                                        protocol='bluetooth',
+                                        rssi=rssi_val,
+                                        name=device.get('name'),
+                                        attributes={'device_type': device.get('type')}
+                                    )
+                                except Exception as e:
+                                    logger.debug(f"BT timeline observation error: {e}")
+                                _maybe_store_timeline(
+                                    identifier=mac,
+                                    protocol='bluetooth',
+                                    rssi=rssi_val,
+                                    attributes={'device_type': device.get('type')}
+                                )
+                            if mac and mac not in all_bt:
+                                all_bt[mac] = device
+                                is_threat = False
+                                # Analyze for threats
+                                threat = detector.analyze_bt_device(device)
+                                if threat:
+                                    _handle_threat(threat)
+                                    threats_found += 1
+                                    is_threat = True
+                                    sev = threat.get('severity', 'low').lower()
+                                    if sev in severity_counts:
+                                        severity_counts[sev] += 1
+                                # Classify device and get correlation profile
+                                classification = detector.classify_bt_device(device)
+                                profile = correlation.analyze_bluetooth_device(device)
+
+                                # Feed to identity engine for MAC-randomization resistant clustering
+                                try:
+                                    ble_obs = {
+                                        'timestamp': datetime.now().isoformat(),
+                                        'addr': mac,
+                                        'rssi': device.get('rssi'),
+                                        'manufacturer_id': device.get('manufacturer_id') or device.get('company_id'),
+                                        'manufacturer_data': device.get('manufacturer_data'),
+                                        'service_uuids': device.get('services', []),
+                                        'local_name': device.get('name'),
+                                    }
+                                    ingest_ble_dict(ble_obs)
+                                except Exception as e:
+                                    logger.debug(f"Identity engine BLE ingest error: {e}")
+
+                                # Send device to frontend
+                                _emit_event('bt_device', {
+                                    'mac': mac,
+                                    'name': device.get('name', 'Unknown'),
+                                    'device_type': device.get('type', ''),
+                                    'rssi': device.get('rssi', ''),
+                                    'manufacturer': device.get('manufacturer'),
+                                    'tracker': device.get('tracker'),
+                                    'tracker_type': device.get('tracker_type'),
+                                    'is_threat': is_threat,
+                                    'is_new': not classification.get('in_baseline', False),
+                                    'classification': profile.risk_level.value,
+                                    'reasons': classification.get('reasons', []),
+                                    'is_audio_capable': classification.get('is_audio_capable', False),
+                                    'score': profile.total_score,
+                                    'score_modifier': profile.score_modifier,
+                                    'known_device': profile.known_device,
+                                    'known_device_name': profile.known_device_name,
+                                    'indicators': [{'type': i.type.value, 'desc': i.description} for i in profile.indicators],
+                                    'recommended_action': profile.recommended_action,
+                                })
+                        except Exception as e:
+                            logger.error(f"BT device processing error for {device.get('mac', '?')}: {e}")
                 except Exception as e:
+                    last_bt_scan = current_time
                     import traceback
                     logger.error(f"Bluetooth scan error: {e}\n{traceback.format_exc()}")
 
@@ -1323,7 +1936,7 @@ def _run_sweep(
                         'rf_count': len(all_rf),
                     })
                     # Try RF scan even if sdr_device is None (will use device 0)
-                    rf_signals = _scan_rf_signals(sdr_device)
+                    rf_signals = _scan_rf_signals(sdr_device, sweep_ranges=preset.get('ranges'))
 
                     # If no signals and this is first RF scan, send info event
                     if not rf_signals and last_rf_scan == 0:
@@ -1334,6 +1947,28 @@ def _run_sweep(
 
                     for signal in rf_signals:
                         freq_key = f"{signal['frequency']:.3f}"
+                        try:
+                            power_val = int(float(signal.get('power', signal.get('level'))))
+                        except (ValueError, TypeError):
+                            power_val = None
+                        try:
+                            timeline_manager.add_observation(
+                                identifier=freq_key,
+                                protocol='rf',
+                                rssi=power_val,
+                                frequency=signal.get('frequency'),
+                                name=f"{freq_key} MHz",
+                                attributes={'band': signal.get('band')}
+                            )
+                        except Exception as e:
+                            logger.debug(f"RF timeline observation error: {e}")
+                        _maybe_store_timeline(
+                            identifier=freq_key,
+                            protocol='rf',
+                            rssi=power_val,
+                            frequency=signal.get('frequency'),
+                            attributes={'band': signal.get('band')}
+                        )
                         if freq_key not in [f"{s['frequency']:.3f}" for s in all_rf]:
                             all_rf.append(signal)
                             is_threat = False
@@ -1360,6 +1995,9 @@ def _run_sweep(
                                 'classification': profile.risk_level.value,
                                 'reasons': classification.get('reasons', []),
                                 'score': profile.total_score,
+                                'score_modifier': profile.score_modifier,
+                                'known_device': profile.known_device,
+                                'known_device_name': profile.known_device_name,
                                 'indicators': [{'type': i.type.value, 'desc': i.description} for i in profile.indicators],
                                 'recommended_action': profile.recommended_action,
                             })
@@ -1384,8 +2022,8 @@ def _run_sweep(
 
             time.sleep(2)  # Update every 2 seconds
 
-        # Complete sweep
-        if _sweep_running and _current_sweep_id:
+        # Complete sweep (run even if stopped by user so correlations/clusters are computed)
+        if _current_sweep_id:
             # Run cross-protocol correlation analysis
             correlations = correlation.correlate_devices()
             findings = correlation.get_all_findings()
@@ -1396,6 +2034,7 @@ def _run_sweep(
                 comparator = BaselineComparator(baseline)
                 baseline_comparison = comparator.compare_all(
                     wifi_devices=list(all_wifi.values()),
+                    wifi_clients=list(all_wifi_clients.values()),
                     bt_devices=list(all_bt.values()),
                     rf_signals=all_rf
                 )
@@ -1411,6 +2050,7 @@ def _run_sweep(
 
             if verbose_results:
                 wifi_payload = list(all_wifi.values())
+                wifi_client_payload = list(all_wifi_clients.values())
                 bt_payload = list(all_bt.values())
                 rf_payload = list(all_rf)
             else:
@@ -1426,6 +2066,28 @@ def _run_sweep(
                     }
                     for d in all_wifi.values()
                 ]
+                wifi_client_payload = []
+                for client in all_wifi_clients.values():
+                    mac = client.get('mac') or client.get('address')
+                    if isinstance(mac, str):
+                        mac = mac.upper()
+                    probed_ssids = client.get('probed_ssids') or []
+                    rssi = client.get('rssi')
+                    if rssi is None:
+                        rssi = client.get('rssi_current')
+                    if rssi is None:
+                        rssi = client.get('rssi_median')
+                    if rssi is None:
+                        rssi = client.get('rssi_ema')
+                    wifi_client_payload.append({
+                        'mac': mac,
+                        'vendor': client.get('vendor'),
+                        'rssi': rssi,
+                        'associated_bssid': client.get('associated_bssid'),
+                        'is_associated': client.get('is_associated'),
+                        'probed_ssids': probed_ssids,
+                        'probe_count': client.get('probe_count', len(probed_ssids)),
+                    })
                 bt_payload = [
                     {
                         'mac': d.get('mac') or d.get('address'),
@@ -1450,9 +2112,11 @@ def _run_sweep(
                 status='completed',
                 results={
                     'wifi_devices': wifi_payload,
+                    'wifi_clients': wifi_client_payload,
                     'bt_devices': bt_payload,
                     'rf_signals': rf_payload,
                     'wifi_count': len(all_wifi),
+                    'wifi_client_count': len(all_wifi_clients),
                     'bt_count': len(all_bt),
                     'rf_count': len(all_rf),
                     'severity_counts': severity_counts,
@@ -1480,6 +2144,7 @@ def _run_sweep(
                     'total_new': baseline_comparison['total_new'],
                     'total_missing': baseline_comparison['total_missing'],
                     'wifi': baseline_comparison.get('wifi'),
+                    'wifi_clients': baseline_comparison.get('wifi_clients'),
                     'bluetooth': baseline_comparison.get('bluetooth'),
                     'rf': baseline_comparison.get('rf'),
                 })
@@ -1497,6 +2162,7 @@ def _run_sweep(
                 'sweep_id': _current_sweep_id,
                 'threats_found': threats_found,
                 'wifi_count': len(all_wifi),
+                'wifi_client_count': len(all_wifi_clients),
                 'bt_count': len(all_bt),
                 'rf_count': len(all_rf),
                 'severity_counts': severity_counts,
@@ -1644,6 +2310,7 @@ def compare_against_baseline():
 
     Expects JSON body with:
     - wifi_devices: list of WiFi devices (optional)
+    - wifi_clients: list of WiFi clients (optional)
     - bt_devices: list of Bluetooth devices (optional)
     - rf_signals: list of RF signals (optional)
 
@@ -1652,12 +2319,14 @@ def compare_against_baseline():
     data = request.get_json() or {}
 
     wifi_devices = data.get('wifi_devices')
+    wifi_clients = data.get('wifi_clients')
     bt_devices = data.get('bt_devices')
     rf_signals = data.get('rf_signals')
 
     # Use the convenience function that gets active baseline
     comparison = get_comparison_for_active_baseline(
         wifi_devices=wifi_devices,
+        wifi_clients=wifi_clients,
         bt_devices=bt_devices,
         rf_signals=rf_signals
     )
@@ -1751,7 +2420,10 @@ def feed_wifi():
     """Feed WiFi device data for baseline recording."""
     data = request.get_json()
     if data:
-        _baseline_recorder.add_wifi_device(data)
+        if data.get('is_client'):
+            _baseline_recorder.add_wifi_client(data)
+        else:
+            _baseline_recorder.add_wifi_device(data)
     return jsonify({'status': 'success'})
 
 
@@ -2403,12 +3075,14 @@ def get_baseline_diff(baseline_id: int, sweep_id: int):
             results = json.loads(results)
 
         current_wifi = results.get('wifi_devices', [])
+        current_wifi_clients = results.get('wifi_clients', [])
         current_bt = results.get('bt_devices', [])
         current_rf = results.get('rf_signals', [])
 
         diff = calculate_baseline_diff(
             baseline=baseline,
             current_wifi=current_wifi,
+            current_wifi_clients=current_wifi_clients,
             current_bt=current_bt,
             current_rf=current_rf,
             sweep_id=sweep_id

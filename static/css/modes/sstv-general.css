@@ -1,0 +1,668 @@
+/**
+ * SSTV General Mode Styles
+ * Terrestrial Slow-Scan Television decoder interface
+ */
+
+/* ============================================
+   MODE VISIBILITY
+   ============================================ */
+#sstvGeneralMode.active {
+    display: block !important;
+}
+
+/* ============================================
+   VISUALS CONTAINER
+   ============================================ */
+.sstv-general-visuals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    min-height: 0;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ============================================
+   STATS STRIP
+   ============================================ */
+.sstv-general-stats-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.sstv-general-strip-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sstv-general-strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sstv-general-strip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sstv-general-strip-dot.idle {
+    background: var(--text-dim);
+}
+
+.sstv-general-strip-dot.listening {
+    background: var(--accent-yellow);
+    animation: sstv-general-pulse 1s infinite;
+}
+
+.sstv-general-strip-dot.decoding {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 6px var(--accent-cyan);
+    animation: sstv-general-pulse 0.5s infinite;
+}
+
+.sstv-general-strip-status-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.sstv-general-strip-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 5px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.sstv-general-strip-btn.start {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+.sstv-general-strip-btn.start:hover {
+    background: var(--accent-cyan-bright, #00d4ff);
+}
+
+.sstv-general-strip-btn.stop {
+    background: var(--accent-red, #ff3366);
+    color: white;
+}
+
+.sstv-general-strip-btn.stop:hover {
+    background: #ff1a53;
+}
+
+.sstv-general-strip-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+}
+
+.sstv-general-strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 50px;
+}
+
+.sstv-general-strip-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-general-strip-value.accent-cyan {
+    color: var(--accent-cyan);
+}
+
+.sstv-general-strip-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   MAIN ROW (Live Decode + Gallery)
+   ============================================ */
+.sstv-general-main-row {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ============================================
+   LIVE DECODE SECTION
+   ============================================ */
+.sstv-general-live-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 300px;
+}
+
+.sstv-general-live-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sstv-general-live-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-general-live-title svg {
+    color: var(--accent-cyan);
+}
+
+.sstv-general-live-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    min-height: 0;
+}
+
+.sstv-general-canvas-container {
+    position: relative;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sstv-general-decode-info {
+    width: 100%;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sstv-general-mode-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-cyan);
+    text-align: center;
+}
+
+.sstv-general-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sstv-general-progress-bar .progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.sstv-general-status-message {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* Idle state */
+.sstv-general-idle-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+}
+
+.sstv-general-idle-state svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.sstv-general-idle-state h4 {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.sstv-general-idle-state p {
+    font-size: 12px;
+    max-width: 250px;
+}
+
+/* ============================================
+   GALLERY SECTION
+   ============================================ */
+.sstv-general-gallery-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1.5;
+    min-width: 300px;
+}
+
+.sstv-general-gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sstv-general-gallery-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sstv-general-gallery-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-cyan);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.sstv-general-gallery-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    padding: 12px;
+    overflow-y: auto;
+    align-content: start;
+}
+
+.sstv-general-image-card {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.15s ease;
+}
+
+.sstv-general-image-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+}
+
+.sstv-general-image-card-inner {
+    cursor: pointer;
+}
+
+.sstv-general-image-preview {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    background: #000;
+    display: block;
+}
+
+.sstv-general-image-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 6px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.sstv-general-image-card:hover .sstv-general-image-actions {
+    opacity: 1;
+}
+
+.sstv-general-image-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sstv-general-image-actions button:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.sstv-general-image-actions button:last-child:hover {
+    background: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
+}
+
+.sstv-general-image-info {
+    padding: 8px 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.sstv-general-image-mode {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    margin-bottom: 4px;
+}
+
+.sstv-general-image-timestamp {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+}
+
+/* Empty gallery state */
+.sstv-general-gallery-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    grid-column: 1 / -1;
+}
+
+.sstv-general-gallery-empty svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
+/* ============================================
+   SIGNAL MONITOR
+   ============================================ */
+.sstv-general-signal-monitor {
+    width: 100%;
+    max-width: 320px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.sstv-general-signal-monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+}
+
+.sstv-general-signal-monitor-header svg {
+    color: var(--accent-cyan);
+}
+
+.sstv-general-signal-level-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.sstv-general-signal-level-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.sstv-general-signal-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.sstv-general-signal-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s ease;
+    background: var(--text-dim);
+}
+
+.sstv-general-signal-level-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 24px;
+    text-align: right;
+}
+
+.sstv-general-signal-status-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+.sstv-general-signal-vis-state {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sstv-general-signal-vis-state.active {
+    color: var(--accent-cyan);
+}
+
+/* ============================================
+   IMAGE MODAL
+   ============================================ */
+.sstv-general-image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 40px;
+}
+
+.sstv-general-image-modal.show {
+    display: flex;
+}
+
+.sstv-general-image-modal img {
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.sstv-general-modal-toolbar {
+    position: absolute;
+    top: 20px;
+    right: 60px;
+    display: flex;
+    gap: 8px;
+    z-index: 1;
+}
+
+.sstv-general-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+}
+
+.sstv-general-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sstv-general-modal-btn.delete:hover {
+    background: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
+}
+
+.sstv-general-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+    z-index: 1;
+}
+
+.sstv-general-modal-close:hover {
+    opacity: 1;
+}
+
+/* Clear All button */
+.sstv-general-gallery-clear-btn {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-left: 8px;
+}
+
+.sstv-general-gallery-clear-btn:hover {
+    color: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .sstv-general-main-row {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .sstv-general-live-section {
+        max-width: none;
+        min-height: 350px;
+    }
+
+    .sstv-general-gallery-section {
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sstv-general-stats-strip {
+        padding: 8px 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .sstv-general-strip-divider {
+        display: none;
+    }
+
+    .sstv-general-gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 8px;
+        padding: 8px;
+    }
+}
+
+@keyframes sstv-general-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}

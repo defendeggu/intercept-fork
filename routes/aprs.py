@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime
-from subprocess import DEVNULL, PIPE, STDOUT
+from subprocess import PIPE, STDOUT
 from typing import Generator, Optional
 
 from flask import Blueprint, jsonify, request, Response
@@ -22,6 +22,7 @@ import app as app_module
 from utils.logging import sensor_logger as logger
 from utils.validation import validate_device_index, validate_gain, validate_ppm
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.constants import (
     PROCESS_TERMINATE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
@@ -31,6 +32,9 @@ from utils.constants import (
 from utils.mqtt import mqtt_publish
 
 aprs_bp = Blueprint('aprs', __name__, url_prefix='/aprs')
+
+# Track which SDR device is being used
+aprs_active_device: int | None = None
 
 # APRS frequencies by region (MHz)
 APRS_FREQUENCIES = {
@@ -50,6 +54,7 @@ aprs_packet_count = 0
 aprs_station_count = 0
 aprs_last_packet_time = None
 aprs_stations = {}  # callsign -> station data
+APRS_MAX_STATIONS = 500  # Limit tracked stations to prevent memory growth
 
 # Meter rate limiting
 _last_meter_time = 0.0
@@ -1302,7 +1307,7 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
 
     This function reads from the decoder's stdout (text mode, line-buffered).
     The decoder's stderr is merged into stdout (STDOUT) to avoid deadlocks.
-    rtl_fm's stderr is sent to DEVNULL for the same reason.
+    rtl_fm's stderr is captured via PIPE with a monitor thread.
 
     Outputs two types of messages to the queue:
     - type='aprs': Decoded APRS packets
@@ -1368,6 +1373,13 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
                         'last_seen': packet.get('timestamp'),
                         'packet_type': packet.get('packet_type'),
                     }
+                    # Evict oldest stations when limit is exceeded
+                    if len(aprs_stations) > APRS_MAX_STATIONS:
+                        oldest = min(
+                            aprs_stations,
+                            key=lambda k: aprs_stations[k].get('last_seen', ''),
+                        )
+                        del aprs_stations[oldest]
 
                 app_module.aprs_queue.put(packet)
 
@@ -1387,6 +1399,7 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
         logger.error(f"APRS stream error: {e}")
         app_module.aprs_queue.put({'type': 'error', 'message': str(e)})
     finally:
+        global aprs_active_device
         app_module.aprs_queue.put({'type': 'status', 'status': 'stopped'})
         # Cleanup processes
         for proc in [rtl_process, decoder_process]:
@@ -1398,6 +1411,10 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
                     proc.kill()
                 except Exception:
                     pass
+        # Release SDR device
+        if aprs_active_device is not None:
+            app_module.release_sdr_device(aprs_active_device)
+            aprs_active_device = None
 
 
 @aprs_bp.route('/tools')
@@ -1445,6 +1462,7 @@ def get_stations() -> Response:
 def start_aprs() -> Response:
     """Start APRS decoder."""
     global aprs_packet_count, aprs_station_count, aprs_last_packet_time, aprs_stations
+    global aprs_active_device
 
     with app_module.aprs_lock:
         if app_module.aprs_process and app_module.aprs_process.poll() is None:
@@ -1480,6 +1498,16 @@ def start_aprs() -> Response:
         ppm = validate_ppm(data.get('ppm', '0'))
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+    # Reserve SDR device to prevent conflicts with other modes
+    error = app_module.claim_sdr_device(device, 'aprs')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error
+        }), 409
+    aprs_active_device = device
 
     # Get frequency for region
     region = data.get('region', 'north_america')
@@ -1556,14 +1584,24 @@ def start_aprs() -> Response:
 
     try:
         # Start rtl_fm with stdout piped to decoder.
-        # stderr goes to DEVNULL to prevent blocking (rtl_fm logs to stderr).
+        # stderr is captured via PIPE so errors are reported to the user.
         # NOTE: RTL-SDR Blog V4 may show offset-tuned frequency in logs - this is normal.
         rtl_process = subprocess.Popen(
             rtl_cmd,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=PIPE,
             start_new_session=True
         )
+
+        # Start a thread to monitor rtl_fm stderr for errors
+        def monitor_rtl_stderr():
+            for line in rtl_process.stderr:
+                err_text = line.decode('utf-8', errors='replace').strip()
+                if err_text:
+                    logger.debug(f"[RTL_FM] {err_text}")
+
+        rtl_stderr_thread = threading.Thread(target=monitor_rtl_stderr, daemon=True)
+        rtl_stderr_thread.start()
 
         # Start decoder with stdin wired to rtl_fm's stdout.
         # Use text mode with line buffering for reliable line-by-line reading.
@@ -1586,13 +1624,25 @@ def start_aprs() -> Response:
         time.sleep(PROCESS_START_WAIT)
 
         if rtl_process.poll() is not None:
-            # rtl_fm exited early - something went wrong
+            # rtl_fm exited early - capture stderr for diagnostics
+            stderr_output = ''
+            try:
+                remaining = rtl_process.stderr.read()
+                if remaining:
+                    stderr_output = remaining.decode('utf-8', errors='replace').strip()
+            except Exception:
+                pass
             error_msg = f'rtl_fm failed to start (exit code {rtl_process.returncode})'
+            if stderr_output:
+                error_msg += f': {stderr_output[:200]}'
             logger.error(error_msg)
             try:
                 decoder_process.kill()
             except Exception:
                 pass
+            if aprs_active_device is not None:
+                app_module.release_sdr_device(aprs_active_device)
+                aprs_active_device = None
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         if decoder_process.poll() is not None:
@@ -1606,6 +1656,9 @@ def start_aprs() -> Response:
                 rtl_process.kill()
             except Exception:
                 pass
+            if aprs_active_device is not None:
+                app_module.release_sdr_device(aprs_active_device)
+                aprs_active_device = None
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         # Store references for status checks and cleanup
@@ -1630,12 +1683,17 @@ def start_aprs() -> Response:
 
     except Exception as e:
         logger.error(f"Failed to start APRS decoder: {e}")
+        if aprs_active_device is not None:
+            app_module.release_sdr_device(aprs_active_device)
+            aprs_active_device = None
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @aprs_bp.route('/stop', methods=['POST'])
 def stop_aprs() -> Response:
     """Stop APRS decoder."""
+    global aprs_active_device
+
     with app_module.aprs_lock:
         processes_to_stop = []
 
@@ -1664,6 +1722,11 @@ def stop_aprs() -> Response:
         if hasattr(app_module, 'aprs_rtl_process'):
             app_module.aprs_rtl_process = None
 
+        # Release SDR device
+        if aprs_active_device is not None:
+            app_module.release_sdr_device(aprs_active_device)
+            aprs_active_device = None
+
     return jsonify({'status': 'stopped'})
 
 
@@ -1677,6 +1740,10 @@ def stream_aprs() -> Response:
             try:
                 msg = app_module.aprs_queue.get(timeout=SSE_QUEUE_TIMEOUT)
                 last_keepalive = time.time()
+                try:
+                    process_event('aprs', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

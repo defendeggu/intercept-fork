@@ -4201,6 +4201,12 @@ header h1 .tagline {
     color: #000;
 }
 
+.bt-detail-btn.active {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.6);
+    color: #9fffd1;
+}
+
 /* Selected device highlight */
 .bt-device-row.selected {
     background: rgba(0, 212, 255, 0.1);
@@ -4390,6 +4396,17 @@ header h1 .tagline {
     background: rgba(139, 92, 246, 0.2);
     color: #8b5cf6;
     border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.bt-history-badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
 }
 
 .bt-device-name {

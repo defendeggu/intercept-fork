@@ -165,6 +165,7 @@ detect_dragonos() {
 # Required tool checks (with alternates)
 # ----------------------------
 missing_required=()
+missing_recommended=()
 
 check_required() {
   local label="$1"; shift
@@ -175,6 +176,18 @@ check_required() {
   else
     warn "${label} - ${desc} (missing, required)"
     missing_required+=("$label")
+  fi
+}
+
+check_recommended() {
+  local label="$1"; shift
+  local desc="$1"; shift
+
+  if have_any "$@"; then
+    ok "${label} - ${desc}"
+  else
+    warn "${label} - ${desc} (missing, recommended)"
+    missing_recommended+=("$label")
   fi
 }
 
@@ -204,11 +217,13 @@ check_tools() {
   check_required "dump1090"    "ADS-B decoder" dump1090
   check_required "acarsdec"    "ACARS decoder" acarsdec
   check_required "AIS-catcher" "AIS vessel decoder" AIS-catcher aiscatcher
-  check_optional "slowrx"      "SSTV decoder (ISS images)" slowrx
-
   echo
   info "GPS:"
   check_required "gpsd" "GPS daemon" gpsd
+
+  echo
+  info "Digital Voice:"
+  check_optional "dsd" "Digital Speech Decoder (DMR/P25)" dsd dsd-fme
 
   echo
   info "Audio:"
@@ -386,48 +401,6 @@ install_rtlamr_from_source() {
   fi
 }
 
-install_slowrx_from_source_macos() {
-  info "slowrx not available via Homebrew. Building from source..."
-
-  # Ensure build dependencies are installed
-  brew_install cmake
-  brew_install fftw
-  brew_install libsndfile
-  brew_install gtk+3
-  brew_install pkg-config
-
-  (
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
-
-    info "Cloning slowrx..."
-    git clone --depth 1 https://github.com/windytan/slowrx.git "$tmp_dir/slowrx" >/dev/null 2>&1 \
-      || { warn "Failed to clone slowrx"; exit 1; }
-
-    cd "$tmp_dir/slowrx"
-    info "Compiling slowrx..."
-    mkdir -p build && cd build
-    local cmake_log make_log
-    cmake_log=$(cmake .. 2>&1) || {
-      warn "cmake failed for slowrx:"
-      echo "$cmake_log" | tail -20
-      exit 1
-    }
-    make_log=$(make 2>&1) || {
-      warn "make failed for slowrx:"
-      echo "$make_log" | tail -20
-      exit 1
-    }
-
-    # Install to /usr/local/bin
-    if [[ -w /usr/local/bin ]]; then
-      install -m 0755 slowrx /usr/local/bin/slowrx
-    else
-      sudo install -m 0755 slowrx /usr/local/bin/slowrx
-    fi
-    ok "slowrx installed successfully from source"
-  )
-}
 
 install_multimon_ng_from_source_macos() {
   info "multimon-ng not available via Homebrew. Building from source..."
@@ -460,8 +433,192 @@ install_multimon_ng_from_source_macos() {
   )
 }
 
+install_dsd_from_source() {
+  info "Building DSD (Digital Speech Decoder) from source..."
+  info "This requires mbelib (vocoder library) as a prerequisite."
+
+  if [[ "$OS" == "macos" ]]; then
+    brew_install cmake
+    brew_install libsndfile
+    brew_install ncurses
+    brew_install fftw
+    brew_install codec2
+    brew_install librtlsdr
+    brew_install pulseaudio || true
+  else
+    apt_install build-essential git cmake libsndfile1-dev libpulse-dev \
+      libfftw3-dev liblapack-dev libncurses-dev librtlsdr-dev libcodec2-dev
+  fi
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    # Step 1: Build and install mbelib (required dependency)
+    info "Building mbelib (vocoder library)..."
+    git clone https://github.com/lwvmobile/mbelib.git "$tmp_dir/mbelib" >/dev/null 2>&1 \
+      || { warn "Failed to clone mbelib"; exit 1; }
+
+    cd "$tmp_dir/mbelib"
+    git checkout ambe_tones >/dev/null 2>&1 || true
+    mkdir -p build && cd build
+
+    if cmake .. >/dev/null 2>&1 && make -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu)" >/dev/null 2>&1; then
+      if [[ "$OS" == "macos" ]]; then
+        if [[ -w /usr/local/lib ]]; then
+          make install >/dev/null 2>&1
+        else
+          sudo make install >/dev/null 2>&1
+        fi
+      else
+        $SUDO make install >/dev/null 2>&1
+        $SUDO ldconfig 2>/dev/null || true
+      fi
+      ok "mbelib installed"
+    else
+      warn "Failed to build mbelib. Cannot build DSD without it."
+      exit 1
+    fi
+
+    # Step 2: Build dsd-fme (or fall back to original dsd)
+    info "Building dsd-fme..."
+    git clone --depth 1 https://github.com/lwvmobile/dsd-fme.git "$tmp_dir/dsd-fme" >/dev/null 2>&1 \
+      || { warn "Failed to clone dsd-fme, trying original DSD...";
+           git clone --depth 1 https://github.com/szechyjs/dsd.git "$tmp_dir/dsd-fme" >/dev/null 2>&1 \
+             || { warn "Failed to clone DSD"; exit 1; }; }
+
+    cd "$tmp_dir/dsd-fme"
+    mkdir -p build && cd build
+
+    # On macOS, help cmake find Homebrew ncurses
+    local cmake_flags=""
+    if [[ "$OS" == "macos" ]]; then
+      local ncurses_prefix
+      ncurses_prefix="$(brew --prefix ncurses 2>/dev/null || echo /opt/homebrew/opt/ncurses)"
+      cmake_flags="-DCMAKE_PREFIX_PATH=$ncurses_prefix"
+    fi
+
+    info "Compiling DSD..."
+    if cmake .. $cmake_flags >/dev/null 2>&1 && make -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu)" >/dev/null 2>&1; then
+      if [[ "$OS" == "macos" ]]; then
+        if [[ -w /usr/local/bin ]]; then
+          install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null || install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null || true
+        else
+          sudo install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null || sudo install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null || true
+        fi
+      else
+        $SUDO make install >/dev/null 2>&1 \
+          || $SUDO install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null \
+          || $SUDO install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null \
+          || true
+        $SUDO ldconfig 2>/dev/null || true
+      fi
+      ok "DSD installed successfully"
+    else
+      warn "Failed to build DSD from source. DMR/P25 decoding will not be available."
+    fi
+  )
+}
+
+install_dump1090_from_source_macos() {
+  info "dump1090 not available via Homebrew. Building from source..."
+
+  brew_install cmake
+  brew_install librtlsdr
+  brew_install pkg-config
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning FlightAware dump1090..."
+    git clone --depth 1 https://github.com/flightaware/dump1090.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
+      || { warn "Failed to clone dump1090"; exit 1; }
+
+    cd "$tmp_dir/dump1090"
+    sed -i '' 's/-Werror//g' Makefile 2>/dev/null || true
+    info "Compiling dump1090..."
+    if make BLADERF=no RTLSDR=yes 2>&1 | tail -5; then
+      if [[ -w /usr/local/bin ]]; then
+        install -m 0755 dump1090 /usr/local/bin/dump1090
+      else
+        sudo install -m 0755 dump1090 /usr/local/bin/dump1090
+      fi
+      ok "dump1090 installed successfully from source"
+    else
+      warn "Failed to build dump1090. ADS-B decoding will not be available."
+    fi
+  )
+}
+
+install_acarsdec_from_source_macos() {
+  info "acarsdec not available via Homebrew. Building from source..."
+
+  brew_install cmake
+  brew_install librtlsdr
+  brew_install libsndfile
+  brew_install pkg-config
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning acarsdec..."
+    git clone --depth 1 https://github.com/TLeconte/acarsdec.git "$tmp_dir/acarsdec" >/dev/null 2>&1 \
+      || { warn "Failed to clone acarsdec"; exit 1; }
+
+    cd "$tmp_dir/acarsdec"
+    mkdir -p build && cd build
+
+    info "Compiling acarsdec..."
+    if cmake .. -Drtl=ON >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      if [[ -w /usr/local/bin ]]; then
+        install -m 0755 acarsdec /usr/local/bin/acarsdec
+      else
+        sudo install -m 0755 acarsdec /usr/local/bin/acarsdec
+      fi
+      ok "acarsdec installed successfully from source"
+    else
+      warn "Failed to build acarsdec. ACARS decoding will not be available."
+    fi
+  )
+}
+
+install_aiscatcher_from_source_macos() {
+  info "AIS-catcher not available via Homebrew. Building from source..."
+
+  brew_install cmake
+  brew_install librtlsdr
+  brew_install curl
+  brew_install pkg-config
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning AIS-catcher..."
+    git clone --depth 1 https://github.com/jvde-github/AIS-catcher.git "$tmp_dir/AIS-catcher" >/dev/null 2>&1 \
+      || { warn "Failed to clone AIS-catcher"; exit 1; }
+
+    cd "$tmp_dir/AIS-catcher"
+    mkdir -p build && cd build
+
+    info "Compiling AIS-catcher..."
+    if cmake .. >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      if [[ -w /usr/local/bin ]]; then
+        install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
+      else
+        sudo install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
+      fi
+      ok "AIS-catcher installed successfully from source"
+    else
+      warn "Failed to build AIS-catcher. AIS vessel tracking will not be available."
+    fi
+  )
+}
+
 install_macos_packages() {
-  TOTAL_STEPS=16
+  TOTAL_STEPS=18
   CURRENT_STEP=0
 
   progress "Checking Homebrew"
@@ -481,11 +638,20 @@ install_macos_packages() {
   progress "Installing direwolf (APRS decoder)"
   (brew_install direwolf) || warn "direwolf not available via Homebrew"
 
-  progress "Installing slowrx (SSTV decoder)"
-  if ! cmd_exists slowrx; then
-    install_slowrx_from_source_macos || warn "slowrx build failed - ISS SSTV decoding will not be available"
+  progress "SSTV decoder"
+  ok "SSTV uses built-in pure Python decoder (no external tools needed)"
+
+  progress "Installing DSD (Digital Speech Decoder, optional)"
+  if ! cmd_exists dsd && ! cmd_exists dsd-fme; then
+    echo
+    info "DSD is used for DMR, P25, NXDN, and D-STAR digital voice decoding."
+    if ask_yes_no "Do you want to install DSD?"; then
+      install_dsd_from_source || warn "DSD build failed. DMR/P25 decoding will not be available."
+    else
+      warn "Skipping DSD installation. DMR/P25 decoding will not be available."
+    fi
   else
-    ok "slowrx already installed"
+    ok "DSD already installed"
   fi
 
   progress "Installing ffmpeg"
@@ -509,14 +675,22 @@ install_macos_packages() {
   fi
 
   progress "Installing dump1090"
-  (brew_install dump1090-mutability) || warn "dump1090 not available via Homebrew"
+  if ! cmd_exists dump1090; then
+    (brew_install dump1090-mutability) || install_dump1090_from_source_macos || warn "dump1090 not available"
+  else
+    ok "dump1090 already installed"
+  fi
 
   progress "Installing acarsdec"
-  (brew_install acarsdec) || warn "acarsdec not available via Homebrew"
+  if ! cmd_exists acarsdec; then
+    (brew_install acarsdec) || install_acarsdec_from_source_macos || warn "acarsdec not available"
+  else
+    ok "acarsdec already installed"
+  fi
 
   progress "Installing AIS-catcher"
   if ! cmd_exists AIS-catcher && ! cmd_exists aiscatcher; then
-    (brew_install aiscatcher) || warn "AIS-catcher not available via Homebrew"
+    (brew_install aiscatcher) || install_aiscatcher_from_source_macos || warn "AIS-catcher not available"
   else
     ok "AIS-catcher already installed"
   fi
@@ -683,37 +857,6 @@ install_aiscatcher_from_source_debian() {
   )
 }
 
-install_slowrx_from_source_debian() {
-  info "slowrx not available via APT. Building from source..."
-
-  # slowrx uses a simple Makefile, not CMake
-  apt_install build-essential git pkg-config \
-    libfftw3-dev libsndfile1-dev libgtk-3-dev libasound2-dev libpulse-dev
-
-  # Run in subshell to isolate EXIT trap
-  (
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
-
-    info "Cloning slowrx..."
-    git clone --depth 1 https://github.com/windytan/slowrx.git "$tmp_dir/slowrx" >/dev/null 2>&1 \
-      || { warn "Failed to clone slowrx"; exit 1; }
-
-    cd "$tmp_dir/slowrx"
-
-    info "Compiling slowrx..."
-    local make_log
-    make_log=$(make 2>&1) || {
-      warn "make failed for slowrx:"
-      echo "$make_log" | tail -20
-      warn "ISS SSTV decoding will not be available."
-      exit 1
-    }
-    $SUDO install -m 0755 slowrx /usr/local/bin/slowrx
-    ok "slowrx installed successfully."
-  )
-}
-
 install_ubertooth_from_source_debian() {
   info "Building Ubertooth from source..."
 
@@ -849,7 +992,7 @@ install_debian_packages() {
     export NEEDRESTART_MODE=a
   fi
 
-  TOTAL_STEPS=21
+  TOTAL_STEPS=25
   CURRENT_STEP=0
 
   progress "Updating APT package lists"
@@ -905,8 +1048,21 @@ install_debian_packages() {
   progress "Installing direwolf (APRS decoder)"
   apt_install direwolf || true
 
-  progress "Installing slowrx (SSTV decoder)"
-  apt_install slowrx || cmd_exists slowrx || install_slowrx_from_source_debian
+  progress "SSTV decoder"
+  ok "SSTV uses built-in pure Python decoder (no external tools needed)"
+
+  progress "Installing DSD (Digital Speech Decoder, optional)"
+  if ! cmd_exists dsd && ! cmd_exists dsd-fme; then
+    echo
+    info "DSD is used for DMR, P25, NXDN, and D-STAR digital voice decoding."
+    if ask_yes_no "Do you want to install DSD?"; then
+      install_dsd_from_source || warn "DSD build failed. DMR/P25 decoding will not be available."
+    else
+      warn "Skipping DSD installation. DMR/P25 decoding will not be available."
+    fi
+  else
+    ok "DSD already installed"
+  fi
 
   progress "Installing ffmpeg"
   apt_install ffmpeg
@@ -1042,6 +1198,14 @@ final_summary_and_hard_fail() {
       exit 1
     fi
   fi
+
+  if [[ "${#missing_recommended[@]}" -gt 0 ]]; then
+    echo
+    warn "Missing RECOMMENDED tools (some features will not work):"
+    for t in "${missing_recommended[@]}"; do echo "  - $t"; done
+    echo
+    warn "Install these for full functionality"
+  fi
 }
 
 # ----------------------------
@@ -1088,6 +1252,19 @@ main() {
   fi
 
   install_python_deps
+
+  # Download leaflet-heat plugin (offline mode)
+  if [ ! -f "static/vendor/leaflet-heat/leaflet-heat.js" ]; then
+    info "Downloading leaflet-heat plugin..."
+    mkdir -p static/vendor/leaflet-heat
+    if curl -sL "https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" \
+        -o static/vendor/leaflet-heat/leaflet-heat.js; then
+      ok "leaflet-heat plugin downloaded"
+    else
+      warn "Failed to download leaflet-heat plugin. Heatmap will use CDN."
+    fi
+  fi
+
   final_summary_and_hard_fail
 }
 

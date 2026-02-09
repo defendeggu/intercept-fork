@@ -21,6 +21,7 @@ from utils.logging import wifi_logger as logger
 from utils.process import is_valid_mac, is_valid_channel
 from utils.validation import validate_wifi_channel, validate_mac_address, validate_network_interface
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from data.oui import get_manufacturer
 from utils.constants import (
     WIFI_TERMINATE_TIMEOUT,
@@ -48,6 +49,31 @@ wifi_bp = Blueprint('wifi', __name__, url_prefix='/wifi')
 # PMKID process state
 pmkid_process = None
 pmkid_lock = threading.Lock()
+
+
+def _parse_channel_list(raw_channels: Any) -> list[int] | None:
+    """Parse a channel list from string/list input."""
+    if raw_channels in (None, '', []):
+        return None
+
+    if isinstance(raw_channels, str):
+        parts = [p.strip() for p in re.split(r'[\s,]+', raw_channels) if p.strip()]
+    elif isinstance(raw_channels, (list, tuple, set)):
+        parts = list(raw_channels)
+    else:
+        parts = [raw_channels]
+
+    channels: list[int] = []
+    seen = set()
+    for part in parts:
+        if part in (None, ''):
+            continue
+        ch = validate_wifi_channel(part)
+        if ch not in seen:
+            channels.append(ch)
+            seen.add(ch)
+
+    return channels or None
 
 
 def detect_wifi_interfaces():
@@ -608,6 +634,7 @@ def start_wifi_scan():
 
         data = request.json
         channel = data.get('channel')
+        channels = data.get('channels')
         band = data.get('band', 'abg')
 
         # Use provided interface or fall back to stored monitor interface
@@ -658,7 +685,16 @@ def start_wifi_scan():
             interface
         ]
 
-        if channel:
+        channel_list = None
+        if channels:
+            try:
+                channel_list = _parse_channel_list(channels)
+            except ValueError as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 400
+
+        if channel_list:
+            cmd.extend(['-c', ','.join(str(c) for c in channel_list)])
+        elif channel:
             cmd.extend(['-c', str(channel)])
 
         logger.info(f"Running: {' '.join(cmd)}")
@@ -852,6 +888,9 @@ def check_handshake_status():
 
     file_size = os.path.getsize(capture_file)
     handshake_found = False
+    handshake_valid: bool | None = None
+    handshake_checked = False
+    handshake_reason: str | None = None
 
     try:
         if target_bssid and is_valid_mac(target_bssid):
@@ -862,20 +901,38 @@ def check_handshake_status():
                     capture_output=True, text=True, timeout=10
                 )
                 output = result.stdout + result.stderr
-                if '1 handshake' in output or ('handshake' in output.lower() and 'wpa' in output.lower()):
-                    if '0 handshake' not in output:
-                        handshake_found = True
+                output_lower = output.lower()
+                handshake_checked = True
+
+                if 'no valid wpa handshakes found' in output_lower:
+                    handshake_valid = False
+                    handshake_reason = 'No valid WPA handshake found'
+                elif '0 handshake' in output_lower:
+                    handshake_valid = False
+                elif '1 handshake' in output_lower or ('handshake' in output_lower and 'wpa' in output_lower):
+                    handshake_valid = True
+                else:
+                    handshake_valid = False
     except subprocess.TimeoutExpired:
         pass
     except Exception as e:
         logger.error(f"Error checking handshake: {e}")
+
+    if handshake_valid:
+        handshake_found = True
+        normalized_bssid = target_bssid.upper() if target_bssid else None
+        if normalized_bssid and normalized_bssid not in app_module.wifi_handshakes:
+            app_module.wifi_handshakes.append(normalized_bssid)
 
     return jsonify({
         'status': 'running' if app_module.wifi_process and app_module.wifi_process.poll() is None else 'stopped',
         'file_exists': True,
         'file_size': file_size,
         'file': capture_file,
-        'handshake_found': handshake_found
+        'handshake_found': handshake_found,
+        'handshake_valid': handshake_valid,
+        'handshake_checked': handshake_checked,
+        'handshake_reason': handshake_reason
     })
 
 
@@ -1086,6 +1143,10 @@ def stream_wifi():
             try:
                 msg = app_module.wifi_queue.get(timeout=1)
                 last_keepalive = time.time()
+                try:
+                    process_event('wifi', msg, msg.get('type'))
+                except Exception:
+                    pass
                 yield format_sse(msg)
             except queue.Empty:
                 now = time.time()

@@ -22,7 +22,7 @@ logger = logging.getLogger('intercept.tscm.correlation')
 class RiskLevel(Enum):
     """Risk classification levels."""
     INFORMATIONAL = 'informational'  # Score 0-2
-    NEEDS_REVIEW = 'review'          # Score 3-5
+    NEEDS_REVIEW = 'needs_review'    # Score 3-5
     HIGH_INTEREST = 'high_interest'  # Score 6+
 
 
@@ -122,6 +122,11 @@ class DeviceProfile:
     name: Optional[str] = None
     manufacturer: Optional[str] = None
     device_type: Optional[str] = None
+    tracker_type: Optional[str] = None
+    tracker_name: Optional[str] = None
+    tracker_confidence: Optional[str] = None
+    tracker_confidence_score: Optional[float] = None
+    tracker_evidence: list[str] = field(default_factory=list)
 
     # Bluetooth-specific
     services: list[str] = field(default_factory=list)
@@ -157,6 +162,9 @@ class DeviceProfile:
     # Output
     confidence: float = 0.0
     recommended_action: str = 'monitor'
+    known_device: bool = False
+    known_device_name: Optional[str] = None
+    score_modifier: int = 0
 
     def add_rssi_sample(self, rssi: int) -> None:
         """Add an RSSI sample with timestamp."""
@@ -208,6 +216,26 @@ class DeviceProfile:
         indicator_count = len(self.indicators)
         self.confidence = min(1.0, (indicator_count * 0.15) + (self.total_score * 0.05))
 
+    def apply_score_modifier(self, modifier: int | None) -> None:
+        """Apply a score modifier (e.g., known-good device adjustment)."""
+        base_score = sum(i.score for i in self.indicators)
+        modifier_val = int(modifier) if modifier is not None else 0
+        self.score_modifier = modifier_val
+        self.total_score = max(0, base_score + modifier_val)
+
+        if self.total_score >= 6:
+            self.risk_level = RiskLevel.HIGH_INTEREST
+            self.recommended_action = 'investigate'
+        elif self.total_score >= 3:
+            self.risk_level = RiskLevel.NEEDS_REVIEW
+            self.recommended_action = 'review'
+        else:
+            self.risk_level = RiskLevel.INFORMATIONAL
+            self.recommended_action = 'monitor'
+
+        indicator_count = len(self.indicators)
+        self.confidence = min(1.0, (indicator_count * 0.15) + (self.total_score * 0.05))
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -216,6 +244,11 @@ class DeviceProfile:
             'name': self.name,
             'manufacturer': self.manufacturer,
             'device_type': self.device_type,
+            'tracker_type': self.tracker_type,
+            'tracker_name': self.tracker_name,
+            'tracker_confidence': self.tracker_confidence,
+            'tracker_confidence_score': self.tracker_confidence_score,
+            'tracker_evidence': self.tracker_evidence,
             'ssid': self.ssid,
             'frequency': self.frequency,
             'first_seen': self.first_seen.isoformat() if self.first_seen else None,
@@ -232,10 +265,13 @@ class DeviceProfile:
                 for i in self.indicators
             ],
             'total_score': self.total_score,
+            'score_modifier': self.score_modifier,
             'risk_level': self.risk_level.value,
             'confidence': round(self.confidence, 2),
             'recommended_action': self.recommended_action,
             'correlated_devices': self.correlated_devices,
+            'known_device': self.known_device,
+            'known_device_name': self.known_device_name,
         }
 
 
@@ -248,6 +284,25 @@ AUDIO_SERVICE_UUIDS = [
     '00001108-0000-1000-8000-00805f9b34fb',  # Headset
     '00001203-0000-1000-8000-00805f9b34fb',  # Generic Audio
 ]
+
+_BT_BASE_UUID_SUFFIX = '-0000-1000-8000-00805f9b34fb'
+
+
+def _normalize_bt_uuid(value: str) -> str:
+    """Normalize BLE UUIDs to 16-bit where possible."""
+    if not value:
+        return ''
+    uuid = str(value).lower().strip()
+    if uuid.startswith('0x'):
+        uuid = uuid[2:]
+    if uuid.endswith(_BT_BASE_UUID_SUFFIX) and len(uuid) >= 8:
+        return uuid[4:8]
+    if len(uuid) == 4:
+        return uuid
+    return uuid
+
+
+AUDIO_SERVICE_UUIDS_16 = {_normalize_bt_uuid(u) for u in AUDIO_SERVICE_UUIDS}
 
 # Generic chipset vendors (often used in covert devices)
 GENERIC_CHIPSET_VENDORS = [
@@ -286,6 +341,7 @@ class CorrelationEngine:
         self.device_profiles: dict[str, DeviceProfile] = {}
         self.meeting_windows: list[tuple[datetime, datetime]] = []
         self.correlation_window = timedelta(minutes=5)
+        self._known_device_cache: dict[str, dict | None] = {}
 
     def start_meeting_window(self) -> None:
         """Mark the start of a sensitive period (meeting)."""
@@ -309,6 +365,54 @@ class CorrelationEngine:
             elif start <= ts <= end:
                 return True
         return False
+
+    def _lookup_known_device(self, identifier: str, protocol: str) -> dict | None:
+        """Lookup known-good device details with light normalization."""
+        cache_key = f"{protocol}:{identifier}"
+        if cache_key in self._known_device_cache:
+            return self._known_device_cache[cache_key]
+
+        try:
+            from utils.database import is_known_good_device
+
+            candidates = []
+            if identifier:
+                candidates.append(str(identifier))
+
+            if protocol == 'rf':
+                try:
+                    freq_val = float(identifier)
+                    candidates.append(f"{freq_val:.3f}")
+                    candidates.append(f"{freq_val:.1f}")
+                except (ValueError, TypeError):
+                    pass
+
+            known = None
+            for cand in candidates:
+                if not cand:
+                    continue
+                known = is_known_good_device(str(cand).upper())
+                if known:
+                    break
+        except Exception:
+            known = None
+
+        self._known_device_cache[cache_key] = known
+        return known
+
+    def _apply_known_device_modifier(self, profile: DeviceProfile, identifier: str, protocol: str) -> None:
+        """Apply known-good score modifier and update profile metadata."""
+        known = self._lookup_known_device(identifier, protocol)
+        if known:
+            profile.known_device = True
+            profile.known_device_name = known.get('name') if isinstance(known, dict) else None
+            modifier = known.get('score_modifier', 0) if isinstance(known, dict) else 0
+        else:
+            profile.known_device = False
+            profile.known_device_name = None
+            modifier = 0
+
+        profile.apply_score_modifier(modifier)
 
     def get_or_create_profile(self, identifier: str, protocol: str) -> DeviceProfile:
         """Get existing profile or create new one."""
@@ -341,9 +445,23 @@ class CorrelationEngine:
         profile.name = device.get('name') or profile.name
         profile.manufacturer = device.get('manufacturer') or profile.manufacturer
         profile.device_type = device.get('type') or profile.device_type
-        profile.services = device.get('services', []) or profile.services
+        services = device.get('services')
+        if not services:
+            services = device.get('service_uuids')
+        profile.services = services or profile.services
         profile.company_id = device.get('company_id') or profile.company_id
         profile.advertising_interval = device.get('advertising_interval') or profile.advertising_interval
+        tracker_data = device.get('tracker') or {}
+        if tracker_data:
+            profile.tracker_type = tracker_data.get('type') or profile.tracker_type
+            profile.tracker_name = tracker_data.get('name') or profile.tracker_name
+            profile.tracker_confidence = tracker_data.get('confidence') or profile.tracker_confidence
+            profile.tracker_confidence_score = tracker_data.get('confidence_score') or profile.tracker_confidence_score
+            evidence = tracker_data.get('evidence')
+            if isinstance(evidence, list):
+                profile.tracker_evidence = evidence
+            elif evidence:
+                profile.tracker_evidence = [str(evidence)]
 
         # Add RSSI sample
         rssi = device.get('rssi', device.get('signal'))
@@ -359,6 +477,19 @@ class CorrelationEngine:
         # === Detection Logic ===
 
         # 1. Unknown manufacturer or generic chipset
+        if not profile.manufacturer and mac and not device.get('is_randomized_mac'):
+            try:
+                first_octet = int(mac.split(':')[0], 16)
+            except (ValueError, IndexError):
+                first_octet = None
+            if first_octet is None or not (first_octet & 0x02):
+                try:
+                    from data.oui import get_manufacturer
+                    vendor = get_manufacturer(mac)
+                    if vendor and vendor != 'Unknown':
+                        profile.manufacturer = vendor
+                except Exception:
+                    pass
         if not profile.manufacturer:
             profile.add_indicator(
                 IndicatorType.UNKNOWN_DEVICE,
@@ -382,8 +513,8 @@ class CorrelationEngine:
 
         # 3. Audio-capable services
         if profile.services:
-            audio_services = [s for s in profile.services
-                           if s.lower() in [u.lower() for u in AUDIO_SERVICE_UUIDS]]
+            normalized_services = {_normalize_bt_uuid(s) for s in profile.services if s}
+            audio_services = [s for s in normalized_services if s in AUDIO_SERVICE_UUIDS_16]
             if audio_services:
                 profile.add_indicator(
                     IndicatorType.AUDIO_CAPABLE,
@@ -446,6 +577,38 @@ class CorrelationEngine:
         # 9. Known tracker detection (AirTag, Tile, SmartTag, ESP32)
         mac_prefix = mac[:8] if len(mac) >= 8 else ''
         tracker_detected = False
+        tracker_data = device.get('tracker') or {}
+
+        if tracker_data.get('is_tracker'):
+            tracker_detected = True
+            tracker_label = tracker_data.get('name') or tracker_data.get('type')
+            if tracker_label:
+                label_lower = str(tracker_label).lower()
+                if 'airtag' in label_lower or 'find my' in label_lower:
+                    profile.add_indicator(
+                        IndicatorType.AIRTAG_DETECTED,
+                        f'Tracker detected: {tracker_label}',
+                        {'mac': mac, 'tracker_type': tracker_label}
+                    )
+                    profile.device_type = 'AirTag'
+                elif 'tile' in label_lower:
+                    profile.add_indicator(
+                        IndicatorType.TILE_DETECTED,
+                        f'Tracker detected: {tracker_label}',
+                        {'mac': mac, 'tracker_type': tracker_label}
+                    )
+                    profile.device_type = 'Tile Tracker'
+                elif 'smarttag' in label_lower or 'samsung' in label_lower:
+                    profile.add_indicator(
+                        IndicatorType.SMARTTAG_DETECTED,
+                        f'Tracker detected: {tracker_label}',
+                        {'mac': mac, 'tracker_type': tracker_label}
+                    )
+                    profile.device_type = 'Samsung SmartTag'
+                else:
+                    profile.device_type = tracker_label
+            elif not profile.device_type:
+                profile.device_type = 'Tracker'
 
         # Check for tracker flags from BLE scanner (manufacturer ID detection)
         if device.get('is_airtag'):
@@ -583,6 +746,8 @@ class CorrelationEngine:
                 )
                 profile.device_type = 'Samsung SmartTag'
 
+        self._apply_known_device_modifier(profile, mac, 'bluetooth')
+
         return profile
 
     def analyze_wifi_device(self, device: dict) -> DeviceProfile:
@@ -597,15 +762,25 @@ class CorrelationEngine:
         """
         bssid = device.get('bssid', device.get('mac', '')).upper()
         profile = self.get_or_create_profile(bssid, 'wifi')
+        is_client = bool(device.get('is_client') or device.get('role') == 'client')
 
         # Update profile data
         ssid = device.get('ssid', device.get('essid', ''))
-        profile.ssid = ssid if ssid else profile.ssid
-        profile.name = ssid or f'Hidden Network ({bssid[-8:]})'
-        profile.channel = device.get('channel') or profile.channel
-        profile.encryption = device.get('encryption', device.get('privacy')) or profile.encryption
-        profile.beacon_interval = device.get('beacon_interval') or profile.beacon_interval
-        profile.is_hidden = not ssid or ssid in ['', 'Hidden', '[Hidden]']
+        if is_client:
+            profile.name = device.get('name') or device.get('vendor') or profile.name or f'Client ({bssid[-8:]})'
+            profile.device_type = 'client'
+            profile.ssid = profile.ssid  # Clients are not SSIDs
+            profile.channel = device.get('channel') or profile.channel
+            profile.encryption = profile.encryption
+            profile.beacon_interval = profile.beacon_interval
+            profile.is_hidden = False
+        else:
+            profile.ssid = ssid if ssid else profile.ssid
+            profile.name = ssid or f'Hidden Network ({bssid[-8:]})'
+            profile.channel = device.get('channel') or profile.channel
+            profile.encryption = device.get('encryption', device.get('privacy')) or profile.encryption
+            profile.beacon_interval = device.get('beacon_interval') or profile.beacon_interval
+            profile.is_hidden = not ssid or ssid in ['', 'Hidden', '[Hidden]']
 
         # Extract manufacturer from OUI
         if bssid and len(bssid) >= 8:
@@ -623,77 +798,119 @@ class CorrelationEngine:
         profile.indicators = []
 
         # === Detection Logic ===
+        if is_client:
+            if not profile.manufacturer:
+                profile.add_indicator(
+                    IndicatorType.UNKNOWN_DEVICE,
+                    'Unknown client manufacturer',
+                    {'mac': bssid}
+                )
 
-        # 1. Hidden or unnamed SSID
-        if profile.is_hidden:
-            profile.add_indicator(
-                IndicatorType.HIDDEN_IDENTITY,
-                'Hidden or empty SSID',
-                {'ssid': ssid}
-            )
+            if profile.detection_count >= 3:
+                profile.add_indicator(
+                    IndicatorType.PERSISTENT,
+                    f'Persistent client ({profile.detection_count} detections)',
+                    {'count': profile.detection_count}
+                )
 
-        # 2. BSSID not in authorized list (would need baseline)
-        # For now, mark as unknown if no manufacturer
-        if not profile.manufacturer:
-            profile.add_indicator(
-                IndicatorType.UNKNOWN_DEVICE,
-                'Unknown AP manufacturer',
-                {'bssid': bssid}
-            )
+            rssi_stability = profile.get_rssi_stability()
+            if rssi_stability > 0.7 and len(profile.rssi_samples) >= 5:
+                profile.add_indicator(
+                    IndicatorType.STABLE_RSSI,
+                    f'Stable client signal (stability: {rssi_stability:.0%})',
+                    {'stability': rssi_stability}
+                )
 
-        # 3. Consumer device OUI in restricted environment
-        consumer_ouis = ['tp-link', 'netgear', 'd-link', 'linksys', 'asus']
-        if profile.manufacturer and any(c in profile.manufacturer.lower() for c in consumer_ouis):
-            profile.add_indicator(
-                IndicatorType.ROGUE_AP,
-                f'Consumer-grade AP detected: {profile.manufacturer}',
-                {'manufacturer': profile.manufacturer}
-            )
+            if self.is_during_meeting():
+                profile.add_indicator(
+                    IndicatorType.MEETING_CORRELATED,
+                    'Detected during sensitive period',
+                    {'during_meeting': True}
+                )
 
-        # 4. Camera device patterns
-        camera_keywords = ['cam', 'camera', 'ipcam', 'dvr', 'nvr', 'wyze',
-                         'ring', 'arlo', 'nest', 'blink', 'eufy', 'yi']
-        if ssid and any(k in ssid.lower() for k in camera_keywords):
-            profile.add_indicator(
-                IndicatorType.AUDIO_CAPABLE,  # Cameras often have mics
-                f'Potential camera device: {ssid}',
-                {'ssid': ssid}
-            )
+            try:
+                first_octet = int(bssid.split(':')[0], 16)
+                if first_octet & 0x02:
+                    profile.add_indicator(
+                        IndicatorType.MAC_ROTATION,
+                        'Random/locally administered MAC detected',
+                        {'mac': bssid}
+                    )
+            except (ValueError, IndexError):
+                pass
+        else:
+            # 1. Hidden or unnamed SSID
+            if profile.is_hidden:
+                profile.add_indicator(
+                    IndicatorType.HIDDEN_IDENTITY,
+                    'Hidden or empty SSID',
+                    {'ssid': ssid}
+                )
 
-        # 5. Persistent presence
-        if profile.detection_count >= 3:
-            profile.add_indicator(
-                IndicatorType.PERSISTENT,
-                f'Persistent AP ({profile.detection_count} detections)',
-                {'count': profile.detection_count}
-            )
+            # 2. BSSID not in authorized list (would need baseline)
+            # For now, mark as unknown if no manufacturer
+            if not profile.manufacturer:
+                profile.add_indicator(
+                    IndicatorType.UNKNOWN_DEVICE,
+                    'Unknown AP manufacturer',
+                    {'bssid': bssid}
+                )
 
-        # 6. Stable RSSI (fixed placement)
-        rssi_stability = profile.get_rssi_stability()
-        if rssi_stability > 0.7 and len(profile.rssi_samples) >= 5:
-            profile.add_indicator(
-                IndicatorType.STABLE_RSSI,
-                f'Stable signal (stability: {rssi_stability:.0%})',
-                {'stability': rssi_stability}
-            )
-
-        # 7. Meeting correlation
-        if self.is_during_meeting():
-            profile.add_indicator(
-                IndicatorType.MEETING_CORRELATED,
-                'Detected during sensitive period',
-                {'during_meeting': True}
-            )
-
-        # 8. Strong hidden AP (very suspicious)
-        if profile.is_hidden and profile.rssi_samples:
-            latest_rssi = profile.rssi_samples[-1][1]
-            if latest_rssi > -50:
+            # 3. Consumer device OUI in restricted environment
+            consumer_ouis = ['tp-link', 'netgear', 'd-link', 'linksys', 'asus']
+            if profile.manufacturer and any(c in profile.manufacturer.lower() for c in consumer_ouis):
                 profile.add_indicator(
                     IndicatorType.ROGUE_AP,
-                    f'Strong hidden AP (RSSI: {latest_rssi} dBm)',
-                    {'rssi': latest_rssi}
+                    f'Consumer-grade AP detected: {profile.manufacturer}',
+                    {'manufacturer': profile.manufacturer}
                 )
+
+            # 4. Camera device patterns
+            camera_keywords = ['cam', 'camera', 'ipcam', 'dvr', 'nvr', 'wyze',
+                             'ring', 'arlo', 'nest', 'blink', 'eufy', 'yi']
+            if ssid and any(k in ssid.lower() for k in camera_keywords):
+                profile.add_indicator(
+                    IndicatorType.AUDIO_CAPABLE,  # Cameras often have mics
+                    f'Potential camera device: {ssid}',
+                    {'ssid': ssid}
+                )
+
+            # 5. Persistent presence
+            if profile.detection_count >= 3:
+                profile.add_indicator(
+                    IndicatorType.PERSISTENT,
+                    f'Persistent AP ({profile.detection_count} detections)',
+                    {'count': profile.detection_count}
+                )
+
+            # 6. Stable RSSI (fixed placement)
+            rssi_stability = profile.get_rssi_stability()
+            if rssi_stability > 0.7 and len(profile.rssi_samples) >= 5:
+                profile.add_indicator(
+                    IndicatorType.STABLE_RSSI,
+                    f'Stable signal (stability: {rssi_stability:.0%})',
+                    {'stability': rssi_stability}
+                )
+
+            # 7. Meeting correlation
+            if self.is_during_meeting():
+                profile.add_indicator(
+                    IndicatorType.MEETING_CORRELATED,
+                    'Detected during sensitive period',
+                    {'during_meeting': True}
+                )
+
+            # 8. Strong hidden AP (very suspicious)
+            if profile.is_hidden and profile.rssi_samples:
+                latest_rssi = profile.rssi_samples[-1][1]
+                if latest_rssi > -50:
+                    profile.add_indicator(
+                        IndicatorType.ROGUE_AP,
+                        f'Strong hidden AP (RSSI: {latest_rssi} dBm)',
+                        {'rssi': latest_rssi}
+                    )
+
+        self._apply_known_device_modifier(profile, bssid, 'wifi')
 
         return profile
 
@@ -784,6 +1001,8 @@ class CorrelationEngine:
                 'Signal detected during sensitive period',
                 {'during_meeting': True}
             )
+
+        self._apply_known_device_modifier(profile, freq_key, 'rf')
 
         return profile
 
@@ -886,6 +1105,10 @@ class CorrelationEngine:
                             'significance': 'medium',
                         }
                         correlations.append(correlation)
+
+        # Re-apply known-good modifiers after correlation boosts
+        for profile in self.device_profiles.values():
+            self._apply_known_device_modifier(profile, profile.identifier, profile.protocol)
 
         return correlations
 

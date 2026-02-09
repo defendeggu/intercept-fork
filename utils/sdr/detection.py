@@ -348,6 +348,68 @@ def detect_hackrf_devices() -> list[SDRDevice]:
     return devices
 
 
+def probe_rtlsdr_device(device_index: int) -> str | None:
+    """Probe whether an RTL-SDR device is available at the USB level.
+
+    Runs a quick ``rtl_test`` invocation targeting a single device to
+    check for USB claim errors that indicate the device is held by an
+    external process (or a stale handle from a previous crash).
+
+    Args:
+        device_index: The RTL-SDR device index to probe.
+
+    Returns:
+        An error message string if the device cannot be opened,
+        or ``None`` if the device is available.
+    """
+    if not _check_tool('rtl_test'):
+        # Can't probe without rtl_test — let the caller proceed and
+        # surface errors from the actual decoder process instead.
+        return None
+
+    try:
+        import os
+        import platform
+        env = os.environ.copy()
+
+        if platform.system() == 'Darwin':
+            lib_paths = ['/usr/local/lib', '/opt/homebrew/lib']
+            current_ld = env.get('DYLD_LIBRARY_PATH', '')
+            env['DYLD_LIBRARY_PATH'] = ':'.join(
+                lib_paths + [current_ld] if current_ld else lib_paths
+            )
+
+        result = subprocess.run(
+            ['rtl_test', '-d', str(device_index), '-t'],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            env=env,
+        )
+        output = result.stderr + result.stdout
+
+        if 'usb_claim_interface' in output or 'Failed to open' in output:
+            logger.warning(
+                f"RTL-SDR device {device_index} USB probe failed: "
+                f"device busy or unavailable"
+            )
+            return (
+                f'SDR device {device_index} is busy at the USB level — '
+                f'another process outside INTERCEPT may be using it. '
+                f'Check for stale rtl_fm/rtl_433/dump1090 processes, '
+                f'or try a different device.'
+            )
+
+    except subprocess.TimeoutExpired:
+        # rtl_test opened the device successfully and is running the
+        # test — that means the device *is* available.
+        pass
+    except Exception as e:
+        logger.debug(f"RTL-SDR probe error for device {device_index}: {e}")
+
+    return None
+
+
 def detect_all_devices() -> list[SDRDevice]:
     """
     Detect all connected SDR devices across all supported hardware types.

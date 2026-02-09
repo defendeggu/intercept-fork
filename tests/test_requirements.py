@@ -1,7 +1,8 @@
 import pytest
 from pathlib import Path
 import importlib.metadata
-import tomllib  # Standard in Python 3.11+
+import tomllib
+import re
 
 def get_root_path():
     return Path(__file__).parent.parent
@@ -18,20 +19,22 @@ def parse_txt_requirements(file_path):
     with open(file_path, "r") as f:
         for line in f:
             line = line.strip()
-            # Ignore empty lines, comments, and recursive/local flags
             if not line or line.startswith(("#", "-e", "git+", "-r")):
                 continue
             packages.add(_clean_string(line))
     return packages
 
 def parse_toml_section(data, section_type="main"):
-    """Extracts full requirement strings from pyproject.toml."""
+    """Extracts full requirement strings from pyproject.toml including optional sections."""
     packages = set()
+    project = data.get("project", {})
+    
     if section_type == "main":
-        deps = data.get("project", {}).get("dependencies", [])
-    else:
-        # Check optional-dependencies or dependency-groups
-        deps = data.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+        deps = project.get("dependencies", [])
+    elif section_type == "optional":
+        deps = project.get("optional-dependencies", {}).get("optionals", [])
+    elif section_type == "dev":
+        deps = project.get("optional-dependencies", {}).get("dev", [])
         if not deps:
             deps = data.get("dependency-groups", {}).get("dev", [])
             
@@ -48,9 +51,10 @@ def test_dependency_files_integrity():
     with open(toml_path, "rb") as f:
         toml_data = tomllib.load(f)
 
-    # Validate Production Sync
+    # Validate Production Sync (Main + Optionals)
     txt_main = parse_txt_requirements(root / "requirements.txt")
-    toml_main = parse_toml_section(toml_data, "main")
+    toml_main = parse_toml_section(toml_data, "main") | parse_toml_section(toml_data, "optional")
+    
     assert txt_main == toml_main, (
         f"Production version mismatch!\n"
         f"Only in TXT: {txt_main - toml_main}\n"
@@ -72,7 +76,11 @@ def test_environment_vs_toml():
     with open(root / "pyproject.toml", "rb") as f:
         data = tomllib.load(f)
     
-    all_declared = parse_toml_section(data, "main") | parse_toml_section(data, "dev")
+    all_declared = (
+        parse_toml_section(data, "main") | 
+        parse_toml_section(data, "optional") | 
+        parse_toml_section(data, "dev")
+    )
     _verify_installation(all_declared, "TOML")
 
 def test_environment_vs_requirements():
@@ -89,21 +97,21 @@ def _verify_installation(package_set, source_name):
     missing_or_wrong = []
     
     for req in package_set:
-        # Split name from version to check installation status
-        # handles ==, >=, ~=, <=, > , <
-        import re
+        # Split name from version
         parts = re.split(r'==|>=|~=|<=|>|<', req)
-        name = parts[0].strip()
+        raw_name = parts[0].strip()
+        
+        # CLEAN EXTRAS: "qrcode[pil]" -> "qrcode"
+        clean_name = re.sub(r'\[.*\]', '', raw_name)
         
         try:
-            installed_ver = importlib.metadata.version(name)
-            # If the config uses exact versioning '==', we can do a strict check
+            installed_ver = importlib.metadata.version(clean_name)
             if "==" in req:
                 expected_ver = req.split("==")[1].strip()
                 if installed_ver != expected_ver:
-                    missing_or_wrong.append(f"{name} (Installed: {installed_ver}, Expected: {expected_ver})")
+                    missing_or_wrong.append(f"{clean_name} (Installed: {installed_ver}, Expected: {expected_ver})")
         except importlib.metadata.PackageNotFoundError:
-            missing_or_wrong.append(f"{name} (Not installed)")
+            missing_or_wrong.append(f"{clean_name} (Not installed)")
 
     if missing_or_wrong:
         pytest.fail(f"Environment out of sync with {source_name}:\n" + "\n".join(missing_or_wrong))

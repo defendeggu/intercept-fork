@@ -94,7 +94,8 @@ services:
       - POSTGRES_USER=intercept
       - POSTGRES_PASSWORD=intercept
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      # Default local path (override with PGDATA_PATH for external storage)
+      - ${PGDATA_PATH:-./pgdata}:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U intercept -d intercept_adsb"]

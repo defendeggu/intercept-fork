@@ -752,6 +752,11 @@ async function checkForUpdatesManual() {
     const content = document.getElementById('updateStatusContent');
     if (!content) return;
 
+    if (typeof Updater === 'undefined') {
+        content.innerHTML = `<div style="color: var(--text-dim); padding: 10px;">Update checking is unavailable. If you use a content blocker, try allowing <code>updater.js</code> to load.</div>`;
+        return;
+    }
+
     content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-dim);">Checking for updates...</div>';
 
     try {
@@ -768,6 +773,11 @@ async function checkForUpdatesManual() {
 async function loadUpdateStatus() {
     const content = document.getElementById('updateStatusContent');
     if (!content) return;
+
+    if (typeof Updater === 'undefined') {
+        content.innerHTML = `<div style="color: var(--text-dim); padding: 10px;">Update checking is unavailable. If you use a content blocker, try allowing <code>updater.js</code> to load.</div>`;
+        return;
+    }
 
     try {
         const data = await Updater.getStatus();
@@ -912,5 +922,64 @@ function switchSettingsTab(tabName) {
         loadUpdateStatus();
     } else if (tabName === 'location') {
         loadObserverLocation();
+    } else if (tabName === 'alerts') {
+        if (typeof AlertCenter !== 'undefined') {
+            AlertCenter.loadFeed();
+        }
+    } else if (tabName === 'recording') {
+        if (typeof RecordingUI !== 'undefined') {
+            RecordingUI.refresh();
+        }
+    } else if (tabName === 'apikeys') {
+        loadApiKeyStatus();
     }
+}
+
+/**
+ * Load API key status into the API Keys settings tab
+ */
+function loadApiKeyStatus() {
+    const badge = document.getElementById('apiKeyStatusBadge');
+    const desc = document.getElementById('apiKeyStatusDesc');
+    const usage = document.getElementById('apiKeyUsageCount');
+    const bar = document.getElementById('apiKeyUsageBar');
+
+    if (!badge) return;
+
+    badge.textContent = 'Not available';
+        badge.className = 'asset-badge missing';
+        desc.textContent = 'GSM feature removed';
+}
+
+/**
+ * Save API key from the settings input
+ */
+function saveApiKey() {
+    const input = document.getElementById('apiKeyInput');
+    const result = document.getElementById('apiKeySaveResult');
+    if (!input || !result) return;
+
+    const key = input.value.trim();
+    if (!key) {
+        result.style.display = 'block';
+        result.style.color = 'var(--accent-red)';
+        result.textContent = 'Please enter an API key.';
+        return;
+    }
+
+    result.style.display = 'block';
+    result.style.color = 'var(--text-dim)';
+    result.textContent = 'Saving...';
+
+    result.style.color = 'var(--accent-red)';
+    result.textContent = 'GSM feature has been removed.';
+}
+
+/**
+ * Toggle API key input visibility
+ */
+function toggleApiKeyVisibility() {
+    const input = document.getElementById('apiKeyInput');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
 }

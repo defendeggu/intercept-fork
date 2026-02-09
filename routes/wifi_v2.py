@@ -24,6 +24,8 @@ from utils.wifi import (
     SCAN_MODE_DEEP,
 )
 from utils.sse import format_sse
+from utils.validation import validate_wifi_channel
+from utils.event_pipeline import process_event
 
 logger = logging.getLogger(__name__)
 
@@ -89,15 +91,30 @@ def start_deep_scan():
         interface: Monitor mode interface (e.g., 'wlan0mon')
         band: Band to scan ('2.4', '5', 'all')
         channel: Optional specific channel to monitor
+        channels: Optional list or comma-separated channels to monitor
     """
     data = request.get_json() or {}
     interface = data.get('interface')
     band = data.get('band', 'all')
     channel = data.get('channel')
+    channels = data.get('channels')
+
+    channel_list = None
+    if channels:
+        if isinstance(channels, str):
+            channel_list = [c.strip() for c in channels.split(',') if c.strip()]
+        elif isinstance(channels, (list, tuple, set)):
+            channel_list = list(channels)
+        else:
+            channel_list = [channels]
+        try:
+            channel_list = [validate_wifi_channel(c) for c in channel_list]
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid channels'}), 400
 
     if channel:
         try:
-            channel = int(channel)
+            channel = validate_wifi_channel(channel)
         except ValueError:
             return jsonify({'error': 'Invalid channel'}), 400
 
@@ -106,6 +123,7 @@ def start_deep_scan():
         interface=interface,
         band=band,
         channel=channel,
+        channels=channel_list,
     )
 
     if success:
@@ -391,6 +409,10 @@ def event_stream():
         scanner = get_wifi_scanner()
 
         for event in scanner.get_event_stream():
+            try:
+                process_event('wifi', event, event.get('type'))
+            except Exception:
+                pass
             yield format_sse(event)
 
     response = Response(generate(), mimetype='text/event-stream')

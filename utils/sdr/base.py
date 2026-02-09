@@ -186,6 +186,41 @@ class CommandBuilder(ABC):
         """Return hardware capabilities for this SDR type."""
         pass
 
+    def build_iq_capture_command(
+        self,
+        device: SDRDevice,
+        frequency_mhz: float,
+        sample_rate: int = 2048000,
+        gain: Optional[float] = None,
+        ppm: Optional[int] = None,
+        bias_t: bool = False,
+        output_format: str = 'cu8',
+    ) -> list[str]:
+        """
+        Build raw I/Q capture command for streaming samples to stdout.
+
+        Used for real-time waterfall/spectrum display. Output is unsigned
+        8-bit I/Q pairs (cu8) written continuously to stdout.
+
+        Args:
+            device: The SDR device to use
+            frequency_mhz: Center frequency in MHz
+            sample_rate: Sample rate in Hz (default 2048000)
+            gain: Gain in dB (None for auto)
+            ppm: PPM frequency correction
+            bias_t: Enable bias-T power (for active antennas)
+            output_format: Output sample format (default 'cu8')
+
+        Returns:
+            Command as list of strings for subprocess
+
+        Raises:
+            NotImplementedError: If the SDR type does not support I/Q capture.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support raw I/Q capture"
+        )
+
     @classmethod
     @abstractmethod
     def get_sdr_type(cls) -> SDRType:

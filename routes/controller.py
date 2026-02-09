@@ -17,6 +17,8 @@ import time
 from datetime import datetime, timezone
 from typing import Generator
 
+import requests
+
 from flask import Blueprint, jsonify, request, Response
 
 from utils.database import (
@@ -478,6 +480,47 @@ def proxy_mode_data(agent_id: int, mode: str):
             'status': 'error',
             'message': f'Agent error: {e}'
         }), 502
+
+
+@controller_bp.route('/agents/<int:agent_id>/<mode>/stream')
+def proxy_mode_stream(agent_id: int, mode: str):
+    """Proxy SSE stream from a remote agent."""
+    agent = get_agent(agent_id)
+    if not agent:
+        return jsonify({'status': 'error', 'message': 'Agent not found'}), 404
+
+    client = create_client_from_agent(agent)
+    query = request.query_string.decode('utf-8')
+    url = f"{client.base_url}/{mode}/stream"
+    if query:
+        url = f"{url}?{query}"
+
+    headers = {'Accept': 'text/event-stream'}
+    if agent.get('api_key'):
+        headers['X-API-Key'] = agent['api_key']
+
+    def generate() -> Generator[str, None, None]:
+        try:
+            with requests.get(url, headers=headers, stream=True, timeout=(5, 3600)) as resp:
+                resp.raise_for_status()
+                for chunk in resp.iter_content(chunk_size=1024):
+                    if not chunk:
+                        continue
+                    yield chunk.decode('utf-8', errors='ignore')
+        except Exception as e:
+            logger.error(f"SSE proxy error for agent {agent_id}/{mode}: {e}")
+            yield format_sse({
+                'type': 'error',
+                'message': str(e),
+                'agent_id': agent_id,
+                'mode': mode,
+            })
+
+    response = Response(generate(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Connection'] = 'keep-alive'
+    return response
 
 
 @controller_bp.route('/agents/<int:agent_id>/wifi/monitor', methods=['POST'])

@@ -2,6 +2,77 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.15.0] - 2026-02-09
+
+### Added
+- **Real-time WebSocket Waterfall** - I/Q capture with server-side FFT
+  - Click-to-tune, zoom controls, and auto-scaling quantization
+  - Shared waterfall UI across SDR modes with function bar controls
+  - WebSocket frame serialization and connection reuse
+- **Cross-Module Frequency Routing** - Tune from Listening Post directly to decoders
+- **Pure Python SSTV Decoder** - Replaces broken slowrx C dependency
+  - Real-time decode progress with partial image streaming
+  - VIS detector state in signal monitor diagnostics
+  - Image gallery with delete and download functionality
+- **Real-time Signal Scope** - Live signal visualization for pager, sensor, and SSTV modes
+- **SSTV Image Gallery** - Delete and download decoded images
+- **USB Device Probe** - Detect broken SDR devices before rtl_fm crashes
+
+### Fixed
+- DMR dsd-fme protocol flags, device label, and tuning controls
+- DMR frontend/backend state desync causing 409 on start
+- Digital voice decoder producing no output due to wrong dsd-fme flags
+- SDR device lock-up from unreleased device registry on process crash
+- APRS crash on large station count and station list overflow
+- Settings modal overflowing viewport on smaller screens
+- Waterfall crash on zoom by reusing WebSocket and adding USB release retry
+- PD120 SSTV decode hang and false leader tone detection
+- WebSocket waterfall blocked by login redirect
+- TSCM sweep KeyError on RiskLevel.NEEDS_REVIEW
+
+### Removed
+- GSM Spy functionality removed for legal compliance
+
+---
+
+## [2.14.0] - 2026-02-06
+
+### Added
+- **DMR Digital Voice Decoder** - Decode DMR, P25, NXDN, and D-STAR protocols
+  - Integration with dsd-fme (Digital Speech Decoder - Florida Man Edition)
+  - Real-time SSE streaming of sync, call, voice, and slot events
+  - Call history table with talkgroup, source ID, and protocol tracking
+  - Protocol auto-detection or manual selection
+  - Pipeline error diagnostics with rtl_fm stderr capture
+- **DMR Visual Synthesizer** - Canvas-based signal activity visualization
+  - Spring-physics animated bars reacting to SSE decoder events
+  - Color-coded by event type: cyan (sync), green (call), orange (voice)
+  - Center-outward ripple bursts on sync events
+  - Smooth decay and idle breathing animation
+  - Responsive canvas with window resize handling
+- **HF SSTV General Mode** - Terrestrial slow-scan TV on shortwave frequencies
+  - Predefined HF SSTV frequencies (14.230, 21.340, 28.680 MHz, etc.)
+  - Modulation support for USB/LSB reception
+- **WebSDR Integration** - Remote HF/shortwave listening via WebSDR servers
+- **Listening Post Enhancements** - Improved signal scanner and audio handling
+
+### Fixed
+- APRS rtl_fm startup failure and SDR device conflicts
+- DSD voice decoder detection for dsd-fme and PulseAudio errors
+- dsd-fme protocol flags and ncurses disable for headless operation
+- dsd-fme audio output flag for pipeline compatibility
+- TSCM sweep scan resilience with per-device error isolation
+- TSCM WiFi detection using scanner singleton for device availability
+- TSCM correlation and cluster emission fixes
+- Detected Threats panel items now clickable to show device details
+- Proximity radar tooltip flicker on hover
+- Radar blip flicker by deferring renders during hover
+- ISS position API priority swap to avoid timeout delays
+- Updater settings panel error when updater.js is blocked
+- Missing scapy in optionals dependency group
+
+---
+
 ## [2.13.1] - 2026-02-04
 
 ### Added

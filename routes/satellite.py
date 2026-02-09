@@ -42,30 +42,30 @@ def _fetch_iss_realtime(observer_lat: Optional[float] = None, observer_lon: Opti
     iss_alt = 420  # Default altitude in km
     source = None
 
-    # Try primary API: Open Notify
+    # Try primary API: Where The ISS At
     try:
-        response = requests.get('http://api.open-notify.org/iss-now.json', timeout=5)
+        response = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=5)
         if response.status_code == 200:
             data = response.json()
-            if data.get('message') == 'success':
-                iss_lat = float(data['iss_position']['latitude'])
-                iss_lon = float(data['iss_position']['longitude'])
-                source = 'open-notify'
+            iss_lat = float(data['latitude'])
+            iss_lon = float(data['longitude'])
+            iss_alt = float(data.get('altitude', 420))
+            source = 'wheretheiss'
     except Exception as e:
-        logger.debug(f"Open Notify API failed: {e}")
+        logger.debug(f"Where The ISS At API failed: {e}")
 
-    # Try fallback API: Where The ISS At
+    # Try fallback API: Open Notify
     if iss_lat is None:
         try:
-            response = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=5)
+            response = requests.get('http://api.open-notify.org/iss-now.json', timeout=5)
             if response.status_code == 200:
                 data = response.json()
-                iss_lat = float(data['latitude'])
-                iss_lon = float(data['longitude'])
-                iss_alt = float(data.get('altitude', 420))
-                source = 'wheretheiss'
+                if data.get('message') == 'success':
+                    iss_lat = float(data['iss_position']['latitude'])
+                    iss_lon = float(data['iss_position']['longitude'])
+                    source = 'open-notify'
         except Exception as e:
-            logger.debug(f"Where The ISS At API failed: {e}")
+            logger.debug(f"Open Notify API failed: {e}")
 
     if iss_lat is None:
         return None
