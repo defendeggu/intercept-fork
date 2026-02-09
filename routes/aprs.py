@@ -90,7 +90,7 @@ def find_rx_fm() -> Optional[str]:
 
 
 # SDR types that require rx_fm instead of rtl_fm
-SOAPY_SDR_TYPES = {SDRType.HACKRF, SDRType.AIRSPY, SDRType.LIMESDR, SDRType.SDRPLAY}
+SOAPY_SDR_TYPES = {SDRType.HACKRF, SDRType.AIRSPY, SDRType.LIME_SDR, SDRType.SDRPLAY}
 
 
 # Path to direwolf config file
