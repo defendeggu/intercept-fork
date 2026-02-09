@@ -10,6 +10,7 @@ let dmrCallCount = 0;
 let dmrSyncCount = 0;
 let dmrCallHistory = [];
 let dmrCurrentProtocol = '--';
+let dmrModeLabel = 'dmr';  // Protocol label for device reservation
 
 // ============== SYNTHESIZER STATE ==============
 let dmrSynthCanvas = null;
@@ -57,17 +58,22 @@ function startDmr() {
     const frequency = parseFloat(document.getElementById('dmrFrequency')?.value || 462.5625);
     const protocol = document.getElementById('dmrProtocol')?.value || 'auto';
     const gain = parseInt(document.getElementById('dmrGain')?.value || 40);
+    const ppm = parseInt(document.getElementById('dmrPPM')?.value || 0);
+    const relaxCrc = document.getElementById('dmrRelaxCrc')?.checked || false;
     const device = typeof getSelectedDevice === 'function' ? getSelectedDevice() : 0;
 
+    // Use protocol name for device reservation so panel shows "D-STAR", "P25", etc.
+    dmrModeLabel = protocol !== 'auto' ? protocol : 'dmr';
+
     // Check device availability before starting
-    if (typeof checkDeviceAvailability === 'function' && !checkDeviceAvailability('dmr')) {
+    if (typeof checkDeviceAvailability === 'function' && !checkDeviceAvailability(dmrModeLabel)) {
         return;
     }
 
     fetch('/dmr/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frequency, protocol, gain, device })
+        body: JSON.stringify({ frequency, protocol, gain, device, ppm, relaxCrc })
     })
     .then(r => r.json())
     .then(data => {
@@ -86,10 +92,10 @@ function startDmr() {
             const statusEl = document.getElementById('dmrStatus');
             if (statusEl) statusEl.textContent = 'DECODING';
             if (typeof reserveDevice === 'function') {
-                reserveDevice(parseInt(device), 'dmr');
+                reserveDevice(parseInt(device), dmrModeLabel);
             }
             if (typeof showNotification === 'function') {
-                showNotification('DMR', `Decoding ${frequency} MHz (${protocol.toUpperCase()})`);
+                showNotification('Digital Voice', `Decoding ${frequency} MHz (${protocol.toUpperCase()})`);
             }
         } else if (data.status === 'error' && data.message === 'Already running') {
             // Backend has an active session the frontend lost track of — resync
@@ -128,7 +134,7 @@ function stopDmr() {
         const statusEl = document.getElementById('dmrStatus');
         if (statusEl) statusEl.textContent = 'STOPPED';
         if (typeof releaseDevice === 'function') {
-            releaseDevice('dmr');
+            releaseDevice(dmrModeLabel);
         }
     })
     .catch(err => console.error('[DMR] Stop error:', err));
@@ -230,7 +236,7 @@ function handleDmrMessage(msg) {
             dmrActivityTarget = 0;
             updateDmrSynthStatus();
             if (statusEl) statusEl.textContent = 'CRASHED';
-            if (typeof releaseDevice === 'function') releaseDevice('dmr');
+            if (typeof releaseDevice === 'function') releaseDevice(dmrModeLabel);
             const detail = msg.detail || `Decoder exited (code ${msg.exit_code})`;
             if (typeof showNotification === 'function') {
                 showNotification('DMR Error', detail);
@@ -242,7 +248,7 @@ function handleDmrMessage(msg) {
             dmrActivityTarget = 0;
             updateDmrSynthStatus();
             if (statusEl) statusEl.textContent = 'STOPPED';
-            if (typeof releaseDevice === 'function') releaseDevice('dmr');
+            if (typeof releaseDevice === 'function') releaseDevice(dmrModeLabel);
         }
     }
 }
@@ -321,10 +327,12 @@ function drawDmrSynthesizer() {
     dmrSynthCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     dmrSynthCtx.fillRect(0, 0, width, height);
 
-    // Decay activity toward target
+    // Decay activity toward target.  Window must exceed the backend
+    // heartbeat interval (3s) so the status doesn't flip-flop between
+    // LISTENING and IDLE on every heartbeat cycle.
     const timeSinceEvent = now - dmrLastEventTime;
-    if (timeSinceEvent > 2000) {
-        // No events for 2s — decay target toward idle
+    if (timeSinceEvent > 5000) {
+        // No events for 5s — decay target toward idle
         dmrActivityTarget = Math.max(0, dmrActivityTarget - DMR_DECAY_RATE);
         if (dmrActivityTarget < 0.1 && dmrEventType !== 'stopped') {
             dmrEventType = 'idle';

@@ -2,7 +2,7 @@
 
 from unittest.mock import patch, MagicMock
 import pytest
-from routes.dmr import parse_dsd_output, _DSD_PROTOCOL_FLAGS, _DSD_FME_PROTOCOL_FLAGS
+from routes.dmr import parse_dsd_output, _DSD_PROTOCOL_FLAGS, _DSD_FME_PROTOCOL_FLAGS, _DSD_FME_MODULATION
 
 
 # ============================================
@@ -98,19 +98,39 @@ def test_parse_unrecognized():
     assert result['text'] == 'some random text'
 
 
-def test_dsd_fme_protocol_flags_match_classic():
-    """dsd-fme flags must match classic DSD flags (same fork, same CLI)."""
-    assert _DSD_FME_PROTOCOL_FLAGS == _DSD_PROTOCOL_FLAGS
+def test_dsd_fme_flags_differ_from_classic():
+    """dsd-fme remapped several flags; tables must NOT be identical."""
+    assert _DSD_FME_PROTOCOL_FLAGS != _DSD_PROTOCOL_FLAGS
+
+
+def test_dsd_fme_protocol_flags_known_values():
+    """dsd-fme flags use its own flag names (NOT classic DSD mappings)."""
+    assert _DSD_FME_PROTOCOL_FLAGS['auto'] == ['-ft']       # XDMA
+    assert _DSD_FME_PROTOCOL_FLAGS['dmr'] == ['-fd']
+    assert _DSD_FME_PROTOCOL_FLAGS['p25'] == ['-f1']        # NOT -fp (ProVoice in fme)
+    assert _DSD_FME_PROTOCOL_FLAGS['nxdn'] == ['-fn']
+    assert _DSD_FME_PROTOCOL_FLAGS['dstar'] == []            # No dedicated flag
+    assert _DSD_FME_PROTOCOL_FLAGS['provoice'] == ['-fp']   # NOT -fv
 
 
 def test_dsd_protocol_flags_known_values():
-    """Protocol flags should map to the correct DSD -f flags."""
+    """Classic DSD protocol flags should map to the correct -f flags."""
     assert _DSD_PROTOCOL_FLAGS['dmr'] == ['-fd']
     assert _DSD_PROTOCOL_FLAGS['p25'] == ['-fp']
     assert _DSD_PROTOCOL_FLAGS['nxdn'] == ['-fn']
     assert _DSD_PROTOCOL_FLAGS['dstar'] == ['-fi']
     assert _DSD_PROTOCOL_FLAGS['provoice'] == ['-fv']
     assert _DSD_PROTOCOL_FLAGS['auto'] == []
+
+
+def test_dsd_fme_modulation_hints():
+    """C4FM modulation hints should be set for C4FM protocols."""
+    assert _DSD_FME_MODULATION['dmr'] == ['-mc']
+    assert _DSD_FME_MODULATION['p25'] == ['-mc']
+    assert _DSD_FME_MODULATION['nxdn'] == ['-mc']
+    # D-Star and ProVoice should not have forced modulation
+    assert 'dstar' not in _DSD_FME_MODULATION
+    assert 'provoice' not in _DSD_FME_MODULATION
 
 
 # ============================================

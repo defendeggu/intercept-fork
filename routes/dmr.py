@@ -20,7 +20,7 @@ from utils.logging import get_logger
 from utils.sse import format_sse
 from utils.event_pipeline import process_event
 from utils.process import register_process, unregister_process
-from utils.validation import validate_frequency, validate_gain, validate_device_index
+from utils.validation import validate_frequency, validate_gain, validate_device_index, validate_ppm
 from utils.constants import (
     SSE_QUEUE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
@@ -55,14 +55,24 @@ _DSD_PROTOCOL_FLAGS = {
     'provoice': ['-fv'],
 }
 
-# dsd-fme uses different flag names
+# dsd-fme remapped several flags from classic DSD:
+#   -fp = ProVoice (NOT P25), -fi = NXDN48 (NOT D-Star),
+#   -f1 = P25 Phase 1, -ft = XDMA multi-protocol decoder
 _DSD_FME_PROTOCOL_FLAGS = {
-    'auto': [],
-    'dmr': ['-fd'],
-    'p25': ['-fp'],
-    'nxdn': ['-fn'],
-    'dstar': ['-fi'],
-    'provoice': ['-fv'],
+    'auto': ['-ft'],       # XDMA: auto-detect DMR/P25/YSF
+    'dmr': ['-fd'],        # DMR (classic flag, works in dsd-fme)
+    'p25': ['-f1'],        # P25 Phase 1 (-fp is ProVoice in dsd-fme!)
+    'nxdn': ['-fn'],       # NXDN96
+    'dstar': [],           # No dedicated flag in dsd-fme; auto-detect
+    'provoice': ['-fp'],   # ProVoice (-fp in dsd-fme, not -fv)
+}
+
+# Modulation hints: force C4FM for protocols that use it, improving
+# sync reliability vs letting dsd-fme auto-detect modulation type.
+_DSD_FME_MODULATION = {
+    'dmr': ['-mc'],        # C4FM
+    'p25': ['-mc'],        # C4FM (Phase 1; Phase 2 would use -mq)
+    'nxdn': ['-mc'],       # C4FM
 }
 
 # ============================================
@@ -326,6 +336,7 @@ def start_dmr() -> Response:
         gain = int(validate_gain(data.get('gain', 40)))
         device = validate_device_index(data.get('device', 0))
         protocol = str(data.get('protocol', 'auto')).lower()
+        ppm = validate_ppm(data.get('ppm', 0))
     except (ValueError, TypeError) as e:
         return jsonify({'status': 'error', 'message': f'Invalid parameter: {e}'}), 400
 
@@ -339,8 +350,10 @@ def start_dmr() -> Response:
     except queue.Empty:
         pass
 
-    # Claim SDR device
-    error = app_module.claim_sdr_device(device, 'dmr')
+    # Claim SDR device — use protocol name so the device panel shows
+    # "D-STAR", "P25", etc. instead of always "DMR"
+    mode_label = protocol.upper() if protocol != 'auto' else 'DMR'
+    error = app_module.claim_sdr_device(device, mode_label)
     if error:
         return jsonify({'status': 'error', 'error_type': 'DEVICE_BUSY', 'message': error}), 409
 
@@ -348,7 +361,10 @@ def start_dmr() -> Response:
 
     freq_hz = int(frequency * 1e6)
 
-    # Build rtl_fm command (48kHz sample rate for DSD)
+    # Build rtl_fm command (48kHz sample rate for DSD).
+    # Squelch disabled (-l 0): rtl_fm's squelch chops the bitstream
+    # mid-frame, destroying DSD sync.  The decoder handles silence
+    # internally via its own frame-sync detection.
     rtl_cmd = [
         rtl_fm_path,
         '-M', 'fm',
@@ -356,8 +372,10 @@ def start_dmr() -> Response:
         '-s', '48000',
         '-g', str(gain),
         '-d', str(device),
-        '-l', '1',  # squelch level
+        '-l', '0',
     ]
+    if ppm != 0:
+        rtl_cmd.extend(['-p', str(ppm)])
 
     # Build DSD command
     # Use -o - to send decoded audio to stdout (piped to DEVNULL)
@@ -365,6 +383,11 @@ def start_dmr() -> Response:
     dsd_cmd = [dsd_path, '-i', '-', '-o', '-']
     if is_fme:
         dsd_cmd.extend(_DSD_FME_PROTOCOL_FLAGS.get(protocol, []))
+        dsd_cmd.extend(_DSD_FME_MODULATION.get(protocol, []))
+        # Relax CRC checks for marginal signals — lets more frames
+        # through at the cost of occasional decode errors.
+        if data.get('relaxCrc', False):
+            dsd_cmd.append('-F')
     else:
         dsd_cmd.extend(_DSD_PROTOCOL_FLAGS.get(protocol, []))
 
