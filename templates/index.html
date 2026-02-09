@@ -8888,7 +8888,8 @@
             const requestBody = {
                 region,
                 device: parseInt(device),
-                gain: parseInt(gain)
+                gain: parseInt(gain),
+                sdr_type: getSelectedSDRType()
             };
 
             // Add custom frequency if selected
