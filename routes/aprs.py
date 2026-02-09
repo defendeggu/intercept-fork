@@ -89,8 +89,21 @@ def find_rx_fm() -> Optional[str]:
     return shutil.which('rx_fm')
 
 
+def find_hackrf_transfer() -> Optional[str]:
+    """Find hackrf_transfer binary for direct HackRF access."""
+    return shutil.which('hackrf_transfer')
+
+
+def find_csdr() -> Optional[str]:
+    """Find csdr binary for DSP processing."""
+    return shutil.which('csdr')
+
+
 # SDR types that require rx_fm instead of rtl_fm
 SOAPY_SDR_TYPES = {SDRType.HACKRF, SDRType.AIRSPY, SDRType.LIME_SDR, SDRType.SDRPLAY}
+
+# HackRF can use direct hackrf_transfer + csdr as fallback when SoapySDR fails
+HACKRF_DIRECT_FALLBACK = True
 
 
 # Path to direwolf config file
@@ -1432,23 +1445,34 @@ def check_aprs_tools() -> Response:
     """Check for APRS decoding tools."""
     has_rtl_fm = find_rtl_fm() is not None
     has_rx_fm = find_rx_fm() is not None
+    has_hackrf_transfer = find_hackrf_transfer() is not None
+    has_csdr = find_csdr() is not None
     has_direwolf = find_direwolf() is not None
     has_multimon = find_multimon_ng() is not None
 
+    # HackRF can use direct pipeline (hackrf_transfer + csdr) or SoapySDR (rx_fm)
+    has_hackrf_direct = has_hackrf_transfer and has_csdr
+    has_hackrf_support = has_hackrf_direct or has_rx_fm
+
     # Ready if we have at least one SDR tool and one decoder
-    has_sdr_tool = has_rtl_fm or has_rx_fm
+    has_sdr_tool = has_rtl_fm or has_rx_fm or has_hackrf_direct
     has_decoder = has_direwolf or has_multimon
 
     # Determine supported SDR types
     supported_sdr_types = []
     if has_rtl_fm:
         supported_sdr_types.append('rtlsdr')
+    if has_hackrf_support:
+        supported_sdr_types.append('hackrf')
     if has_rx_fm:
-        supported_sdr_types.extend(['hackrf', 'airspy', 'limesdr', 'sdrplay'])
+        supported_sdr_types.extend(['airspy', 'limesdr', 'sdrplay'])
 
     return jsonify({
         'rtl_fm': has_rtl_fm,
         'rx_fm': has_rx_fm,
+        'hackrf_transfer': has_hackrf_transfer,
+        'csdr': has_csdr,
+        'hackrf_direct': has_hackrf_direct,
         'direwolf': has_direwolf,
         'multimon_ng': has_multimon,
         'ready': has_sdr_tool and has_decoder,
@@ -1517,8 +1541,23 @@ def start_aprs() -> Response:
     # Check for required SDR tools based on type
     rtl_fm_path = find_rtl_fm()
     rx_fm_path = find_rx_fm()
+    hackrf_transfer_path = find_hackrf_transfer()
+    csdr_path = find_csdr()
 
-    if sdr_type in SOAPY_SDR_TYPES:
+    # For HackRF: prefer hackrf_transfer + csdr (direct), fallback to rx_fm (SoapySDR)
+    use_hackrf_direct = False
+    if sdr_type == SDRType.HACKRF:
+        if hackrf_transfer_path and csdr_path:
+            use_hackrf_direct = True
+            logger.info("Using direct HackRF pipeline (hackrf_transfer + csdr)")
+        elif rx_fm_path:
+            logger.info("Using SoapySDR pipeline (rx_fm) for HackRF")
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'HackRF tools not found. Install hackrf and csdr, or rx_tools.'
+            }), 400
+    elif sdr_type in SOAPY_SDR_TYPES:
         if not rx_fm_path:
             return jsonify({
                 'status': 'error',
@@ -1570,9 +1609,40 @@ def start_aprs() -> Response:
     aprs_stations = {}
 
     # Build SDR command for APRS (narrowband FM at 22050 Hz for AFSK1200)
-    freq_hz = f"{float(frequency)}M"
+    freq_hz = int(float(frequency) * 1e6)  # Convert MHz to Hz
 
-    if sdr_type in SOAPY_SDR_TYPES:
+    # Flag to track if we're using shell pipeline (for HackRF direct)
+    use_shell_pipeline = False
+    rtl_cmd = []
+
+    if use_hackrf_direct:
+        # Direct HackRF pipeline: hackrf_transfer -> csdr (FM demod + resample) -> s16 audio
+        # HackRF captures at 2 MHz sample rate, we decimate to 22050 Hz for direwolf
+        # Pipeline: hackrf_transfer | csdr convert_u8_f | csdr fmdemod_quadri_cf |
+        #           csdr fractional_decimator_ff | csdr realpart_cf |
+        #           csdr agc_ff | csdr convert_f_s16
+
+        hackrf_sample_rate = 2000000  # 2 MHz
+        audio_sample_rate = 22050     # For direwolf
+        decimation = hackrf_sample_rate / audio_sample_rate  # ~90.7
+
+        # Build gain string for hackrf_transfer
+        gain_val = int(gain) if gain and str(gain) != '0' else 32
+
+        # HackRF pipeline as shell command
+        rtl_cmd = [
+            'sh', '-c',
+            f'{hackrf_transfer_path} -r - -f {freq_hz} -s {hackrf_sample_rate} -l 32 -g {gain_val} 2>/dev/null | '
+            f'{csdr_path} convert_u8_f | '
+            f'{csdr_path} fmdemod_quadri_cf | '
+            f'{csdr_path} fractional_decimator_ff {decimation} | '
+            f'{csdr_path} agc_ff | '
+            f'{csdr_path} convert_f_s16'
+        ]
+        use_shell_pipeline = True
+        sdr_tool_name = 'hackrf_transfer+csdr'
+
+    elif sdr_type in SOAPY_SDR_TYPES:
         # Use rx_fm via SDR abstraction layer for HackRF, Airspy, LimeSDR, SDRPlay
         sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
         builder = SDRFactory.get_builder(sdr_type)
@@ -1591,9 +1661,10 @@ def start_aprs() -> Response:
         sdr_tool_name = 'rx_fm'
     else:
         # Use rtl_fm for RTL-SDR
+        freq_mhz = f"{float(frequency)}M"
         rtl_cmd = [
             rtl_fm_path,
-            '-f', freq_hz,
+            '-f', freq_mhz,
             '-M', 'fm',              # FM demodulation for APRS
             '-s', '22050',           # Sample rate matching direwolf -r 22050
             '-E', 'dc',              # Enable DC blocking filter for cleaner audio
