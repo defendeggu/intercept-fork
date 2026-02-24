@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+">
-  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache 2.0 License">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
 </p>
 
@@ -40,7 +40,7 @@ Support the developer of this open-source project
 - **HF SSTV** - Terrestrial SSTV on shortwave frequencies (80m-10m, VHF, UHF)
 - **APRS** - Amateur packet radio position reports and telemetry via direwolf
 - **Satellite Tracking** - Pass prediction with polar plot and ground track map
-- **Utility Meters** - Electric, gas, and water meter reading via rtl_amr
+- **Utility Meters** - Electric, gas, and water meter reading via rtlamr
 - **ADS-B History** - Persistent aircraft history with reporting dashboard (Postgres optional)
 - **WiFi Scanning** - Monitor mode reconnaissance via aircrack-ng
 - **Bluetooth Scanning** - Device discovery and tracker detection (with Ubertooth support)
@@ -56,8 +56,6 @@ Support the developer of this open-source project
 ---
 
 ## Installation / Debian / Ubuntu / MacOS
-
-```
 
 **1. Clone and run:**
 ```bash
@@ -150,7 +148,7 @@ Set these as environment variables for either local installs or Docker:
 ```bash
 INTERCEPT_ADSB_AUTO_START=true \
 INTERCEPT_SHARED_OBSERVER_LOCATION=false \
-python app.py
+sudo -E venv/bin/python intercept.py
 ```
 
 **Docker example (.env)**
@@ -172,7 +170,7 @@ Then open **/adsb/history** for the reporting dashboard.
 
 After starting, open **http://localhost:5050** in your browser. The username and password is <b>admin</b>:<b>admin</b> 
 
-The credentials can be change in the ADMIN_USERNAME & ADMIN_PASSWORD variables in config.py
+The credentials can be changed in the ADMIN_USERNAME & ADMIN_PASSWORD variables in config.py
 
 ---
 
@@ -245,7 +243,7 @@ Created by **smittix** - [GitHub](https://github.com/smittix)
 [AIS-catcher](https://github.com/jvde-github/AIS-catcher) |
 [acarsdec](https://github.com/TLeconte/acarsdec) |
 [direwolf](https://github.com/wb2osz/direwolf) |
-[rtl_amr](https://github.com/bemasher/rtlamr) |
+[rtlamr](https://github.com/bemasher/rtlamr) |
 [dumpvdl2](https://github.com/szpajder/dumpvdl2) |
 [aircrack-ng](https://www.aircrack-ng.org/) |
 [Leaflet.js](https://leafletjs.com/) |

@@ -637,27 +637,45 @@ def start_locate_session(
     """Start a new locate session, stopping any existing one."""
     global _session
 
+    # Grab and evict any existing session without holding the lock during stop()
+    # (stop() joins a thread which can block for up to 3 s).
+    old_session = None
     with _session_lock:
         if _session and _session.active:
-            _session.stop()
-
-        _session = LocateSession(
-            target, environment, custom_exponent, fallback_lat, fallback_lon
-        )
-        if not _session.start():
+            old_session = _session
             _session = None
-            raise RuntimeError("Bluetooth scanner failed to start")
-        return _session
+
+    if old_session:
+        old_session.stop()
+
+    new_session = LocateSession(
+        target, environment, custom_exponent, fallback_lat, fallback_lon
+    )
+    with _session_lock:
+        _session = new_session
+
+    if not new_session.start():
+        with _session_lock:
+            if _session is new_session:
+                _session = None
+        raise RuntimeError("Bluetooth scanner failed to start")
+
+    return new_session
 
 
 def stop_locate_session() -> None:
     """Stop the active locate session."""
     global _session
 
+    # Release the lock before stop() so concurrent status/SSE requests
+    # aren't blocked for up to 3 s while the poll thread is joined.
+    session_to_stop = None
     with _session_lock:
-        if _session:
-            _session.stop()
-            _session = None
+        session_to_stop = _session
+        _session = None
+
+    if session_to_stop:
+        session_to_stop.stop()
 
 
 def get_locate_session() -> LocateSession | None:

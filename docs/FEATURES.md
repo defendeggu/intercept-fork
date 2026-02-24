@@ -24,17 +24,6 @@ Complete feature list for all modules.
 - **Wideband spectrum analysis** with real-time visualization
 - **I/Q capture** - record raw samples for offline analysis
 
-## AIS Vessel Tracking
-
-- **Real-time vessel tracking** via AIS-catcher on 161.975/162.025 MHz
-- **Full-screen dashboard** - dedicated popout with interactive map
-- **Interactive Leaflet map** with OpenStreetMap tiles (dark-themed)
-- **Vessel details popup** - name, MMSI, callsign, destination, ETA
-- **Navigation data** - speed, course, heading, rate of turn
-- **Ship type classification** - cargo, tanker, passenger, fishing, etc.
-- **Vessel dimensions** - length, width, draught
-- **Multi-SDR support** - RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay
-
 ## Spy Stations (Number Stations)
 
 - **Comprehensive database** of active number stations and diplomatic networks

@@ -116,6 +116,8 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
             ['rtl_test', '-t'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5,
             env=env 
         )
@@ -123,7 +125,8 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
 
         # Parse device info from rtl_test output
         # Format: "0:  Realtek, RTL2838UHIDIR, SN: 00000001"
-        device_pattern = r'(\d+):\s+(.+?)(?:,\s*SN:\s*(\S+))?$'
+        # Require a non-empty serial to avoid matching malformed lines like "SN:".
+        device_pattern = r'(\d+):\s+(.+?),\s*SN:\s*(\S+)\s*$'
 
         from .rtlsdr import RTLSDRCommandBuilder
 
@@ -135,7 +138,7 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
                     sdr_type=SDRType.RTL_SDR,
                     index=int(match.group(1)),
                     name=match.group(2).strip().rstrip(','),
-                    serial=match.group(3) or 'N/A',
+                    serial=match.group(3),
                     driver='rtlsdr',
                     capabilities=RTLSDRCommandBuilder.CAPABILITIES
                 ))

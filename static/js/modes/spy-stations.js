@@ -269,12 +269,10 @@ const SpyStations = (function() {
      */
     function tuneToStation(stationId, freqKhz) {
         const freqMhz = freqKhz / 1000;
-        sessionStorage.setItem('tuneFrequency', freqMhz.toString());
 
         // Find the station and determine mode
         const station = stations.find(s => s.id === stationId);
         const tuneMode = station ? getModeFromStation(station.mode) : 'usb';
-        sessionStorage.setItem('tuneMode', tuneMode);
 
         const stationName = station ? station.name : 'Station';
 
@@ -282,12 +280,18 @@ const SpyStations = (function() {
             showNotification('Tuning to ' + stationName, formatFrequency(freqKhz) + ' (' + tuneMode.toUpperCase() + ')');
         }
 
-        // Switch to listening post mode
-        if (typeof selectMode === 'function') {
-            selectMode('listening');
-        } else if (typeof switchMode === 'function') {
-            switchMode('listening');
+        // Switch to spectrum waterfall mode and tune after mode init.
+        if (typeof switchMode === 'function') {
+            switchMode('waterfall');
+        } else if (typeof selectMode === 'function') {
+            selectMode('waterfall');
         }
+
+        setTimeout(() => {
+            if (typeof Waterfall !== 'undefined' && typeof Waterfall.quickTune === 'function') {
+                Waterfall.quickTune(freqMhz, tuneMode);
+            }
+        }, 220);
     }
 
     /**
@@ -305,7 +309,7 @@ const SpyStations = (function() {
      * Check if we arrived from another page with a tune request
      */
     function checkTuneFrequency() {
-        // This is for the listening post to check - spy stations sets, listening post reads
+        // Reserved for cross-mode tune handoff behavior.
     }
 
     /**
@@ -445,7 +449,7 @@ const SpyStations = (function() {
                     <div class="signal-details-section">
                         <div class="signal-details-title">How to Listen</div>
                         <p style="color: var(--text-secondary); font-size: 12px; line-height: 1.6;">
-                            Click "Tune In" on any station to open the Listening Post with the frequency pre-configured.
+                            Click "Tune In" on any station to open Spectrum Waterfall with the frequency pre-configured.
                             Most number stations use USB (Upper Sideband) mode. You'll need an SDR capable of receiving
                             HF frequencies (typically 3-30 MHz) and an appropriate antenna.
                         </p>

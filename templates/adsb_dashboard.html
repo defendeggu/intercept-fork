@@ -258,6 +258,10 @@
             <div class="display-container">
                 <div id="radarMap">
                 </div>
+                <div id="mapCrosshairOverlay" class="map-crosshair-overlay" aria-hidden="true">
+                    <div class="map-crosshair-line map-crosshair-vertical"></div>
+                    <div class="map-crosshair-line map-crosshair-horizontal"></div>
+                </div>
             </div>
         </div>
 
@@ -429,6 +433,17 @@
         let alertsEnabled = true;
         let detectionSoundEnabled = localStorage.getItem('adsb_detectionSound') !== 'false';  // Default on
         let soundedAircraft = {};  // Track aircraft we've played detection sound for
+        const MAP_CROSSHAIR_DURATION_MS = 1500;
+        const PANEL_SELECTION_BASE_ZOOM = 10;
+        const PANEL_SELECTION_MAX_ZOOM = 12;
+        const PANEL_SELECTION_ZOOM_INCREMENT = 1.4;
+        const PANEL_SELECTION_STAGE1_DURATION_SEC = 1.05;
+        const PANEL_SELECTION_STAGE2_DURATION_SEC = 1.15;
+        const PANEL_SELECTION_STAGE_GAP_MS = 180;
+        let mapCrosshairResetTimer = null;
+        let panelSelectionFallbackTimer = null;
+        let panelSelectionStageTimer = null;
+        let mapCrosshairRequestId = 0;
         // Watchlist - persisted to localStorage
         let watchlist = JSON.parse(localStorage.getItem('adsb_watchlist') || '[]');
 
@@ -2620,7 +2635,7 @@ sudo make install</code>
             } else {
                 markers[icao] = L.marker([ac.lat, ac.lon], { icon: createMarkerIcon(rotation, color, iconType, isSelected) })
                     .addTo(radarMap)
-                    .on('click', () => selectAircraft(icao));
+                    .on('click', () => selectAircraft(icao, 'map'));
                 markers[icao].bindTooltip(`${callsign}<br>${alt}`, {
                     permanent: false, direction: 'top', className: 'aircraft-tooltip'
                 });
@@ -2724,7 +2739,7 @@ sudo make install</code>
                     const div = document.createElement('div');
                     div.className = `aircraft-item ${selectedIcao === ac.icao ? 'selected' : ''} ${isOnWatchlist(ac) ? 'watched' : ''}`;
                     div.setAttribute('data-icao', ac.icao);
-                    div.onclick = () => selectAircraft(ac.icao);
+                    div.onclick = () => selectAircraft(ac.icao, 'panel');
                     div.innerHTML = buildAircraftItemHTML(ac);
                     fragment.appendChild(div);
                 });
@@ -2797,34 +2812,139 @@ sudo make install</code>
             `;
         }
 
-        function selectAircraft(icao) {
-            // Toggle: clicking the same aircraft deselects it
-            if (selectedIcao === icao) {
-                const prev = selectedIcao;
-                selectedIcao = null;
-                // Reset previous marker icon
-                if (prev && markers[prev] && aircraft[prev]) {
-                    const ac = aircraft[prev];
-                    const militaryInfo = isMilitaryAircraft(prev, ac.callsign);
-                    const rotation = Math.round((ac.heading || 0) / 5) * 5;
-                    const color = militaryInfo.military ? '#556b2f' : getAltitudeColor(ac.altitude);
-                    const iconType = getAircraftIconType(ac.type_code, militaryInfo.military);
-                    markers[prev].setIcon(createMarkerIcon(rotation, color, iconType, false));
-                    if (markerState[prev]) markerState[prev].isSelected = false;
-                }
-                renderAircraftList();
-                showAircraftDetails(null);
-                updateFlightLookupBtn();
-                highlightSidebarMessages(null);
-                if (acarsMessageTimer) {
-                    clearInterval(acarsMessageTimer);
-                    acarsMessageTimer = null;
-                }
+        function triggerMapCrosshairAnimation(lat, lon, durationMs = MAP_CROSSHAIR_DURATION_MS, lockToMapCenter = false) {
+            if (!radarMap) return;
+            const overlay = document.getElementById('mapCrosshairOverlay');
+            if (!overlay) return;
+
+            const size = radarMap.getSize();
+            let targetX;
+            let targetY;
+
+            if (lockToMapCenter) {
+                targetX = size.x / 2;
+                targetY = size.y / 2;
+            } else {
+                const point = radarMap.latLngToContainerPoint([lat, lon]);
+                targetX = Math.max(0, Math.min(size.x, point.x));
+                targetY = Math.max(0, Math.min(size.y, point.y));
+            }
+
+            const startX = size.x + 8;
+            const startY = size.y + 8;
+
+            overlay.style.setProperty('--crosshair-x-start', `${startX}px`);
+            overlay.style.setProperty('--crosshair-y-start', `${startY}px`);
+            overlay.style.setProperty('--crosshair-x-end', `${targetX}px`);
+            overlay.style.setProperty('--crosshair-y-end', `${targetY}px`);
+            overlay.style.setProperty('--crosshair-duration', `${durationMs}ms`);
+            overlay.classList.remove('active');
+            void overlay.offsetWidth;
+            overlay.classList.add('active');
+
+            if (mapCrosshairResetTimer) {
+                clearTimeout(mapCrosshairResetTimer);
+            }
+            mapCrosshairResetTimer = setTimeout(() => {
+                overlay.classList.remove('active');
+                mapCrosshairResetTimer = null;
+            }, durationMs + 100);
+        }
+
+        function getPanelSelectionFinalZoom() {
+            if (!radarMap) return PANEL_SELECTION_BASE_ZOOM;
+            const currentZoom = radarMap.getZoom();
+            const maxZoom = typeof radarMap.getMaxZoom === 'function' ? radarMap.getMaxZoom() : PANEL_SELECTION_MAX_ZOOM;
+            return Math.min(
+                PANEL_SELECTION_MAX_ZOOM,
+                maxZoom,
+                Math.max(PANEL_SELECTION_BASE_ZOOM, currentZoom + PANEL_SELECTION_ZOOM_INCREMENT)
+            );
+        }
+
+        function getPanelSelectionIntermediateZoom(finalZoom) {
+            if (!radarMap) return finalZoom;
+            const currentZoom = radarMap.getZoom();
+            if (finalZoom - currentZoom < 0.8) {
+                return finalZoom;
+            }
+            const midpointZoom = currentZoom + ((finalZoom - currentZoom) * 0.55);
+            return Math.min(finalZoom - 0.45, midpointZoom);
+        }
+
+        function runPanelSelectionAnimation(lat, lon, requestId) {
+            if (!radarMap) return;
+
+            const finalZoom = getPanelSelectionFinalZoom();
+            const intermediateZoom = getPanelSelectionIntermediateZoom(finalZoom);
+            const sequenceDurationMs = Math.round(
+                ((PANEL_SELECTION_STAGE1_DURATION_SEC + PANEL_SELECTION_STAGE2_DURATION_SEC) * 1000) +
+                PANEL_SELECTION_STAGE_GAP_MS + 260
+            );
+            const startSecondStage = () => {
+                if (requestId !== mapCrosshairRequestId) return;
+                radarMap.flyTo([lat, lon], finalZoom, {
+                    animate: true,
+                    duration: PANEL_SELECTION_STAGE2_DURATION_SEC,
+                    easeLinearity: 0.2
+                });
+            };
+
+            triggerMapCrosshairAnimation(
+                lat,
+                lon,
+                Math.max(MAP_CROSSHAIR_DURATION_MS, sequenceDurationMs),
+                true
+            );
+
+            if (intermediateZoom >= finalZoom - 0.1) {
+                radarMap.flyTo([lat, lon], finalZoom, {
+                    animate: true,
+                    duration: PANEL_SELECTION_STAGE2_DURATION_SEC,
+                    easeLinearity: 0.2
+                });
                 return;
             }
 
+            let stage1Handled = false;
+            const finishStage1 = () => {
+                if (stage1Handled || requestId !== mapCrosshairRequestId) return;
+                stage1Handled = true;
+                if (panelSelectionFallbackTimer) {
+                    clearTimeout(panelSelectionFallbackTimer);
+                    panelSelectionFallbackTimer = null;
+                }
+                panelSelectionStageTimer = setTimeout(() => {
+                    panelSelectionStageTimer = null;
+                    startSecondStage();
+                }, PANEL_SELECTION_STAGE_GAP_MS);
+            };
+
+            radarMap.once('moveend', finishStage1);
+            panelSelectionFallbackTimer = setTimeout(
+                finishStage1,
+                Math.round(PANEL_SELECTION_STAGE1_DURATION_SEC * 1000) + 160
+            );
+
+            radarMap.flyTo([lat, lon], intermediateZoom, {
+                animate: true,
+                duration: PANEL_SELECTION_STAGE1_DURATION_SEC,
+                easeLinearity: 0.2
+            });
+        }
+
+        function selectAircraft(icao, source = 'map') {
             const prevSelected = selectedIcao;
             selectedIcao = icao;
+            mapCrosshairRequestId += 1;
+            if (panelSelectionFallbackTimer) {
+                clearTimeout(panelSelectionFallbackTimer);
+                panelSelectionFallbackTimer = null;
+            }
+            if (panelSelectionStageTimer) {
+                clearTimeout(panelSelectionStageTimer);
+                panelSelectionStageTimer = null;
+            }
 
             // Update marker icons for both previous and new selection
             [prevSelected, icao].forEach(targetIcao => {
@@ -2850,7 +2970,15 @@ sudo make install</code>
 
             const ac = aircraft[icao];
             if (ac && ac.lat !== undefined && ac.lat !== null && ac.lon !== undefined && ac.lon !== null) {
-                radarMap.setView([ac.lat, ac.lon], 10);
+                const targetLat = ac.lat;
+                const targetLon = ac.lon;
+
+                if (source === 'panel' && radarMap) {
+                    runPanelSelectionAnimation(targetLat, targetLon, mapCrosshairRequestId);
+                    return;
+                }
+
+                radarMap.setView([targetLat, targetLon], 10);
             }
         }
 
@@ -3264,7 +3392,7 @@ sudo make install</code>
 
         function initAirband() {
             // Check if audio tools are available
-            fetch('/listening/tools')
+            fetch('/receiver/tools')
                 .then(r => r.json())
                 .then(data => {
                     const missingTools = [];
@@ -3414,7 +3542,7 @@ sudo make install</code>
 
             try {
                 // Start audio on backend
-                const response = await fetch('/listening/audio/start', {
+                const response = await fetch('/receiver/audio/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3451,7 +3579,7 @@ sudo make install</code>
                 audioPlayer.load();
 
                 // Connect to stream
-                const streamUrl = `/listening/audio/stream?t=${Date.now()}`;
+                const streamUrl = `/receiver/audio/stream?t=${Date.now()}`;
                 console.log('[AIRBAND] Connecting to stream:', streamUrl);
                 audioPlayer.src = streamUrl;
 
@@ -3495,7 +3623,7 @@ sudo make install</code>
             audioPlayer.pause();
             audioPlayer.src = '';
 
-            fetch('/listening/audio/stop', { method: 'POST' })
+            fetch('/receiver/audio/stop', { method: 'POST' })
                 .then(r => r.json())
                 .then(() => {
                     isAirbandPlaying = false;

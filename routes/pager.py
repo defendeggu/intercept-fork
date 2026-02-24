@@ -108,6 +108,20 @@ def log_message(msg: dict[str, Any]) -> None:
         logger.error(f"Failed to log message: {e}")
 
 
+def _encode_scope_waveform(samples: tuple[int, ...], window_size: int = 256) -> list[int]:
+    """Compress recent PCM samples into a signed 8-bit waveform for SSE."""
+    if not samples:
+        return []
+
+    window = samples[-window_size:] if len(samples) > window_size else samples
+    waveform: list[int] = []
+    for sample in window:
+        # Convert int16 PCM to int8 range for lightweight transport.
+        packed = int(round(sample / 256))
+        waveform.append(max(-127, min(127, packed)))
+    return waveform
+
+
 def audio_relay_thread(
     rtl_stdout,
     multimon_stdin,
@@ -118,7 +132,7 @@ def audio_relay_thread(
 
     Reads raw 16-bit LE PCM from *rtl_stdout*, writes every chunk straight
     through to *multimon_stdin*, and every ~100 ms pushes an RMS / peak scope
-    event onto *output_queue*.
+    event plus a compact waveform sample onto *output_queue*.
     """
     CHUNK = 4096  # bytes – 2048 samples at 16-bit mono
     INTERVAL = 0.1  # seconds between scope updates
@@ -152,6 +166,7 @@ def audio_relay_thread(
                         'type': 'scope',
                         'rms': rms,
                         'peak': peak,
+                        'waveform': _encode_scope_waveform(samples),
                     })
                 except (struct.error, ValueError, queue.Full):
                     pass

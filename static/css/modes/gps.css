@@ -140,14 +140,65 @@
 }
 
 .gps-skyview-canvas-wrap {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    position: relative;
+    display: block;
+    width: min(100%, 430px);
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    overflow: hidden;
 }
 
 #gpsSkyCanvas {
-    max-width: 100%;
-    height: auto;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+#gpsSkyCanvas:active {
+    cursor: grabbing;
+}
+
+.gps-sky-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    font-family: var(--font-mono);
+}
+
+.gps-sky-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    letter-spacing: 0.2px;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
+}
+
+.gps-sky-label-cardinal {
+    font-weight: 700;
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+.gps-sky-label-sat {
+    font-weight: 600;
+}
+
+.gps-sky-label-sat.unused {
+    opacity: 0.75;
+}
+
+.gps-sky-hint {
+    margin-top: 8px;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
 /* Position info panel */

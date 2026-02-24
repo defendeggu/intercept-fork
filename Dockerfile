@@ -57,7 +57,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     soapysdr-module-airspy \
     airspy \
     limesuite \
-    hackrf \
     # Utilities
     curl \
     procps \
@@ -190,6 +189,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fi \
     && cd /tmp \
     && rm -rf /tmp/SatDump \
+    # Build hackrf CLI tools from source — avoids libhackrf0 version conflict
+    # between the 'hackrf' apt package and soapysdr-module-hackrf's newer libhackrf0
+    && cd /tmp \
+    && git clone --depth 1 https://github.com/greatscottgadgets/hackrf.git \
+    && cd hackrf/host \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/hackrf \
     # Build rtlamr (utility meter decoder - requires Go)
     && cd /tmp \
     && curl -fsSL "https://go.dev/dl/go1.22.5.linux-$(dpkg --print-architecture).tar.gz" | tar -C /usr/local -xz \
@@ -240,6 +250,7 @@ RUN mkdir -p /app/data /app/data/weather_sat
 
 # Expose web interface port
 EXPOSE 5050
+EXPOSE 5443
 
 # Environment variables with defaults
 ENV INTERCEPT_HOST=0.0.0.0 \

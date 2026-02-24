@@ -590,20 +590,35 @@ const WiFiMode = (function() {
             eventSource = null;
         }
 
+        // Update UI immediately so mode transitions are responsive even if the
+        // backend needs extra time to terminate subprocesses.
+        setScanning(false);
+
         // Stop scan on server (local or agent)
         const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+        const timeoutMs = isAgentMode ? 8000 : 2200;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
         try {
             if (isAgentMode) {
-                await fetch(`/controller/agents/${currentAgent}/wifi/stop`, { method: 'POST' });
+                await fetch(`/controller/agents/${currentAgent}/wifi/stop`, {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             } else if (scanMode === 'deep') {
-                await fetch(`${CONFIG.apiBase}/scan/stop`, { method: 'POST' });
+                await fetch(`${CONFIG.apiBase}/scan/stop`, {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             }
         } catch (error) {
             console.warn('[WiFiMode] Error stopping scan:', error);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
         }
-
-        setScanning(false);
     }
 
     function setScanning(scanning, mode = null) {

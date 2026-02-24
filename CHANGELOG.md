@@ -2,6 +2,66 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.22.3] - 2026-02-23
+
+### Fixed
+- Waterfall control panel rendered as unstyled text for up to 20 seconds on first visit — CSS is now loaded eagerly with the rest of the page assets
+- WebSDR globe failed to render on first page load — initialization now waits for a layout frame before mounting the WebGL renderer, ensuring the container has non-zero dimensions
+- Waterfall monitor audio took minutes to start — `_waitForPlayback` now only reports success on actual audio playback (`playing`/`timeupdate`), not from the WAV header alone (`loadeddata`/`canplay`)
+- Waterfall monitor could not be stopped — `stopMonitor()` now pauses audio and updates the UI immediately instead of waiting for the backend stop request (which blocked for 1+ seconds during SDR process cleanup)
+- Stopping the waterfall no longer shows a stale "WebSocket closed before ready" message — the `onclose` handler now detects intentional closes
+
+---
+
+## [2.22.1] - 2026-02-23
+
+### Fixed
+- PWA install prompt not appearing — manifest now includes required PNG icons (192×192, 512×512)
+- Apple touch icon updated to PNG for iOS Safari compatibility
+- Service worker cache bumped to bust stale cached assets
+
+---
+
+## [2.22.0] - 2026-02-23
+
+### Added
+- **Waterfall Receiver Overhaul** - WebSocket-based I/Q streaming with server-side FFT, click-to-tune, zoom controls, and auto-scaling
+- **Voice Alerts** - Configurable text-to-speech event notifications across modes
+- **Signal Fingerprinting** - RF device identification and pattern analysis mode
+- **SignalID** - Automatic signal classification via SigIDWiki API integration
+- **PWA Support** - Installable web app with service worker caching and manifest
+- **Real-time Signal Scope** - Live signal visualization for pager, sensor, and SSTV modes
+- **ADS-B MSG2 Surface Parsing** - Ground vehicle movement tracking from MSG2 frames
+- **Cheat Sheets** - Quick reference overlays for keyboard shortcuts and mode controls
+- App icon (SVG) for PWA and browser tab
+
+### Changed
+- **WebSDR overhaul** - Improved receiver management, audio streaming, and UI
+- **Mode stop responsiveness** - Faster timeout handling and improved WiFi/Bluetooth scanner shutdown
+- **Mode transitions** - Smoother navigation with performance instrumentation
+- **BT Locate** - Refactored JS engine with improved trail management and signal smoothing
+- **Listening Post** - Refactored with cross-module frequency routing
+- **SSTV decoder** - State machine improvements and partial image streaming
+- Analytics mode removed; per-mode analytics panels integrated into existing dashboards
+
+### Fixed
+- ADS-B SSE multi-client fanout stability and update flush timing
+- WiFi scanner robustness and monitor mode teardown reliability
+- Agent client reliability improvements for remote sensor nodes
+- SSTV VIS detector state reporting in signal monitor diagnostics
+
+### Documentation
+- Complete documentation audit across README, FEATURES, USAGE, help modal, and GitHub Pages
+- Fixed license badge (MIT → Apache 2.0) to match actual LICENSE file
+- Fixed tool name `rtl_amr` → `rtlamr` throughout all docs
+- Fixed incorrect entry point examples (`python app.py` → `sudo -E venv/bin/python intercept.py`)
+- Removed duplicate AIS Vessel Tracking section from FEATURES.md
+- Updated SSTV requirements: pure Python decoder, no external `slowrx` needed
+- Added ACARS and VDL2 mode descriptions to in-app help modal
+- GitHub Pages site: corrected Docker command, license, and tool name references
+
+---
+
 ## [2.21.1] - 2026-02-20
 
 ### Fixed

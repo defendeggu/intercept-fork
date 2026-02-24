@@ -97,7 +97,7 @@ class AgentClient:
         except requests.RequestException as e:
             raise AgentHTTPError(f"Request failed: {e}")
 
-    def _post(self, path: str, data: dict | None = None) -> dict:
+    def _post(self, path: str, data: dict | None = None, timeout: float | None = None) -> dict:
         """
         Perform POST request to agent.
 
@@ -113,19 +113,20 @@ class AgentClient:
             AgentConnectionError: If agent is unreachable
         """
         url = f"{self.base_url}{path}"
+        request_timeout = self.timeout if timeout is None else timeout
         try:
             response = requests.post(
                 url,
                 json=data or {},
                 headers=self._headers(),
-                timeout=self.timeout
+                timeout=request_timeout
             )
             response.raise_for_status()
             return response.json() if response.content else {}
         except requests.ConnectionError as e:
             raise AgentConnectionError(f"Cannot connect to agent at {self.base_url}: {e}")
         except requests.Timeout:
-            raise AgentConnectionError(f"Request to agent timed out after {self.timeout}s")
+            raise AgentConnectionError(f"Request to agent timed out after {request_timeout}s")
         except requests.HTTPError as e:
             # Try to extract error message from response body
             error_msg = f"Agent returned error: {e.response.status_code}"
@@ -141,9 +142,9 @@ class AgentClient:
         except requests.RequestException as e:
             raise AgentHTTPError(f"Request failed: {e}")
 
-    def post(self, path: str, data: dict | None = None) -> dict:
+    def post(self, path: str, data: dict | None = None, timeout: float | None = None) -> dict:
         """Public POST method for arbitrary endpoints."""
-        return self._post(path, data)
+        return self._post(path, data, timeout=timeout)
 
     # =========================================================================
     # Capability & Status
@@ -214,7 +215,7 @@ class AgentClient:
         """
         return self._post(f'/{mode}/start', params or {})
 
-    def stop_mode(self, mode: str) -> dict:
+    def stop_mode(self, mode: str, timeout: float = 8.0) -> dict:
         """
         Stop a running mode on the agent.
 
@@ -224,7 +225,7 @@ class AgentClient:
         Returns:
             Stop result with 'status' field
         """
-        return self._post(f'/{mode}/stop')
+        return self._post(f'/{mode}/stop', timeout=timeout)
 
     def get_mode_status(self, mode: str) -> dict:
         """

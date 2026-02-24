@@ -266,7 +266,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
     padding: 8px;
 }
 
@@ -280,8 +282,8 @@
 }
 
 #btLocateMap {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
     background: #1a1a2e;
 }
 
@@ -556,5 +558,71 @@
         right: 8px;
         bottom: 8px;
         font-size: 9px;
+    }
+}
+
+/* ── Crosshair sweep animation ───────────────────────────────────── */
+.btl-crosshair-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1200;
+    --btl-crosshair-x-start: 100%;
+    --btl-crosshair-y-start: 100%;
+    --btl-crosshair-x-end: 50%;
+    --btl-crosshair-y-end: 50%;
+    --btl-crosshair-duration: 1500ms;
+}
+
+.btl-crosshair-line {
+    position: absolute;
+    opacity: 0;
+    background: var(--accent-cyan);
+    will-change: transform, opacity;
+}
+
+.btl-crosshair-vertical {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    left: 0;
+    transform: translateX(var(--btl-crosshair-x-start));
+}
+
+.btl-crosshair-horizontal {
+    left: 0;
+    right: 0;
+    height: 1px;
+    top: 0;
+    transform: translateY(var(--btl-crosshair-y-start));
+}
+
+.btl-crosshair-overlay.active .btl-crosshair-vertical {
+    animation: btlCrosshairSweepX var(--btl-crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+.btl-crosshair-overlay.active .btl-crosshair-horizontal {
+    animation: btlCrosshairSweepY var(--btl-crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+@keyframes btlCrosshairSweepX {
+    0%   { transform: translateX(var(--btl-crosshair-x-start)); opacity: 0; }
+    12%  { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateX(var(--btl-crosshair-x-end));   opacity: 0; }
+}
+
+@keyframes btlCrosshairSweepY {
+    0%   { transform: translateY(var(--btl-crosshair-y-start)); opacity: 0; }
+    12%  { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateY(var(--btl-crosshair-y-end));   opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btl-crosshair-overlay.active .btl-crosshair-vertical,
+    .btl-crosshair-overlay.active .btl-crosshair-horizontal {
+        animation-duration: 220ms;
     }
 }

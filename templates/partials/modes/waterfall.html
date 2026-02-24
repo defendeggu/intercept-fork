@@ -1,0 +1,327 @@
+<!-- WATERFALL MODE -->
+<div id="waterfallMode" class="mode-content wf-side">
+    <div class="section wf-side-hero">
+        <div class="wf-side-hero-title-row">
+            <div class="wf-side-hero-title">Spectrum Waterfall</div>
+            <div class="wf-side-chip" id="wfHeroVisualStatus">CONNECTING</div>
+        </div>
+        <div class="wf-side-hero-subtext">
+            Click spectrum/waterfall to tune. Scroll to step-tune. Ctrl/Cmd + scroll to zoom span.
+        </div>
+        <div class="wf-side-hero-stats">
+            <div class="wf-side-stat">
+                <div class="wf-side-stat-label">Tuned</div>
+                <div class="wf-side-stat-value" id="wfHeroFreq">100.0000 MHz</div>
+            </div>
+            <div class="wf-side-stat">
+                <div class="wf-side-stat-label">Mode</div>
+                <div class="wf-side-stat-value" id="wfHeroMode">WFM</div>
+            </div>
+            <div class="wf-side-stat">
+                <div class="wf-side-stat-label">Scan</div>
+                <div class="wf-side-stat-value" id="wfHeroScan">Idle</div>
+            </div>
+            <div class="wf-side-stat">
+                <div class="wf-side-stat-label">Hits</div>
+                <div class="wf-side-stat-value" id="wfHeroHits">0</div>
+            </div>
+        </div>
+        <div class="wf-side-hero-actions">
+            <button class="run-btn" id="wfStartBtn" onclick="Waterfall.start()">Start Waterfall</button>
+            <button class="stop-btn" id="wfStopBtn" onclick="Waterfall.stop()" style="display:none;">Stop Waterfall</button>
+        </div>
+        <div id="wfStatus" class="wf-side-status-line"></div>
+    </div>
+
+    <div class="section">
+        <h3>Device</h3>
+        <div class="form-group">
+            <label>SDR Device</label>
+            <select id="wfDevice" onchange="Waterfall && Waterfall.onDeviceChange && Waterfall.onDeviceChange()">
+                <option value="">Loading devices...</option>
+            </select>
+        </div>
+        <div id="wfDeviceInfo" class="wf-side-box" style="display:none;">
+            <div class="wf-side-kv">
+                <span class="wf-side-kv-label">Type</span>
+                <span id="wfDeviceType" class="wf-side-kv-value">--</span>
+            </div>
+            <div class="wf-side-kv">
+                <span class="wf-side-kv-label">Range</span>
+                <span id="wfDeviceRange" class="wf-side-kv-value">--</span>
+            </div>
+            <div class="wf-side-kv">
+                <span class="wf-side-kv-label">Capture SR</span>
+                <span id="wfDeviceBw" class="wf-side-kv-value">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Tuning</h3>
+        <div class="form-group">
+            <label>Center Frequency (MHz)</label>
+            <input type="number" id="wfCenterFreq" value="100.0000" step="0.001" min="0.001" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Span (MHz)</label>
+            <input type="number" id="wfSpanMhz" value="2.4" step="0.1" min="0.05" max="30">
+        </div>
+        <div class="wf-side-grid-2">
+            <button class="preset-btn" onclick="Waterfall.applyPreset('fm')">FM Broadcast</button>
+            <button class="preset-btn" onclick="Waterfall.applyPreset('air')">Airband</button>
+            <button class="preset-btn" onclick="Waterfall.applyPreset('marine')">Marine</button>
+            <button class="preset-btn" onclick="Waterfall.applyPreset('ham2m')">2m Ham</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Quick Tune & Bookmarks</h3>
+        <div class="wf-side-grid-2">
+            <button class="preset-btn" onclick="Waterfall.quickTune(121.5, 'am')">121.5 Guard</button>
+            <button class="preset-btn" onclick="Waterfall.quickTune(156.8, 'fm')">156.8 CH16</button>
+            <button class="preset-btn" onclick="Waterfall.quickTune(145.5, 'fm')">145.5 2m</button>
+            <button class="preset-btn" onclick="Waterfall.quickTune(98.1, 'wfm')">98.1 FM</button>
+            <button class="preset-btn" onclick="Waterfall.quickTune(462.5625, 'fm')">462.56 FRS</button>
+            <button class="preset-btn" onclick="Waterfall.quickTune(446.0, 'fm')">446.0 PMR</button>
+        </div>
+        <div class="wf-side-divider"></div>
+        <div class="wf-bookmark-row">
+            <input type="number" id="wfBookmarkFreqInput" step="0.0001" min="0.001" max="6000" placeholder="Frequency MHz">
+            <select id="wfBookmarkMode">
+                <option value="auto" selected>Auto</option>
+                <option value="wfm">WFM</option>
+                <option value="fm">NFM</option>
+                <option value="am">AM</option>
+                <option value="usb">USB</option>
+                <option value="lsb">LSB</option>
+            </select>
+        </div>
+        <div class="wf-side-grid-2">
+            <button class="preset-btn" onclick="Waterfall.useTuneForBookmark()">Use Tuned</button>
+            <button class="preset-btn" onclick="Waterfall.addBookmarkFromInput()">Save Bookmark</button>
+        </div>
+        <div id="wfBookmarkList" class="wf-bookmark-list">
+            <div class="wf-empty">No bookmarks saved</div>
+        </div>
+        <div class="wf-side-inline-label">Recent Hits</div>
+        <div id="wfRecentSignals" class="wf-recent-list">
+            <div class="wf-empty">No recent signal hits</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Handoff</h3>
+        <div class="wf-side-help">
+            Send current tuned frequency to another decoder/workflow.
+        </div>
+        <div class="wf-side-grid-2">
+            <button class="preset-btn" onclick="Waterfall.handoff('pager')">To Pager</button>
+            <button class="preset-btn" onclick="Waterfall.handoff('subghz')">To SubGHz</button>
+            <button class="preset-btn" onclick="Waterfall.handoff('subghz433')">433 Profile</button>
+            <button class="preset-btn" onclick="Waterfall.handoff('signalid')">Signal ID</button>
+        </div>
+        <div id="wfHandoffStatus" class="wf-side-status-line">Ready</div>
+    </div>
+
+    <div class="section">
+        <h3>Signal Identification</h3>
+        <div class="wf-side-help">
+            Identify current frequency using local catalog and SigID Wiki matches.
+        </div>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="number" id="wfSigIdFreq" value="100.0000" step="0.0001" min="0.001" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Mode Hint</label>
+            <select id="wfSigIdMode">
+                <option value="auto" selected>Auto (Current Mode)</option>
+                <option value="wfm">WFM</option>
+                <option value="fm">NFM</option>
+                <option value="am">AM</option>
+                <option value="usb">USB</option>
+                <option value="lsb">LSB</option>
+            </select>
+        </div>
+        <div class="wf-side-grid-2">
+            <button class="preset-btn" onclick="Waterfall.useTuneForSignalId()">Use Tuned</button>
+            <button class="preset-btn" onclick="Waterfall.identifySignal()">Identify</button>
+        </div>
+        <div id="wfSigIdStatus" class="wf-side-status-line">Ready</div>
+        <div id="wfSigIdResult" class="wf-side-box" style="display:none;"></div>
+        <div id="wfSigIdExternal" class="wf-side-box wf-side-box-muted" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h3>Scan</h3>
+        <div class="form-group">
+            <label>Range Start (MHz)</label>
+            <input type="number" id="wfScanStart" value="98.8000" step="0.001" min="0.001" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Range End (MHz)</label>
+            <input type="number" id="wfScanEnd" value="101.2000" step="0.001" min="0.001" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Step (kHz)</label>
+            <select id="wfScanStepKhz">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="12.5">12.5</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Dwell (ms)</label>
+            <input type="number" id="wfScanDwellMs" value="450" min="60" max="10000" step="10">
+        </div>
+        <div class="form-group">
+            <label>Signal Threshold <span id="wfScanThresholdValue" class="wf-inline-value">170</span></label>
+            <input type="range" id="wfScanThreshold" min="0" max="255" value="170">
+        </div>
+        <div class="form-group">
+            <label>Hold On Hit (ms)</label>
+            <input type="number" id="wfScanHoldMs" value="2500" min="0" max="30000" step="100">
+        </div>
+        <div class="checkbox-group wf-scan-checkboxes">
+            <label>
+                <input type="checkbox" id="wfScanStopOnSignal" checked>
+                Pause scan when signal is above threshold
+            </label>
+        </div>
+        <div class="wf-side-grid-2 wf-side-grid-gap-top">
+            <button class="preset-btn" onclick="Waterfall.setScanRangeFromView()">Use Current Span</button>
+            <button class="preset-btn" id="wfScanStartBtn" onclick="Waterfall.startScan()">Start Scan</button>
+            <button class="preset-btn" id="wfScanStopBtn" onclick="Waterfall.stopScan()" disabled>Stop Scan</button>
+        </div>
+        <div id="wfScanState" class="wf-side-status-line">Scan idle</div>
+    </div>
+
+    <div class="section">
+        <h3>Scan Activity</h3>
+        <div class="wf-scan-metric-grid">
+            <div class="wf-scan-metric-card">
+                <div class="wf-scan-metric-label">Signals</div>
+                <div class="wf-scan-metric-value" id="wfScanSignalsCount">0</div>
+            </div>
+            <div class="wf-scan-metric-card">
+                <div class="wf-scan-metric-label">Scanned</div>
+                <div class="wf-scan-metric-value" id="wfScanStepsCount">0</div>
+            </div>
+            <div class="wf-scan-metric-card">
+                <div class="wf-scan-metric-label">Cycles</div>
+                <div class="wf-scan-metric-value" id="wfScanCyclesCount">0</div>
+            </div>
+        </div>
+        <div class="wf-side-grid-2 wf-side-grid-gap-top">
+            <button class="preset-btn" onclick="Waterfall.exportScanLog()">Export Log</button>
+            <button class="preset-btn" onclick="Waterfall.clearScanHistory()">Clear History</button>
+        </div>
+        <div class="wf-hit-table-wrap">
+            <table class="wf-hit-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Frequency</th>
+                        <th>Level</th>
+                        <th>Mode</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="wfSignalHitsBody">
+                    <tr><td colspan="5" class="wf-empty">No signals detected</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="wfSignalHitCount" class="wf-side-inline-label">0 signals found</div>
+        <div id="wfActivityLog" class="wf-activity-log">
+            <div class="wf-empty">Ready</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Capture</h3>
+        <div class="form-group">
+            <label>Gain <span class="wf-inline-value">(dB or AUTO)</span></label>
+            <input type="text" id="wfGain" value="AUTO" placeholder="AUTO or numeric">
+        </div>
+        <div class="form-group">
+            <label>FFT Size</label>
+            <select id="wfFftSize">
+                <option value="256">256</option>
+                <option value="512">512</option>
+                <option value="1024" selected>1024</option>
+                <option value="2048">2048</option>
+                <option value="4096">4096</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Frame Rate</label>
+            <select id="wfFps">
+                <option value="10">10 fps</option>
+                <option value="20" selected>20 fps</option>
+                <option value="30">30 fps</option>
+                <option value="40">40 fps</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>FFT Averaging</label>
+            <select id="wfAvgCount">
+                <option value="1">1 (none)</option>
+                <option value="2">2</option>
+                <option value="4" selected>4</option>
+                <option value="8">8</option>
+                <option value="16">16</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>PPM Correction</label>
+            <input type="number" id="wfPpm" value="0" step="1" min="-200" max="200" placeholder="0">
+        </div>
+        <div class="checkbox-group wf-scan-checkboxes">
+            <label>
+                <input type="checkbox" id="wfBiasT">
+                Bias-T (antenna power)
+            </label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Display</h3>
+        <div class="form-group">
+            <label>Color Palette</label>
+            <select id="wfPalette" onchange="Waterfall.setPalette(this.value)">
+                <option value="turbo" selected>Turbo</option>
+                <option value="plasma">Plasma</option>
+                <option value="inferno">Inferno</option>
+                <option value="viridis">Viridis</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Noise Floor (dB)</label>
+            <input type="number" id="wfDbMin" value="-100" step="5" disabled>
+        </div>
+        <div class="form-group">
+            <label>Ceiling (dB)</label>
+            <input type="number" id="wfDbMax" value="-20" step="5" disabled>
+        </div>
+        <div class="checkbox-group wf-scan-checkboxes">
+            <label>
+                <input type="checkbox" id="wfPeakHold" onchange="Waterfall.togglePeakHold(this.checked)">
+                Peak Hold
+            </label>
+            <label>
+                <input type="checkbox" id="wfBandAnnotations" checked onchange="Waterfall.toggleAnnotations(this.checked)">
+                Band Labels
+            </label>
+            <label>
+                <input type="checkbox" id="wfAutoRange" checked onchange="Waterfall.toggleAutoRange(this.checked)">
+                Auto Range
+            </label>
+        </div>
+    </div>
+</div>

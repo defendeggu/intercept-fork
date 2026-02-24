@@ -946,17 +946,32 @@ const BluetoothMode = (function() {
 
     async function stopScan() {
         const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+        const timeoutMs = isAgentMode ? 8000 : 2200;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+        // Optimistic UI teardown keeps mode changes responsive.
+        setScanning(false);
+        stopEventStream();
 
         try {
             if (isAgentMode) {
-                await fetch(`/controller/agents/${currentAgent}/bluetooth/stop`, { method: 'POST' });
+                await fetch(`/controller/agents/${currentAgent}/bluetooth/stop`, {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             } else {
-                await fetch('/api/bluetooth/scan/stop', { method: 'POST' });
+                await fetch('/api/bluetooth/scan/stop', {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             }
-            setScanning(false);
-            stopEventStream();
         } catch (err) {
             console.error('Failed to stop scan:', err);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
         }
     }
 

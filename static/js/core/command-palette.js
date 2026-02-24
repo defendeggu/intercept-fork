@@ -12,8 +12,8 @@ const CommandPalette = (function() {
         { mode: 'pager', label: 'Pager' },
         { mode: 'sensor', label: '433MHz Sensors' },
         { mode: 'rtlamr', label: 'Meters' },
-        { mode: 'listening', label: 'Listening Post' },
         { mode: 'subghz', label: 'SubGHz' },
+        { mode: 'waterfall', label: 'Spectrum Waterfall' },
         { mode: 'aprs', label: 'APRS' },
         { mode: 'wifi', label: 'WiFi Scanner' },
         { mode: 'bluetooth', label: 'Bluetooth Scanner' },
@@ -25,7 +25,6 @@ const CommandPalette = (function() {
         { mode: 'gps', label: 'GPS' },
         { mode: 'meshtastic', label: 'Meshtastic' },
         { mode: 'websdr', label: 'WebSDR' },
-        { mode: 'analytics', label: 'Analytics' },
         { mode: 'spaceweather', label: 'Space Weather' },
     ];
 
@@ -188,13 +187,39 @@ const CommandPalette = (function() {
                 title: 'View Aircraft Dashboard',
                 description: 'Open dedicated ADS-B dashboard page',
                 keyword: 'aircraft adsb dashboard',
-                run: () => { window.location.href = '/adsb/dashboard'; }
+                run: () => {
+                    if (window.InterceptNavPerf && typeof window.InterceptNavPerf.markStart === 'function') {
+                        window.InterceptNavPerf.markStart({
+                            targetPath: '/adsb/dashboard',
+                            trigger: 'command-palette',
+                            sourceMode: (typeof currentMode === 'string' && currentMode) ? currentMode : null,
+                            activeScans: (typeof getActiveScanSummary === 'function') ? getActiveScanSummary() : null,
+                        });
+                    }
+                    if (typeof stopActiveLocalScansForNavigation === 'function') {
+                        stopActiveLocalScansForNavigation();
+                    }
+                    window.location.href = '/adsb/dashboard';
+                }
             },
             {
                 title: 'View Vessel Dashboard',
                 description: 'Open dedicated AIS dashboard page',
                 keyword: 'vessel ais dashboard',
-                run: () => { window.location.href = '/ais/dashboard'; }
+                run: () => {
+                    if (window.InterceptNavPerf && typeof window.InterceptNavPerf.markStart === 'function') {
+                        window.InterceptNavPerf.markStart({
+                            targetPath: '/ais/dashboard',
+                            trigger: 'command-palette',
+                            sourceMode: (typeof currentMode === 'string' && currentMode) ? currentMode : null,
+                            activeScans: (typeof getActiveScanSummary === 'function') ? getActiveScanSummary() : null,
+                        });
+                    }
+                    if (typeof stopActiveLocalScansForNavigation === 'function') {
+                        stopActiveLocalScansForNavigation();
+                    }
+                    window.location.href = '/ais/dashboard';
+                }
             },
             {
                 title: 'Kill All Running Processes',

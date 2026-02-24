@@ -285,6 +285,93 @@
         <!-- Alerts Section -->
         <div id="settings-alerts" class="settings-section">
             <div class="settings-group">
+                <div class="settings-group-title">Voice Alerts</div>
+                <p style="color: var(--text-dim); margin-bottom: 10px; font-size: 12px;">
+                    Configure which events trigger spoken alerts and adjust voice settings.
+                </p>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Pager Messages</span>
+                        <span class="settings-label-desc">Speak decoded pager messages</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="voiceCfgPager" checked onchange="saveVoiceAlertConfig()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">TSCM Alerts</span>
+                        <span class="settings-label-desc">Speak counter-surveillance detections</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="voiceCfgTscm" checked onchange="saveVoiceAlertConfig()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Tracker Detection</span>
+                        <span class="settings-label-desc">Speak when AirTag, Tile, or SmartTag found</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="voiceCfgTracker" checked onchange="saveVoiceAlertConfig()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Emergency Squawks</span>
+                        <span class="settings-label-desc">Speak aircraft emergency transponder codes</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="voiceCfgSquawk" checked onchange="saveVoiceAlertConfig()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Voice</span>
+                        <span class="settings-label-desc">Speech synthesis voice</span>
+                    </div>
+                    <select id="voiceCfgVoice" class="settings-select" style="width: 200px;" onchange="saveVoiceAlertConfig()">
+                        <option value="">Default</option>
+                    </select>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Rate</span>
+                        <span class="settings-label-desc">Speech speed (0.5 – 2.0)</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; width:200px;">
+                        <input type="range" id="voiceCfgRate" min="0.5" max="2.0" step="0.1" value="1.1" style="flex:1;" oninput="document.getElementById('voiceCfgRateVal').textContent=this.value; saveVoiceAlertConfig();">
+                        <span id="voiceCfgRateVal" style="font-family:var(--font-mono); font-size:11px; color:var(--text-dim); min-width:28px; text-align:right;">1.1</span>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-label-text">Pitch</span>
+                        <span class="settings-label-desc">Voice pitch (0.5 – 2.0)</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; width:200px;">
+                        <input type="range" id="voiceCfgPitch" min="0.5" max="2.0" step="0.1" value="0.9" style="flex:1;" oninput="document.getElementById('voiceCfgPitchVal').textContent=this.value; saveVoiceAlertConfig();">
+                        <span id="voiceCfgPitchVal" style="font-family:var(--font-mono); font-size:11px; color:var(--text-dim); min-width:28px; text-align:right;">0.9</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <button class="check-assets-btn" onclick="testVoiceAlert()">Test Voice</button>
+                </div>
+            </div>
+
+            <div class="settings-group">
                 <div class="settings-group-title">Alert Feed <span id="alertsFeedCount" style="color: var(--text-dim); font-weight: 500;"></span></div>
                 <div id="alertsFeedList" class="settings-feed">
                     <div class="settings-feed-empty">No alerts yet</div>
@@ -316,7 +403,6 @@
                         <option value="acars">ACARS</option>
                         <option value="vdl2">VDL2</option>
                         <option value="aprs">APRS</option>
-                        <option value="dsc">DSC</option>
                         <option value="meshtastic">Meshtastic</option>
                     </select>
                 </div>
@@ -392,14 +478,12 @@
                         <option value="bluetooth">Bluetooth</option>
                         <option value="adsb">ADS-B</option>
                         <option value="ais">AIS</option>
-                        <option value="dsc">DSC</option>
                         <option value="acars">ACARS</option>
                         <option value="aprs">APRS</option>
                         <option value="rtlamr">RTLAMR</option>
                         <option value="tscm">TSCM</option>
                         <option value="sstv">SSTV</option>
                         <option value="sstv_general">SSTV General</option>
-                        <option value="listening_scanner">Listening Post</option>
                         <option value="waterfall">Waterfall</option>
                     </select>
                 </div>

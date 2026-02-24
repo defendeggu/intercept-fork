@@ -122,6 +122,17 @@ class DecodeProgress:
         return result
 
 
+def _encode_scope_waveform(raw_samples: np.ndarray, window_size: int = 256) -> list[int]:
+    """Compress recent int16 PCM samples to signed 8-bit values for SSE."""
+    if raw_samples.size == 0:
+        return []
+
+    window = raw_samples[-window_size:] if raw_samples.size > window_size else raw_samples
+    packed = np.rint(window.astype(np.float64) / 256.0).astype(np.int16)
+    packed = np.clip(packed, -127, 127)
+    return packed.tolist()
+
+
 # ---------------------------------------------------------------------------
 # DopplerTracker
 # ---------------------------------------------------------------------------
@@ -423,6 +434,7 @@ class SSTVDecoder:
                 # Scope: compute RMS/peak from raw int16 samples every chunk
                 rms_val = int(np.sqrt(np.mean(raw_samples.astype(np.float64) ** 2)))
                 peak_val = int(np.max(np.abs(raw_samples)))
+                waveform = _encode_scope_waveform(raw_samples)
 
                 if image_decoder is not None:
                     # Currently decoding an image
@@ -451,7 +463,7 @@ class SSTVDecoder:
                         message=f'Decoding {current_mode_name}: {pct}%',
                         partial_image=partial_url,
                     ))
-                    self._emit_scope(rms_val, peak_val, 'decoding')
+                    self._emit_scope(rms_val, peak_val, 'decoding', waveform)
 
                     if complete:
                         # Save image
@@ -529,7 +541,7 @@ class SSTVDecoder:
                             vis_state=vis_detector.state.value,
                         ))
 
-                    self._emit_scope(rms_val, peak_val, scope_tone)
+                    self._emit_scope(rms_val, peak_val, scope_tone, waveform)
 
             except Exception as e:
                 logger.error(f"Error in decode thread: {e}")
@@ -762,11 +774,20 @@ class SSTVDecoder:
             except Exception as e:
                 logger.error(f"Error in progress callback: {e}")
 
-    def _emit_scope(self, rms: int, peak: int, tone: str | None = None) -> None:
+    def _emit_scope(
+        self,
+        rms: int,
+        peak: int,
+        tone: str | None = None,
+        waveform: list[int] | None = None,
+    ) -> None:
         """Emit scope signal levels to callback."""
         if self._callback:
             try:
-                self._callback({'type': 'sstv_scope', 'rms': rms, 'peak': peak, 'tone': tone})
+                payload = {'type': 'sstv_scope', 'rms': rms, 'peak': peak, 'tone': tone}
+                if waveform:
+                    payload['waveform'] = waveform
+                self._callback(payload)
             except Exception:
                 pass
 

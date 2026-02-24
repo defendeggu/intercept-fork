@@ -15,13 +15,21 @@ const SSTVGeneral = (function() {
     let sstvGeneralScopeCtx = null;
     let sstvGeneralScopeAnim = null;
     let sstvGeneralScopeHistory = [];
+    let sstvGeneralScopeWaveBuffer = [];
+    let sstvGeneralScopeDisplayWave = [];
     const SSTV_GENERAL_SCOPE_LEN = 200;
+    const SSTV_GENERAL_SCOPE_WAVE_BUFFER_LEN = 2048;
+    const SSTV_GENERAL_SCOPE_WAVE_INPUT_SMOOTH_ALPHA = 0.55;
+    const SSTV_GENERAL_SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA = 0.22;
+    const SSTV_GENERAL_SCOPE_WAVE_IDLE_DECAY = 0.96;
     let sstvGeneralScopeRms = 0;
     let sstvGeneralScopePeak = 0;
     let sstvGeneralScopeTargetRms = 0;
     let sstvGeneralScopeTargetPeak = 0;
     let sstvGeneralScopeMsgBurst = 0;
     let sstvGeneralScopeTone = null;
+    let sstvGeneralScopeLastWaveAt = 0;
+    let sstvGeneralScopeLastInputSample = 0;
 
     /**
      * Initialize the SSTV General mode
@@ -205,20 +213,64 @@ const SSTVGeneral = (function() {
     /**
      * Initialize signal scope canvas
      */
+    function resizeSstvGeneralScopeCanvas(canvas) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.floor(rect.width * dpr));
+        const height = Math.max(1, Math.floor(rect.height * dpr));
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+    }
+
+    function applySstvGeneralScopeData(scopeData) {
+        if (!scopeData || typeof scopeData !== 'object') return;
+
+        sstvGeneralScopeTargetRms = Number(scopeData.rms) || 0;
+        sstvGeneralScopeTargetPeak = Number(scopeData.peak) || 0;
+        if (scopeData.tone !== undefined) {
+            sstvGeneralScopeTone = scopeData.tone;
+        }
+
+        if (Array.isArray(scopeData.waveform) && scopeData.waveform.length) {
+            for (const packedSample of scopeData.waveform) {
+                const sample = Number(packedSample);
+                if (!Number.isFinite(sample)) continue;
+                const normalized = Math.max(-127, Math.min(127, sample)) / 127;
+                sstvGeneralScopeLastInputSample += (normalized - sstvGeneralScopeLastInputSample) * SSTV_GENERAL_SCOPE_WAVE_INPUT_SMOOTH_ALPHA;
+                sstvGeneralScopeWaveBuffer.push(sstvGeneralScopeLastInputSample);
+            }
+            if (sstvGeneralScopeWaveBuffer.length > SSTV_GENERAL_SCOPE_WAVE_BUFFER_LEN) {
+                sstvGeneralScopeWaveBuffer.splice(0, sstvGeneralScopeWaveBuffer.length - SSTV_GENERAL_SCOPE_WAVE_BUFFER_LEN);
+            }
+            sstvGeneralScopeLastWaveAt = performance.now();
+        }
+    }
+
     function initSstvGeneralScope() {
         const canvas = document.getElementById('sstvGeneralScopeCanvas');
         if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * (window.devicePixelRatio || 1);
-        canvas.height = rect.height * (window.devicePixelRatio || 1);
+
+        if (sstvGeneralScopeAnim) {
+            cancelAnimationFrame(sstvGeneralScopeAnim);
+            sstvGeneralScopeAnim = null;
+        }
+
+        resizeSstvGeneralScopeCanvas(canvas);
         sstvGeneralScopeCtx = canvas.getContext('2d');
         sstvGeneralScopeHistory = new Array(SSTV_GENERAL_SCOPE_LEN).fill(0);
+        sstvGeneralScopeWaveBuffer = [];
+        sstvGeneralScopeDisplayWave = [];
         sstvGeneralScopeRms = 0;
         sstvGeneralScopePeak = 0;
         sstvGeneralScopeTargetRms = 0;
         sstvGeneralScopeTargetPeak = 0;
         sstvGeneralScopeMsgBurst = 0;
         sstvGeneralScopeTone = null;
+        sstvGeneralScopeLastWaveAt = 0;
+        sstvGeneralScopeLastInputSample = 0;
         drawSstvGeneralScope();
     }
 
@@ -228,12 +280,14 @@ const SSTVGeneral = (function() {
     function drawSstvGeneralScope() {
         const ctx = sstvGeneralScopeCtx;
         if (!ctx) return;
+
+        resizeSstvGeneralScopeCanvas(ctx.canvas);
         const W = ctx.canvas.width;
         const H = ctx.canvas.height;
         const midY = H / 2;
 
         // Phosphor persistence
-        ctx.fillStyle = 'rgba(5, 5, 16, 0.3)';
+        ctx.fillStyle = 'rgba(5, 5, 16, 0.26)';
         ctx.fillRect(0, 0, W, H);
 
         // Smooth towards target
@@ -256,32 +310,84 @@ const SSTVGeneral = (function() {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
         }
 
-        // Waveform
-        const stepX = W / (SSTV_GENERAL_SCOPE_LEN - 1);
-        ctx.strokeStyle = '#c080ff';
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = '#c080ff';
-        ctx.shadowBlur = 4;
-
-        // Upper half
+        // Envelope
+        const envStepX = W / (SSTV_GENERAL_SCOPE_LEN - 1);
+        ctx.strokeStyle = 'rgba(168, 110, 255, 0.45)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         for (let i = 0; i < sstvGeneralScopeHistory.length; i++) {
-            const x = i * stepX;
-            const amp = sstvGeneralScopeHistory[i] * midY * 0.9;
+            const x = i * envStepX;
+            const amp = sstvGeneralScopeHistory[i] * midY * 0.85;
             const y = midY - amp;
             if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
-
-        // Lower half (mirror)
         ctx.beginPath();
         for (let i = 0; i < sstvGeneralScopeHistory.length; i++) {
-            const x = i * stepX;
-            const amp = sstvGeneralScopeHistory[i] * midY * 0.9;
+            const x = i * envStepX;
+            const amp = sstvGeneralScopeHistory[i] * midY * 0.85;
             const y = midY + amp;
             if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
+
+        // Actual waveform trace
+        const waveformPointCount = Math.min(Math.max(120, Math.floor(W / 3.2)), 420);
+        if (sstvGeneralScopeWaveBuffer.length > 1) {
+            const waveIsFresh = (performance.now() - sstvGeneralScopeLastWaveAt) < 1000;
+            const sourceLen = sstvGeneralScopeWaveBuffer.length;
+            const sourceWindow = Math.min(sourceLen, 1536);
+            const sourceStart = sourceLen - sourceWindow;
+
+            if (sstvGeneralScopeDisplayWave.length !== waveformPointCount) {
+                sstvGeneralScopeDisplayWave = new Array(waveformPointCount).fill(0);
+            }
+
+            for (let i = 0; i < waveformPointCount; i++) {
+                const a = sourceStart + Math.floor((i / waveformPointCount) * sourceWindow);
+                const b = sourceStart + Math.floor(((i + 1) / waveformPointCount) * sourceWindow);
+                const start = Math.max(sourceStart, Math.min(sourceLen - 1, a));
+                const end = Math.max(start + 1, Math.min(sourceLen, b));
+
+                let sum = 0;
+                let count = 0;
+                for (let j = start; j < end; j++) {
+                    sum += sstvGeneralScopeWaveBuffer[j];
+                    count++;
+                }
+                const targetSample = count > 0 ? (sum / count) : 0;
+                sstvGeneralScopeDisplayWave[i] += (targetSample - sstvGeneralScopeDisplayWave[i]) * SSTV_GENERAL_SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA;
+            }
+
+            ctx.strokeStyle = waveIsFresh ? '#c080ff' : 'rgba(192, 128, 255, 0.45)';
+            ctx.lineWidth = 1.7;
+            ctx.shadowColor = '#c080ff';
+            ctx.shadowBlur = waveIsFresh ? 6 : 2;
+
+            const stepX = waveformPointCount > 1 ? (W / (waveformPointCount - 1)) : W;
+            ctx.beginPath();
+            const firstY = midY - (sstvGeneralScopeDisplayWave[0] * midY * 0.9);
+            ctx.moveTo(0, firstY);
+            for (let i = 1; i < waveformPointCount - 1; i++) {
+                const x = i * stepX;
+                const y = midY - (sstvGeneralScopeDisplayWave[i] * midY * 0.9);
+                const nx = (i + 1) * stepX;
+                const ny = midY - (sstvGeneralScopeDisplayWave[i + 1] * midY * 0.9);
+                const cx = (x + nx) / 2;
+                const cy = (y + ny) / 2;
+                ctx.quadraticCurveTo(x, y, cx, cy);
+            }
+            const lastX = (waveformPointCount - 1) * stepX;
+            const lastY = midY - (sstvGeneralScopeDisplayWave[waveformPointCount - 1] * midY * 0.9);
+            ctx.lineTo(lastX, lastY);
+            ctx.stroke();
+
+            if (!waveIsFresh) {
+                for (let i = 0; i < sstvGeneralScopeDisplayWave.length; i++) {
+                    sstvGeneralScopeDisplayWave[i] *= SSTV_GENERAL_SCOPE_WAVE_IDLE_DECAY;
+                }
+            }
+        }
         ctx.shadowBlur = 0;
 
         // Peak indicator
@@ -317,8 +423,17 @@ const SSTVGeneral = (function() {
             else { toneLabel.textContent = 'QUIET'; toneLabel.style.color = '#444'; }
         }
         if (statusLabel) {
-            if (sstvGeneralScopeRms > 500) { statusLabel.textContent = 'SIGNAL'; statusLabel.style.color = '#0f0'; }
-            else { statusLabel.textContent = 'MONITORING'; statusLabel.style.color = '#555'; }
+            const waveIsFresh = (performance.now() - sstvGeneralScopeLastWaveAt) < 1000;
+            if (sstvGeneralScopeRms > 900 && waveIsFresh) {
+                statusLabel.textContent = 'DEMODULATING';
+                statusLabel.style.color = '#c080ff';
+            } else if (sstvGeneralScopeRms > 500) {
+                statusLabel.textContent = 'CARRIER';
+                statusLabel.style.color = '#e0b8ff';
+            } else {
+                statusLabel.textContent = 'QUIET';
+                statusLabel.style.color = '#555';
+            }
         }
 
         sstvGeneralScopeAnim = requestAnimationFrame(drawSstvGeneralScope);
@@ -330,6 +445,11 @@ const SSTVGeneral = (function() {
     function stopSstvGeneralScope() {
         if (sstvGeneralScopeAnim) { cancelAnimationFrame(sstvGeneralScopeAnim); sstvGeneralScopeAnim = null; }
         sstvGeneralScopeCtx = null;
+        sstvGeneralScopeWaveBuffer = [];
+        sstvGeneralScopeDisplayWave = [];
+        sstvGeneralScopeHistory = [];
+        sstvGeneralScopeLastWaveAt = 0;
+        sstvGeneralScopeLastInputSample = 0;
     }
 
     /**
@@ -353,9 +473,7 @@ const SSTVGeneral = (function() {
                 if (data.type === 'sstv_progress') {
                     handleProgress(data);
                 } else if (data.type === 'sstv_scope') {
-                    sstvGeneralScopeTargetRms = data.rms;
-                    sstvGeneralScopeTargetPeak = data.peak;
-                    if (data.tone !== undefined) sstvGeneralScopeTone = data.tone;
+                    applySstvGeneralScopeData(data);
                 }
             } catch (err) {
                 console.error('Failed to parse SSE message:', err);

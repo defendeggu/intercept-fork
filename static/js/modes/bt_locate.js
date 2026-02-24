@@ -44,6 +44,7 @@ const BtLocate = (function() {
     let queuedDetectionTimer = null;
     let lastDetectionRenderAt = 0;
     let startRequestInFlight = false;
+    let crosshairResetTimer = null;
 
     const MAX_HEAT_POINTS = 1200;
     const MAX_TRAIL_POINTS = 1200;
@@ -226,11 +227,11 @@ const BtLocate = (function() {
             map.on('resize moveend zoomend', () => {
                 flushPendingHeatSync();
             });
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 safeInvalidateMap();
                 flushPendingHeatSync();
-            }, 100);
-            scheduleMapStabilization();
+                scheduleMapStabilization();
+            });
         }
 
         // Init RSSI chart canvas
@@ -349,19 +350,18 @@ const BtLocate = (function() {
     }
 
     function stop() {
+        // Update UI immediately — don't wait for the backend response.
+        if (queuedDetectionTimer) {
+            clearTimeout(queuedDetectionTimer);
+            queuedDetectionTimer = null;
+        }
+        queuedDetection = null;
+        queuedDetectionOptions = null;
+        showIdleUI();
+        disconnectSSE();
+        stopAudio();
+        // Notify backend asynchronously.
         fetch('/bt_locate/stop', { method: 'POST' })
-            .then(r => r.json())
-            .then(() => {
-                if (queuedDetectionTimer) {
-                    clearTimeout(queuedDetectionTimer);
-                    queuedDetectionTimer = null;
-                }
-                queuedDetection = null;
-                queuedDetectionOptions = null;
-                showIdleUI();
-                disconnectSSE();
-                stopAudio();
-            })
             .catch(err => console.error('[BtLocate] Stop error:', err));
     }
 
@@ -703,6 +703,32 @@ const BtLocate = (function() {
         if (gpsCountEl) gpsCountEl.textContent = gpsPoints || 0;
     }
 
+    function triggerCrosshairAnimation(lat, lon) {
+        if (!map) return;
+        const overlay = document.getElementById('btLocateCrosshairOverlay');
+        if (!overlay) return;
+        const size = map.getSize();
+        const point = map.latLngToContainerPoint([lat, lon]);
+        const targetX = Math.max(0, Math.min(size.x, point.x));
+        const targetY = Math.max(0, Math.min(size.y, point.y));
+        const startX = size.x + 8;
+        const startY = size.y + 8;
+        const duration = 1500;
+        overlay.style.setProperty('--btl-crosshair-x-start', `${startX}px`);
+        overlay.style.setProperty('--btl-crosshair-y-start', `${startY}px`);
+        overlay.style.setProperty('--btl-crosshair-x-end', `${targetX}px`);
+        overlay.style.setProperty('--btl-crosshair-y-end', `${targetY}px`);
+        overlay.style.setProperty('--btl-crosshair-duration', `${duration}ms`);
+        overlay.classList.remove('active');
+        void overlay.offsetWidth;
+        overlay.classList.add('active');
+        if (crosshairResetTimer) clearTimeout(crosshairResetTimer);
+        crosshairResetTimer = setTimeout(() => {
+            overlay.classList.remove('active');
+            crosshairResetTimer = null;
+        }, duration + 100);
+    }
+
     function addMapMarker(point, options = {}) {
         if (!map || point.lat == null || point.lon == null) return false;
         const lat = Number(point.lat);
@@ -737,6 +763,7 @@ const BtLocate = (function() {
             'Time: ' + formatPointTimestamp(trailPoint.timestamp) +
             '</div>'
         );
+        marker.on('click', () => triggerCrosshairAnimation(lat, lon));
 
         trailPoints.push(trailPoint);
         mapMarkers.push(marker);

@@ -733,39 +733,69 @@ class UnifiedWiFiScanner:
         Returns:
             True if scan was stopped.
         """
+        cleanup_process: Optional[subprocess.Popen] = None
+        cleanup_thread: Optional[threading.Thread] = None
+        cleanup_detector = None
+
         with self._lock:
             if not self._status.is_scanning:
                 return True
 
-            # Stop deauth detector first
-            self._stop_deauth_detector()
-
             self._deep_scan_stop_event.set()
-
-            if self._deep_scan_process:
-                try:
-                    self._deep_scan_process.terminate()
-                    self._deep_scan_process.wait(timeout=5)
-                except Exception as e:
-                    logger.warning(f"Error terminating airodump-ng: {e}")
-                    try:
-                        self._deep_scan_process.kill()
-                    except Exception:
-                        pass
-                self._deep_scan_process = None
-
-            if self._deep_scan_thread:
-                self._deep_scan_thread.join(timeout=5)
-                self._deep_scan_thread = None
+            cleanup_process = self._deep_scan_process
+            cleanup_thread = self._deep_scan_thread
+            cleanup_detector = self._deauth_detector
+            self._deauth_detector = None
+            self._deep_scan_process = None
+            self._deep_scan_thread = None
 
             self._status.is_scanning = False
+            self._status.error = None
 
             self._queue_event({
                 'type': 'scan_stopped',
                 'mode': SCAN_MODE_DEEP,
             })
 
-            return True
+        cleanup_start = time.perf_counter()
+
+        def _finalize_stop(
+            process: Optional[subprocess.Popen],
+            scan_thread: Optional[threading.Thread],
+            detector,
+        ) -> None:
+            if detector:
+                try:
+                    detector.stop()
+                    logger.info("Deauth detector stopped")
+                    self._queue_event({'type': 'deauth_detector_stopped'})
+                except Exception as exc:
+                    logger.error(f"Error stopping deauth detector: {exc}")
+
+            if process and process.poll() is None:
+                try:
+                    process.terminate()
+                    process.wait(timeout=1.5)
+                except Exception:
+                    try:
+                        process.kill()
+                    except Exception:
+                        pass
+
+            if scan_thread and scan_thread.is_alive():
+                scan_thread.join(timeout=1.5)
+
+            elapsed_ms = (time.perf_counter() - cleanup_start) * 1000.0
+            logger.info(f"Deep scan stop finalized in {elapsed_ms:.1f}ms")
+
+        threading.Thread(
+            target=_finalize_stop,
+            args=(cleanup_process, cleanup_thread, cleanup_detector),
+            daemon=True,
+            name='wifi-deep-stop',
+        ).start()
+
+        return True
 
     def _run_deep_scan(
         self,
@@ -799,12 +829,30 @@ class UnifiedWiFiScanner:
 
             logger.info(f"Starting airodump-ng: {' '.join(cmd)}")
 
+            process: Optional[subprocess.Popen] = None
             try:
-                self._deep_scan_process = subprocess.Popen(
+                process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                should_track_process = False
+                with self._lock:
+                    # Only expose the process handle if this run has not been
+                    # replaced by a newer deep scan session.
+                    if self._status.is_scanning and not self._deep_scan_stop_event.is_set():
+                        should_track_process = True
+                        self._deep_scan_process = process
+                if not should_track_process:
+                    try:
+                        process.terminate()
+                        process.wait(timeout=1.0)
+                    except Exception:
+                        try:
+                            process.kill()
+                        except Exception:
+                            pass
+                    return
 
                 csv_file = f"{output_prefix}-01.csv"
 
@@ -837,7 +885,9 @@ class UnifiedWiFiScanner:
                     'error': str(e),
                 })
             finally:
-                self._deep_scan_process = None
+                with self._lock:
+                    if process is not None and self._deep_scan_process is process:
+                        self._deep_scan_process = None
 
     # =========================================================================
     # Observation Processing

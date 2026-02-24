@@ -1,6 +1,6 @@
 [project]
 name = "intercept"
-version = "2.21.1"
+version = "2.22.3"
 description = "Signal Intelligence Platform - Pager/433MHz/ADS-B/Satellite/WiFi/Bluetooth"
 readme = "README.md"
 requires-python = ">=3.9"

@@ -55,6 +55,12 @@ def _load_meta() -> dict[str, Any] | None:
         if os.path.exists(DB_META_FILE):
             with open(DB_META_FILE, 'r') as f:
                 return json.load(f)
+    except json.JSONDecodeError as e:
+        logger.warning(f"Corrupt aircraft db meta file, removing: {e}")
+        try:
+            os.remove(DB_META_FILE)
+        except OSError:
+            pass
     except Exception as e:
         logger.warning(f"Error loading aircraft db meta: {e}")
     return None

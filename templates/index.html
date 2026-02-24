@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>iNTERCEPT // See the Invisible</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0b1118">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
     <!-- Disclaimer gate - must accept before seeing welcome page -->
     <script>
         // Check BEFORE page renders - if disclaimer not accepted, hide welcome page
@@ -13,7 +18,7 @@
             document.write('<style id="disclaimer-gate">.welcome-overlay{display:none !important}</style>');
             window._showDisclaimerOnLoad = true;
         }
-        // If navigating with a mode param (e.g. /?mode=listening), hide welcome immediately
+        // If navigating with a mode param (e.g. /?mode=waterfall), hide welcome immediately
         // to prevent flash of welcome screen before JS applies the mode
         else if (new URLSearchParams(window.location.search).get('mode')) {
             document.write('<style id="mode-gate">.welcome-overlay{display:none !important}</style>');
@@ -61,11 +66,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/function-strip.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/ux-platform.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/waterfall.css') }}?v={{ version }}&r=wfdeck19">
     <script>
         window.INTERCEPT_MODE_STYLE_MAP = {
             aprs: "{{ url_for('static', filename='css/modes/aprs.css') }}",
             tscm: "{{ url_for('static', filename='css/modes/tscm.css') }}",
-            analytics: "{{ url_for('static', filename='css/modes/analytics.css') }}",
             spystations: "{{ url_for('static', filename='css/modes/spy-stations.css') }}",
             meshtastic: "{{ url_for('static', filename='css/modes/meshtastic.css') }}",
             sstv: "{{ url_for('static', filename='css/modes/sstv.css') }}",
@@ -80,12 +85,28 @@
         window.ensureModeStyles = function(mode) {
             const href = window.INTERCEPT_MODE_STYLE_MAP ? window.INTERCEPT_MODE_STYLE_MAP[mode] : null;
             if (!href) return;
-            if (window.INTERCEPT_MODE_STYLE_LOADED[href]) return;
-            window.INTERCEPT_MODE_STYLE_LOADED[href] = true;
+            const absHref = new URL(href, window.location.href).href;
+            const existing = Array.from(document.querySelectorAll('link[data-mode-style]'))
+                .find((link) => link.href === absHref);
+            if (existing) {
+                window.INTERCEPT_MODE_STYLE_LOADED[href] = 'loaded';
+                return;
+            }
+            if (window.INTERCEPT_MODE_STYLE_LOADED[href] === 'loading') return;
+            window.INTERCEPT_MODE_STYLE_LOADED[href] = 'loading';
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = href;
             link.dataset.modeStyle = mode;
+            link.onload = () => {
+                window.INTERCEPT_MODE_STYLE_LOADED[href] = 'loaded';
+            };
+            link.onerror = () => {
+                delete window.INTERCEPT_MODE_STYLE_LOADED[href];
+                try {
+                    link.remove();
+                } catch (_) {}
+            };
             document.head.appendChild(link);
         };
     </script>
@@ -189,13 +210,13 @@
                                 <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
                                 <span class="mode-name">Meters</span>
                             </button>
-                            <button class="mode-card mode-card-sm" onclick="selectMode('listening')">
-                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
-                                <span class="mode-name">Listening Post</span>
-                            </button>
                             <button class="mode-card mode-card-sm" onclick="selectMode('subghz')">
                                 <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h6l3-9 3 18 3-9h5"/></svg></span>
                                 <span class="mode-name">SubGHz</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('waterfall')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-8 3 16 3-8h4"/><path d="M2 18h20" opacity="0.5"/><path d="M2 21h20" opacity="0.3"/></svg></span>
+                                <span class="mode-name">Waterfall</span>
                             </button>
                         </div>
                     </div>
@@ -281,10 +302,6 @@
                                 <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
                                 <span class="mode-name">TSCM</span>
                             </button>
-                            <button class="mode-card mode-card-sm" onclick="selectMode('analytics')">
-                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
-                                <span class="mode-name">Analytics</span>
-                            </button>
                             <button class="mode-card mode-card-sm" onclick="selectMode('spystations')">
                                 <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span>
                                 <span class="mode-name">Spy Stations</span>
@@ -295,6 +312,7 @@
                             </button>
                         </div>
                     </div>
+
                 </div>
             </div>
 
@@ -600,11 +618,7 @@
 
                 {% include 'partials/modes/space-weather.html' %}
 
-                {% include 'partials/modes/listening-post.html' %}
-
                 {% include 'partials/modes/tscm.html' %}
-
-                {% include 'partials/modes/analytics.html' %}
 
                 {% include 'partials/modes/ais.html' %}
 
@@ -617,6 +631,7 @@
                 {% include 'partials/modes/subghz.html' %}
 
                 {% include 'partials/modes/bt_locate.html' %}
+                {% include 'partials/modes/waterfall.html' %}
 
 
 
@@ -1170,9 +1185,11 @@
                         <!-- Sky View Polar Plot -->
                         <div class="gps-skyview-panel">
                             <h4>Satellite Sky View</h4>
-                            <div class="gps-skyview-canvas-wrap">
-                                <canvas id="gpsSkyCanvas" width="400" height="400"></canvas>
+                            <div class="gps-skyview-canvas-wrap" id="gpsSkyViewWrap">
+                                <canvas id="gpsSkyCanvas" width="400" height="400" aria-label="GPS satellite sky globe"></canvas>
+                                <div class="gps-sky-overlay" id="gpsSkyOverlay" aria-hidden="true"></div>
                             </div>
+                            <div class="gps-sky-hint">Drag to orbit | Scroll to zoom</div>
                             <div class="gps-legend">
                                 <div class="gps-legend-item"><span class="gps-legend-dot" style="background:#00d4ff;"></span> GPS</div>
                                 <div class="gps-legend-item"><span class="gps-legend-dot" style="background:#00ff88;"></span> GLONASS</div>
@@ -1223,442 +1240,6 @@
                         <h4>Signal Strength (SNR dB-Hz)</h4>
                         <div class="gps-signal-bars" id="gpsSignalBars"></div>
                     </div>
-                </div>
-
-                <!-- Listening Post Visualizations - Professional Ham Radio Scanner -->
-                <div class="wifi-visuals" id="listeningPostVisuals" style="display: none;">
-
-                    <!-- WATERFALL FUNCTION BAR -->
-                    <div class="function-strip listening-strip" style="grid-column: span 4;">
-                        <div class="function-strip-inner">
-                            <span class="strip-title">WATERFALL</span>
-                            <div class="strip-divider"></div>
-                            <!-- Span display -->
-                            <div class="strip-stat">
-                                <span class="strip-value" id="waterfallZoomSpan">20.0 MHz</span>
-                                <span class="strip-label">SPAN</span>
-                            </div>
-                            <div class="strip-divider"></div>
-                            <!-- Frequency inputs -->
-                            <div class="strip-control">
-                                <span class="strip-input-label">START</span>
-                                <input type="number" id="waterfallStartFreq" class="strip-input wide" value="88" step="0.1">
-                            </div>
-                            <div class="strip-control">
-                                <span class="strip-input-label">END</span>
-                                <input type="number" id="waterfallEndFreq" class="strip-input wide" value="108" step="0.1">
-                            </div>
-                            <div class="strip-divider"></div>
-                            <!-- Zoom buttons -->
-                            <button type="button" class="strip-btn" onclick="zoomWaterfall('out')">−</button>
-                            <button type="button" class="strip-btn" onclick="zoomWaterfall('in')">+</button>
-                            <div class="strip-divider"></div>
-                            <!-- FFT Size -->
-                            <div class="strip-control">
-                                <span class="strip-input-label">FFT</span>
-                                <select id="waterfallFftSize" class="strip-select">
-                                    <option value="512">512</option>
-                                    <option value="1024" selected>1024</option>
-                                    <option value="2048">2048</option>
-                                    <option value="4096">4096</option>
-                                </select>
-                            </div>
-                            <!-- Gain -->
-                            <div class="strip-control">
-                                <span class="strip-input-label">GAIN</span>
-                                <input type="number" id="waterfallGain" class="strip-input" value="40" min="0" max="50">
-                            </div>
-                            <div class="strip-divider"></div>
-                            <!-- Start / Stop -->
-                            <button type="button" class="strip-btn primary" id="startWaterfallBtn" onclick="startWaterfall()">▶ START</button>
-                            <button type="button" class="strip-btn stop" id="stopWaterfallBtn" onclick="stopWaterfall()" style="display: none;">◼ STOP</button>
-                            <!-- Status -->
-                            <div class="strip-status">
-                                <div class="status-dot inactive" id="waterfallStripDot"></div>
-                                <span id="waterfallFreqRange">STANDBY</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- WATERFALL / SPECTROGRAM PANEL -->
-                    <div id="waterfallPanel" class="radio-module-box" style="grid-column: span 4; padding: 10px; display: none;">
-                        <div class="module-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 10px;">
-                            <span>WATERFALL / SPECTROGRAM</span>
-                            <span id="waterfallFreqRangeHeader" style="font-size: 9px; color: var(--accent-cyan);"></span>
-                        </div>
-                        <canvas id="spectrumCanvas" width="800" height="120" style="width: 100%; height: 120px; border-radius: 4px; background: rgba(0,0,0,0.8);"></canvas>
-                        <canvas id="waterfallCanvas" width="800" height="400" style="width: 100%; height: 400px; border-radius: 4px; margin-top: 4px; background: rgba(0,0,0,0.9);"></canvas>
-                    </div>
-
-                    <!-- TOP: FREQUENCY DISPLAY PANEL -->
-                    <div class="radio-module-box scanner-main" style="grid-column: span 4; padding: 12px;">
-                        <div style="display: flex; gap: 15px; align-items: stretch;">
-                            <!-- Main Frequency Display -->
-                            <div
-                                style="flex: 1; text-align: center; padding: 15px 20px; background: rgba(0,0,0,0.6); border-radius: 6px; border: 1px solid var(--border-color);">
-                                <div class="freq-status" id="mainScannerModeLabel"
-                                    style="font-size: 10px; color: var(--text-muted); margin-bottom: 4px; letter-spacing: 3px;">
-                                    STOPPED</div>
-                                <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
-                                    <div class="freq-digits" id="mainScannerFreq"
-                                        style="font-size: 52px; font-weight: bold; color: var(--accent-cyan); text-shadow: 0 0 30px var(--accent-cyan); font-family: var(--font-mono); letter-spacing: 3px;">
-                                        118.000</div>
-                                    <span class="freq-unit"
-                                        style="font-size: 20px; color: var(--text-secondary); font-weight: 500;">MHz</span>
-                                </div>
-                                <div
-                                    style="display: flex; justify-content: center; align-items: center; margin-top: 6px;">
-                                    <span class="freq-mode-badge" id="mainScannerMod"
-                                        style="background: var(--accent-cyan); color: #000; padding: 3px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">AM</span>
-                                </div>
-                                <!-- Progress bar -->
-                                <div id="mainScannerProgress" style="display: none; margin-top: 12px;">
-                                    <div
-                                        style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted); margin-bottom: 3px;">
-                                        <span id="mainRangeStart">--</span>
-                                        <span id="mainRangeEnd">--</span>
-                                    </div>
-                                    <div
-                                        style="height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; overflow: hidden;">
-                                        <div class="scan-bar" id="mainProgressBar"
-                                            style="height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); width: 0%; transition: width 0.1s;">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Synthesizer + Audio Output Panel -->
-                            <div style="width: 320px; display: flex; flex-direction: column; gap: 8px;">
-                                <!-- Synthesizer Display -->
-                                <div
-                                    style="flex: 1; padding: 10px; background: rgba(0,0,0,0.6); border-radius: 6px; border: 1px solid var(--border-color);">
-                                    <div
-                                        style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">
-                                        Synthesizer</div>
-                                    <canvas id="synthesizerCanvas"
-                                        style="width: 100%; height: 60px; background: rgba(0,0,0,0.4); border-radius: 4px;"></canvas>
-                                </div>
-                                <!-- Audio Output -->
-                                <div
-                                    style="padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; border: 1px solid var(--border-color);">
-                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                        <div
-                                            style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
-                                            Audio Output</div>
-                                    </div>
-                                    <audio id="scannerAudioPlayer" style="width: 100%; height: 28px;" controls></audio>
-                                    <button id="audioUnlockBtn" type="button"
-                                        style="display: none; margin-top: 8px; width: 100%; padding: 6px 10px; font-size: 10px; letter-spacing: 1px; background: var(--accent-cyan); color: #000; border: 1px solid var(--accent-cyan); border-radius: 4px; cursor: pointer;">
-                                        CLICK TO ENABLE AUDIO
-                                    </button>
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                                        <span style="font-size: 7px; color: var(--text-muted);">LEVEL</span>
-                                        <div
-                                            style="flex: 1; height: 8px; background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden;">
-                                            <div id="audioSignalBar"
-                                                style="height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan), var(--accent-orange), var(--accent-red)); width: 0%; transition: width 0.1s;">
-                                            </div>
-                                        </div>
-                                        <span id="audioSignalDb"
-                                            style="font-size: 8px; color: var(--text-muted); min-width: 40px; text-align: right;">--
-                                            dB</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                                        <span style="font-size: 7px; color: var(--text-muted); letter-spacing: 1px;">SNR THRESH</span>
-                                        <input type="range" id="snrThresholdSlider" min="6" max="20" step="1" value="8"
-                                            style="flex: 1;" />
-                                        <span id="snrThresholdValue"
-                                            style="font-size: 8px; color: var(--text-muted); min-width: 26px; text-align: right;">8</span>
-                                    </div>
-                                    <!-- Signal Alert inline -->
-                                    <div id="mainSignalAlert"
-                                        style="display: none; background: rgba(0, 255, 100, 0.2); border: 1px solid var(--accent-green); border-radius: 4px; padding: 5px; text-align: center; margin-top: 8px;">
-                                        <span style="font-size: 9px; color: var(--accent-green); font-weight: bold;">●
-                                            SIGNAL</span>
-                                        <button class="tune-btn" onclick="skipSignal()"
-                                            style="margin-left: 8px; padding: 2px 8px; font-size: 8px;">Skip</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- CONTROL PANEL: Tuning Section | Mode/Band | Action Buttons -->
-                    <div class="radio-module-box" style="grid-column: span 4; padding: 12px;">
-                        <div style="display: flex; gap: 15px; align-items: stretch;">
-
-                            <!-- LEFT: Tuning Section -->
-                            <div
-                                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 20px; padding: 10px 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid var(--border-color);">
-
-                                <!-- Fine Tune Buttons (Left of dial) -->
-                                <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <button class="tune-btn" onclick="tuneFreq(-1)"
-                                        style="padding: 8px 12px; font-size: 11px;">-1</button>
-                                    <button class="tune-btn" onclick="tuneFreq(-0.1)"
-                                        style="padding: 8px 12px; font-size: 11px;">-.1</button>
-                                    <button class="tune-btn" onclick="tuneFreq(-0.05)"
-                                        style="padding: 8px 12px; font-size: 11px;">-.05</button>
-                                    <button class="tune-btn" onclick="tuneFreq(-0.005)"
-                                        style="padding: 8px 12px; font-size: 10px;">-.005</button>
-                                </div>
-
-                                <!-- Main Tuning Dial -->
-                                <div style="display: flex; flex-direction: column; align-items: center;">
-                                    <div class="tuning-dial" id="mainTuningDial" data-value="118" data-min="24"
-                                        data-max="1800" data-step="0.1" style="width: 100px; height: 100px;"></div>
-                                    <div
-                                        style="font-size: 9px; color: var(--text-muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 1px;">
-                                        Tune</div>
-                                    <div
-                                        style="font-size: 8px; color: var(--text-muted); margin-top: 3px; opacity: 0.6;"
-                                        title="Arrow keys: &#177;0.05/0.1 MHz&#10;Shift+Arrow: &#177;0.005/1 MHz">
-                                        &#9000; arrow keys</div>
-                                </div>
-
-                                <!-- Fine Tune Buttons (Right of dial) -->
-                                <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <button class="tune-btn" onclick="tuneFreq(1)"
-                                        style="padding: 8px 12px; font-size: 11px;">+1</button>
-                                    <button class="tune-btn" onclick="tuneFreq(0.1)"
-                                        style="padding: 8px 12px; font-size: 11px;">+.1</button>
-                                    <button class="tune-btn" onclick="tuneFreq(0.05)"
-                                        style="padding: 8px 12px; font-size: 11px;">+.05</button>
-                                    <button class="tune-btn" onclick="tuneFreq(0.005)"
-                                        style="padding: 8px 12px; font-size: 10px;">+.005</button>
-                                </div>
-
-                                <!-- Divider -->
-                                <div style="width: 1px; height: 80px; background: var(--border-color);"></div>
-
-                                <!-- Settings: Step & Dwell -->
-                                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 90px;">
-                                    <div
-                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 10px;">
-                                        <span style="color: var(--text-muted);">Step</span>
-                                        <select id="radioScanStep"
-                                            style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 5px; border-radius: 3px; font-size: 9px;">
-                                            <option value="8.33">8.33k</option>
-                                            <option value="12.5">12.5k</option>
-                                            <option value="25" selected>25k</option>
-                                            <option value="50">50k</option>
-                                            <option value="100">100k</option>
-                                        </select>
-                                    </div>
-                                    <div
-                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 10px;">
-                                        <span style="color: var(--text-muted);">Dwell</span>
-                                        <select id="radioScanDwell"
-                                            style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 5px; border-radius: 3px; font-size: 9px;">
-                                            <option value="2">2s</option>
-                                            <option value="5">5s</option>
-                                            <option value="10" selected>10s</option>
-                                            <option value="30">30s</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Divider -->
-                                <div style="width: 1px; height: 80px; background: var(--border-color);"></div>
-
-                                <!-- SQL, Gain, Vol Knobs -->
-                                <div style="display: flex; gap: 15px;">
-                                    <div class="knob-container">
-                                        <div class="radio-knob" id="radioSquelchKnob" data-value="0" data-min="0"
-                                            data-max="100" data-step="1"></div>
-                                        <div class="knob-label">SQL</div>
-                                        <div class="knob-value" id="radioSquelchValue">0</div>
-                                    </div>
-                                    <div class="knob-container">
-                                        <div class="radio-knob" id="radioGainKnob" data-value="40" data-min="0"
-                                            data-max="50" data-step="1"></div>
-                                        <div class="knob-label">GAIN</div>
-                                        <div class="knob-value" id="radioGainValue">40</div>
-                                    </div>
-                                    <div class="knob-container">
-                                        <div class="radio-knob" id="radioVolumeKnob" data-value="80" data-min="0"
-                                            data-max="100" data-step="1"></div>
-                                        <div class="knob-label">VOL</div>
-                                        <div class="knob-value" id="radioVolumeValue">80</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- CENTER: Mode & Band (Stacked) -->
-                            <div
-                                style="width: 130px; display: flex; flex-direction: column; gap: 10px; justify-content: center;">
-                                <div>
-                                    <div
-                                        style="font-size: 8px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">
-                                        Modulation</div>
-                                    <div class="radio-button-bank compact" id="modBtnBank"
-                                        style="flex-wrap: wrap; gap: 2px;">
-                                        <button class="radio-btn active" data-mod="am" onclick="setModulation('am')"
-                                            style="padding: 6px 10px; font-size: 10px;">AM</button>
-                                        <button class="radio-btn" data-mod="fm" onclick="setModulation('fm')"
-                                            style="padding: 6px 10px; font-size: 10px;">NFM</button>
-                                        <button class="radio-btn" data-mod="wfm" onclick="setModulation('wfm')"
-                                            style="padding: 6px 10px; font-size: 10px;">WFM</button>
-                                        <button class="radio-btn" data-mod="usb" onclick="setModulation('usb')"
-                                            style="padding: 6px 10px; font-size: 10px;">USB</button>
-                                        <button class="radio-btn" data-mod="lsb" onclick="setModulation('lsb')"
-                                            style="padding: 6px 10px; font-size: 10px;">LSB</button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div
-                                        style="font-size: 8px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">
-                                        Band</div>
-                                    <div class="radio-button-bank compact" id="bandBtnBank"
-                                        style="flex-wrap: wrap; gap: 2px;">
-                                        <button class="radio-btn" data-band="fm" onclick="setBand('fm')"
-                                            style="padding: 6px 10px; font-size: 10px;">FM</button>
-                                        <button class="radio-btn active" data-band="air" onclick="setBand('air')"
-                                            style="padding: 6px 10px; font-size: 10px;">AIR</button>
-                                        <button class="radio-btn" data-band="marine" onclick="setBand('marine')"
-                                            style="padding: 6px 10px; font-size: 10px;">MAR</button>
-                                        <button class="radio-btn" data-band="amateur2m" onclick="setBand('amateur2m')"
-                                            style="padding: 6px 10px; font-size: 10px;">2M</button>
-                                        <button class="radio-btn" data-band="amateur70cm"
-                                            onclick="setBand('amateur70cm')"
-                                            style="padding: 6px 10px; font-size: 10px;">70CM</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- RIGHT: Scan Range + Action Buttons -->
-                            <div style="width: 175px; display: flex; flex-direction: column; gap: 8px;">
-                                <!-- Frequency Range - Prominent -->
-                                <div
-                                    style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
-                                    <div
-                                        style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; text-align: center;">
-                                        Scan Range (MHz)</div>
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <div style="flex: 1;">
-                                            <div style="font-size: 7px; color: var(--text-muted); margin-bottom: 2px;">
-                                                START</div>
-                                            <input type="number" id="radioScanStart" value="118" step="0.1"
-                                                class="radio-input"
-                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: var(--font-mono); font-weight: bold; color: var(--accent-cyan);">
-                                        </div>
-                                        <span
-                                            style="color: var(--text-muted); font-size: 16px; padding-top: 12px;">→</span>
-                                        <div style="flex: 1;">
-                                            <div style="font-size: 7px; color: var(--text-muted); margin-bottom: 2px;">
-                                                END</div>
-                                            <input type="number" id="radioScanEnd" value="137" step="0.1"
-                                                class="radio-input"
-                                                style="width: 100%; font-size: 16px; padding: 8px 6px; text-align: center; font-family: var(--font-mono); font-weight: bold; color: var(--accent-cyan);">
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Action Buttons -->
-                                <button class="radio-action-btn scan" id="radioScanBtn" onclick="toggleScanner()">
-                                    <span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>SCAN
-                                </button>
-                                <button class="radio-action-btn listen" id="radioListenBtn" onclick="toggleDirectListen()">
-                                    <span class="icon icon--sm" style="margin-right: 4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>LISTEN
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- QUICK TUNE BAR -->
-                    <div class="radio-module-box" style="grid-column: span 4; padding: 8px 12px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span
-                                style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Quick
-                                Tune:</span>
-                            <button class="preset-freq-btn" onclick="quickTune(121.5, 'am')">121.5 GUARD</button>
-                            <button class="preset-freq-btn" onclick="quickTune(156.8, 'fm')">156.8 CH16</button>
-                            <button class="preset-freq-btn" onclick="quickTune(145.5, 'fm')">145.5 2M</button>
-                            <button class="preset-freq-btn" onclick="quickTune(98.1, 'wfm')">98.1 FM</button>
-                            <button class="preset-freq-btn" onclick="quickTune(462.5625, 'fm')">462.56 FRS</button>
-                            <button class="preset-freq-btn" onclick="quickTune(446.0, 'fm')">446.0 PMR</button>
-                        </div>
-                    </div>
-
-                    <!-- SIGNAL HITS -->
-                    <div class="radio-module-box" style="grid-column: span 2; padding: 10px;">
-                        <div class="module-header"
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px;">
-                            <span>SIGNAL HITS</span>
-                            <span
-                                style="font-size: 10px; color: var(--accent-cyan); background: rgba(0,212,255,0.1); padding: 2px 8px; border-radius: 3px;"
-                                id="scannerHitCount">0 signals</span>
-                        </div>
-                        <div id="scannerHitsList" style="overflow-y: auto; max-height: 100px;">
-                            <table style="width: 100%; font-size: 10px; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
-                                        <th style="text-align: left; padding: 4px;">Time</th>
-                                        <th style="text-align: left; padding: 4px;">Frequency</th>
-                                        <th style="text-align: left; padding: 4px;">SNR</th>
-                                        <th style="text-align: left; padding: 4px;">Mod</th>
-                                        <th style="text-align: center; padding: 4px; width: 60px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="scannerHitsBody">
-                                    <tr style="color: var(--text-muted);">
-                                        <td colspan="5" style="padding: 15px; text-align: center; font-size: 10px;">No
-                                            signals detected</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- STATS PANEL -->
-                    <div class="radio-module-box" style="grid-column: span 1; padding: 10px;">
-                        <div class="module-header" style="margin-bottom: 8px; font-size: 10px;">
-                            <span>STATS</span>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 9px; color: var(--text-muted);">SIGNALS</span>
-                                <span
-                                    style="color: var(--accent-green); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
-                                    id="mainSignalCount">0</span>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 9px; color: var(--text-muted);">SCANNED</span>
-                                <span
-                                    style="color: var(--accent-cyan); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
-                                    id="mainFreqsScanned">0</span>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 9px; color: var(--text-muted);">CYCLES</span>
-                                <span
-                                    style="color: var(--accent-orange); font-size: 18px; font-weight: bold; font-family: var(--font-mono);"
-                                    id="mainScanCycles">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ACTIVITY LOG -->
-                    <div class="radio-module-box" style="grid-column: span 1; padding: 10px;">
-                        <div class="module-header"
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px;">
-                            <span>LOG</span>
-                            <div style="display: flex; gap: 4px;">
-                                <button class="tune-btn" onclick="exportScannerLog()"
-                                    style="padding: 2px 6px; font-size: 8px;">Export</button>
-                                <button class="tune-btn" onclick="clearScannerLog()"
-                                    style="padding: 2px 6px; font-size: 8px;">Clear</button>
-                            </div>
-                        </div>
-                        <div class="log-content" id="scannerActivityLog"
-                            style="max-height: 100px; overflow-y: auto; font-size: 9px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 6px;">
-                            <div class="scanner-log-entry" style="color: var(--text-muted);">Ready</div>
-                        </div>
-                    </div>
-
-                    <!-- SIGNAL ACTIVITY TIMELINE -->
-                    <div class="radio-module-box" style="grid-column: span 4; padding: 10px;">
-                        <div id="listeningPostTimelineContainer"></div>
-                    </div>
-
                 </div>
 
                 <!-- Satellite Dashboard (Embedded) -->
@@ -2177,7 +1758,7 @@
                 </div>
 
                 <!-- BT Locate SAR Dashboard -->
-                <div id="btLocateVisuals" class="btl-visuals-container" style="display: none;">
+                <div id="btLocateVisuals" class="btl-visuals-container" style="display: none; flex-direction: column; gap: 8px; flex: 1; min-height: 0; overflow: hidden; padding: 8px;">
                     <!-- Proximity HUD -->
                     <div class="btl-hud" id="btLocateHud" style="display: none;">
                         <div class="btl-hud-top">
@@ -2248,8 +1829,12 @@
                             <div id="btLocateDiag" class="btl-hud-diag"></div>
                         </div>
                     </div>
-                    <div class="btl-map-container">
-                        <div id="btLocateMap"></div>
+                    <div class="btl-map-container" style="flex: 1; min-height: 250px; position: relative; overflow: hidden;">
+                        <div id="btLocateMap" style="position: absolute; inset: 0;"></div>
+                        <div id="btLocateCrosshairOverlay" class="btl-crosshair-overlay" aria-hidden="true">
+                            <div class="btl-crosshair-line btl-crosshair-vertical"></div>
+                            <div class="btl-crosshair-line btl-crosshair-horizontal"></div>
+                        </div>
                         <div class="btl-map-overlay-controls">
                             <label class="btl-map-overlay-toggle">
                                 <input type="checkbox" id="btLocateHeatmapEnable" onchange="BtLocate.toggleHeatmap()">
@@ -2606,7 +2191,7 @@
                     <div id="sstvScopePanel" style="display: none; margin-bottom: 12px;">
                         <div style="background: #0a0a0a; border: 1px solid #1e1a2e; border-radius: 6px; padding: 8px 10px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px;">
-                                <span>Signal Scope</span>
+                                <span>Audio Waveform</span>
                                 <div style="display: flex; gap: 14px;">
                                     <span>RMS: <span id="sstvScopeRmsLabel" style="color: #c080ff; font-variant-numeric: tabular-nums;">0</span></span>
                                     <span>PEAK: <span id="sstvScopePeakLabel" style="color: #f44; font-variant-numeric: tabular-nums;">0</span></span>
@@ -2874,7 +2459,7 @@
                     <div id="sstvGeneralScopePanel" style="display: none; margin-bottom: 12px;">
                         <div style="background: #0a0a0a; border: 1px solid #1e1a2e; border-radius: 6px; padding: 8px 10px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px;">
-                                <span>Signal Scope</span>
+                                <span>Audio Waveform</span>
                                 <div style="display: flex; gap: 14px;">
                                     <span>RMS: <span id="sstvGeneralScopeRmsLabel" style="color: #c080ff; font-variant-numeric: tabular-nums;">0</span></span>
                                     <span>PEAK: <span id="sstvGeneralScopePeakLabel" style="color: #f44; font-variant-numeric: tabular-nums;">0</span></span>
@@ -3077,6 +2662,153 @@
                     </div>
                 </div>
 
+                <!-- Waterfall Visuals -->
+                <div id="waterfallVisuals" style="display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+                    <div class="wf-container">
+                        <div class="wf-headline">
+                            <div class="wf-headline-left">
+                                <span class="wf-headline-tag">SPECTRUM RECEIVER</span>
+                                <span class="wf-headline-sub">Local SDR</span>
+                            </div>
+                            <div class="wf-headline-right">
+                                <span class="wf-range-text" id="wfRangeDisplay">98.8000 - 101.2000 MHz</span>
+                                <span class="wf-tune-text" id="wfTuneDisplay">Tune 100.0000 MHz</span>
+                            </div>
+                        </div>
+
+                        <div class="wf-monitor-strip">
+                            <div class="wf-rx-vfo">
+                                <div class="wf-rx-vfo-top">
+                                    <span class="wf-rx-vfo-name">VFO-A</span>
+                                    <span class="wf-rx-vfo-status" id="wfVisualStatus">IDLE</span>
+                                </div>
+                                <div class="wf-rx-vfo-readout">
+                                    <span id="wfRxFreqReadout">100.0000</span>
+                                    <span class="wf-rx-vfo-unit">MHz</span>
+                                </div>
+                                <div class="wf-rx-vfo-bottom">
+                                    <span id="wfRxModeReadout">WFM</span>
+                                    <span id="wfRxStepReadout">STEP 100 kHz</span>
+                                </div>
+                            </div>
+
+                            <div class="wf-rx-modebank" id="wfModeBank">
+                                <button class="wf-mode-btn is-active" data-mode="wfm">WFM</button>
+                                <button class="wf-mode-btn" data-mode="fm">NFM</button>
+                                <button class="wf-mode-btn" data-mode="am">AM</button>
+                                <button class="wf-mode-btn" data-mode="usb">USB</button>
+                                <button class="wf-mode-btn" data-mode="lsb">LSB</button>
+                                <select id="wfMonitorMode" class="wf-monitor-select wf-monitor-select-hidden">
+                                    <option value="wfm" selected>WFM</option>
+                                    <option value="fm">NFM</option>
+                                    <option value="am">AM</option>
+                                    <option value="usb">USB</option>
+                                    <option value="lsb">LSB</option>
+                                </select>
+                            </div>
+
+                            <div class="wf-rx-levels">
+                                <div class="wf-monitor-group">
+                                    <span class="wf-monitor-label">Squelch</span>
+                                    <div class="wf-monitor-slider-wrap">
+                                        <input type="range" id="wfMonitorSquelch" min="0" max="100" value="0">
+                                        <span id="wfMonitorSquelchValue" class="wf-monitor-value">0</span>
+                                    </div>
+                                </div>
+                                <div class="wf-monitor-group">
+                                    <span class="wf-monitor-label">Gain</span>
+                                    <div class="wf-monitor-slider-wrap">
+                                        <input type="range" id="wfMonitorGain" min="0" max="60" value="40">
+                                        <span id="wfMonitorGainValue" class="wf-monitor-value">40</span>
+                                    </div>
+                                </div>
+                                <div class="wf-monitor-group">
+                                    <span class="wf-monitor-label">Volume</span>
+                                    <div class="wf-monitor-slider-wrap">
+                                        <input type="range" id="wfMonitorVolume" min="0" max="100" value="82">
+                                        <span id="wfMonitorVolumeValue" class="wf-monitor-value">82</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wf-rx-meter-wrap">
+                                <span class="wf-monitor-label">S-Meter</span>
+                                <div class="wf-rx-smeter">
+                                    <div class="wf-rx-smeter-fill" id="wfSmeterBar"></div>
+                                </div>
+                                <div class="wf-rx-smeter-text" id="wfSmeterText">S0</div>
+                            </div>
+
+                            <div class="wf-rx-actions">
+                                <div class="wf-rx-action-row">
+                                    <button class="wf-monitor-btn" id="wfMonitorBtn" onclick="Waterfall.toggleMonitor()">Monitor</button>
+                                    <button class="wf-monitor-btn wf-monitor-btn-secondary" id="wfMuteBtn" onclick="Waterfall.toggleMute()">Mute</button>
+                                    <button class="wf-monitor-btn wf-monitor-btn-unlock" id="wfAudioUnlockBtn" onclick="Waterfall.unlockAudio()" style="display:none;">Unlock Audio</button>
+                                </div>
+                                <div class="wf-monitor-state" id="wfMonitorState">No audio monitor</div>
+                            </div>
+                            <audio id="wfAudioPlayer" autoplay playsinline></audio>
+                        </div>
+
+                        <!-- Frequency control bar -->
+                        <div class="wf-freq-bar">
+                            <button class="wf-step-btn" onclick="Waterfall.stepFreq && Waterfall.stepFreq(-10)" title="Step down ×10">«</button>
+                            <button class="wf-step-btn" onclick="Waterfall.stepFreq && Waterfall.stepFreq(-1)" title="Step down">‹</button>
+                            <div class="wf-freq-display-wrap">
+                                <span class="wf-freq-bar-label">CENTER</span>
+                                <input type="text" id="wfFreqCenterDisplay" class="wf-freq-center-input" value="100.0000" inputmode="decimal" autocomplete="off" spellcheck="false">
+                                <span class="wf-freq-bar-unit">MHz</span>
+                            </div>
+                            <button class="wf-step-btn" onclick="Waterfall.stepFreq && Waterfall.stepFreq(1)" title="Step up">›</button>
+                            <button class="wf-step-btn" onclick="Waterfall.stepFreq && Waterfall.stepFreq(10)" title="Step up ×10">»</button>
+                            <div class="wf-freq-bar-sep"></div>
+                            <span class="wf-freq-bar-label">ZOOM</span>
+                            <button class="wf-step-btn wf-zoom-btn" onclick="Waterfall.zoomOut && Waterfall.zoomOut()" title="Zoom out (wider span)">-</button>
+                            <button class="wf-step-btn wf-zoom-btn" onclick="Waterfall.zoomIn && Waterfall.zoomIn()" title="Zoom in (narrower span)">+</button>
+                            <div class="wf-freq-bar-sep"></div>
+                            <span class="wf-freq-bar-label">STEP</span>
+                            <select id="wfStepSize" class="wf-step-select">
+                                <option value="0.001">1 kHz</option>
+                                <option value="0.005">5 kHz</option>
+                                <option value="0.01">10 kHz</option>
+                                <option value="0.025">25 kHz</option>
+                                <option value="0.05">50 kHz</option>
+                                <option value="0.1" selected>100 kHz</option>
+                                <option value="0.5">500 kHz</option>
+                                <option value="1">1 MHz</option>
+                                <option value="5">5 MHz</option>
+                            </select>
+                            <div class="wf-freq-bar-sep"></div>
+                            <span class="wf-freq-bar-label">SPAN</span>
+                            <span id="wfSpanDisplay" class="wf-span-display">2.4 MHz</span>
+                        </div>
+
+                        <!-- Spectrum canvas -->
+                        <div class="wf-spectrum-canvas-wrap">
+                            <canvas id="wfSpectrumCanvas"></canvas>
+                            <div class="wf-center-line"></div>
+                            <div class="wf-tune-line" id="wfTuneLineSpec"></div>
+                        </div>
+
+                        <div class="wf-band-strip" id="wfBandStrip"></div>
+
+                        <!-- Drag handle to resize spectrum vs waterfall -->
+                        <div class="wf-resize-handle" id="wfResizeHandle">
+                            <div class="wf-resize-grip"></div>
+                        </div>
+
+                        <!-- Waterfall canvas -->
+                        <div class="wf-waterfall-canvas-wrap">
+                            <canvas id="wfWaterfallCanvas"></canvas>
+                            <div class="wf-tooltip" id="wfTooltip"></div>
+                            <div class="wf-center-line"></div>
+                            <div class="wf-tune-line" id="wfTuneLineWf"></div>
+                        </div>
+
+                        <div class="wf-freq-axis" id="wfFreqAxis"></div>
+                    </div>
+                </div>
+
                 <!-- Device Intelligence Dashboard (above waterfall for prominence) -->
                 <div class="recon-panel collapsed" id="reconPanel">
                     <div class="recon-header" onclick="toggleReconCollapse()" style="cursor: pointer;">
@@ -3101,7 +2833,7 @@
                 <div id="pagerScopePanel" style="display: none; margin-bottom: 12px;">
                     <div style="background: #0a0a0a; border: 1px solid #1a1a2e; border-radius: 6px; padding: 8px 10px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px;">
-                            <span>Signal Scope</span>
+                            <span>Audio Waveform</span>
                             <div style="display: flex; gap: 14px;">
                                 <span>RMS: <span id="scopeRmsLabel" style="color: #0ff; font-variant-numeric: tabular-nums;">0</span></span>
                                 <span>PEAK: <span id="scopePeakLabel" style="color: #f44; font-variant-numeric: tabular-nums;">0</span></span>
@@ -3119,7 +2851,7 @@
                 <div id="sensorScopePanel" style="display: none; margin-bottom: 12px;">
                     <div style="background: #0a0a0a; border: 1px solid #1a2e1a; border-radius: 6px; padding: 8px 10px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px;">
-                            <span>Signal Scope</span>
+                            <span>Audio Waveform</span>
                             <div style="display: flex; gap: 14px;">
                                 <span>RSSI: <span id="sensorScopeRssiLabel" style="color: #0f0; font-variant-numeric: tabular-nums;">--</span><span style="color: #444;"> dB</span></span>
                                 <span>SNR: <span id="sensorScopeSnrLabel" style="color: #fa0; font-variant-numeric: tabular-nums;">--</span><span style="color: #444;"> dB</span></span>
@@ -3191,7 +2923,6 @@
     <!-- WiFi v2 components -->
     <script src="{{ url_for('static', filename='js/components/channel-chart.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/wifi.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/modes/listening-post.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/spy-stations.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/meshtastic.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/sstv.js') }}"></script>
@@ -3201,8 +2932,11 @@
     <script src="{{ url_for('static', filename='js/modes/websdr.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/subghz.js') }}?v={{ version }}&r=subghz_layout9"></script>
     <script src="{{ url_for('static', filename='js/modes/bt_locate.js') }}?v={{ version }}&r=btlocate4"></script>
-    <script src="{{ url_for('static', filename='js/modes/analytics.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/space-weather.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/voice-alerts.js') }}?v={{ version }}&r=voicefix2"></script>
+    <script src="{{ url_for('static', filename='js/core/keyboard-shortcuts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/cheat-sheets.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/waterfall.js') }}?v={{ version }}&r=wfdeck21"></script>
 
     <script>
         // ============================================
@@ -3247,15 +2981,6 @@
                         mode: 'tscm',
                         visualMode: 'enriched',
                         collapsed: true
-                    }
-                },
-                'listening': {
-                    container: 'listeningPostTimelineContainer',
-                    config: typeof RFTimelineAdapter !== 'undefined' ? RFTimelineAdapter.getListeningPostConfig() : {
-                        title: 'Signal Activity',
-                        mode: 'listening-post',
-                        visualMode: 'enriched',
-                        collapsed: false
                     }
                 },
                 'bluetooth': {
@@ -3313,7 +3038,11 @@
         }
 
         // Selected mode from welcome screen
-        let selectedStartMode = localStorage.getItem('intercept.default_mode') || 'pager';
+        const savedDefaultMode = localStorage.getItem('intercept.default_mode');
+        let selectedStartMode = savedDefaultMode === 'listening' ? 'waterfall' : (savedDefaultMode || 'pager');
+        if (savedDefaultMode === 'listening') {
+            localStorage.setItem('intercept.default_mode', 'waterfall');
+        }
 
         // Mode selection from welcome page
         function selectMode(mode) {
@@ -3339,7 +3068,6 @@
             pager: { label: 'Pager', indicator: 'PAGER', outputTitle: 'Pager Decoder', group: 'signals' },
             sensor: { label: '433MHz', indicator: '433MHZ', outputTitle: '433MHz Sensor Monitor', group: 'signals' },
             rtlamr: { label: 'Meters', indicator: 'METERS', outputTitle: 'Utility Meter Monitor', group: 'signals' },
-            listening: { label: 'Listening Post', indicator: 'LISTENING POST', outputTitle: 'Listening Post', group: 'signals' },
             subghz: { label: 'SubGHz', indicator: 'SUBGHZ', outputTitle: 'SubGHz Transceiver', group: 'signals' },
             aprs: { label: 'APRS', indicator: 'APRS', outputTitle: 'APRS Tracker', group: 'tracking' },
             gps: { label: 'GPS', indicator: 'GPS', outputTitle: 'GPS Receiver', group: 'tracking' },
@@ -3353,16 +3081,17 @@
             bt_locate: { label: 'BT Locate', indicator: 'BT LOCATE', outputTitle: 'BT Locate — SAR Tracker', group: 'wireless' },
             meshtastic: { label: 'Meshtastic', indicator: 'MESHTASTIC', outputTitle: 'Meshtastic Mesh Monitor', group: 'wireless' },
             tscm: { label: 'TSCM', indicator: 'TSCM', outputTitle: 'TSCM Counter-Surveillance', group: 'intel' },
-            analytics: { label: 'Analytics', indicator: 'ANALYTICS', outputTitle: 'Cross-Mode Analytics', group: 'intel' },
             spystations: { label: 'Spy Stations', indicator: 'SPY STATIONS', outputTitle: 'Spy Stations', group: 'intel' },
             websdr: { label: 'WebSDR', indicator: 'WEBSDR', outputTitle: 'HF/Shortwave WebSDR', group: 'intel' },
+            waterfall: { label: 'Waterfall', indicator: 'WATERFALL', outputTitle: 'Spectrum Waterfall', group: 'signals' },
         };
         const validModes = new Set(Object.keys(modeCatalog));
         window.interceptModeCatalog = Object.assign({}, modeCatalog);
 
         function getModeFromQuery() {
             const params = new URLSearchParams(window.location.search);
-            const mode = params.get('mode');
+            const requestedMode = params.get('mode');
+            const mode = requestedMode === 'listening' ? 'waterfall' : requestedMode;
             if (!mode || !validModes.has(mode)) return null;
             return mode;
         }
@@ -3871,25 +3600,189 @@
             }
         }
 
+        const LOCAL_STOP_TIMEOUT_MS = 2200;
+        const REMOTE_STOP_TIMEOUT_MS = 8000;
+        const DASHBOARD_NAV_PATHS = new Set([
+            '/adsb/dashboard',
+            '/ais/dashboard',
+            '/satellite/dashboard',
+        ]);
+
+        function getActiveScanSummary() {
+            return {
+                pager: Boolean(isRunning),
+                sensor: Boolean(isSensorRunning),
+                wifi: Boolean(
+                    ((typeof WiFiMode !== 'undefined' && typeof WiFiMode.isScanning === 'function' && WiFiMode.isScanning()) || isWifiRunning)
+                ),
+                bluetooth: Boolean(
+                    ((typeof BluetoothMode !== 'undefined' && typeof BluetoothMode.isScanning === 'function' && BluetoothMode.isScanning()) || isBtRunning)
+                ),
+                aprs: Boolean(typeof isAprsRunning !== 'undefined' && isAprsRunning),
+                tscm: Boolean(typeof isTscmRunning !== 'undefined' && isTscmRunning),
+            };
+        }
+
+        function stopActiveLocalScansForNavigation() {
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            if (isAgentMode) return;
+
+            if (isRunning && typeof stopDecoding === 'function') {
+                Promise.resolve(stopDecoding()).catch(() => { });
+            }
+            if (isSensorRunning && typeof stopSensorDecoding === 'function') {
+                Promise.resolve(stopSensorDecoding()).catch(() => { });
+            }
+
+            const wifiScanActive = (
+                typeof WiFiMode !== 'undefined'
+                && typeof WiFiMode.isScanning === 'function'
+                && WiFiMode.isScanning()
+            ) || isWifiRunning;
+            if (wifiScanActive && typeof stopWifiScan === 'function') {
+                Promise.resolve(stopWifiScan()).catch(() => { });
+            }
+
+            const btScanActive = (
+                typeof BluetoothMode !== 'undefined'
+                && typeof BluetoothMode.isScanning === 'function'
+                && BluetoothMode.isScanning()
+            ) || isBtRunning;
+            if (btScanActive && typeof stopBtScan === 'function') {
+                Promise.resolve(stopBtScan()).catch(() => { });
+            }
+
+            if (typeof isAprsRunning !== 'undefined' && isAprsRunning && typeof stopAprs === 'function') {
+                Promise.resolve(stopAprs()).catch(() => { });
+            }
+            if (typeof isTscmRunning !== 'undefined' && isTscmRunning && typeof stopTscmSweep === 'function') {
+                Promise.resolve(stopTscmSweep()).catch(() => { });
+            }
+        }
+
+        if (!window._dashboardNavigationStopHookBound) {
+            window._dashboardNavigationStopHookBound = true;
+            document.addEventListener('click', (event) => {
+                if (event.defaultPrevented || event.button !== 0) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+                const link = event.target && event.target.closest
+                    ? event.target.closest('a[href]')
+                    : null;
+                if (!link || link.target === '_blank') return;
+
+                try {
+                    const href = new URL(link.href, window.location.href);
+                    if (href.origin !== window.location.origin) return;
+                    if (!DASHBOARD_NAV_PATHS.has(href.pathname)) return;
+                    if (window.InterceptNavPerf && typeof window.InterceptNavPerf.markStart === 'function') {
+                        window.InterceptNavPerf.markStart({
+                            targetPath: href.pathname,
+                            trigger: 'index-link',
+                            sourceMode: currentMode,
+                            activeScans: getActiveScanSummary(),
+                        });
+                    }
+                    stopActiveLocalScansForNavigation();
+                } catch (_) {
+                    // Ignore malformed hrefs.
+                }
+            });
+        }
+
+        function postStopRequest(url, timeoutMs = LOCAL_STOP_TIMEOUT_MS) {
+            const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+            const started = performance.now();
+            return fetch(url, {
+                method: 'POST',
+                ...(controller ? { signal: controller.signal } : {}),
+            })
+                .then((response) => response.json().catch(() => ({ status: response.ok ? 'ok' : 'error' })))
+                .catch((err) => {
+                    if (err && err.name === 'AbortError') {
+                        console.warn(`[Stop] ${url} timed out after ${timeoutMs}ms`);
+                        return { status: 'timeout', timed_out: true };
+                    }
+                    console.warn(`[Stop] ${url} failed: ${err?.message || err}`);
+                    return { status: 'error', message: err?.message || String(err) };
+                })
+                .finally(() => {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    const elapsedMs = Math.round(performance.now() - started);
+                    console.debug(`[Stop] ${url} finished in ${elapsedMs}ms`);
+                });
+        }
+
+        async function awaitStopAction(name, action, timeoutMs = LOCAL_STOP_TIMEOUT_MS) {
+            const started = performance.now();
+            try {
+                const result = action();
+                const promise = (result && typeof result.then === 'function')
+                    ? result
+                    : Promise.resolve(result);
+                await Promise.race([
+                    promise,
+                    new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+                ]);
+            } catch (err) {
+                console.warn(`[ModeSwitch] stop ${name} failed: ${err?.message || err}`);
+            } finally {
+                const elapsedMs = Math.round(performance.now() - started);
+                console.debug(`[ModeSwitch] stop ${name} finished in ${elapsedMs}ms`);
+            }
+        }
+
         // Mode switching
-        function switchMode(mode, options = {}) {
+        async function switchMode(mode, options = {}) {
             const { updateUrl = true } = options;
+            const switchStartMs = performance.now();
+            const previousMode = currentMode;
+            if (mode === 'listening') mode = 'waterfall';
+            if (!validModes.has(mode)) mode = 'pager';
             // Only stop local scans if in local mode (not agent mode)
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            const stopPhaseStartMs = performance.now();
+            let stopTaskCount = 0;
             if (!isAgentMode) {
-                if (isRunning) stopDecoding();
-                if (isSensorRunning) stopSensorDecoding();
-                if (isWifiRunning) stopWifiScan();
+                const stopTasks = [];
+
+                if (isRunning) {
+                    stopTasks.push(awaitStopAction('pager', () => stopDecoding(), LOCAL_STOP_TIMEOUT_MS));
+                }
+                if (isSensorRunning) {
+                    stopTasks.push(awaitStopAction('sensor', () => stopSensorDecoding(), LOCAL_STOP_TIMEOUT_MS));
+                }
+                const wifiScanActive = (
+                    typeof WiFiMode !== 'undefined'
+                    && typeof WiFiMode.isScanning === 'function'
+                    && WiFiMode.isScanning()
+                ) || isWifiRunning;
+                if (wifiScanActive) {
+                    stopTasks.push(awaitStopAction('wifi', () => stopWifiScan(), LOCAL_STOP_TIMEOUT_MS));
+                }
                 const btScanActive = (typeof BluetoothMode !== 'undefined' &&
                     typeof BluetoothMode.isScanning === 'function' &&
                     BluetoothMode.isScanning()) || isBtRunning;
                 const isBtModeTransition =
                     (currentMode === 'bluetooth' && mode === 'bt_locate') ||
                     (currentMode === 'bt_locate' && mode === 'bluetooth');
-                if (btScanActive && !isBtModeTransition && typeof stopBtScan === 'function') stopBtScan();
-                if (isAprsRunning) stopAprs();
-                if (isTscmRunning) stopTscmSweep();
+                if (btScanActive && !isBtModeTransition && typeof stopBtScan === 'function') {
+                    stopTasks.push(awaitStopAction('bluetooth', () => stopBtScan(), LOCAL_STOP_TIMEOUT_MS));
+                }
+                if (isAprsRunning) {
+                    stopTasks.push(awaitStopAction('aprs', () => stopAprs(), LOCAL_STOP_TIMEOUT_MS));
+                }
+                if (isTscmRunning) {
+                    stopTasks.push(awaitStopAction('tscm', () => stopTscmSweep(), LOCAL_STOP_TIMEOUT_MS));
+                }
+
+                if (stopTasks.length) {
+                    await Promise.allSettled(stopTasks);
+                }
+                stopTaskCount = stopTasks.length;
             }
+            const stopPhaseMs = Math.round(performance.now() - stopPhaseStartMs);
 
             // Clean up SubGHz SSE connection when leaving the mode
             if (typeof SubGhz !== 'undefined' && currentMode === 'subghz' && mode !== 'subghz') {
@@ -3937,7 +3830,6 @@
             document.getElementById('wifiMode')?.classList.toggle('active', mode === 'wifi');
             document.getElementById('bluetoothMode')?.classList.toggle('active', mode === 'bluetooth');
             document.getElementById('btLocateMode')?.classList.toggle('active', mode === 'bt_locate');
-            document.getElementById('listeningPostMode')?.classList.toggle('active', mode === 'listening');
             document.getElementById('aprsMode')?.classList.toggle('active', mode === 'aprs');
             document.getElementById('tscmMode')?.classList.toggle('active', mode === 'tscm');
             document.getElementById('aisMode')?.classList.toggle('active', mode === 'ais');
@@ -3945,8 +3837,8 @@
             document.getElementById('meshtasticMode')?.classList.toggle('active', mode === 'meshtastic');
             document.getElementById('websdrMode')?.classList.toggle('active', mode === 'websdr');
             document.getElementById('subghzMode')?.classList.toggle('active', mode === 'subghz');
-            document.getElementById('analyticsMode')?.classList.toggle('active', mode === 'analytics');
             document.getElementById('spaceWeatherMode')?.classList.toggle('active', mode === 'spaceweather');
+            document.getElementById('waterfallMode')?.classList.toggle('active', mode === 'waterfall');
 
 
             const pagerStats = document.getElementById('pagerStats');
@@ -3974,7 +3866,6 @@
             const wifiLayoutContainer = document.getElementById('wifiLayoutContainer');
             const btLayoutContainer = document.getElementById('btLayoutContainer');
             const satelliteVisuals = document.getElementById('satelliteVisuals');
-            const listeningPostVisuals = document.getElementById('listeningPostVisuals');
             const aprsVisuals = document.getElementById('aprsVisuals');
             const tscmVisuals = document.getElementById('tscmVisuals');
             const spyStationsVisuals = document.getElementById('spyStationsVisuals');
@@ -3987,10 +3878,10 @@
             const subghzVisuals = document.getElementById('subghzVisuals');
             const btLocateVisuals = document.getElementById('btLocateVisuals');
             const spaceWeatherVisuals = document.getElementById('spaceWeatherVisuals');
+            const waterfallVisuals = document.getElementById('waterfallVisuals');
             if (wifiLayoutContainer) wifiLayoutContainer.style.display = mode === 'wifi' ? 'flex' : 'none';
             if (btLayoutContainer) btLayoutContainer.style.display = mode === 'bluetooth' ? 'flex' : 'none';
             if (satelliteVisuals) satelliteVisuals.style.display = mode === 'satellite' ? 'block' : 'none';
-            if (listeningPostVisuals) listeningPostVisuals.style.display = mode === 'listening' ? 'grid' : 'none';
             if (aprsVisuals) aprsVisuals.style.display = mode === 'aprs' ? 'flex' : 'none';
             if (tscmVisuals) tscmVisuals.style.display = mode === 'tscm' ? 'flex' : 'none';
             if (spyStationsVisuals) spyStationsVisuals.style.display = mode === 'spystations' ? 'flex' : 'none';
@@ -4003,6 +3894,7 @@
             if (subghzVisuals) subghzVisuals.style.display = mode === 'subghz' ? 'flex' : 'none';
             if (btLocateVisuals) btLocateVisuals.style.display = mode === 'bt_locate' ? 'flex' : 'none';
             if (spaceWeatherVisuals) spaceWeatherVisuals.style.display = mode === 'spaceweather' ? 'flex' : 'none';
+            if (waterfallVisuals) waterfallVisuals.style.display = mode === 'waterfall' ? 'flex' : 'none';
 
             // Prevent Leaflet heatmap redraws on hidden BT Locate map containers.
             if (typeof BtLocate !== 'undefined' && BtLocate.setActiveMode) {
@@ -4017,8 +3909,6 @@
                 } else {
                     mainContent.classList.remove('mesh-sidebar-hidden');
                 }
-                // Analytics is sidebar-only — hide output panel and expand sidebar
-                mainContent.classList.toggle('analytics-active', mode === 'analytics');
             }
 
             // Show/hide mode-specific timeline containers
@@ -4040,15 +3930,6 @@
                 refreshTscmDevices();
             }
 
-            // Initialize/destroy Analytics mode
-            if (mode === 'analytics') {
-                // Expand all analytics sections (sidebar sections default to collapsed)
-                document.querySelectorAll('#analyticsMode .section.collapsed').forEach(s => s.classList.remove('collapsed'));
-                if (typeof Analytics !== 'undefined') Analytics.init();
-            } else {
-                if (typeof Analytics !== 'undefined' && Analytics.destroy) Analytics.destroy();
-            }
-
             // Initialize/destroy Space Weather mode
             if (mode !== 'spaceweather') {
                 if (typeof SpaceWeather !== 'undefined' && SpaceWeather.destroy) SpaceWeather.destroy();
@@ -4063,7 +3944,7 @@
             const reconBtn = document.getElementById('reconBtn');
             const intelBtn = document.querySelector('[onclick="exportDeviceDB()"]');
             const reconPanel = document.getElementById('reconPanel');
-            if (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'gps' || mode === 'listening' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'analytics' || mode === 'spaceweather') {
+            if (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'gps' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall') {
                 if (reconPanel) reconPanel.style.display = 'none';
                 if (reconBtn) reconBtn.style.display = 'none';
                 if (intelBtn) intelBtn.style.display = 'none';
@@ -4078,19 +3959,12 @@
 
             // Show agent selector for modes that support remote agents
             const agentSection = document.getElementById('agentSection');
-            const agentModes = ['pager', 'sensor', 'rtlamr', 'listening', 'aprs', 'wifi', 'bluetooth', 'aircraft', 'tscm', 'ais', 'dsc'];
+            const agentModes = ['pager', 'sensor', 'rtlamr', 'aprs', 'wifi', 'bluetooth', 'aircraft', 'tscm', 'ais'];
             if (agentSection) agentSection.style.display = agentModes.includes(mode) ? 'block' : 'none';
 
             // Show RTL-SDR device section for modes that use it
             const rtlDeviceSection = document.getElementById('rtlDeviceSection');
-            if (rtlDeviceSection) rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'listening' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general') ? 'block' : 'none';
-
-            // Show waterfall panel if running in listening mode
-            const waterfallPanel = document.getElementById('waterfallPanel');
-            if (waterfallPanel) {
-                const running = (typeof isWaterfallRunning !== 'undefined' && isWaterfallRunning);
-                waterfallPanel.style.display = (mode === 'listening' && running) ? 'block' : 'none';
-            }
+            if (rtlDeviceSection) rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general') ? 'block' : 'none';
 
             // Toggle mode-specific tool status displays
             const toolStatusPager = document.getElementById('toolStatusPager');
@@ -4101,8 +3975,8 @@
             // Hide output console for modes with their own visualizations
             const outputEl = document.getElementById('output');
             const statusBar = document.querySelector('.status-bar');
-            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'listening' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'analytics' || mode === 'spaceweather') ? 'none' : 'block';
-            if (statusBar) statusBar.style.display = (mode === 'satellite' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather') ? 'none' : 'flex';
+            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'bt_locate' || mode === 'waterfall') ? 'none' : 'block';
+            if (statusBar) statusBar.style.display = (mode === 'satellite' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall') ? 'none' : 'flex';
 
             // Restore sidebar when leaving Meshtastic mode (user may have collapsed it)
             if (mode !== 'meshtastic') {
@@ -4134,11 +4008,6 @@
             } else if (mode === 'satellite') {
                 initPolarPlot();
                 initSatelliteList();
-            } else if (mode === 'listening') {
-                // Check for incoming tune requests from Spy Stations
-                if (typeof checkIncomingTuneRequest === 'function') {
-                    checkIncomingTuneRequest();
-                }
             } else if (mode === 'spystations') {
                 SpyStations.init();
             } else if (mode === 'meshtastic') {
@@ -4175,7 +4044,27 @@
                 }, 320);
             } else if (mode === 'spaceweather') {
                 SpaceWeather.init();
+            } else if (mode === 'waterfall') {
+                if (typeof Waterfall !== 'undefined') Waterfall.init();
             }
+
+            // Destroy Waterfall WebSocket when leaving SDR receiver modes
+            if (mode !== 'waterfall' && typeof Waterfall !== 'undefined' && Waterfall.destroy) {
+                Promise.resolve(Waterfall.destroy()).catch(() => {});
+            }
+
+            const totalMs = Math.round(performance.now() - switchStartMs);
+            console.info(
+                `[Perf] switchMode ${previousMode} -> ${mode}: stop=${stopPhaseMs}ms tasks=${stopTaskCount} total=${totalMs}ms`,
+                {
+                    updateUrl,
+                    agentMode: isAgentMode,
+                }
+            );
+            requestAnimationFrame(() => {
+                const firstFrameMs = Math.round(performance.now() - switchStartMs);
+                console.info(`[Perf] switchMode ${previousMode} -> ${mode}: first-frame=${firstFrameMs}ms`);
+            });
         }
 
         // Handle window resize for maps (especially important on mobile orientation change)
@@ -4218,61 +4107,157 @@
         let sensorScopeCtx = null;
         let sensorScopeAnim = null;
         let sensorScopeHistory = [];
+        let sensorScopeWaveBuffer = [];
+        let sensorScopeDisplayWave = [];
         const SENSOR_SCOPE_LEN = 200;
+        const SENSOR_SCOPE_WAVE_BUFFER_LEN = 2048;
+        const SENSOR_SCOPE_WAVE_INPUT_SMOOTH_ALPHA = 0.55;
+        const SENSOR_SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA = 0.22;
+        const SENSOR_SCOPE_WAVE_IDLE_DECAY = 0.96;
         let sensorScopeRssi = 0;
         let sensorScopeSnr = 0;
         let sensorScopeTargetRssi = 0;
         let sensorScopeTargetSnr = 0;
         let sensorScopeMsgBurst = 0;
-        let sensorScopeLastPulse = 0;
+        let sensorScopeLastWaveAt = 0;
+        let sensorScopeLastInputSample = 0;
+
+        function resizeSensorScopeCanvas(canvas) {
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(1, Math.floor(rect.width * dpr));
+            const height = Math.max(1, Math.floor(rect.height * dpr));
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+        }
+
+        function buildSensorWaveformFallback(rssi, snr, noise, points = 160) {
+            const rssiNorm = Math.min(Math.max(Math.abs(rssi) / 40, 0), 1);
+            const snrNorm = Math.min(Math.max((snr + 5) / 35, 0), 1);
+            const noiseNorm = Math.min(Math.max(Math.abs(noise) / 40, 0), 1);
+
+            const amplitude = Math.max(0.06, Math.min(1.0, (0.6 * rssiNorm + 0.4 * snrNorm) - (0.22 * noiseNorm)));
+            const cycles = 3 + (snrNorm * 8);
+            const harmonic = 0.25 + (0.35 * snrNorm);
+            const hiss = 0.08 + (0.18 * noiseNorm);
+            const phase = (performance.now() * 0.002 * (1.4 + (snrNorm * 2.2))) % (Math.PI * 2);
+
+            const waveform = [];
+            for (let i = 0; i < points; i++) {
+                const t = points > 1 ? (i / (points - 1)) : 0;
+                const base = Math.sin((Math.PI * 2 * cycles * t) + phase);
+                const overtone = Math.sin((Math.PI * 2 * (cycles * 2.4) * t) + (phase * 0.7));
+                const noiseWobble = Math.sin((Math.PI * 2 * (cycles * 7.0) * t) + (phase * 2.1));
+                let sample = amplitude * (base + (harmonic * overtone) + (hiss * noiseWobble));
+                sample /= (1 + harmonic + hiss);
+                waveform.push(Math.round(Math.max(-1, Math.min(1, sample)) * 127));
+            }
+            return waveform;
+        }
+
+        function appendSensorWaveformSamples(waveform) {
+            if (!Array.isArray(waveform) || waveform.length === 0) return;
+
+            for (const packedSample of waveform) {
+                const sample = Number(packedSample);
+                if (!Number.isFinite(sample)) continue;
+                const normalized = Math.max(-127, Math.min(127, sample)) / 127;
+                sensorScopeLastInputSample += (normalized - sensorScopeLastInputSample) * SENSOR_SCOPE_WAVE_INPUT_SMOOTH_ALPHA;
+                sensorScopeWaveBuffer.push(sensorScopeLastInputSample);
+            }
+
+            if (sensorScopeWaveBuffer.length > SENSOR_SCOPE_WAVE_BUFFER_LEN) {
+                sensorScopeWaveBuffer.splice(0, sensorScopeWaveBuffer.length - SENSOR_SCOPE_WAVE_BUFFER_LEN);
+            }
+            sensorScopeLastWaveAt = performance.now();
+        }
+
+        function applySensorScopeData(scopeData) {
+            if (!scopeData || typeof scopeData !== 'object') return;
+
+            const parsedRssi = Number(scopeData.rssi);
+            const parsedSnr = Number(scopeData.snr);
+            const parsedNoise = Number(scopeData.noise);
+
+            const rssi = Number.isFinite(parsedRssi) ? parsedRssi : 0;
+            const snr = Number.isFinite(parsedSnr) ? parsedSnr : 0;
+            const noise = Number.isFinite(parsedNoise) ? parsedNoise : 0;
+
+            sensorScopeTargetRssi = rssi;
+            sensorScopeTargetSnr = snr;
+
+            if (Array.isArray(scopeData.waveform) && scopeData.waveform.length) {
+                appendSensorWaveformSamples(scopeData.waveform);
+            } else {
+                appendSensorWaveformSamples(buildSensorWaveformFallback(rssi, snr, noise));
+            }
+        }
 
         function initSensorScope() {
             const canvas = document.getElementById('sensorScopeCanvas');
             if (!canvas) return;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * (window.devicePixelRatio || 1);
-            canvas.height = rect.height * (window.devicePixelRatio || 1);
+
+            if (sensorScopeAnim) {
+                cancelAnimationFrame(sensorScopeAnim);
+                sensorScopeAnim = null;
+            }
+
+            resizeSensorScopeCanvas(canvas);
             sensorScopeCtx = canvas.getContext('2d');
             sensorScopeHistory = new Array(SENSOR_SCOPE_LEN).fill(0);
+            sensorScopeWaveBuffer = [];
+            sensorScopeDisplayWave = [];
             sensorScopeRssi = 0;
             sensorScopeSnr = 0;
             sensorScopeTargetRssi = 0;
             sensorScopeTargetSnr = 0;
             sensorScopeMsgBurst = 0;
-            sensorScopeLastPulse = 0;
+            sensorScopeLastWaveAt = 0;
+            sensorScopeLastInputSample = 0;
             drawSensorScope();
         }
 
         function drawSensorScope() {
             const ctx = sensorScopeCtx;
             if (!ctx) return;
+
+            resizeSensorScopeCanvas(ctx.canvas);
             const W = ctx.canvas.width;
             const H = ctx.canvas.height;
             const midY = H / 2;
 
             // Phosphor persistence
-            ctx.fillStyle = 'rgba(5, 5, 16, 0.3)';
+            ctx.fillStyle = 'rgba(5, 5, 16, 0.26)';
             ctx.fillRect(0, 0, W, H);
 
-            // Smooth towards targets (decay when no new packets)
+            // Smooth towards targets
             sensorScopeRssi += (sensorScopeTargetRssi - sensorScopeRssi) * 0.25;
             sensorScopeSnr += (sensorScopeTargetSnr - sensorScopeSnr) * 0.15;
 
-            // Decay targets back to zero between packets
+            // Decay targets back to idle between updates
             sensorScopeTargetRssi *= 0.97;
             sensorScopeTargetSnr *= 0.97;
 
-            // RSSI is typically negative dBm (e.g. -0.1 to -30+)
-            // Normalize: map absolute RSSI to 0-1 range (0 dB = max, -40 dB = min)
+            // Keep amplitude envelope for context
             const rssiNorm = Math.min(Math.max(Math.abs(sensorScopeRssi) / 40, 0), 1.0);
             sensorScopeHistory.push(rssiNorm);
             if (sensorScopeHistory.length > SENSOR_SCOPE_LEN) {
                 sensorScopeHistory.shift();
             }
 
-            // Grid lines
+            // Grid lines (horizontal + vertical)
             ctx.strokeStyle = 'rgba(40, 80, 40, 0.4)';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 0.8;
+            for (let i = 1; i < 8; i++) {
+                const gx = (W / 8) * i;
+                ctx.beginPath();
+                ctx.moveTo(gx, 0);
+                ctx.lineTo(gx, H);
+                ctx.stroke();
+            }
             for (let g = 0.25; g < 1; g += 0.25) {
                 const gy = midY - g * midY;
                 const gy2 = midY + g * midY;
@@ -4284,40 +4269,92 @@
 
             // Center baseline
             ctx.strokeStyle = 'rgba(60, 100, 60, 0.5)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, midY);
             ctx.lineTo(W, midY);
             ctx.stroke();
 
-            // Waveform (mirrored, green theme for 433)
-            const stepX = W / SENSOR_SCOPE_LEN;
-            ctx.strokeStyle = '#0f0';
-            ctx.lineWidth = 1.5;
-            ctx.shadowColor = '#0f0';
-            ctx.shadowBlur = 4;
-
-            // Upper half
+            // Slow envelope as context around baseline
+            const envStepX = W / (SENSOR_SCOPE_LEN - 1);
+            ctx.strokeStyle = 'rgba(86, 230, 120, 0.45)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
             for (let i = 0; i < sensorScopeHistory.length; i++) {
-                const x = i * stepX;
-                const amp = sensorScopeHistory[i] * midY * 0.9;
+                const x = i * envStepX;
+                const amp = sensorScopeHistory[i] * midY * 0.85;
                 const y = midY - amp;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
-
-            // Lower half (mirror)
             ctx.beginPath();
             for (let i = 0; i < sensorScopeHistory.length; i++) {
-                const x = i * stepX;
-                const amp = sensorScopeHistory[i] * midY * 0.9;
+                const x = i * envStepX;
+                const amp = sensorScopeHistory[i] * midY * 0.85;
                 const y = midY + amp;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
 
+            // Actual waveform trace
+            const waveformPointCount = Math.min(Math.max(120, Math.floor(W / 3.2)), 420);
+            if (sensorScopeWaveBuffer.length > 1) {
+                const waveIsFresh = (performance.now() - sensorScopeLastWaveAt) < 1000;
+                const sourceLen = sensorScopeWaveBuffer.length;
+                const sourceWindow = Math.min(sourceLen, 1536);
+                const sourceStart = sourceLen - sourceWindow;
+
+                if (sensorScopeDisplayWave.length !== waveformPointCount) {
+                    sensorScopeDisplayWave = new Array(waveformPointCount).fill(0);
+                }
+
+                for (let i = 0; i < waveformPointCount; i++) {
+                    const a = sourceStart + Math.floor((i / waveformPointCount) * sourceWindow);
+                    const b = sourceStart + Math.floor(((i + 1) / waveformPointCount) * sourceWindow);
+                    const start = Math.max(sourceStart, Math.min(sourceLen - 1, a));
+                    const end = Math.max(start + 1, Math.min(sourceLen, b));
+
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = start; j < end; j++) {
+                        sum += sensorScopeWaveBuffer[j];
+                        count++;
+                    }
+                    const targetSample = count > 0 ? (sum / count) : 0;
+                    sensorScopeDisplayWave[i] += (targetSample - sensorScopeDisplayWave[i]) * SENSOR_SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA;
+                }
+
+                ctx.strokeStyle = waveIsFresh ? '#40ff7a' : 'rgba(64, 255, 122, 0.45)';
+                ctx.lineWidth = 1.7;
+                ctx.shadowColor = '#40ff7a';
+                ctx.shadowBlur = waveIsFresh ? 6 : 2;
+
+                const stepX = waveformPointCount > 1 ? (W / (waveformPointCount - 1)) : W;
+                ctx.beginPath();
+                const firstY = midY - (sensorScopeDisplayWave[0] * midY * 0.9);
+                ctx.moveTo(0, firstY);
+                for (let i = 1; i < waveformPointCount - 1; i++) {
+                    const x = i * stepX;
+                    const y = midY - (sensorScopeDisplayWave[i] * midY * 0.9);
+                    const nx = (i + 1) * stepX;
+                    const ny = midY - (sensorScopeDisplayWave[i + 1] * midY * 0.9);
+                    const cx = (x + nx) / 2;
+                    const cy = (y + ny) / 2;
+                    ctx.quadraticCurveTo(x, y, cx, cy);
+                }
+                const lastX = (waveformPointCount - 1) * stepX;
+                const lastY = midY - (sensorScopeDisplayWave[waveformPointCount - 1] * midY * 0.9);
+                ctx.lineTo(lastX, lastY);
+                ctx.stroke();
+
+                if (!waveIsFresh) {
+                    for (let i = 0; i < sensorScopeDisplayWave.length; i++) {
+                        sensorScopeDisplayWave[i] *= SENSOR_SCOPE_WAVE_IDLE_DECAY;
+                    }
+                }
+            }
             ctx.shadowBlur = 0;
 
             // SNR indicator (amber dashed line)
@@ -4334,7 +4371,7 @@
                 ctx.setLineDash([]);
             }
 
-            // Sensor decode flash (green overlay)
+            // Sensor decode flash
             if (sensorScopeMsgBurst > 0.01) {
                 ctx.fillStyle = `rgba(0, 255, 100, ${sensorScopeMsgBurst * 0.15})`;
                 ctx.fillRect(0, 0, W, H);
@@ -4348,11 +4385,15 @@
             if (rssiLabel) rssiLabel.textContent = sensorScopeRssi < -0.5 ? sensorScopeRssi.toFixed(1) : '--';
             if (snrLabel) snrLabel.textContent = sensorScopeSnr > 0.5 ? sensorScopeSnr.toFixed(1) : '--';
             if (statusLabel) {
-                if (Math.abs(sensorScopeRssi) > 1) {
-                    statusLabel.textContent = 'SIGNAL';
-                    statusLabel.style.color = '#0f0';
+                const waveIsFresh = (performance.now() - sensorScopeLastWaveAt) < 1000;
+                if (Math.abs(sensorScopeRssi) > 1.2 && waveIsFresh) {
+                    statusLabel.textContent = 'DEMODULATING';
+                    statusLabel.style.color = '#40ff7a';
+                } else if (Math.abs(sensorScopeRssi) > 0.6) {
+                    statusLabel.textContent = 'CARRIER';
+                    statusLabel.style.color = '#78ff9a';
                 } else {
-                    statusLabel.textContent = 'MONITORING';
+                    statusLabel.textContent = 'QUIET';
                     statusLabel.style.color = '#555';
                 }
             }
@@ -4366,6 +4407,11 @@
                 sensorScopeAnim = null;
             }
             sensorScopeCtx = null;
+            sensorScopeWaveBuffer = [];
+            sensorScopeDisplayWave = [];
+            sensorScopeHistory = [];
+            sensorScopeLastWaveAt = 0;
+            sensorScopeLastInputSample = 0;
         }
 
         // Start sensor decoding
@@ -4470,35 +4516,31 @@
 
         // Stop sensor decoding
         function stopSensorDecoding() {
-            // Check if using remote agent
-            if (typeof currentAgent !== 'undefined' && currentAgent !== 'local') {
-                fetch(`/controller/agents/${currentAgent}/sensor/stop`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(data => {
-                        setSensorRunning(false);
-                        if (eventSource) {
-                            eventSource.close();
-                            eventSource = null;
-                        }
-                        if (agentPollInterval) {
-                            clearInterval(agentPollInterval);
-                            agentPollInterval = null;
-                        }
-                        showInfo('Sensor stopped on remote agent');
-                    });
-                return;
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/sensor/stop`
+                : '/stop_sensor';
+            const timeoutMs = isAgentMode ? REMOTE_STOP_TIMEOUT_MS : LOCAL_STOP_TIMEOUT_MS;
+
+            setSensorRunning(false);
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (agentPollInterval) {
+                clearInterval(agentPollInterval);
+                agentPollInterval = null;
+            }
+            if (!isAgentMode) {
+                releaseDevice('sensor');
             }
 
-            fetch('/stop_sensor', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    releaseDevice('sensor');
-                    setSensorRunning(false);
-                    if (eventSource) {
-                        eventSource.close();
-                        eventSource = null;
-                    }
-                });
+            return postStopRequest(endpoint, timeoutMs).then((data) => {
+                if (isAgentMode && data && data.status !== 'error' && data.status !== 'timeout') {
+                    showInfo('Sensor stopped on remote agent');
+                }
+                return data;
+            });
         }
 
         // Polling interval for agent data
@@ -4539,6 +4581,11 @@
             // Remove placeholder
             const placeholder = output.querySelector('.placeholder');
             if (placeholder) placeholder.style.display = 'none';
+
+            // Agent polling may only return decoded packets, so derive scope updates from packet levels.
+            if (msg && (msg.rssi !== undefined || msg.snr !== undefined || msg.noise !== undefined)) {
+                applySensorScopeData(msg);
+            }
 
             // Create signal card if SignalCards is available
             if (typeof SignalCards !== 'undefined' && SignalCards.createFromSensor) {
@@ -4587,8 +4634,7 @@
                 if (data.type === 'sensor') {
                     addSensorReading(data);
                 } else if (data.type === 'scope') {
-                    sensorScopeTargetRssi = data.rssi;
-                    sensorScopeTargetSnr = data.snr;
+                    applySensorScopeData(data);
                 } else if (data.type === 'status') {
                     if (data.text === 'stopped') {
                         setSensorRunning(false);
@@ -4615,6 +4661,12 @@
 
             // Flash sensor scope green on decode
             sensorScopeMsgBurst = 1.0;
+
+            // Fallback when no dedicated scope packet has arrived recently.
+            if ((data.rssi !== undefined || data.snr !== undefined || data.noise !== undefined)
+                && ((performance.now() - sensorScopeLastWaveAt) > 250)) {
+                applySensorScopeData(data);
+            }
 
             sensorCount++;
             document.getElementById('sensorCount').textContent = sensorCount;
@@ -4802,25 +4854,23 @@
             const endpoint = isAgentMode
                 ? `/controller/agents/${rtlamrCurrentAgent}/rtlamr/stop`
                 : '/stop_rtlamr';
+            const timeoutMs = isAgentMode ? REMOTE_STOP_TIMEOUT_MS : LOCAL_STOP_TIMEOUT_MS;
 
-            fetch(endpoint, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (!isAgentMode) {
-                        releaseDevice('rtlamr');
-                    }
-                    rtlamrCurrentAgent = null;
-                    setRtlamrRunning(false);
-                    if (eventSource) {
-                        eventSource.close();
-                        eventSource = null;
-                    }
-                    // Clear polling timer
-                    if (rtlamrPollTimer) {
-                        clearInterval(rtlamrPollTimer);
-                        rtlamrPollTimer = null;
-                    }
-                });
+            rtlamrCurrentAgent = null;
+            setRtlamrRunning(false);
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (rtlamrPollTimer) {
+                clearInterval(rtlamrPollTimer);
+                rtlamrPollTimer = null;
+            }
+            if (!isAgentMode) {
+                releaseDevice('rtlamr');
+            }
+
+            return postStopRequest(endpoint, timeoutMs);
         }
 
         function setRtlamrRunning(running) {
@@ -5492,54 +5542,111 @@
         let pagerScopeCtx = null;
         let pagerScopeAnim = null;
         let pagerScopeHistory = [];
+        let pagerScopeWaveBuffer = [];
+        let pagerScopeDisplayWave = [];
         const SCOPE_HISTORY_LEN = 200;
+        const SCOPE_WAVE_BUFFER_LEN = 2048;
+        const SCOPE_WAVE_INPUT_SMOOTH_ALPHA = 0.55;
+        const SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA = 0.22;
+        const SCOPE_WAVE_IDLE_DECAY = 0.96;
         let pagerScopeRms = 0;
         let pagerScopePeak = 0;
         let pagerScopeTargetRms = 0;
         let pagerScopeTargetPeak = 0;
         let pagerScopeMsgBurst = 0;
+        let pagerScopeLastWaveAt = 0;
+        let pagerScopeLastInputSample = 0;
+
+        function resizePagerScopeCanvas(canvas) {
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(1, Math.floor(rect.width * dpr));
+            const height = Math.max(1, Math.floor(rect.height * dpr));
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+        }
+
+        function applyPagerScopeData(scopeData) {
+            if (!scopeData || typeof scopeData !== 'object') return;
+
+            pagerScopeTargetRms = Number(scopeData.rms) || 0;
+            pagerScopeTargetPeak = Number(scopeData.peak) || 0;
+
+            if (Array.isArray(scopeData.waveform) && scopeData.waveform.length) {
+                for (const packedSample of scopeData.waveform) {
+                    const sample = Number(packedSample);
+                    if (!Number.isFinite(sample)) continue;
+                    const normalized = Math.max(-127, Math.min(127, sample)) / 127;
+                    pagerScopeLastInputSample += (normalized - pagerScopeLastInputSample) * SCOPE_WAVE_INPUT_SMOOTH_ALPHA;
+                    pagerScopeWaveBuffer.push(pagerScopeLastInputSample);
+                }
+                if (pagerScopeWaveBuffer.length > SCOPE_WAVE_BUFFER_LEN) {
+                    pagerScopeWaveBuffer.splice(0, pagerScopeWaveBuffer.length - SCOPE_WAVE_BUFFER_LEN);
+                }
+                pagerScopeLastWaveAt = performance.now();
+            }
+        }
 
         function initPagerScope() {
             const canvas = document.getElementById('pagerScopeCanvas');
             if (!canvas) return;
-            // Set actual pixel resolution
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * (window.devicePixelRatio || 1);
-            canvas.height = rect.height * (window.devicePixelRatio || 1);
+
+            if (pagerScopeAnim) {
+                cancelAnimationFrame(pagerScopeAnim);
+                pagerScopeAnim = null;
+            }
+
+            resizePagerScopeCanvas(canvas);
             pagerScopeCtx = canvas.getContext('2d');
             pagerScopeHistory = new Array(SCOPE_HISTORY_LEN).fill(0);
+            pagerScopeWaveBuffer = [];
+            pagerScopeDisplayWave = [];
             pagerScopeRms = 0;
             pagerScopePeak = 0;
             pagerScopeTargetRms = 0;
             pagerScopeTargetPeak = 0;
             pagerScopeMsgBurst = 0;
+            pagerScopeLastWaveAt = 0;
+            pagerScopeLastInputSample = 0;
             drawPagerScope();
         }
 
         function drawPagerScope() {
             const ctx = pagerScopeCtx;
             if (!ctx) return;
+
+            resizePagerScopeCanvas(ctx.canvas);
             const W = ctx.canvas.width;
             const H = ctx.canvas.height;
             const midY = H / 2;
 
-            // Phosphor persistence: semi-transparent clear
-            ctx.fillStyle = 'rgba(5, 5, 16, 0.3)';
+            // Phosphor persistence
+            ctx.fillStyle = 'rgba(5, 5, 16, 0.26)';
             ctx.fillRect(0, 0, W, H);
 
             // Smooth towards target values
             pagerScopeRms += (pagerScopeTargetRms - pagerScopeRms) * 0.25;
             pagerScopePeak += (pagerScopeTargetPeak - pagerScopePeak) * 0.15;
 
-            // Push current RMS into history (normalized 0-1 against 32768)
+            // Keep a slow amplitude envelope for readability
             pagerScopeHistory.push(Math.min(pagerScopeRms / 32768, 1.0));
             if (pagerScopeHistory.length > SCOPE_HISTORY_LEN) {
                 pagerScopeHistory.shift();
             }
 
-            // Grid lines
+            // Grid lines (horizontal + vertical)
             ctx.strokeStyle = 'rgba(40, 40, 80, 0.4)';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 0.8;
+            for (let i = 1; i < 8; i++) {
+                const gx = (W / 8) * i;
+                ctx.beginPath();
+                ctx.moveTo(gx, 0);
+                ctx.lineTo(gx, H);
+                ctx.stroke();
+            }
             for (let g = 0.25; g < 1; g += 0.25) {
                 const gy = midY - g * midY;
                 const gy2 = midY + g * midY;
@@ -5551,40 +5658,92 @@
 
             // Center baseline
             ctx.strokeStyle = 'rgba(60, 60, 100, 0.5)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, midY);
             ctx.lineTo(W, midY);
             ctx.stroke();
 
-            // Waveform (mirrored)
-            const stepX = W / SCOPE_HISTORY_LEN;
-            ctx.strokeStyle = '#0ff';
-            ctx.lineWidth = 1.5;
-            ctx.shadowColor = '#0ff';
-            ctx.shadowBlur = 4;
-
-            // Upper half
+            // Slow envelope as context around baseline
+            const envStepX = W / (SCOPE_HISTORY_LEN - 1);
+            ctx.strokeStyle = 'rgba(90, 180, 255, 0.45)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
             for (let i = 0; i < pagerScopeHistory.length; i++) {
-                const x = i * stepX;
-                const amp = pagerScopeHistory[i] * midY * 0.9;
+                const x = i * envStepX;
+                const amp = pagerScopeHistory[i] * midY * 0.85;
                 const y = midY - amp;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
-
-            // Lower half (mirror)
             ctx.beginPath();
             for (let i = 0; i < pagerScopeHistory.length; i++) {
-                const x = i * stepX;
-                const amp = pagerScopeHistory[i] * midY * 0.9;
+                const x = i * envStepX;
+                const amp = pagerScopeHistory[i] * midY * 0.85;
                 const y = midY + amp;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
 
+            // Actual waveform from real incoming audio samples
+            const waveformPointCount = Math.min(Math.max(120, Math.floor(W / 3.2)), 420);
+            if (pagerScopeWaveBuffer.length > 1) {
+                const waveIsFresh = (performance.now() - pagerScopeLastWaveAt) < 700;
+                const sourceLen = pagerScopeWaveBuffer.length;
+                const sourceWindow = Math.min(sourceLen, 1536);
+                const sourceStart = sourceLen - sourceWindow;
+
+                if (pagerScopeDisplayWave.length !== waveformPointCount) {
+                    pagerScopeDisplayWave = new Array(waveformPointCount).fill(0);
+                }
+
+                for (let i = 0; i < waveformPointCount; i++) {
+                    const a = sourceStart + Math.floor((i / waveformPointCount) * sourceWindow);
+                    const b = sourceStart + Math.floor(((i + 1) / waveformPointCount) * sourceWindow);
+                    const start = Math.max(sourceStart, Math.min(sourceLen - 1, a));
+                    const end = Math.max(start + 1, Math.min(sourceLen, b));
+
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = start; j < end; j++) {
+                        sum += pagerScopeWaveBuffer[j];
+                        count++;
+                    }
+                    const targetSample = count > 0 ? (sum / count) : 0;
+                    pagerScopeDisplayWave[i] += (targetSample - pagerScopeDisplayWave[i]) * SCOPE_WAVE_DISPLAY_SMOOTH_ALPHA;
+                }
+
+                ctx.strokeStyle = waveIsFresh ? '#2efbff' : 'rgba(46, 251, 255, 0.45)';
+                ctx.lineWidth = 1.7;
+                ctx.shadowColor = '#2efbff';
+                ctx.shadowBlur = waveIsFresh ? 6 : 2;
+
+                const stepX = waveformPointCount > 1 ? (W / (waveformPointCount - 1)) : W;
+                ctx.beginPath();
+                const firstY = midY - (pagerScopeDisplayWave[0] * midY * 0.9);
+                ctx.moveTo(0, firstY);
+                for (let i = 1; i < waveformPointCount - 1; i++) {
+                    const x = i * stepX;
+                    const y = midY - (pagerScopeDisplayWave[i] * midY * 0.9);
+                    const nx = (i + 1) * stepX;
+                    const ny = midY - (pagerScopeDisplayWave[i + 1] * midY * 0.9);
+                    const cx = (x + nx) / 2;
+                    const cy = (y + ny) / 2;
+                    ctx.quadraticCurveTo(x, y, cx, cy);
+                }
+                const lastX = (waveformPointCount - 1) * stepX;
+                const lastY = midY - (pagerScopeDisplayWave[waveformPointCount - 1] * midY * 0.9);
+                ctx.lineTo(lastX, lastY);
+                ctx.stroke();
+
+                if (!waveIsFresh) {
+                    for (let i = 0; i < pagerScopeDisplayWave.length; i++) {
+                        pagerScopeDisplayWave[i] *= SCOPE_WAVE_IDLE_DECAY;
+                    }
+                }
+            }
             ctx.shadowBlur = 0;
 
             // Peak indicator (dashed red line)
@@ -5615,11 +5774,15 @@
             if (rmsLabel) rmsLabel.textContent = Math.round(pagerScopeRms);
             if (peakLabel) peakLabel.textContent = Math.round(pagerScopePeak);
             if (statusLabel) {
-                if (pagerScopeRms > 500) {
-                    statusLabel.textContent = 'SIGNAL';
-                    statusLabel.style.color = '#0f0';
+                const waveIsFresh = (performance.now() - pagerScopeLastWaveAt) < 700;
+                if (pagerScopeRms > 1300 && waveIsFresh) {
+                    statusLabel.textContent = 'DEMODULATING';
+                    statusLabel.style.color = '#00ff88';
+                } else if (pagerScopeRms > 500) {
+                    statusLabel.textContent = 'CARRIER';
+                    statusLabel.style.color = '#2efbff';
                 } else {
-                    statusLabel.textContent = 'MONITORING';
+                    statusLabel.textContent = 'QUIET';
                     statusLabel.style.color = '#555';
                 }
             }
@@ -5633,6 +5796,11 @@
                 pagerScopeAnim = null;
             }
             pagerScopeCtx = null;
+            pagerScopeWaveBuffer = [];
+            pagerScopeDisplayWave = [];
+            pagerScopeHistory = [];
+            pagerScopeLastWaveAt = 0;
+            pagerScopeLastInputSample = 0;
         }
 
         function startDecoding() {
@@ -5726,24 +5894,22 @@
             const endpoint = isAgentMode
                 ? `/controller/agents/${currentAgent}/pager/stop`
                 : '/stop';
+            const timeoutMs = isAgentMode ? REMOTE_STOP_TIMEOUT_MS : LOCAL_STOP_TIMEOUT_MS;
 
-            fetch(endpoint, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (!isAgentMode) {
-                        releaseDevice('pager');
-                    }
-                    setRunning(false);
-                    if (eventSource) {
-                        eventSource.close();
-                        eventSource = null;
-                    }
-                    // Clear polling timer if active
-                    if (pagerPollTimer) {
-                        clearInterval(pagerPollTimer);
-                        pagerPollTimer = null;
-                    }
-                });
+            if (!isAgentMode) {
+                releaseDevice('pager');
+            }
+            setRunning(false);
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (pagerPollTimer) {
+                clearInterval(pagerPollTimer);
+                pagerPollTimer = null;
+            }
+
+            return postStopRequest(endpoint, timeoutMs);
         }
 
         function killAll() {
@@ -5862,8 +6028,7 @@
                         } else if (payload.type === 'info') {
                             showInfo(`[${data.agent_name}] ${payload.text}`);
                         } else if (payload.type === 'scope') {
-                            pagerScopeTargetRms = payload.rms;
-                            pagerScopeTargetPeak = payload.peak;
+                            applyPagerScopeData(payload);
                         }
                     } else if (data.type === 'keepalive') {
                         // Ignore keepalive messages
@@ -5883,8 +6048,7 @@
                     } else if (data.type === 'raw') {
                         showInfo(data.text);
                     } else if (data.type === 'scope') {
-                        pagerScopeTargetRms = data.rms;
-                        pagerScopeTargetPeak = data.peak;
+                        applyPagerScopeData(data);
                     }
                 }
             };
@@ -7643,15 +7807,19 @@
 
         // Stop WiFi scan
         function stopWifiScan() {
-            fetch('/wifi/scan/stop', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    setWifiRunning(false);
-                    if (wifiEventSource) {
-                        wifiEventSource.close();
-                        wifiEventSource = null;
-                    }
+            setWifiRunning(false);
+            if (wifiEventSource) {
+                wifiEventSource.close();
+                wifiEventSource = null;
+            }
+
+            if (typeof WiFiMode !== 'undefined' && typeof WiFiMode.stopScan === 'function') {
+                return Promise.resolve(WiFiMode.stopScan()).catch((err) => {
+                    console.warn('[WiFi] stop via WiFiMode failed:', err);
                 });
+            }
+
+            return postStopRequest('/wifi/scan/stop', LOCAL_STOP_TIMEOUT_MS);
         }
 
         function setWifiRunning(running) {
@@ -8857,10 +9025,14 @@
 
         function stopBtScan() {
             const bt = getBluetoothModeApi();
+            let stopPromise = Promise.resolve();
             if (bt && typeof bt.stopScan === 'function') {
-                bt.stopScan();
+                stopPromise = Promise.resolve(bt.stopScan()).catch((err) => {
+                    console.warn('[BT] stop failed:', err);
+                });
             }
             setTimeout(syncBtRunningState, 0);
+            return stopPromise;
         }
 
         function setBtRunning(running) {
@@ -9176,44 +9348,36 @@
             const endpoint = isAgentMode
                 ? `/controller/agents/${aprsCurrentAgent}/aprs/stop`
                 : '/aprs/stop';
+            const timeoutMs = isAgentMode ? REMOTE_STOP_TIMEOUT_MS : LOCAL_STOP_TIMEOUT_MS;
 
-            fetch(endpoint, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    isAprsRunning = false;
-                    aprsCurrentAgent = null;
-                    // Update function bar buttons
-                    document.getElementById('aprsStripStartBtn').style.display = 'inline-block';
-                    document.getElementById('aprsStripStopBtn').style.display = 'none';
-                    // Update map status
-                    document.getElementById('aprsMapStatus').textContent = 'STANDBY';
-                    document.getElementById('aprsMapStatus').style.color = '';
-                    // Reset function bar status
-                    updateAprsStatus('standby');
-                    document.getElementById('aprsStripFreq').textContent = '--';
-                    document.getElementById('aprsStripSignal').textContent = '--';
-                    // Re-enable controls
-                    document.getElementById('aprsStripRegion').disabled = false;
-                    document.getElementById('aprsStripGain').disabled = false;
-                    const customFreqInput = document.getElementById('aprsStripCustomFreq');
-                    if (customFreqInput) customFreqInput.disabled = false;
-                    // Remove signal quality class
-                    const signalStat = document.getElementById('aprsStripSignalStat');
-                    if (signalStat) {
-                        signalStat.classList.remove('good', 'warning', 'poor');
-                    }
-                    // Stop meter check interval
-                    stopAprsMeterCheck();
-                    if (aprsEventSource) {
-                        aprsEventSource.close();
-                        aprsEventSource = null;
-                    }
-                    // Clear polling timer
-                    if (aprsPollTimer) {
-                        clearInterval(aprsPollTimer);
-                        aprsPollTimer = null;
-                    }
-                });
+            isAprsRunning = false;
+            aprsCurrentAgent = null;
+            document.getElementById('aprsStripStartBtn').style.display = 'inline-block';
+            document.getElementById('aprsStripStopBtn').style.display = 'none';
+            document.getElementById('aprsMapStatus').textContent = 'STANDBY';
+            document.getElementById('aprsMapStatus').style.color = '';
+            updateAprsStatus('standby');
+            document.getElementById('aprsStripFreq').textContent = '--';
+            document.getElementById('aprsStripSignal').textContent = '--';
+            document.getElementById('aprsStripRegion').disabled = false;
+            document.getElementById('aprsStripGain').disabled = false;
+            const customFreqInput = document.getElementById('aprsStripCustomFreq');
+            if (customFreqInput) customFreqInput.disabled = false;
+            const signalStat = document.getElementById('aprsStripSignalStat');
+            if (signalStat) {
+                signalStat.classList.remove('good', 'warning', 'poor');
+            }
+            stopAprsMeterCheck();
+            if (aprsEventSource) {
+                aprsEventSource.close();
+                aprsEventSource = null;
+            }
+            if (aprsPollTimer) {
+                clearInterval(aprsPollTimer);
+                aprsPollTimer = null;
+            }
+
+            return postStopRequest(endpoint, timeoutMs);
         }
 
         function startAprsStream(isAgentMode = false) {
@@ -10596,7 +10760,7 @@
             }
         });
 
-        // NOTE: Scanner and Audio Receiver code moved to static/js/modes/listening-post.js
+        // Scanner and receiver logic are handled by Waterfall mode.
 
         // ============================================
         // TSCM (Counter-Surveillance) Functions
@@ -10903,16 +11067,11 @@
         }
 
         async function stopTscmSweep() {
-            try {
-                // Route to agent or local based on selection
-                const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
-                const endpoint = isAgentMode
-                    ? `/controller/agents/${currentAgent}/tscm/stop`
-                    : '/tscm/sweep/stop';
-                await fetch(endpoint, { method: 'POST' });
-            } catch (e) {
-                console.error('Error stopping sweep:', e);
-            }
+            const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+            const endpoint = isAgentMode
+                ? `/controller/agents/${currentAgent}/tscm/stop`
+                : '/tscm/sweep/stop';
+            const timeoutMs = isAgentMode ? REMOTE_STOP_TIMEOUT_MS : LOCAL_STOP_TIMEOUT_MS;
 
             isTscmRunning = false;
             tscmSweepEndTime = new Date();
@@ -10932,6 +11091,8 @@
             // Show report button if we have any data
             const hasData = tscmWifiDevices.length > 0 || tscmBtDevices.length > 0 || tscmRfSignals.length > 0;
             document.getElementById('tscmReportBtn').style.display = hasData ? 'block' : 'none';
+
+            return postStopRequest(endpoint, timeoutMs);
         }
 
         function generateTscmReport() {
@@ -12179,7 +12340,7 @@
                         </button>
                     </div>
                     <div style="font-size: 10px; color: var(--text-secondary); margin-top: 8px;">
-                        ${protocol === 'rf' ? 'Listen buttons open Listening Post. ' : ''}Known devices are excluded from threat scoring in future sweeps.
+                        ${protocol === 'rf' ? 'Listen buttons open Spectrum Waterfall. ' : ''}Known devices are excluded from threat scoring in future sweeps.
                     </div>
                 </div>
             `;
@@ -12957,18 +13118,18 @@
             // Close the modal
             closeTscmDeviceModal();
 
-            // Switch to listening post mode
-            switchMode('listening');
+            // Switch to spectrum waterfall mode
+            switchMode('waterfall');
 
             // Wait a moment for the mode to switch, then tune to the frequency
             setTimeout(() => {
-                if (typeof tuneToFrequency === 'function') {
-                    tuneToFrequency(frequency, modulation);
+                if (typeof Waterfall !== 'undefined' && typeof Waterfall.quickTune === 'function') {
+                    Waterfall.quickTune(frequency, modulation);
                 } else {
-                    // Fallback: manually update the frequency input
-                    const freqInput = document.getElementById('radioScanStart');
+                    // Fallback: update Waterfall center control directly
+                    const freqInput = document.getElementById('wfCenterFreq');
                     if (freqInput) {
-                        freqInput.value = frequency.toFixed(1);
+                        freqInput.value = frequency.toFixed(4);
                     }
                     alert(`Tune to ${frequency.toFixed(3)} MHz (${modulation.toUpperCase()}) to listen`);
                 }
@@ -14910,8 +15071,6 @@
         });
     </script>
 
-    <!-- Scanner/Audio code moved to static/js/modes/listening-post.js -->
-
     {% include 'partials/help-modal.html' %}
 
 
@@ -15103,6 +15262,47 @@
     <script src="{{ url_for('static', filename='js/core/run-state.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/command-palette.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/first-run-setup.js') }}"></script>
+
+    <!-- Cheat Sheet Modal -->
+    <div id="cheatSheetModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this)CheatSheets.hide()">
+        <div style="background:var(--bg-card, #1a1f2e); border:1px solid rgba(255,255,255,0.15); border-radius:12px; max-width:480px; width:100%; max-height:80vh; overflow-y:auto; padding:20px; position:relative;">
+            <button onclick="CheatSheets.hide()" style="position:absolute; top:12px; right:12px; background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+            <div id="cheatSheetContent"></div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="kbShortcutsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this)KeyboardShortcuts.hideHelp()">
+        <div style="background:var(--bg-card, #1a1f2e); border:1px solid rgba(255,255,255,0.15); border-radius:12px; max-width:520px; width:100%; max-height:80vh; overflow-y:auto; padding:20px; position:relative;">
+            <button onclick="KeyboardShortcuts.hideHelp()" style="position:absolute; top:12px; right:12px; background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+            <h2 style="margin:0 0 16px; font-size:16px; color:var(--accent-cyan, #4aa3ff); font-family:var(--font-mono);">Keyboard Shortcuts</h2>
+            <table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12px;">
+                <tbody>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+W</td><td style="padding:6px 8px; color:var(--text-secondary);">Switch to Waterfall</td></tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+M</td><td style="padding:6px 8px; color:var(--text-secondary);">Toggle voice mute</td></tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+S</td><td style="padding:6px 8px; color:var(--text-secondary);">Toggle sidebar</td></tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+K / ?</td><td style="padding:6px 8px; color:var(--text-secondary);">Show keyboard shortcuts</td></tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+C</td><td style="padding:6px 8px; color:var(--text-secondary);">Show cheat sheet for current mode</td></tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 8px; color:var(--accent-cyan);">Alt+1..9</td><td style="padding:6px 8px; color:var(--text-secondary);">Switch to Nth mode in current group</td></tr>
+                    <tr><td style="padding:6px 8px; color:var(--accent-cyan);">Escape</td><td style="padding:6px 8px; color:var(--text-secondary);">Close modal / Return to welcome</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+        });
+    }
+    // Initialize global core modules after page load
+    window.addEventListener('DOMContentLoaded', () => {
+        if (typeof VoiceAlerts !== 'undefined') VoiceAlerts.init();
+        if (typeof KeyboardShortcuts !== 'undefined') KeyboardShortcuts.init();
+    });
+    </script>
 </body>
 
 </html>

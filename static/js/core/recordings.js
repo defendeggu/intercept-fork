@@ -114,13 +114,7 @@ const RecordingUI = (function() {
 
     function openReplay(sessionId) {
         if (!sessionId) return;
-        localStorage.setItem('analyticsReplaySession', sessionId);
-        if (typeof hideSettings === 'function') hideSettings();
-        if (typeof switchMode === 'function') {
-            switchMode('analytics', { updateUrl: true });
-            return;
-        }
-        window.location.href = '/?mode=analytics';
+        window.open(`/recordings/${sessionId}/download`, '_blank');
     }
 
     function escapeHtml(str) {

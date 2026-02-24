@@ -76,6 +76,10 @@ def safe_terminate(process: subprocess.Popen | None, timeout: float = 2.0) -> bo
         return True
     except subprocess.TimeoutExpired:
         process.kill()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
         unregister_process(process)
         return True
     except Exception as e:

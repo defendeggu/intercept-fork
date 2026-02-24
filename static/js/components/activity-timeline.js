@@ -1,7 +1,7 @@
 /**
  * Activity Timeline Component
  * Reusable, configuration-driven timeline visualization for time-based metadata
- * Supports multiple modes: TSCM, Listening Post, Bluetooth, WiFi, Monitoring
+ * Supports multiple modes: TSCM, RF Receiver, Bluetooth, WiFi, Monitoring
  */
 
 const ActivityTimeline = (function() {
@@ -176,7 +176,7 @@ const ActivityTimeline = (function() {
      */
     function categorizeById(id, mode) {
         // RF frequency categorization
-        if (mode === 'rf' || mode === 'tscm' || mode === 'listening-post') {
+        if (mode === 'rf' || mode === 'tscm' || mode === 'waterfall') {
             const f = parseFloat(id);
             if (!isNaN(f)) {
                 if (f >= 2400 && f <= 2500) return '2.4 GHz wireless band';

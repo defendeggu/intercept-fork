@@ -893,6 +893,92 @@ body {
     display: block;
 }
 
+.map-crosshair-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1200;
+    --crosshair-x-start: 100%;
+    --crosshair-y-start: 100%;
+    --crosshair-x-end: 50%;
+    --crosshair-y-end: 50%;
+    --crosshair-duration: 1500ms;
+}
+
+.map-crosshair-line {
+    position: absolute;
+    opacity: 0;
+    background: var(--accent-cyan);
+    box-shadow: none;
+    will-change: transform, opacity;
+}
+
+.map-crosshair-vertical {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    left: 0;
+    transform: translateX(var(--crosshair-x-start));
+}
+
+.map-crosshair-horizontal {
+    left: 0;
+    right: 0;
+    height: 1px;
+    top: 0;
+    transform: translateY(var(--crosshair-y-start));
+}
+
+.map-crosshair-overlay.active .map-crosshair-vertical {
+    animation: mapCrosshairSweepX var(--crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+.map-crosshair-overlay.active .map-crosshair-horizontal {
+    animation: mapCrosshairSweepY var(--crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+@keyframes mapCrosshairSweepX {
+    0% {
+        transform: translateX(var(--crosshair-x-start));
+        opacity: 0;
+    }
+    12% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(var(--crosshair-x-end));
+        opacity: 0;
+    }
+}
+
+@keyframes mapCrosshairSweepY {
+    0% {
+        transform: translateY(var(--crosshair-y-start));
+        opacity: 0;
+    }
+    12% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(var(--crosshair-y-end));
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .map-crosshair-overlay.active .map-crosshair-vertical,
+    .map-crosshair-overlay.active .map-crosshair-horizontal {
+        animation-duration: 220ms;
+    }
+}
+
 /* Right sidebar - Mobile first */
 .sidebar {
     display: flex;

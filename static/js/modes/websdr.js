@@ -9,6 +9,20 @@ let websdrMarkers = [];
 let websdrReceivers = [];
 let websdrInitialized = false;
 let websdrSpyStationsLoaded = false;
+let websdrMapType = null;
+let websdrGlobe = null;
+let websdrGlobePopup = null;
+let websdrSelectedReceiverIndex = null;
+let websdrGlobeScriptPromise = null;
+let websdrResizeObserver = null;
+let websdrResizeHooked = false;
+let websdrGlobeFallbackNotified = false;
+
+const WEBSDR_GLOBE_SCRIPT_URLS = [
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
+    'https://cdn.jsdelivr.net/npm/globe.gl@2.33.1/dist/globe.gl.min.js',
+];
+const WEBSDR_GLOBE_TEXTURE_URL = '/static/images/globe/earth-dark.jpg';
 
 // KiwiSDR audio state
 let kiwiWebSocket = null;
@@ -29,43 +43,37 @@ const KIWI_SAMPLE_RATE = 12000;
 
 async function initWebSDR() {
     if (websdrInitialized) {
-        if (websdrMap) {
-            setTimeout(() => websdrMap.invalidateSize(), 100);
-        }
+        setTimeout(invalidateWebSDRViewport, 100);
         return;
     }
 
     const mapEl = document.getElementById('websdrMap');
-    if (!mapEl || typeof L === 'undefined') return;
+    if (!mapEl) return;
 
-    // Calculate minimum zoom so tiles fill the container vertically
-    const mapHeight = mapEl.clientHeight || 500;
-    const minZoom = Math.ceil(Math.log2(mapHeight / 256));
+    const globeReady = await ensureWebsdrGlobeLibrary();
 
-    websdrMap = L.map('websdrMap', {
-        center: [20, 0],
-        zoom: Math.max(minZoom, 2),
-        minZoom: Math.max(minZoom, 2),
-        zoomControl: true,
-        maxBounds: [[-85, -360], [85, 360]],
-        maxBoundsViscosity: 1.0,
-    });
+    // Wait for a paint frame so the browser computes layout after the
+    // display:flex change in switchMode.  Without this, Globe()(mapEl) can
+    // run before clientWidth/clientHeight are non-zero (especially when
+    // scripts are served from cache and resolve before the first layout pass).
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
-    if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
-        await Settings.init();
-        Settings.createTileLayer().addTo(websdrMap);
-        Settings.registerMap(websdrMap);
+    // If the mode was switched away while scripts were loading, abort so
+    // websdrInitialized stays false and we retry cleanly next time.
+    if (!mapEl.clientWidth || !mapEl.clientHeight) return;
+
+    if (globeReady && initWebsdrGlobe(mapEl)) {
+        websdrMapType = 'globe';
+    } else if (typeof L !== 'undefined' && await initWebsdrLeaflet(mapEl)) {
+        websdrMapType = 'leaflet';
+        if (!websdrGlobeFallbackNotified && typeof showNotification === 'function') {
+            showNotification('WebSDR', '3D globe unavailable, using fallback map');
+            websdrGlobeFallbackNotified = true;
+        }
     } else {
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 19,
-            className: 'tile-layer-cyan',
-        }).addTo(websdrMap);
+        console.error('[WEBSDR] Unable to initialize globe or map renderer');
+        return;
     }
-
-    // Match background to tile ocean color so any remaining edge is seamless
-    mapEl.style.background = '#1a1d29';
 
     websdrInitialized = true;
 
@@ -73,10 +81,12 @@ async function initWebSDR() {
         loadSpyStationPresets();
     }
 
+    setupWebsdrResizeHandling(mapEl);
+    if (websdrReceivers.length > 0) {
+        plotReceiversOnMap(websdrReceivers);
+    }
     [100, 300, 600, 1000].forEach(delay => {
-        setTimeout(() => {
-            if (websdrMap) websdrMap.invalidateSize();
-        }, delay);
+        setTimeout(invalidateWebSDRViewport, delay);
     });
 }
 
@@ -94,6 +104,8 @@ function searchReceivers(refresh) {
         .then(data => {
             if (data.status === 'success') {
                 websdrReceivers = data.receivers || [];
+                websdrSelectedReceiverIndex = null;
+                hideWebsdrGlobePopup();
                 renderReceiverList(websdrReceivers);
                 plotReceiversOnMap(websdrReceivers);
 
@@ -107,6 +119,11 @@ function searchReceivers(refresh) {
 // ============== MAP ==============
 
 function plotReceiversOnMap(receivers) {
+    if (websdrMapType === 'globe' && websdrGlobe) {
+        plotReceiversOnGlobe(receivers);
+        return;
+    }
+
     if (!websdrMap) return;
 
     websdrMarkers.forEach(m => websdrMap.removeLayer(m));
@@ -144,6 +161,369 @@ function plotReceiversOnMap(receivers) {
     }
 }
 
+async function ensureWebsdrGlobeLibrary() {
+    if (typeof window.Globe === 'function') return true;
+    if (!isWebglSupported()) return false;
+
+    if (!websdrGlobeScriptPromise) {
+        websdrGlobeScriptPromise = WEBSDR_GLOBE_SCRIPT_URLS
+            .reduce(
+                (promise, src) => promise.then(() => loadWebsdrScript(src)),
+                Promise.resolve()
+            )
+            .then(() => typeof window.Globe === 'function')
+            .catch((error) => {
+                console.warn('[WEBSDR] Failed to load globe scripts:', error);
+                return false;
+            });
+    }
+
+    const loaded = await websdrGlobeScriptPromise;
+    if (!loaded) {
+        websdrGlobeScriptPromise = null;
+    }
+    return loaded;
+}
+
+function loadWebsdrScript(src) {
+    return new Promise((resolve, reject) => {
+        const selector = `script[data-websdr-src="${src}"]`;
+        const existing = document.querySelector(selector);
+
+        if (existing) {
+            if (existing.dataset.loaded === 'true') {
+                resolve();
+                return;
+            }
+            if (existing.dataset.failed === 'true') {
+                existing.remove();
+            } else {
+                existing.addEventListener('load', () => resolve(), { once: true });
+                existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+                return;
+            }
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.dataset.websdrSrc = src;
+        script.onload = () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        };
+        script.onerror = () => {
+            script.dataset.failed = 'true';
+            reject(new Error(`Failed to load ${src}`));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+function isWebglSupported() {
+    try {
+        const canvas = document.createElement('canvas');
+        return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+    } catch (_) {
+        return false;
+    }
+}
+
+function initWebsdrGlobe(mapEl) {
+    if (typeof window.Globe !== 'function' || !isWebglSupported()) return false;
+
+    mapEl.innerHTML = '';
+    mapEl.style.background = 'radial-gradient(circle at 30% 20%, rgba(14, 42, 68, 0.9), rgba(4, 9, 16, 0.95) 58%, rgba(2, 4, 9, 0.98) 100%)';
+    mapEl.style.cursor = 'grab';
+
+    websdrGlobe = window.Globe()(mapEl)
+        .backgroundColor('rgba(0,0,0,0)')
+        .globeImageUrl(WEBSDR_GLOBE_TEXTURE_URL)
+        .showAtmosphere(true)
+        .atmosphereColor('#3bb9ff')
+        .atmosphereAltitude(0.17)
+        .pointRadius('radius')
+        .pointAltitude('altitude')
+        .pointColor('color')
+        .pointsTransitionDuration(250)
+        .pointLabel(point => point.label || '')
+        .onPointHover(point => {
+            mapEl.style.cursor = point ? 'pointer' : 'grab';
+        })
+        .onPointClick((point, event) => {
+            if (!point) return;
+            showWebsdrGlobePopup(point, event);
+        });
+
+    const controls = websdrGlobe.controls();
+    if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.25;
+        controls.enablePan = false;
+        controls.minDistance = 140;
+        controls.maxDistance = 380;
+        controls.rotateSpeed = 0.7;
+        controls.zoomSpeed = 0.8;
+    }
+
+    ensureWebsdrGlobePopup(mapEl);
+    resizeWebsdrGlobe();
+    return true;
+}
+
+async function initWebsdrLeaflet(mapEl) {
+    if (typeof L === 'undefined') return false;
+
+    mapEl.innerHTML = '';
+    const mapHeight = mapEl.clientHeight || 500;
+    const minZoom = Math.ceil(Math.log2(mapHeight / 256));
+
+    websdrMap = L.map('websdrMap', {
+        center: [20, 0],
+        zoom: Math.max(minZoom, 2),
+        minZoom: Math.max(minZoom, 2),
+        zoomControl: true,
+        maxBounds: [[-85, -360], [85, 360]],
+        maxBoundsViscosity: 1.0,
+    });
+
+    if (typeof Settings !== 'undefined' && Settings.createTileLayer) {
+        await Settings.init();
+        Settings.createTileLayer().addTo(websdrMap);
+        Settings.registerMap(websdrMap);
+    } else {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19,
+            className: 'tile-layer-cyan',
+        }).addTo(websdrMap);
+    }
+
+    mapEl.style.background = '#1a1d29';
+    return true;
+}
+
+function setupWebsdrResizeHandling(mapEl) {
+    if (typeof ResizeObserver !== 'undefined') {
+        if (websdrResizeObserver) {
+            websdrResizeObserver.disconnect();
+        }
+        websdrResizeObserver = new ResizeObserver(() => invalidateWebSDRViewport());
+        websdrResizeObserver.observe(mapEl);
+    }
+
+    if (!websdrResizeHooked) {
+        window.addEventListener('resize', invalidateWebSDRViewport);
+        window.addEventListener('orientationchange', () => setTimeout(invalidateWebSDRViewport, 120));
+        websdrResizeHooked = true;
+    }
+}
+
+function invalidateWebSDRViewport() {
+    if (websdrMapType === 'globe') {
+        resizeWebsdrGlobe();
+        return;
+    }
+    if (websdrMap && typeof websdrMap.invalidateSize === 'function') {
+        websdrMap.invalidateSize({ pan: false, animate: false });
+    }
+}
+
+function resizeWebsdrGlobe() {
+    if (!websdrGlobe) return;
+    const mapEl = document.getElementById('websdrMap');
+    if (!mapEl) return;
+
+    const width = mapEl.clientWidth;
+    const height = mapEl.clientHeight;
+    if (!width || !height) return;
+
+    websdrGlobe.width(width);
+    websdrGlobe.height(height);
+}
+
+function plotReceiversOnGlobe(receivers) {
+    if (!websdrGlobe) return;
+
+    const points = [];
+    receivers.forEach((rx, idx) => {
+        const lat = Number(rx.lat);
+        const lon = Number(rx.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        const selected = idx === websdrSelectedReceiverIndex;
+        points.push({
+            lat: lat,
+            lng: lon,
+            receiverIndex: idx,
+            radius: selected ? 0.52 : 0.38,
+            altitude: selected ? 0.1 : 0.04,
+            color: selected ? '#00ff88' : (rx.available ? '#00d4ff' : '#5f6976'),
+            label: buildWebsdrPointLabel(rx, idx),
+        });
+    });
+
+    websdrGlobe.pointsData(points);
+
+    if (points.length > 0) {
+        if (websdrSelectedReceiverIndex != null) {
+            const selectedPoint = points.find(point => point.receiverIndex === websdrSelectedReceiverIndex);
+            if (selectedPoint) {
+                websdrGlobe.pointOfView({ lat: selectedPoint.lat, lng: selectedPoint.lng, altitude: 1.45 }, 900);
+                return;
+            }
+        }
+
+        const center = computeWebsdrGlobeCenter(points);
+        websdrGlobe.pointOfView(center, 900);
+    }
+}
+
+function computeWebsdrGlobeCenter(points) {
+    if (!points.length) return { lat: 20, lng: 0, altitude: 2.1 };
+
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    points.forEach(point => {
+        const latRad = point.lat * Math.PI / 180;
+        const lonRad = point.lng * Math.PI / 180;
+        x += Math.cos(latRad) * Math.cos(lonRad);
+        y += Math.cos(latRad) * Math.sin(lonRad);
+        z += Math.sin(latRad);
+    });
+
+    const count = points.length;
+    x /= count;
+    y /= count;
+    z /= count;
+
+    const hyp = Math.sqrt((x * x) + (y * y));
+    const centerLat = Math.atan2(z, hyp) * 180 / Math.PI;
+    const centerLng = Math.atan2(y, x) * 180 / Math.PI;
+
+    let meanAngularDistance = 0;
+    const centerLatRad = centerLat * Math.PI / 180;
+    const centerLngRad = centerLng * Math.PI / 180;
+    points.forEach(point => {
+        const latRad = point.lat * Math.PI / 180;
+        const lonRad = point.lng * Math.PI / 180;
+        const cosAngle = (
+            (Math.sin(centerLatRad) * Math.sin(latRad)) +
+            (Math.cos(centerLatRad) * Math.cos(latRad) * Math.cos(lonRad - centerLngRad))
+        );
+        const safeCos = Math.max(-1, Math.min(1, cosAngle));
+        meanAngularDistance += Math.acos(safeCos) * 180 / Math.PI;
+    });
+    meanAngularDistance /= count;
+
+    const altitude = Math.min(2.9, Math.max(1.35, 1.35 + (meanAngularDistance / 45)));
+    return { lat: centerLat, lng: centerLng, altitude: altitude };
+}
+
+function ensureWebsdrGlobePopup(mapEl) {
+    if (websdrGlobePopup) {
+        if (websdrGlobePopup.parentElement !== mapEl) {
+            mapEl.appendChild(websdrGlobePopup);
+        }
+        return;
+    }
+
+    websdrGlobePopup = document.createElement('div');
+    websdrGlobePopup.id = 'websdrGlobePopup';
+    websdrGlobePopup.style.position = 'absolute';
+    websdrGlobePopup.style.minWidth = '220px';
+    websdrGlobePopup.style.maxWidth = '260px';
+    websdrGlobePopup.style.padding = '10px';
+    websdrGlobePopup.style.borderRadius = '8px';
+    websdrGlobePopup.style.border = '1px solid rgba(0, 212, 255, 0.35)';
+    websdrGlobePopup.style.background = 'rgba(5, 13, 20, 0.92)';
+    websdrGlobePopup.style.backdropFilter = 'blur(4px)';
+    websdrGlobePopup.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)';
+    websdrGlobePopup.style.color = 'var(--text-primary)';
+    websdrGlobePopup.style.display = 'none';
+    websdrGlobePopup.style.zIndex = '20';
+    mapEl.appendChild(websdrGlobePopup);
+
+    if (!mapEl.dataset.websdrPopupHooked) {
+        mapEl.addEventListener('click', (event) => {
+            if (!websdrGlobePopup || websdrGlobePopup.style.display === 'none') return;
+            if (event.target.closest('#websdrGlobePopup')) return;
+            hideWebsdrGlobePopup();
+        });
+        mapEl.dataset.websdrPopupHooked = 'true';
+    }
+}
+
+function showWebsdrGlobePopup(point, event) {
+    if (!websdrGlobePopup || !point || point.receiverIndex == null) return;
+    const rx = websdrReceivers[point.receiverIndex];
+    if (!rx) return;
+
+    const mapEl = document.getElementById('websdrMap');
+    if (!mapEl) return;
+
+    websdrSelectedReceiverIndex = point.receiverIndex;
+    renderReceiverList(websdrReceivers);
+    plotReceiversOnGlobe(websdrReceivers);
+
+    websdrGlobePopup.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px; margin-bottom: 6px;">
+            <strong style="font-size: 12px; color: var(--accent-cyan);">${escapeHtmlWebsdr(rx.name)}</strong>
+            <button type="button" data-websdr-popup-close style="border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1;">&times;</button>
+        </div>
+        ${rx.location ? `<div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">${escapeHtmlWebsdr(rx.location)}</div>` : ''}
+        <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Antenna: ${escapeHtmlWebsdr(rx.antenna || 'Unknown')}</div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 10px;">Users: ${rx.users}/${rx.users_max}</div>
+        <button type="button" data-websdr-listen style="width: 100%; padding: 5px 10px; background: #00d4ff; color: #041018; border: none; border-radius: 4px; cursor: pointer; font-weight: 700;">Listen</button>
+    `;
+    websdrGlobePopup.style.display = 'block';
+
+    const rect = mapEl.getBoundingClientRect();
+    const x = event && Number.isFinite(event.clientX) ? (event.clientX - rect.left) : (rect.width / 2);
+    const y = event && Number.isFinite(event.clientY) ? (event.clientY - rect.top) : (rect.height / 2);
+    const popupWidth = 260;
+    const popupHeight = 155;
+    const left = Math.max(12, Math.min(rect.width - popupWidth - 12, x + 12));
+    const top = Math.max(12, Math.min(rect.height - popupHeight - 12, y + 12));
+    websdrGlobePopup.style.left = `${left}px`;
+    websdrGlobePopup.style.top = `${top}px`;
+
+    const closeBtn = websdrGlobePopup.querySelector('[data-websdr-popup-close]');
+    if (closeBtn) {
+        closeBtn.onclick = () => hideWebsdrGlobePopup();
+    }
+    const listenBtn = websdrGlobePopup.querySelector('[data-websdr-listen]');
+    if (listenBtn) {
+        listenBtn.onclick = () => selectReceiver(point.receiverIndex);
+    }
+
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+}
+
+function hideWebsdrGlobePopup() {
+    if (websdrGlobePopup) {
+        websdrGlobePopup.style.display = 'none';
+    }
+}
+
+function buildWebsdrPointLabel(rx, idx) {
+    const location = rx.location ? escapeHtmlWebsdr(rx.location) : 'Unknown location';
+    const antenna = escapeHtmlWebsdr(rx.antenna || 'Unknown antenna');
+    return `
+        <div style="padding: 4px 6px; font-size: 11px; background: rgba(4, 12, 19, 0.9); border: 1px solid rgba(0,212,255,0.28); border-radius: 4px;">
+            <div style="color: #00d4ff; font-weight: 600;">${escapeHtmlWebsdr(rx.name)}</div>
+            <div style="color: #a5b1c3;">${location}</div>
+            <div style="color: #8f9fb3;">${antenna} · ${rx.users}/${rx.users_max}</div>
+            <div style="color: #7a899b; margin-top: 2px;">Receiver #${idx + 1}</div>
+        </div>
+    `;
+}
+
 // ============== RECEIVER LIST ==============
 
 function renderReceiverList(receivers) {
@@ -155,12 +535,16 @@ function renderReceiverList(receivers) {
         return;
     }
 
-    container.innerHTML = receivers.slice(0, 50).map((rx, idx) => `
-        <div style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.2s;"
-             onmouseover="this.style.background='rgba(0,212,255,0.05)'" onmouseout="this.style.background='transparent'"
+    container.innerHTML = receivers.slice(0, 50).map((rx, idx) => {
+        const selected = idx === websdrSelectedReceiverIndex;
+        const baseBg = selected ? 'rgba(0,212,255,0.14)' : 'transparent';
+        const hoverBg = selected ? 'rgba(0,212,255,0.18)' : 'rgba(0,212,255,0.05)';
+        return `
+        <div style="padding: 8px 8px 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.2s; border-left: 2px solid ${selected ? 'var(--accent-cyan)' : 'transparent'}; background: ${baseBg};"
+             onmouseover="this.style.background='${hoverBg}'" onmouseout="this.style.background='${baseBg}'"
              onclick="selectReceiver(${idx})">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <strong style="font-size: 11px; color: var(--text-primary);">${escapeHtmlWebsdr(rx.name)}</strong>
+                <strong style="font-size: 11px; color: ${selected ? 'var(--accent-cyan)' : 'var(--text-primary)'};">${escapeHtmlWebsdr(rx.name)}</strong>
                 <span style="font-size: 9px; padding: 1px 6px; background: ${rx.available ? 'rgba(0,230,118,0.15)' : 'rgba(158,158,158,0.15)'}; color: ${rx.available ? '#00e676' : '#9e9e9e'}; border-radius: 3px;">${rx.users}/${rx.users_max}</span>
             </div>
             <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">
@@ -168,7 +552,8 @@ function renderReceiverList(receivers) {
                 ${rx.distance_km !== undefined ? ` · ${rx.distance_km} km` : ''}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // ============== SELECT RECEIVER ==============
@@ -180,14 +565,30 @@ function selectReceiver(index) {
     const freqKhz = parseFloat(document.getElementById('websdrFrequency')?.value || 7000);
     const mode = document.getElementById('websdrMode_select')?.value || 'am';
 
+    websdrSelectedReceiverIndex = index;
+    renderReceiverList(websdrReceivers);
+    focusReceiverOnMap(rx);
+    hideWebsdrGlobePopup();
+
     kiwiReceiverName = rx.name;
 
     // Connect via backend proxy
     connectToReceiver(rx.url, freqKhz, mode);
+}
 
-    // Highlight on map
-    if (websdrMap && rx.lat != null && rx.lon != null) {
-        websdrMap.setView([rx.lat, rx.lon], 6);
+function focusReceiverOnMap(rx) {
+    const lat = Number(rx.lat);
+    const lon = Number(rx.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    if (websdrMapType === 'globe' && websdrGlobe) {
+        plotReceiversOnGlobe(websdrReceivers);
+        websdrGlobe.pointOfView({ lat: lat, lng: lon, altitude: 1.4 }, 900);
+        return;
+    }
+
+    if (websdrMap) {
+        websdrMap.setView([lat, lon], 6);
     }
 }
 
@@ -551,6 +952,8 @@ function tuneToSpyStation(stationId, freqKhz) {
         .then(data => {
             if (data.status === 'success') {
                 websdrReceivers = data.receivers || [];
+                websdrSelectedReceiverIndex = null;
+                hideWebsdrGlobePopup();
                 renderReceiverList(websdrReceivers);
                 plotReceiversOnMap(websdrReceivers);
 

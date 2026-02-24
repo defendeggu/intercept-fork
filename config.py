@@ -7,10 +7,39 @@ import os
 import sys
 
 # Application version
-VERSION = "2.21.1"
+VERSION = "2.22.3"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.22.3",
+        "date": "February 2026",
+        "highlights": [
+            "Waterfall control panel no longer shows as unstyled text on first visit",
+            "WebSDR globe renders correctly on first page load without requiring a refresh",
+            "Waterfall monitor audio no longer takes minutes to start — playback detection now waits for real audio data instead of just the WAV header",
+            "Waterfall monitor stop is now instant — audio pauses and UI updates immediately instead of waiting for backend cleanup",
+            "Stopping the waterfall no longer shows a stale 'WebSocket closed before ready' message",
+        ]
+    },
+    {
+        "version": "2.22.1",
+        "date": "February 2026",
+        "highlights": [
+            "Waterfall receiver overhaul: WebSocket I/Q streaming with server-side FFT, click-to-tune, and zoom controls",
+            "Voice alerts for configurable event notifications across modes",
+            "Signal fingerprinting mode for RF device identification and pattern analysis",
+            "SignalID integration via SigIDWiki API for automatic signal classification",
+            "PWA support: installable web app with service worker and manifest",
+            "Mode stop responsiveness improvements with faster timeout handling",
+            "Navigation performance instrumentation and smoother mode transitions",
+            "Pager, sensor, and SSTV real-time signal scope visualization",
+            "ADS-B MSG2 surface movement parsing for ground vehicle tracking",
+            "WebSDR major overhaul with improved receiver management and audio streaming",
+            "Documentation audit: fixed license, tool names, entry points, and SSTV decoder references",
+            "Help modal updated with ACARS and VDL2 mode descriptions",
+        ]
+    },
     {
         "version": "2.21.1",
         "date": "February 2026",
@@ -250,6 +279,11 @@ HOST = _get_env('HOST', '0.0.0.0')
 PORT = _get_env_int('PORT', 5050)
 DEBUG = _get_env_bool('DEBUG', False)
 THREADED = _get_env_bool('THREADED', True)
+
+# HTTPS / SSL settings
+HTTPS = _get_env_bool('HTTPS', False)
+SSL_CERT = _get_env('SSL_CERT', '')
+SSL_KEY = _get_env('SSL_KEY', '')
 
 # Default RTL-SDR settings
 DEFAULT_GAIN = _get_env('DEFAULT_GAIN', '40')

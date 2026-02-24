@@ -2,40 +2,40 @@
 
 def register_blueprints(app):
     """Register all route blueprints with the Flask app."""
-    from .pager import pager_bp
-    from .sensor import sensor_bp
-    from .rtlamr import rtlamr_bp
-    from .wifi import wifi_bp
-    from .wifi_v2 import wifi_v2_bp
-    from .bluetooth import bluetooth_bp
-    from .bluetooth_v2 import bluetooth_v2_bp
+    from .acars import acars_bp
     from .adsb import adsb_bp
     from .ais import ais_bp
-    from .dsc import dsc_bp
-    from .acars import acars_bp
-    from .vdl2 import vdl2_bp
-    from .aprs import aprs_bp
-    from .satellite import satellite_bp
-    from .gps import gps_bp
-    from .settings import settings_bp
-    from .correlation import correlation_bp
-    from .listening_post import listening_post_bp
-    from .meshtastic import meshtastic_bp
-    from .tscm import tscm_bp, init_tscm_state
-    from .spy_stations import spy_stations_bp
-    from .controller import controller_bp
-    from .offline import offline_bp
-    from .updater import updater_bp
-    from .sstv import sstv_bp
-    from .weather_sat import weather_sat_bp
-    from .sstv_general import sstv_general_bp
-    from .websdr import websdr_bp
     from .alerts import alerts_bp
-    from .recordings import recordings_bp
-    from .subghz import subghz_bp
+    from .aprs import aprs_bp
+    from .bluetooth import bluetooth_bp
+    from .bluetooth_v2 import bluetooth_v2_bp
     from .bt_locate import bt_locate_bp
-    from .analytics import analytics_bp
+    from .controller import controller_bp
+    from .correlation import correlation_bp
+    from .dsc import dsc_bp
+    from .gps import gps_bp
+    from .listening_post import receiver_bp
+    from .meshtastic import meshtastic_bp
+    from .offline import offline_bp
+    from .pager import pager_bp
+    from .recordings import recordings_bp
+    from .rtlamr import rtlamr_bp
+    from .satellite import satellite_bp
+    from .sensor import sensor_bp
+    from .settings import settings_bp
+    from .signalid import signalid_bp
     from .space_weather import space_weather_bp
+    from .spy_stations import spy_stations_bp
+    from .sstv import sstv_bp
+    from .sstv_general import sstv_general_bp
+    from .subghz import subghz_bp
+    from .tscm import init_tscm_state, tscm_bp
+    from .updater import updater_bp
+    from .vdl2 import vdl2_bp
+    from .weather_sat import weather_sat_bp
+    from .websdr import websdr_bp
+    from .wifi import wifi_bp
+    from .wifi_v2 import wifi_v2_bp
 
     app.register_blueprint(pager_bp)
     app.register_blueprint(sensor_bp)
@@ -54,7 +54,7 @@ def register_blueprints(app):
     app.register_blueprint(gps_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(correlation_bp)
-    app.register_blueprint(listening_post_bp)
+    app.register_blueprint(receiver_bp)
     app.register_blueprint(meshtastic_bp)
     app.register_blueprint(tscm_bp)
     app.register_blueprint(spy_stations_bp)
@@ -69,8 +69,8 @@ def register_blueprints(app):
     app.register_blueprint(recordings_bp)  # Session recordings
     app.register_blueprint(subghz_bp)  # SubGHz transceiver (HackRF)
     app.register_blueprint(bt_locate_bp)  # BT Locate SAR device tracking
-    app.register_blueprint(analytics_bp)  # Cross-mode analytics dashboard
     app.register_blueprint(space_weather_bp)  # Space weather monitoring
+    app.register_blueprint(signalid_bp)  # External signal ID enrichment
 
     # Initialize TSCM state with queue and lock from app
     import app as app_module

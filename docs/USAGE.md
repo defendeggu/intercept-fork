@@ -172,7 +172,7 @@ Set the following environment variables (Docker recommended):
 ```bash
 INTERCEPT_ADSB_AUTO_START=true \
 INTERCEPT_SHARED_OBSERVER_LOCATION=false \
-python app.py
+sudo -E venv/bin/python intercept.py
 ```
 
 **Docker example (.env)**

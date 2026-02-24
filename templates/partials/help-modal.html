@@ -43,7 +43,7 @@
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></span><span class="desc">Aircraft - ADS-B tracking &amp; history</span></div>
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l2 2h14l2-2"/><path d="M5 18v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><path d="M12 12V6"/><path d="M12 6l4 3"/></svg></span><span class="desc">Vessels - AIS &amp; VHF DSC distress</span></div>
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="desc">APRS - Amateur radio tracking</span></div>
-                <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span><span class="desc">Listening Post - SDR scanner</span></div>
+                <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-8 3 16 3-8h4"/><path d="M2 18h20" opacity="0.4"/><path d="M2 21h20" opacity="0.2"/></svg></span><span class="desc">Waterfall - SDR receiver + signal ID</span></div>
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><circle cx="12" cy="12" r="2"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg></span><span class="desc">Spy Stations - Number stations database</span></div>
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></span><span class="desc">Meshtastic - LoRa mesh networking</span></div>
                 <div class="icon-item"><span class="icon icon--sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span><span class="desc">WebSDR - Remote SDR receivers</span></div>
@@ -114,7 +114,7 @@
                 <li>Interactive map shows station positions in real-time</li>
             </ul>
 
-            <h3>Listening Post Mode</h3>
+            <h3>Spectrum Waterfall Mode</h3>
             <ul class="tip-list">
                 <li>Wideband SDR scanner with spectrum visualization</li>
                 <li>Tune to any frequency supported by your SDR hardware</li>
@@ -129,7 +129,7 @@
                 <li>Browse stations from priyom.org with frequencies and schedules</li>
                 <li>Filter by type (number/diplomatic), country, and mode</li>
                 <li>Famous stations: UVB-76 "The Buzzer", Cuban HM01, Israeli E17z</li>
-                <li>Click "Tune" to listen via Listening Post mode</li>
+                <li>Click "Tune" to listen via Spectrum Waterfall mode</li>
             </ul>
 
             <h3>Meshtastic Mode</h3>
@@ -166,11 +166,27 @@
                 <li>View next pass predictions with elevation and duration</li>
             </ul>
 
+            <h3>ACARS Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes Aircraft Communications Addressing and Reporting System messages via acarsdec</li>
+                <li>Receives operational, weather, and position reports on 129-136 MHz</li>
+                <li>Supports North America, Europe, and Asia-Pacific regional frequency presets</li>
+                <li>Filter by message type, flight ID, or aircraft registration</li>
+            </ul>
+
+            <h3>VDL2 Mode</h3>
+            <ul class="tip-list">
+                <li>Decodes VHF Data Link Mode 2 aircraft datalink messages via dumpvdl2</li>
+                <li>Captures ACARS-over-AVLC frames with full signal analysis (SNR, burst length)</li>
+                <li>Monitor multiple VDL2 frequencies simultaneously (136.725, 136.775, 136.975 MHz)</li>
+                <li>Export captured messages to CSV or JSON for offline analysis</li>
+            </ul>
+
             <h3>ISS SSTV Mode</h3>
             <ul class="tip-list">
                 <li>Decodes Slow Scan Television (SSTV) images from the International Space Station</li>
                 <li>Automated ISS pass tracking with Doppler correction on 145.800 MHz</li>
-                <li>Images decoded in real-time using slowrx</li>
+                <li>Images decoded in real-time using the built-in pure Python decoder</li>
                 <li>Gallery view with timestamped decoded images</li>
             </ul>
 
@@ -330,15 +346,17 @@
                 <li><strong>Aircraft (ACARS):</strong> Second RTL-SDR, acarsdec</li>
                 <li><strong>Vessels (AIS):</strong> RTL-SDR, AIS-catcher</li>
                 <li><strong>APRS:</strong> RTL-SDR, direwolf or multimon-ng</li>
-                <li><strong>Listening Post:</strong> RTL-SDR or SoapySDR-compatible hardware</li>
+                <li><strong>Spectrum Waterfall:</strong> RTL-SDR or SoapySDR-compatible hardware</li>
                 <li><strong>Spy Stations:</strong> Internet connection (database lookup)</li>
                 <li><strong>Meshtastic:</strong> Meshtastic LoRa device, <code>pip install meshtastic</code></li>
                 <li><strong>WebSDR:</strong> Internet connection (remote receivers)</li>
                 <li><strong>SubGHz:</strong> RTL-SDR or compatible SDR hardware</li>
                 <li><strong>Satellite:</strong> Internet for Celestrak (optional), skyfield</li>
-                <li><strong>ISS SSTV:</strong> RTL-SDR, slowrx</li>
+                <li><strong>ACARS:</strong> RTL-SDR, acarsdec</li>
+                <li><strong>VDL2:</strong> RTL-SDR, dumpvdl2</li>
+                <li><strong>ISS SSTV:</strong> RTL-SDR (pure Python decoder — no external tools needed)</li>
                 <li><strong>Weather Sat:</strong> RTL-SDR, SatDump</li>
-                <li><strong>HF SSTV:</strong> RTL-SDR or SoapySDR-compatible hardware, slowrx</li>
+                <li><strong>HF SSTV:</strong> RTL-SDR or SoapySDR-compatible hardware (pure Python decoder)</li>
                 <li><strong>GPS:</strong> RTL-SDR or GPS-capable SDR</li>
                 <li><strong>Space Weather:</strong> Internet connection (public APIs)</li>
                 <li><strong>WiFi:</strong> Monitor-mode adapter, aircrack-ng suite</li>
