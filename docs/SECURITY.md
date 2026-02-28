@@ -18,10 +18,9 @@ By default, INTERCEPT binds to `0.0.0.0:5050`, making it accessible from any net
    echo "block in on en0 proto tcp from any to any port 5050" | sudo pfctl -ef -
    ```
 
-2. **Bind to Localhost**: For local-only access, set the host environment variable:
+2. **Bind to Localhost**: For local-only access, set the host or use the CLI flag:
    ```bash
-   export INTERCEPT_HOST=127.0.0.1
-   python intercept.py
+   sudo ./start.sh -H 127.0.0.1
    ```
 
 3. **Trusted Networks Only**: Only run INTERCEPT on networks you trust. The application has no authentication mechanism.

@@ -88,8 +88,10 @@ Troubleshooting (no decode / noisy decode):
 git clone https://github.com/smittix/intercept.git
 cd intercept
 ./setup.sh
-sudo -E venv/bin/python intercept.py
+sudo ./start.sh
 ```
+
+> **Production vs Dev server:** `start.sh` auto-detects gunicorn + gevent and runs a production server with cooperative greenlets — handles multiple SSE/WebSocket clients without blocking. Falls back to Flask dev server if gunicorn is not installed. For quick local development, you can still use `sudo -E venv/bin/python intercept.py` directly.
 
 ### Docker
 
@@ -174,7 +176,7 @@ Set these as environment variables for either local installs or Docker:
 ```bash
 INTERCEPT_ADSB_AUTO_START=true \
 INTERCEPT_SHARED_OBSERVER_LOCATION=false \
-sudo -E venv/bin/python intercept.py
+sudo ./start.sh
 ```
 
 **Docker example (.env)**

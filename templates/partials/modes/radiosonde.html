@@ -148,6 +148,8 @@
                 freq_min: freqMin,
                 freq_max: freqMax,
                 bias_t: typeof getBiasTEnabled === 'function' ? getBiasTEnabled() : false,
+                latitude: radiosondeStationLocation.lat,
+                longitude: radiosondeStationLocation.lon,
             })
         })
         .then(r => r.json())
@@ -230,15 +232,23 @@
     let radiosondeMarkers = new Map();
     let radiosondeTracks = new Map();
     let radiosondeTrackPoints = new Map();
+    let radiosondeStationLocation = { lat: 0, lon: 0 };
+    let radiosondeStationMarker = null;
 
     function initRadiosondeMap() {
         if (radiosondeMap) return;
         const container = document.getElementById('radiosondeMapContainer');
         if (!container) return;
 
+        // Resolve observer location
+        if (window.ObserverLocation && ObserverLocation.getForModule) {
+            radiosondeStationLocation = ObserverLocation.getForModule('radiosonde_observerLocation');
+        }
+        const hasLocation = radiosondeStationLocation.lat !== 0 || radiosondeStationLocation.lon !== 0;
+
         radiosondeMap = L.map('radiosondeMapContainer', {
-            center: [40, -95],
-            zoom: 4,
+            center: hasLocation ? [radiosondeStationLocation.lat, radiosondeStationLocation.lon] : [40, -95],
+            zoom: hasLocation ? 7 : 4,
             zoomControl: true,
         });
 
@@ -246,6 +256,50 @@
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             maxZoom: 18,
         }).addTo(radiosondeMap);
+
+        // Add station marker if we have a location
+        if (hasLocation) {
+            radiosondeStationMarker = L.circleMarker(
+                [radiosondeStationLocation.lat, radiosondeStationLocation.lon], {
+                radius: 8,
+                fillColor: '#00e5ff',
+                color: '#00e5ff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.5,
+            }).addTo(radiosondeMap);
+            radiosondeStationMarker.bindTooltip('Station', { permanent: false, direction: 'top' });
+        }
+
+        // Try GPS for live position updates
+        fetch('/gps/position')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok' && data.position && data.position.latitude != null) {
+                    radiosondeStationLocation = { lat: data.position.latitude, lon: data.position.longitude };
+                    const ll = [data.position.latitude, data.position.longitude];
+                    if (radiosondeStationMarker) {
+                        radiosondeStationMarker.setLatLng(ll);
+                    } else {
+                        radiosondeStationMarker = L.circleMarker(ll, {
+                            radius: 8,
+                            fillColor: '#00e5ff',
+                            color: '#00e5ff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.5,
+                        }).addTo(radiosondeMap);
+                        radiosondeStationMarker.bindTooltip('Station (GPS)', { permanent: false, direction: 'top' });
+                    }
+                    if (!radiosondeMap._gpsInitialized) {
+                        radiosondeMap.setView(ll, 7);
+                        radiosondeMap._gpsInitialized = true;
+                    }
+                    // Re-render cards with updated distances
+                    updateRadiosondeCards();
+                }
+            })
+            .catch(() => {});
     }
 
     function updateRadiosondeMap(balloon) {
@@ -284,12 +338,19 @@
         const tempStr = balloon.temp != null ? `${balloon.temp.toFixed(1)} °C` : '--';
         const humStr = balloon.humidity != null ? `${balloon.humidity.toFixed(0)}%` : '--';
         const velStr = balloon.vel_v != null ? `${balloon.vel_v.toFixed(1)} m/s` : '--';
+        let distStr = '';
+        if ((radiosondeStationLocation.lat !== 0 || radiosondeStationLocation.lon !== 0) && balloon.lat && balloon.lon) {
+            const distM = radiosondeMap.distance(
+                [radiosondeStationLocation.lat, radiosondeStationLocation.lon], latlng);
+            distStr = `Dist: ${(distM / 1000).toFixed(1)} km<br>`;
+        }
         radiosondeMarkers.get(id).bindPopup(
             `<strong>${id}</strong><br>` +
             `Type: ${balloon.sonde_type || '--'}<br>` +
             `Alt: ${altStr}<br>` +
             `Temp: ${tempStr} | Hum: ${humStr}<br>` +
             `Vert: ${velStr}<br>` +
+            distStr +
             (balloon.freq ? `Freq: ${balloon.freq.toFixed(3)} MHz` : '')
         );
 
@@ -322,6 +383,7 @@
         if (!container) return;
 
         const sorted = Object.values(radiosondeBalloons).sort((a, b) => (b.alt || 0) - (a.alt || 0));
+        const hasStation = radiosondeStationLocation.lat !== 0 || radiosondeStationLocation.lon !== 0;
         container.innerHTML = sorted.map(b => {
             const alt = b.alt ? `${Math.round(b.alt).toLocaleString()} m` : '--';
             const temp = b.temp != null ? `${b.temp.toFixed(1)}°C` : '--';
@@ -329,6 +391,13 @@
             const press = b.pressure != null ? `${b.pressure.toFixed(1)} hPa` : '--';
             const vel = b.vel_v != null ? `${b.vel_v > 0 ? '+' : ''}${b.vel_v.toFixed(1)} m/s` : '--';
             const freq = b.freq ? `${b.freq.toFixed(3)} MHz` : '--';
+            let dist = '--';
+            if (hasStation && b.lat && b.lon && radiosondeMap) {
+                const distM = radiosondeMap.distance(
+                    [radiosondeStationLocation.lat, radiosondeStationLocation.lon],
+                    [b.lat, b.lon]);
+                dist = `${(distM / 1000).toFixed(1)} km`;
+            }
             return `
                 <div class="radiosonde-card" onclick="radiosondeMap && radiosondeMap.setView([${b.lat || 0}, ${b.lon || 0}], 10)">
                     <div class="radiosonde-card-header">
@@ -359,6 +428,10 @@
                         <div class="radiosonde-stat">
                             <span class="radiosonde-stat-value">${freq}</span>
                             <span class="radiosonde-stat-label">FREQ</span>
+                        </div>
+                        <div class="radiosonde-stat">
+                            <span class="radiosonde-stat-value">${dist}</span>
+                            <span class="radiosonde-stat-label">DIST</span>
                         </div>
                     </div>
                 </div>

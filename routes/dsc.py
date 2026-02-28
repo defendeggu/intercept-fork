@@ -37,7 +37,12 @@ from utils.database import (
 from utils.dsc.parser import parse_dsc_message
 from utils.sse import sse_stream_fanout
 from utils.event_pipeline import process_event
-from utils.validation import validate_device_index, validate_gain
+from utils.validation import (
+    validate_device_index,
+    validate_gain,
+    validate_rtl_tcp_host,
+    validate_rtl_tcp_port,
+)
 from utils.sdr import SDRFactory, SDRType
 from utils.dependencies import get_tool_path
 from utils.process import register_process, unregister_process
@@ -336,19 +341,29 @@ def start_decoding() -> Response:
         # Get SDR type from request
         sdr_type_str = data.get('sdr_type', 'rtlsdr')
 
-        # Check if device is available using centralized registry
-        global dsc_active_device, dsc_active_sdr_type
-        device_int = int(device)
-        error = app_module.claim_sdr_device(device_int, 'dsc', sdr_type_str)
-        if error:
-            return jsonify({
-                'status': 'error',
-                'error_type': 'DEVICE_BUSY',
-                'message': error
-            }), 409
+        # Check for rtl_tcp (remote SDR) connection
+        rtl_tcp_host = data.get('rtl_tcp_host')
+        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
 
-        dsc_active_device = device_int
-        dsc_active_sdr_type = sdr_type_str
+        try:
+            sdr_type = SDRType(sdr_type_str)
+        except ValueError:
+            sdr_type = SDRType.RTL_SDR
+
+        # Check if device is available using centralized registry (skip for remote rtl_tcp)
+        global dsc_active_device, dsc_active_sdr_type
+        if not rtl_tcp_host:
+            device_int = int(device)
+            error = app_module.claim_sdr_device(device_int, 'dsc', sdr_type_str)
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error
+                }), 409
+
+            dsc_active_device = device_int
+            dsc_active_sdr_type = sdr_type_str
 
         # Clear queue
         while not app_module.dsc_queue.empty():
@@ -357,22 +372,32 @@ def start_decoding() -> Response:
             except queue.Empty:
                 break
 
-        # Build rtl_fm command
-        rtl_fm_path = tools['rtl_fm']['path']
+        # Build rtl_fm command via SDR abstraction layer
         decoder_path = tools['dsc_decoder']['path']
 
-        # rtl_fm command for DSC decoding
-        # DSC uses narrow FM at 156.525 MHz with 48kHz sample rate
-        rtl_cmd = [
-            rtl_fm_path,
-            '-f', f'{DSC_VHF_FREQUENCY_MHZ}M',
-            '-s', str(DSC_SAMPLE_RATE),
-            '-d', str(device),
-            '-g', str(gain),
-            '-M', 'fm',           # FM demodulation
-            '-l', '0',            # No squelch for DSC
-            '-E', 'dc'            # DC blocking filter
-        ]
+        if rtl_tcp_host:
+            try:
+                rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+                rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+            except ValueError as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 400
+            sdr_device = SDRFactory.create_network_device(rtl_tcp_host, rtl_tcp_port)
+            logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+        else:
+            sdr_device = SDRFactory.create_default_device(sdr_type, index=int(device))
+
+        builder = SDRFactory.get_builder(sdr_device.sdr_type)
+        rtl_cmd = list(builder.build_fm_demod_command(
+            device=sdr_device,
+            frequency_mhz=DSC_VHF_FREQUENCY_MHZ,
+            sample_rate=DSC_SAMPLE_RATE,
+            gain=float(gain) if gain and str(gain) != '0' else None,
+            modulation='fm',
+            squelch=0,
+        ))
+        # Ensure trailing '-' for stdin piping and add DC blocking filter
+        if rtl_cmd and rtl_cmd[-1] == '-':
+            rtl_cmd = rtl_cmd[:-1] + ['-E', 'dc', '-']
 
         # Decoder command
         decoder_cmd = [decoder_path]

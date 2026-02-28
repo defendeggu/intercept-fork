@@ -4296,6 +4296,10 @@
             const sensorTimelineContainer = document.getElementById('sensorTimelineContainer');
             if (pagerTimelineContainer) pagerTimelineContainer.style.display = mode === 'pager' ? 'block' : 'none';
             if (sensorTimelineContainer) sensorTimelineContainer.style.display = mode === 'sensor' ? 'block' : 'none';
+            const pagerScopePanel = document.getElementById('pagerScopePanel');
+            if (pagerScopePanel && mode !== 'pager') pagerScopePanel.style.display = 'none';
+            const sensorScopePanel = document.getElementById('sensorScopePanel');
+            if (sensorScopePanel && mode !== 'sensor') sensorScopePanel.style.display = 'none';
             const morseScopePanel = document.getElementById('morseScopePanel');
             const morseOutputPanel = document.getElementById('morseOutputPanel');
             if (morseScopePanel && mode !== 'morse') morseScopePanel.style.display = 'none';
@@ -9793,6 +9797,10 @@
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
             aprsCurrentAgent = isAgentMode ? currentAgent : null;
 
+            // Check for remote SDR (only for local mode)
+            const remoteConfig = isAgentMode ? null : getRemoteSDRConfig();
+            if (remoteConfig === false) return; // Validation failed
+
             // Build request body
             const requestBody = {
                 region,
@@ -9800,6 +9808,12 @@
                 gain: parseInt(gain),
                 sdr_type: sdrType
             };
+
+            // Add rtl_tcp params if using remote SDR
+            if (remoteConfig) {
+                requestBody.rtl_tcp_host = remoteConfig.host;
+                requestBody.rtl_tcp_port = remoteConfig.port;
+            }
 
             // Add custom frequency if selected
             if (region === 'custom') {

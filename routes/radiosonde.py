@@ -12,8 +12,8 @@ import os
 import queue
 import shutil
 import socket
-import sys
 import subprocess
+import sys
 import threading
 import time
 from typing import Any
@@ -29,10 +29,16 @@ from utils.constants import (
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
 )
+from utils.gps import is_gpsd_running
 from utils.logging import get_logger
 from utils.sdr import SDRFactory, SDRType
 from utils.sse import sse_stream_fanout
-from utils.validation import validate_device_index, validate_gain
+from utils.validation import (
+    validate_device_index,
+    validate_gain,
+    validate_latitude,
+    validate_longitude,
+)
 
 logger = get_logger('intercept.radiosonde')
 
@@ -83,6 +89,10 @@ def generate_station_cfg(
     ppm: int = 0,
     bias_t: bool = False,
     udp_port: int = RADIOSONDE_UDP_PORT,
+    latitude: float = 0.0,
+    longitude: float = 0.0,
+    station_alt: float = 0.0,
+    gpsd_enabled: bool = False,
 ) -> str:
     """Generate a station.cfg for radiosonde_auto_rx and return the file path."""
     cfg_dir = os.path.abspath(os.path.join('data', 'radiosonde'))
@@ -116,10 +126,10 @@ always_scan = []
 always_decode = []
 
 [location]
-station_lat = 0.0
-station_lon = 0.0
-station_alt = 0.0
-gpsd_enabled = False
+station_lat = {latitude}
+station_lon = {longitude}
+station_alt = {station_alt}
+gpsd_enabled = {str(gpsd_enabled)}
 gpsd_host = localhost
 gpsd_port = 2947
 
@@ -471,6 +481,20 @@ def start_radiosonde():
     bias_t = data.get('bias_t', False)
     ppm = int(data.get('ppm', 0))
 
+    # Validate optional location
+    latitude = 0.0
+    longitude = 0.0
+    if data.get('latitude') is not None and data.get('longitude') is not None:
+        try:
+            latitude = validate_latitude(data['latitude'])
+            longitude = validate_longitude(data['longitude'])
+        except ValueError:
+            latitude = 0.0
+            longitude = 0.0
+
+    # Check if gpsd is available for live position updates
+    gpsd_enabled = is_gpsd_running()
+
     # Find auto_rx
     auto_rx_path = find_auto_rx()
     if not auto_rx_path:
@@ -515,6 +539,9 @@ def start_radiosonde():
         device_index=device_int,
         ppm=ppm,
         bias_t=bias_t,
+        latitude=latitude,
+        longitude=longitude,
+        gpsd_enabled=gpsd_enabled,
     )
 
     # Build command - auto_rx -c expects a file path, not a directory

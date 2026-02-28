@@ -28,6 +28,8 @@ from utils.validation import (
     validate_frequency,
     validate_gain,
     validate_ppm,
+    validate_rtl_tcp_host,
+    validate_rtl_tcp_port,
 )
 
 morse_bp = Blueprint('morse', __name__)
@@ -219,6 +221,14 @@ def _validate_signal_gate(value: Any) -> float:
         raise ValueError(f'Invalid signal gate: {value}') from e
 
 
+def _validate_detect_mode(value: Any) -> str:
+    """Validate detection mode ('goertzel' or 'envelope')."""
+    mode = str(value or 'goertzel').lower().strip()
+    if mode not in ('goertzel', 'envelope'):
+        raise ValueError("detect_mode must be 'goertzel' or 'envelope'")
+    return mode
+
+
 def _snapshot_live_resources() -> list[str]:
     alive: list[str] = []
     if morse_decoder_worker and morse_decoder_worker.is_alive():
@@ -238,8 +248,15 @@ def start_morse() -> Response:
 
     data = request.json or {}
 
+    # Validate detect_mode first — it determines frequency limits.
     try:
-        freq = validate_frequency(data.get('frequency', '14.060'), min_mhz=0.5, max_mhz=30.0)
+        detect_mode = _validate_detect_mode(data.get('detect_mode', 'goertzel'))
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+    freq_max = 1766.0 if detect_mode == 'envelope' else 30.0
+    try:
+        freq = validate_frequency(data.get('frequency', '14.060'), min_mhz=0.5, max_mhz=freq_max)
         gain = validate_gain(data.get('gain', '0'))
         ppm = validate_ppm(data.get('ppm', '0'))
         device = validate_device_index(data.get('device', '0'))
@@ -264,6 +281,10 @@ def start_morse() -> Response:
 
     sdr_type_str = data.get('sdr_type', 'rtlsdr')
 
+    # Check for rtl_tcp (remote SDR) connection
+    rtl_tcp_host = data.get('rtl_tcp_host')
+    rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
     with app_module.morse_lock:
         if morse_state in {MORSE_STARTING, MORSE_RUNNING, MORSE_STOPPING}:
             return jsonify({
@@ -272,24 +293,34 @@ def start_morse() -> Response:
                 'state': morse_state,
             }), 409
 
-        device_int = int(device)
-        error = app_module.claim_sdr_device(device_int, 'morse', sdr_type_str)
-        if error:
-            return jsonify({
-                'status': 'error',
-                'error_type': 'DEVICE_BUSY',
-                'message': error,
-            }), 409
+        # Reserve SDR device (skip for remote rtl_tcp)
+        if not rtl_tcp_host:
+            device_int = int(device)
+            error = app_module.claim_sdr_device(device_int, 'morse', sdr_type_str)
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error,
+                }), 409
 
-        morse_active_device = device_int
-        morse_active_sdr_type = sdr_type_str
+            morse_active_device = device_int
+            morse_active_sdr_type = sdr_type_str
         morse_last_error = ''
         morse_session_id += 1
 
         _drain_queue(app_module.morse_queue)
         _set_state(MORSE_STARTING, 'Starting decoder...')
 
-    sample_rate = 22050
+    # Envelope mode (OOK/AM): use AM demod, higher sample rate for better
+    # envelope resolution.  Goertzel mode (HF CW): use USB demod.
+    if detect_mode == 'envelope':
+        sample_rate = 48000
+        modulation = 'am'
+    else:
+        sample_rate = 22050
+        modulation = 'usb'
+
     bias_t = _bool_value(data.get('bias_t', False), False)
 
     try:
@@ -297,23 +328,35 @@ def start_morse() -> Response:
     except ValueError:
         sdr_type = SDRType.RTL_SDR
 
+    # Create network or local SDR device
+    network_sdr_device = None
+    if rtl_tcp_host:
+        try:
+            rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+            rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+        except ValueError as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+        network_sdr_device = SDRFactory.create_network_device(rtl_tcp_host, rtl_tcp_port)
+        logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+
     requested_device_index = int(device)
     active_device_index = requested_device_index
-    builder = SDRFactory.get_builder(sdr_type)
+    builder = SDRFactory.get_builder(network_sdr_device.sdr_type if network_sdr_device else sdr_type)
 
     device_catalog: dict[int, dict[str, str]] = {}
     candidate_device_indices: list[int] = [requested_device_index]
-    with contextlib.suppress(Exception):
-        detected_devices = SDRFactory.detect_devices()
-        same_type_devices = [d for d in detected_devices if d.sdr_type == sdr_type]
-        for d in same_type_devices:
-            device_catalog[d.index] = {
-                'name': str(d.name or f'SDR {d.index}'),
-                'serial': str(d.serial or 'Unknown'),
-            }
-        for d in sorted(same_type_devices, key=lambda dev: dev.index):
-            if d.index not in candidate_device_indices:
-                candidate_device_indices.append(d.index)
+    if not network_sdr_device:
+        with contextlib.suppress(Exception):
+            detected_devices = SDRFactory.detect_devices()
+            same_type_devices = [d for d in detected_devices if d.sdr_type == sdr_type]
+            for d in same_type_devices:
+                device_catalog[d.index] = {
+                    'name': str(d.name or f'SDR {d.index}'),
+                    'serial': str(d.serial or 'Unknown'),
+                }
+            for d in sorted(same_type_devices, key=lambda dev: dev.index):
+                if d.index not in candidate_device_indices:
+                    candidate_device_indices.append(d.index)
 
     def _device_label(device_index: int) -> str:
         meta = device_catalog.get(device_index, {})
@@ -322,15 +365,19 @@ def start_morse() -> Response:
         return f'device {device_index} ({name}, SN: {serial})'
 
     def _build_rtl_cmd(device_index: int, direct_sampling_mode: int | None) -> list[str]:
-        tuned_frequency_mhz = max(0.5, float(freq) - (float(tone_freq) / 1_000_000.0))
-        sdr_device = SDRFactory.create_default_device(sdr_type, index=device_index)
+        # Envelope mode tunes directly to center freq (no tone offset).
+        if detect_mode == 'envelope':
+            tuned_frequency_mhz = max(0.5, float(freq))
+        else:
+            tuned_frequency_mhz = max(0.5, float(freq) - (float(tone_freq) / 1_000_000.0))
+        sdr_device = network_sdr_device or SDRFactory.create_default_device(sdr_type, index=device_index)
         fm_kwargs: dict[str, Any] = {
             'device': sdr_device,
             'frequency_mhz': tuned_frequency_mhz,
             'sample_rate': sample_rate,
             'gain': float(gain) if gain and gain != '0' else None,
             'ppm': int(ppm) if ppm and ppm != '0' else None,
-            'modulation': 'usb',
+            'modulation': modulation,
             'bias_t': bias_t,
         }
         if direct_sampling_mode in (1, 2):
@@ -342,13 +389,19 @@ def start_morse() -> Response:
             cmd.append('-')
         return cmd
 
-    can_try_direct_sampling = bool(sdr_type == SDRType.RTL_SDR and float(freq) < 24.0)
+    can_try_direct_sampling = bool(
+        sdr_type == SDRType.RTL_SDR
+        and detect_mode != 'envelope'  # direct sampling is HF-only
+        and float(freq) < 24.0
+    )
     direct_sampling_attempts: list[int | None] = [2, 1, None] if can_try_direct_sampling else [None]
 
     runtime_config: dict[str, Any] = {
         'sample_rate': sample_rate,
+        'detect_mode': detect_mode,
+        'modulation': modulation,
         'rf_frequency_mhz': float(freq),
-        'tuned_frequency_mhz': max(0.5, float(freq) - (float(tone_freq) / 1_000_000.0)),
+        'tuned_frequency_mhz': max(0.5, float(freq)) if detect_mode == 'envelope' else max(0.5, float(freq) - (float(tone_freq) / 1_000_000.0)),
         'tone_freq': tone_freq,
         'wpm': wpm,
         'bandwidth_hz': bandwidth_hz,
@@ -663,6 +716,8 @@ def start_morse() -> Response:
             'status': 'started',
             'state': MORSE_RUNNING,
             'command': full_cmd,
+            'detect_mode': detect_mode,
+            'modulation': modulation,
             'tone_freq': tone_freq,
             'wpm': wpm,
             'config': runtime_config,

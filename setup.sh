@@ -337,7 +337,8 @@ install_python_deps() {
   info "Installing optional packages..."
   for pkg in "numpy>=1.24.0" "scipy>=1.10.0" "Pillow>=9.0.0" "skyfield>=1.45" \
              "bleak>=0.21.0" "psycopg2-binary>=2.9.9" "meshtastic>=2.0.0" \
-             "scapy>=2.4.5" "qrcode[pil]>=7.4" "cryptography>=41.0.0"; do
+             "scapy>=2.4.5" "qrcode[pil]>=7.4" "cryptography>=41.0.0" \
+             "gunicorn>=21.2.0" "gevent>=23.9.0" "psutil>=5.9.0"; do
     pkg_name="${pkg%%>=*}"
     if ! $PIP install "$pkg" 2>/dev/null; then
       warn "${pkg_name} failed to install (optional - related features may be unavailable)"
@@ -1590,6 +1591,9 @@ final_summary_and_hard_fail() {
   echo "============================================"
   echo
   echo "To start INTERCEPT:"
+  echo "  sudo ./start.sh"
+  echo
+  echo "Or for quick local dev:"
   echo "  sudo -E venv/bin/python intercept.py"
   echo
   echo "Then open http://localhost:5050 in your browser"

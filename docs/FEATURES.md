@@ -100,11 +100,30 @@ Digital Selective Calling (DSC) monitoring on the international maritime distres
 - **CSV/JSON export** - export captured messages for offline analysis
 - **Integrated with ADS-B dashboard** - VDL2 messages linked to aircraft tracking
 
+## CW/Morse Code Decoder
+
+- **Custom Goertzel tone detection** for CW (continuous wave) Morse decoding
+- **OOK/AM envelope detection** mode for on-off keying signals in ISM bands
+- **HF frequency presets** for amateur CW bands (160m-10m)
+- **ISM band presets** for OOK envelope mode (315 MHz, 433 MHz, 868 MHz, 915 MHz)
+- **Real-time character and word output** with WPM estimation
+- **Multi-SDR support** - RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay
+
+## WeFax (Weather Fax)
+
+- **HF weather fax reception** from marine and meteorological broadcast stations
+- **Broadcast timeline** with scheduled transmission times by station
+- **Auto-scheduler** for unattended capture of scheduled broadcasts
+- **Image gallery** with timestamped decoded weather charts
+- **Station presets** for major WeFax broadcasters worldwide
+- **Multi-SDR support** - RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay
+
 ## Listening Post
 
 - **Wideband frequency scanning** via rtl_power sweep with SNR filtering
 - **Real-time audio monitoring** with FM and SSB demodulation
 - **Cross-module frequency routing** from scanner to decoders
+- **Waterfall spectrum display** for visual signal identification
 - **Customizable frequency presets** and band bookmarks
 - **Multi-SDR support** - RTL-SDR, LimeSDR, HackRF, Airspy, SDRplay
 
@@ -169,6 +188,16 @@ Digital Selective Calling (DSC) monitoring on the international maritime distres
 - **Active solar regions** - Current sunspot region data with location and area
 - **Auto-refresh** - 5-minute polling with manual refresh option
 - **No SDR required** - Data fetched from NOAA SWPC, NASA SDO, and HamQSL public APIs
+
+## Radiosonde Weather Balloon Tracking
+
+- **400-406 MHz reception** via radiosonde_auto_rx for weather balloon telemetry
+- **Frequency presets** for common radiosonde bands
+- **Real-time telemetry** - altitude, temperature, humidity, pressure, GPS position
+- **Interactive map** with balloon trajectory and burst point prediction
+- **Station location** with configurable observer position
+- **Distance tracking** - real-time distance-to-balloon calculation
+- **Multi-SDR support** - RTL-SDR, HackRF, LimeSDR, Airspy, SDRplay
 
 ## Satellite Tracking
 
@@ -270,7 +299,7 @@ Technical Surveillance Countermeasures (TSCM) screening for detecting wireless s
 ### Wireless Sweep Features
 - **BLE scanning** with manufacturer data detection (AirTags, Tile, SmartTags, ESP32)
 - **WiFi scanning** for rogue APs, hidden SSIDs, camera devices
-- **RF spectrum analysis** (requires RTL-SDR) - FM bugs, ISM bands, video transmitters
+- **RF spectrum analysis** (RTL-SDR or HackRF) - FM bugs, ISM bands, video transmitters
 - **Cross-protocol correlation** - links devices across BLE/WiFi/RF
 - **Baseline comparison** - detect new/unknown devices vs known environment
 
@@ -369,6 +398,14 @@ Deploy lightweight sensor nodes across multiple locations and aggregate data to 
 - **Redundancy** - Multiple nodes for reliable coverage
 - **Triangulation** - Use multiple GPS-enabled agents for signal location
 
+## System Health
+
+- **Telemetry dashboard** with real-time system metrics
+- **Process monitoring** for all running SDR tools and decoders
+- **CPU, memory, and disk usage** tracking
+- **SDR device status** overview
+- **No SDR required** - monitors system health independently
+
 ## User Interface
 
 - **Mode-specific header stats** - real-time badges showing key metrics per mode
@@ -429,14 +466,19 @@ The settings modal shows availability status for each bundled asset:
 ## General
 
 - **Web-based interface** - no desktop app needed
+- **Production server** - gunicorn + gevent via `start.sh` for concurrent SSE/WebSocket handling (falls back to Flask dev server)
 - **Live message streaming** via Server-Sent Events (SSE)
 - **Audio alerts** with mute toggle
 - **Message export** to CSV/JSON
 - **Signal activity meter** and waterfall display
 - **Message logging** to file with timestamps
-- **Multi-SDR hardware support** - RTL-SDR, LimeSDR, HackRF
+- **HTTPS support** via `INTERCEPT_HTTPS` configuration for secure deployments
+- **Voice alerts** for configurable event notifications across modes
+- **Multi-SDR hardware support** - RTL-SDR, LimeSDR, HackRF, Airspy, SDRplay
 - **Automatic device detection** across all supported hardware
 - **Hardware-specific validation** - frequency/gain ranges per device type
+- **Tool path overrides** via `INTERCEPT_*_PATH` environment variables
+- **Native Homebrew detection** for Apple Silicon tool paths
 - **Configurable gain and PPM correction**
 - **Device intelligence** dashboard with tracking
 - **GPS dongle support** - USB GPS receivers for precise observer location

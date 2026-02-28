@@ -96,13 +96,14 @@ var MorseMode = (function () {
     }
 
     function collectConfig() {
-        return {
+        var config = {
             frequency: (el('morseFrequency') && el('morseFrequency').value) || '14.060',
             gain: (el('morseGain') && el('morseGain').value) || '40',
             ppm: (el('morsePPM') && el('morsePPM').value) || '0',
             device: (el('deviceSelect') && el('deviceSelect').value) || '0',
             sdr_type: (el('sdrTypeSelect') && el('sdrTypeSelect').value) || 'rtlsdr',
             bias_t: (typeof getBiasTEnabled === 'function') ? getBiasTEnabled() : false,
+            detect_mode: (el('morseDetectMode') && el('morseDetectMode').value) || 'goertzel',
             tone_freq: (el('morseToneFreq') && el('morseToneFreq').value) || '700',
             bandwidth_hz: (el('morseBandwidth') && el('morseBandwidth').value) || '200',
             auto_tone_track: !!(el('morseAutoToneTrack') && el('morseAutoToneTrack').checked),
@@ -116,6 +117,17 @@ var MorseMode = (function () {
             wpm: (el('morseWpm') && el('morseWpm').value) || '15',
             wpm_lock: !!(el('morseWpmLock') && el('morseWpmLock').checked),
         };
+
+        // Add rtl_tcp params if using remote SDR
+        if (typeof getRemoteSDRConfig === 'function') {
+            var remoteConfig = getRemoteSDRConfig();
+            if (remoteConfig) {
+                config.rtl_tcp_host = remoteConfig.host;
+                config.rtl_tcp_port = remoteConfig.port;
+            }
+        }
+
+        return config;
     }
 
     function persistSettings() {
@@ -124,6 +136,7 @@ var MorseMode = (function () {
                 frequency: (el('morseFrequency') && el('morseFrequency').value) || '14.060',
                 gain: (el('morseGain') && el('morseGain').value) || '40',
                 ppm: (el('morsePPM') && el('morsePPM').value) || '0',
+                detect_mode: (el('morseDetectMode') && el('morseDetectMode').value) || 'goertzel',
                 tone_freq: (el('morseToneFreq') && el('morseToneFreq').value) || '700',
                 bandwidth_hz: (el('morseBandwidth') && el('morseBandwidth').value) || '200',
                 auto_tone_track: !!(el('morseAutoToneTrack') && el('morseAutoToneTrack').checked),
@@ -167,6 +180,9 @@ var MorseMode = (function () {
         if (el('morseShowRaw') && settings.show_raw !== undefined) el('morseShowRaw').checked = !!settings.show_raw;
         if (el('morseShowDiag') && settings.show_diag !== undefined) el('morseShowDiag').checked = !!settings.show_diag;
 
+        if (settings.detect_mode) {
+            setDetectMode(settings.detect_mode);
+        }
         updateToneLabel((el('morseToneFreq') && el('morseToneFreq').value) || '700');
         updateWpmLabel((el('morseWpm') && el('morseWpm').value) || '15');
         onThresholdModeChange();
@@ -198,10 +214,11 @@ var MorseMode = (function () {
         state.controlsBound = true;
 
         var ids = [
-            'morseFrequency', 'morseGain', 'morsePPM', 'morseToneFreq', 'morseBandwidth',
-            'morseAutoToneTrack', 'morseToneLock', 'morseThresholdMode', 'morseManualThreshold',
-            'morseThresholdMultiplier', 'morseThresholdOffset', 'morseSignalGate',
-            'morseWpmMode', 'morseWpm', 'morseWpmLock', 'morseShowRaw', 'morseShowDiag'
+            'morseFrequency', 'morseGain', 'morsePPM', 'morseDetectMode', 'morseToneFreq',
+            'morseBandwidth', 'morseAutoToneTrack', 'morseToneLock', 'morseThresholdMode',
+            'morseManualThreshold', 'morseThresholdMultiplier', 'morseThresholdOffset',
+            'morseSignalGate', 'morseWpmMode', 'morseWpm', 'morseWpmLock',
+            'morseShowRaw', 'morseShowDiag'
         ];
 
         ids.forEach(function (id) {
@@ -1199,12 +1216,80 @@ var MorseMode = (function () {
         });
     }
 
+    function setDetectMode(mode) {
+        var hidden = el('morseDetectMode');
+        if (hidden) hidden.value = mode;
+
+        // Update toggle button styles
+        var btnGoertzel = el('morseDetectGoertzel');
+        var btnEnvelope = el('morseDetectEnvelope');
+        if (btnGoertzel && btnEnvelope) {
+            if (mode === 'envelope') {
+                btnEnvelope.style.background = 'var(--accent)';
+                btnEnvelope.style.color = '#000';
+                btnGoertzel.style.background = '';
+                btnGoertzel.style.color = '';
+            } else {
+                btnGoertzel.style.background = 'var(--accent)';
+                btnGoertzel.style.color = '#000';
+                btnEnvelope.style.background = '';
+                btnEnvelope.style.color = '';
+            }
+        }
+
+        // Toggle preset groups
+        var hfPresets = el('morseHFPresets');
+        var ismPresets = el('morseISMPresets');
+        if (hfPresets) hfPresets.style.display = mode === 'envelope' ? 'none' : 'flex';
+        if (ismPresets) ismPresets.style.display = mode === 'envelope' ? 'flex' : 'none';
+
+        // Toggle CW detector section (tone freq, bandwidth, tone track -- not needed for envelope)
+        var toneGroup = el('morseToneFreqGroup');
+        if (toneGroup) toneGroup.style.display = mode === 'envelope' ? 'none' : '';
+
+        // Toggle antenna notes
+        var hfNote = el('morseHFNote');
+        var envNote = el('morseEnvelopeNote');
+        if (hfNote) hfNote.style.display = mode === 'envelope' ? 'none' : '';
+        if (envNote) envNote.style.display = mode === 'envelope' ? '' : 'none';
+
+        // Update hint text
+        var hint = el('morseDetectHint');
+        if (hint) {
+            hint.textContent = mode === 'envelope'
+                ? 'OOK Envelope: AM demod, RMS detection. For ISM-band OOK/CW.'
+                : 'CW Tone: HF bands, USB demod, Goertzel filter. For amateur CW.';
+        }
+
+        // Set sensible default frequency when switching modes
+        var freqEl = el('morseFrequency');
+        if (freqEl) {
+            var curFreq = parseFloat(freqEl.value);
+            if (mode === 'envelope' && curFreq < 30) {
+                freqEl.value = '433.300';
+            } else if (mode === 'goertzel' && curFreq > 30) {
+                freqEl.value = '14.060';
+            }
+        }
+
+        // Set WPM default for envelope mode (OOK transmitters tend to be slower)
+        var wpmEl = el('morseWpm');
+        var wpmLabel = el('morseWpmLabel');
+        if (mode === 'envelope' && wpmEl) {
+            wpmEl.value = '12';
+            if (wpmLabel) wpmLabel.textContent = '12';
+        }
+
+        persistSettings();
+    }
+
     return {
         init: init,
         destroy: destroy,
         start: start,
         stop: stop,
         setFreq: setFreq,
+        setDetectMode: setDetectMode,
         exportTxt: exportTxt,
         exportCsv: exportCsv,
         copyToClipboard: copyToClipboard,

@@ -274,4 +274,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -sf http://localhost:5050/health || exit 1
 
 # Run the application
-CMD ["python", "intercept.py"]
+CMD ["/bin/bash", "start.sh"]

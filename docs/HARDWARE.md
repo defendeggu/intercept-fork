@@ -259,10 +259,13 @@ pip install -r requirements.txt
 After installation:
 
 ```bash
-sudo -E venv/bin/python intercept.py
+sudo ./start.sh
 
 # Custom port
-INTERCEPT_PORT=8080 sudo -E venv/bin/python intercept.py
+sudo ./start.sh -p 8080
+
+# HTTPS
+sudo ./start.sh --https
 ```
 
 Open **http://localhost:5050** in your browser.

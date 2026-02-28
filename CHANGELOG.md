@@ -2,6 +2,44 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.23.0] - 2026-02-27
+
+### Added
+- **Radiosonde Weather Balloon Tracking** - 400-406 MHz reception via radiosonde_auto_rx with telemetry, map, and station distance tracking
+- **CW/Morse Code Decoder** - Custom Goertzel tone detection with OOK/AM envelope detection mode for ISM bands
+- **WeFax (Weather Fax) Decoder** - HF weather fax reception with auto-scheduler, broadcast timeline, and image gallery
+- **System Health Monitoring** - Telemetry dashboard with process monitoring and system metrics
+- **HTTPS Support** - TLS via `INTERCEPT_HTTPS` configuration
+- **ADS-B Voice Alerts** - Text-to-speech notifications for military and emergency aircraft detections
+- **HackRF TSCM RF Scan** - HackRF support added to TSCM counter-surveillance RF sweep
+- **Multi-SDR WeFax** - Multiple SDR hardware support for WeFax decoder
+- **Tool Path Overrides** - `INTERCEPT_*_PATH` environment variables for custom tool locations
+- **Homebrew Tool Detection** - Native path detection for Apple Silicon Homebrew installations
+- **Production Server** - `start.sh` with gunicorn + gevent for concurrent SSE/WebSocket handling — eliminates multi-client page load delays
+
+### Changed
+- Morse decoder rebuilt with custom Goertzel decoder, replacing multimon-ng dependency
+- GPS mode upgraded to textured 3D globe visualization
+- Destroy lifecycle added to all mode modules to prevent resource leaks
+- Docker container now uses gunicorn + gevent by default via `start.sh`
+
+### Fixed
+- ADS-B device release leak and startup performance regression
+- ADS-B probe incorrectly treating "No devices found" as success
+- USB claim race condition after SDR probe
+- SDR device registry collision when multiple SDR types present
+- APRS 15-minute startup delay caused by pipe buffering
+- APRS map centering at [0,0] when GPS unavailable
+- DSC decoder ITU-R M.493 compliance issues
+- Weather satellite 0dB SNR — increased sample rate for Meteor LRPT
+- SSE fanout backlog causing delayed updates across all modes
+- SSE reconnect packet loss during client reconnection
+- Waterfall monitor tuning race conditions
+- Mode FOUC (flash of unstyled content) on initial navigation
+- Various Morse decoder stability and lifecycle fixes
+
+---
+
 ## [2.22.3] - 2026-02-23
 
 ### Fixed

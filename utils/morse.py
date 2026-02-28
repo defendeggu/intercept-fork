@@ -1,10 +1,12 @@
-"""Morse code (CW) decoding helpers.
+"""Morse code (CW) decoding helpers with dual detection modes.
 
-Signal chain:
-- SDR audio from `rtl_fm -M usb` (16-bit LE PCM)
-- Goertzel tone detection with optional auto-tone tracking
-- Adaptive threshold + hysteresis + minimum signal gate
-- Timing estimator (auto/manual WPM) and Morse symbol decoding
+Supports two signal chains:
+  goertzel: rtl_fm -M usb -> raw PCM -> Goertzel tone filter -> timing state machine -> characters
+  envelope: rtl_fm -M am  -> raw PCM -> RMS envelope       -> timing state machine -> characters
+
+Goertzel mode is the original path for HF CW (beat note detection).
+Envelope mode adds support for OOK/AM signals (e.g. 433 MHz carrier keying)
+where AM demod already produces a baseband envelope -- no tone to detect.
 """
 
 from __future__ import annotations
@@ -80,6 +82,25 @@ class GoertzelFilter:
         return math.sqrt(max(power, 0.0))
 
 
+class EnvelopeDetector:
+    """RMS envelope detector for AM-demodulated OOK signals.
+
+    When rtl_fm uses -M am, carrier-on produces a high amplitude envelope
+    and carrier-off produces near-silence.  RMS over a short block gives
+    a clean on/off metric without needing a specific tone frequency.
+    """
+
+    def __init__(self, block_size: int):
+        self.block_size = block_size
+
+    def magnitude(self, samples: list[float] | tuple[float, ...] | np.ndarray) -> float:
+        """Compute RMS magnitude of the sample block."""
+        arr = np.asarray(samples, dtype=np.float64)
+        if arr.size == 0:
+            return 0.0
+        return float(np.sqrt(np.mean(np.square(arr))))
+
+
 def _goertzel_mag(samples: np.ndarray, target_freq: float, sample_rate: int) -> float:
     """Compute Goertzel magnitude, preferring shared DSP helper."""
     if _shared_goertzel_mag is not None:
@@ -137,10 +158,12 @@ class MorseDecoder:
         wpm_mode: str = 'auto',
         wpm_lock: bool = False,
         min_signal_gate: float = 0.0,
+        detect_mode: str = 'goertzel',
     ):
         self.sample_rate = int(sample_rate)
         self.tone_freq = float(tone_freq)
         self.wpm = int(wpm)
+        self.detect_mode = detect_mode if detect_mode in ('goertzel', 'envelope') else 'goertzel'
 
         self.bandwidth_hz = int(_clamp(float(bandwidth_hz), 50, 400))
         self.auto_tone_track = bool(auto_tone_track)
@@ -163,17 +186,22 @@ class MorseDecoder:
         self._tone_scan_step_hz = 10.0
         self._tone_scan_interval_blocks = 8
 
-        self._detector = GoertzelFilter(self._active_tone_freq, self.sample_rate, self._block_size)
-        self._noise_detector_low = GoertzelFilter(
-            _clamp(self._active_tone_freq - max(150.0, self.bandwidth_hz), 150.0, 2000.0),
-            self.sample_rate,
-            self._block_size,
-        )
-        self._noise_detector_high = GoertzelFilter(
-            _clamp(self._active_tone_freq + max(150.0, self.bandwidth_hz), 150.0, 2000.0),
-            self.sample_rate,
-            self._block_size,
-        )
+        if self.detect_mode == 'envelope':
+            self._detector = EnvelopeDetector(self._block_size)
+            self._noise_detector_low = None
+            self._noise_detector_high = None
+        else:
+            self._detector = GoertzelFilter(self._active_tone_freq, self.sample_rate, self._block_size)
+            self._noise_detector_low = GoertzelFilter(
+                _clamp(self._active_tone_freq - max(150.0, self.bandwidth_hz), 150.0, 2000.0),
+                self.sample_rate,
+                self._block_size,
+            )
+            self._noise_detector_high = GoertzelFilter(
+                _clamp(self._active_tone_freq + max(150.0, self.bandwidth_hz), 150.0, 2000.0),
+                self.sample_rate,
+                self._block_size,
+            )
 
         # AGC for weak HF/direct-sampling signals.
         self._agc_target = 0.22
@@ -181,8 +209,14 @@ class MorseDecoder:
         self._agc_alpha = 0.06
 
         # Envelope smoothing.
-        self._attack_alpha = 0.55
-        self._release_alpha = 0.45
+        # OOK has clean binary transitions; use symmetric fast alpha.
+        # HF CW has gradual fading (QSB); use asymmetric slower release.
+        if self.detect_mode == 'envelope':
+            self._attack_alpha = 0.55
+            self._release_alpha = 0.55
+        else:
+            self._attack_alpha = 0.55
+            self._release_alpha = 0.45
         self._envelope = 0.0
 
         # Adaptive threshold model.
@@ -203,8 +237,13 @@ class MorseDecoder:
         dit_blocks = max(1.0, dit_sec / self._block_duration)
         self._dah_threshold = 2.2 * dit_blocks
         self._dit_min = 0.38 * dit_blocks
-        self._char_gap = 2.6 * dit_blocks
-        self._word_gap = 6.0 * dit_blocks
+        if self.detect_mode == 'envelope':
+            # Tighter gaps for OOK — clean binary transitions tolerate this.
+            self._char_gap = 2.0 * dit_blocks
+            self._word_gap = 5.0 * dit_blocks
+        else:
+            self._char_gap = 2.6 * dit_blocks
+            self._word_gap = 6.0 * dit_blocks
         self._dit_observations: deque[float] = deque(maxlen=32)
         self._estimated_wpm = float(self.wpm)
 
@@ -236,10 +275,7 @@ class MorseDecoder:
 
     def get_metrics(self) -> dict[str, float | bool]:
         """Return latest decoder metrics for UI/status messages."""
-        snr_mult = max(1.15, self.threshold_multiplier * 0.5)
-        snr_on = snr_mult * (1.0 + self._hysteresis)
-        snr_off = snr_mult * (1.0 - self._hysteresis)
-        return {
+        metrics: dict[str, Any] = {
             'wpm': float(self._estimated_wpm),
             'tone_freq': float(self._active_tone_freq),
             'level': float(self._last_level),
@@ -247,14 +283,27 @@ class MorseDecoder:
             'threshold': float(self._threshold),
             'tone_on': bool(self._tone_on),
             'dit_ms': float((self._effective_dit_blocks() * self._block_duration) * 1000.0),
-            'snr': float(self._last_level / max(self._noise_floor, 1e-6)),
-            'noise_ref': float(self._noise_floor),
-            'snr_on': float(snr_on),
-            'snr_off': float(snr_off),
+            'detect_mode': self.detect_mode,
         }
+        if self.detect_mode == 'envelope':
+            metrics['snr'] = 0.0
+            metrics['noise_ref'] = 0.0
+            metrics['snr_on'] = 0.0
+            metrics['snr_off'] = 0.0
+        else:
+            snr_mult = max(1.15, self.threshold_multiplier * 0.5)
+            snr_on = snr_mult * (1.0 + self._hysteresis)
+            snr_off = snr_mult * (1.0 - self._hysteresis)
+            metrics['snr'] = float(self._last_level / max(self._noise_floor, 1e-6))
+            metrics['noise_ref'] = float(self._noise_floor)
+            metrics['snr_on'] = float(snr_on)
+            metrics['snr_off'] = float(snr_off)
+        return metrics
 
     def _rebuild_detectors(self) -> None:
         """Rebuild target/noise Goertzel filters after tone updates."""
+        if self.detect_mode == 'envelope':
+            return  # Envelope detector is frequency-agnostic
         self._detector = GoertzelFilter(self._active_tone_freq, self.sample_rate, self._block_size)
         ref_offset = max(150.0, self.bandwidth_hz)
         self._noise_detector_low = GoertzelFilter(
@@ -391,93 +440,143 @@ class MorseDecoder:
             self._blocks_processed += 1
 
             mag = self._detector.magnitude(normalized)
-            noise_low = self._noise_detector_low.magnitude(normalized)
-            noise_high = self._noise_detector_high.magnitude(normalized)
-            noise_ref = max(1e-9, (noise_low + noise_high) * 0.5)
 
-            if (
-                self.auto_tone_track
-                and not self.tone_lock
-                and self._blocks_processed > self._WARMUP_BLOCKS
-                and (self._blocks_processed % self._tone_scan_interval_blocks == 0)
-                and self._estimate_tone_frequency(normalized, mag, noise_ref)
-            ):
-                # Detector changed; refresh magnitudes for this window.
-                mag = self._detector.magnitude(normalized)
+            if self.detect_mode == 'envelope':
+                # Envelope mode: direct magnitude threshold, no noise detectors
+                noise_ref = 0.0
+                level = float(mag)
+                alpha = self._attack_alpha if level >= self._envelope else self._release_alpha
+                self._envelope += alpha * (level - self._envelope)
+                self._last_level = self._envelope
+                self._last_noise_ref = 0.0
+                amplitudes.append(level)
+
+                if self._blocks_processed <= self._WARMUP_BLOCKS:
+                    self._mag_min = min(self._mag_min, level)
+                    self._mag_max = max(self._mag_max, level)
+                    if self._blocks_processed == self._WARMUP_BLOCKS:
+                        self._noise_floor = self._mag_min if math.isfinite(self._mag_min) else 0.0
+                        if self._mag_max <= (self._noise_floor * 1.2):
+                            self._signal_peak = max(self._noise_floor + 0.5, self._noise_floor * 2.5)
+                        else:
+                            self._signal_peak = max(self._mag_max, self._noise_floor * 1.8)
+                        self._threshold = self._noise_floor + 0.22 * (
+                            self._signal_peak - self._noise_floor
+                        )
+                    tone_detected = False
+                else:
+                    settle_alpha = 0.30 if self._blocks_processed < (self._WARMUP_BLOCKS + self._SETTLE_BLOCKS) else 0.06
+                    if level <= self._threshold:
+                        self._noise_floor += settle_alpha * (level - self._noise_floor)
+                    else:
+                        self._signal_peak += settle_alpha * (level - self._signal_peak)
+                    self._signal_peak = max(self._signal_peak, self._noise_floor * 1.05)
+
+                    if self.threshold_mode == 'manual':
+                        self._threshold = max(0.0, self.manual_threshold)
+                    else:
+                        self._threshold = (
+                            max(0.0, self._noise_floor * self.threshold_multiplier)
+                            + self.threshold_offset
+                        )
+                        self._threshold = max(self._threshold, self._noise_floor + 0.35)
+
+                    dynamic_span = max(0.0, self._signal_peak - self._noise_floor)
+                    gate_level = self._noise_floor + (self.min_signal_gate * dynamic_span)
+                    gate_ok = self.min_signal_gate <= 0.0 or level >= gate_level
+
+                    # Direct magnitude threshold with hysteresis (no SNR)
+                    if self._tone_on:
+                        tone_detected = gate_ok and level >= (self._threshold * (1.0 - self._hysteresis))
+                    else:
+                        tone_detected = gate_ok and level >= (self._threshold * (1.0 + self._hysteresis))
+            else:
+                # Goertzel mode: SNR-based tone detection with noise reference
                 noise_low = self._noise_detector_low.magnitude(normalized)
                 noise_high = self._noise_detector_high.magnitude(normalized)
                 noise_ref = max(1e-9, (noise_low + noise_high) * 0.5)
 
-            level = float(mag)
-            alpha = self._attack_alpha if level >= self._envelope else self._release_alpha
-            self._envelope += alpha * (level - self._envelope)
-            self._last_level = self._envelope
-            self._last_noise_ref = noise_ref
-            amplitudes.append(level)
+                if (
+                    self.auto_tone_track
+                    and not self.tone_lock
+                    and self._blocks_processed > self._WARMUP_BLOCKS
+                    and (self._blocks_processed % self._tone_scan_interval_blocks == 0)
+                    and self._estimate_tone_frequency(normalized, mag, noise_ref)
+                ):
+                    # Detector changed; refresh magnitudes for this window.
+                    mag = self._detector.magnitude(normalized)
+                    noise_low = self._noise_detector_low.magnitude(normalized)
+                    noise_high = self._noise_detector_high.magnitude(normalized)
+                    noise_ref = max(1e-9, (noise_low + noise_high) * 0.5)
 
-            if self._blocks_processed <= self._WARMUP_BLOCKS:
-                self._mag_min = min(self._mag_min, level)
-                self._mag_max = max(self._mag_max, level)
-                if self._blocks_processed == self._WARMUP_BLOCKS:
-                    self._noise_floor = self._mag_min if math.isfinite(self._mag_min) else 0.0
-                    if self._mag_max <= (self._noise_floor * 1.2):
-                        self._signal_peak = max(self._noise_floor + 0.5, self._noise_floor * 2.5)
+                level = float(mag)
+                alpha = self._attack_alpha if level >= self._envelope else self._release_alpha
+                self._envelope += alpha * (level - self._envelope)
+                self._last_level = self._envelope
+                self._last_noise_ref = noise_ref
+                amplitudes.append(level)
+
+                if self._blocks_processed <= self._WARMUP_BLOCKS:
+                    self._mag_min = min(self._mag_min, level)
+                    self._mag_max = max(self._mag_max, level)
+                    if self._blocks_processed == self._WARMUP_BLOCKS:
+                        self._noise_floor = self._mag_min if math.isfinite(self._mag_min) else 0.0
+                        if self._mag_max <= (self._noise_floor * 1.2):
+                            self._signal_peak = max(self._noise_floor + 0.5, self._noise_floor * 2.5)
+                        else:
+                            self._signal_peak = max(self._mag_max, self._noise_floor * 1.8)
+                        self._threshold = self._noise_floor + 0.22 * (
+                            self._signal_peak - self._noise_floor
+                        )
+                    tone_detected = False
+                else:
+                    settle_alpha = 0.30 if self._blocks_processed < (self._WARMUP_BLOCKS + self._SETTLE_BLOCKS) else 0.06
+
+                    detector_level = level
+
+                    if detector_level <= self._threshold:
+                        self._noise_floor += settle_alpha * (detector_level - self._noise_floor)
                     else:
-                        self._signal_peak = max(self._mag_max, self._noise_floor * 1.8)
-                    self._threshold = self._noise_floor + 0.22 * (
-                        self._signal_peak - self._noise_floor
-                    )
-                tone_detected = False
-            else:
-                settle_alpha = 0.30 if self._blocks_processed < (self._WARMUP_BLOCKS + self._SETTLE_BLOCKS) else 0.06
+                        self._signal_peak += settle_alpha * (detector_level - self._signal_peak)
 
-                detector_level = level
+                    self._signal_peak = max(self._signal_peak, self._noise_floor * 1.05)
 
-                if detector_level <= self._threshold:
-                    self._noise_floor += settle_alpha * (detector_level - self._noise_floor)
-                else:
-                    self._signal_peak += settle_alpha * (detector_level - self._signal_peak)
+                    # Blend adjacent-band noise reference into noise floor.
+                    self._noise_floor += (settle_alpha * 0.25) * (noise_ref - self._noise_floor)
 
-                self._signal_peak = max(self._signal_peak, self._noise_floor * 1.05)
+                    if self.threshold_mode == 'manual':
+                        self._threshold = max(0.0, self.manual_threshold)
+                    else:
+                        self._threshold = (
+                            max(0.0, self._noise_floor * self.threshold_multiplier)
+                            + self.threshold_offset
+                        )
+                        self._threshold = max(self._threshold, self._noise_floor + 0.35)
 
-                # Always blend adjacent-band noise reference into noise floor.
-                # Adjacent bands track the same AGC gain but exclude the tone,
-                # so this prevents noise floor from staying stuck at warmup-era
-                # low values after AGC converges.
-                self._noise_floor += (settle_alpha * 0.25) * (noise_ref - self._noise_floor)
+                    dynamic_span = max(0.0, self._signal_peak - self._noise_floor)
+                    gate_level = self._noise_floor + (self.min_signal_gate * dynamic_span)
+                    gate_ok = self.min_signal_gate <= 0.0 or detector_level >= gate_level
 
-                if self.threshold_mode == 'manual':
-                    self._threshold = max(0.0, self.manual_threshold)
-                else:
-                    self._threshold = (
-                        max(0.0, self._noise_floor * self.threshold_multiplier)
-                        + self.threshold_offset
-                    )
-                    self._threshold = max(self._threshold, self._noise_floor + 0.35)
+                    # SNR-based tone detection (gain-invariant).
+                    snr = level / max(noise_ref, 1e-6)
+                    snr_mult = max(1.15, self.threshold_multiplier * 0.5)
+                    snr_on = snr_mult * (1.0 + self._hysteresis)
+                    snr_off = snr_mult * (1.0 - self._hysteresis)
 
-                dynamic_span = max(0.0, self._signal_peak - self._noise_floor)
-                gate_level = self._noise_floor + (self.min_signal_gate * dynamic_span)
-                gate_ok = self.min_signal_gate <= 0.0 or detector_level >= gate_level
-
-                # Use SNR (tone mag / adjacent-band noise) for tone detection.
-                # Both bands are equally amplified by AGC, so the ratio is
-                # gain-invariant — fixes stuck-ON tone when AGC amplifies
-                # inter-element silence above the raw magnitude threshold.
-                snr = level / max(noise_ref, 1e-6)
-                snr_mult = max(1.15, self.threshold_multiplier * 0.5)
-                snr_on = snr_mult * (1.0 + self._hysteresis)
-                snr_off = snr_mult * (1.0 - self._hysteresis)
-
-                if self._tone_on:
-                    tone_detected = gate_ok and snr >= snr_off
-                else:
-                    tone_detected = gate_ok and snr >= snr_on
+                    if self._tone_on:
+                        tone_detected = gate_ok and snr >= snr_off
+                    else:
+                        tone_detected = gate_ok and snr >= snr_on
 
             dit_blocks = self._effective_dit_blocks()
             self._dah_threshold = 2.2 * dit_blocks
             self._dit_min = max(1.0, 0.38 * dit_blocks)
-            self._char_gap = 2.6 * dit_blocks
-            self._word_gap = 6.0 * dit_blocks
+            if self.detect_mode == 'envelope':
+                self._char_gap = 2.0 * dit_blocks
+                self._word_gap = 5.0 * dit_blocks
+            else:
+                self._char_gap = 2.6 * dit_blocks
+                self._word_gap = 6.0 * dit_blocks
 
             if tone_detected and not self._tone_on:
                 # Tone edge up.
@@ -548,10 +647,7 @@ class MorseDecoder:
                 self._silence_blocks += 1.0
 
         if amplitudes:
-            snr_mult = max(1.15, self.threshold_multiplier * 0.5)
-            snr_on = snr_mult * (1.0 + self._hysteresis)
-            snr_off = snr_mult * (1.0 - self._hysteresis)
-            events.append({
+            scope_event: dict[str, Any] = {
                 'type': 'scope',
                 'amplitudes': amplitudes,
                 'threshold': self._threshold,
@@ -561,11 +657,22 @@ class MorseDecoder:
                 'noise_floor': self._noise_floor,
                 'wpm': round(self._estimated_wpm, 1),
                 'dit_ms': round(self._effective_dit_blocks() * self._block_duration * 1000.0, 1),
-                'snr': round(self._last_level / max(self._noise_floor, 1e-6), 2),
-                'noise_ref': round(self._noise_floor, 4),
-                'snr_on': round(snr_on, 2),
-                'snr_off': round(snr_off, 2),
-            })
+                'detect_mode': self.detect_mode,
+            }
+            if self.detect_mode == 'envelope':
+                scope_event['snr'] = 0.0
+                scope_event['noise_ref'] = 0.0
+                scope_event['snr_on'] = 0.0
+                scope_event['snr_off'] = 0.0
+            else:
+                snr_mult = max(1.15, self.threshold_multiplier * 0.5)
+                snr_on = snr_mult * (1.0 + self._hysteresis)
+                snr_off = snr_mult * (1.0 - self._hysteresis)
+                scope_event['snr'] = round(self._last_level / max(self._noise_floor, 1e-6), 2)
+                scope_event['noise_ref'] = round(self._noise_floor, 4)
+                scope_event['snr_on'] = round(snr_on, 2)
+                scope_event['snr_off'] = round(snr_off, 2)
+            events.append(scope_event)
 
         return events
 
@@ -818,6 +925,7 @@ def morse_decoder_thread(
         wpm_mode=_normalize_wpm_mode(cfg.get('wpm_mode', 'auto')),
         wpm_lock=_coerce_bool(cfg.get('wpm_lock', False), False),
         min_signal_gate=float(cfg.get('min_signal_gate', 0.0) or 0.0),
+        detect_mode=str(cfg.get('detect_mode', 'goertzel')),
     )
 
     last_scope = time.monotonic()
@@ -1101,6 +1209,7 @@ def morse_iq_decoder_thread(
         wpm_mode=_normalize_wpm_mode(cfg.get('wpm_mode', 'auto')),
         wpm_lock=_coerce_bool(cfg.get('wpm_lock', False), False),
         min_signal_gate=float(cfg.get('min_signal_gate', 0.0) or 0.0),
+        detect_mode=str(cfg.get('detect_mode', 'goertzel')),
     )
 
     last_scope = time.monotonic()

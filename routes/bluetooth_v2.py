@@ -261,7 +261,7 @@ def start_scan():
     # Check if already scanning
     if scanner.is_scanning:
         return jsonify({
-            'status': 'already_running',
+            'status': 'already_scanning',
             'scan_status': scanner.get_status().to_dict()
         })
 

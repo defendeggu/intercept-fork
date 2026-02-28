@@ -22,7 +22,13 @@ from flask import Blueprint, jsonify, request, Response
 
 import app as app_module
 from utils.logging import sensor_logger as logger
-from utils.validation import validate_device_index, validate_gain, validate_ppm
+from utils.validation import (
+    validate_device_index,
+    validate_gain,
+    validate_ppm,
+    validate_rtl_tcp_host,
+    validate_rtl_tcp_port,
+)
 from utils.sse import sse_stream_fanout
 from utils.event_pipeline import process_event
 from utils.sdr import SDRFactory, SDRType
@@ -1689,6 +1695,10 @@ def start_aprs() -> Response:
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
+    # Check for rtl_tcp (remote SDR) connection
+    rtl_tcp_host = data.get('rtl_tcp_host')
+    rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
     sdr_type_str = str(data.get('sdr_type', 'rtlsdr')).lower()
     try:
         sdr_type = SDRType(sdr_type_str)
@@ -1708,16 +1718,17 @@ def start_aprs() -> Response:
                 'message': f'rx_fm not found. Install SoapySDR tools for {sdr_type.value}.'
             }), 400
 
-    # Reserve SDR device to prevent conflicts with other modes
-    error = app_module.claim_sdr_device(device, 'aprs', sdr_type_str)
-    if error:
-        return jsonify({
-            'status': 'error',
-            'error_type': 'DEVICE_BUSY',
-            'message': error
-        }), 409
-    aprs_active_device = device
-    aprs_active_sdr_type = sdr_type_str
+    # Reserve SDR device to prevent conflicts (skip for remote rtl_tcp)
+    if not rtl_tcp_host:
+        error = app_module.claim_sdr_device(device, 'aprs', sdr_type_str)
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+        aprs_active_device = device
+        aprs_active_sdr_type = sdr_type_str
 
     # Get frequency for region
     region = data.get('region', 'north_america')
@@ -1741,8 +1752,17 @@ def start_aprs() -> Response:
 
     # Build FM demod command for APRS (AFSK1200 @ 22050 Hz) via SDR abstraction.
     try:
-        sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
-        builder = SDRFactory.get_builder(sdr_type)
+        if rtl_tcp_host:
+            try:
+                rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+                rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+            except ValueError as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 400
+            sdr_device = SDRFactory.create_network_device(rtl_tcp_host, rtl_tcp_port)
+            logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+        else:
+            sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
+        builder = SDRFactory.get_builder(sdr_device.sdr_type)
         rtl_cmd = builder.build_fm_demod_command(
             device=sdr_device,
             frequency_mhz=float(frequency),

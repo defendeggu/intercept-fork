@@ -12,19 +12,17 @@ import time
 import wave
 from collections import Counter
 
-import pytest
-
 import app as app_module
 import routes.morse as morse_routes
 from utils.morse import (
     CHAR_TO_MORSE,
     MORSE_TABLE,
+    EnvelopeDetector,
     GoertzelFilter,
     MorseDecoder,
     decode_morse_wav_file,
     morse_decoder_thread,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -131,6 +129,93 @@ class TestToneDetector:
         on_tone = [0.8 * math.sin(2 * math.pi * 700.0 * i / 8000.0) for i in range(160)]
         off_tone = [0.8 * math.sin(2 * math.pi * 1500.0 * i / 8000.0) for i in range(160)]
         assert gf.magnitude(on_tone) > gf.magnitude(off_tone) * 3.0
+
+
+class TestEnvelopeDetector:
+    def test_magnitude_of_silence_is_near_zero(self):
+        det = EnvelopeDetector(block_size=160)
+        silence = [0.0] * 160
+        assert det.magnitude(silence) < 1e-6
+
+    def test_magnitude_of_constant_amplitude(self):
+        det = EnvelopeDetector(block_size=160)
+        loud = [0.8] * 160
+        mag = det.magnitude(loud)
+        assert abs(mag - 0.8) < 0.01
+
+    def test_magnitude_of_sine_wave(self):
+        det = EnvelopeDetector(block_size=160)
+        samples = [0.5 * math.sin(2 * math.pi * 700 * i / 8000.0) for i in range(160)]
+        mag = det.magnitude(samples)
+        # RMS of a sine at amplitude 0.5 is 0.5/sqrt(2) ~ 0.354
+        assert 0.30 < mag < 0.40
+
+    def test_magnitude_with_numpy_array(self):
+        import numpy as np
+        det = EnvelopeDetector(block_size=100)
+        arr = np.ones(100, dtype=np.float64) * 0.6
+        assert abs(det.magnitude(arr) - 0.6) < 0.01
+
+    def test_empty_samples_returns_zero(self):
+        det = EnvelopeDetector(block_size=0)
+        assert det.magnitude([]) == 0.0
+
+
+class TestEnvelopeMorseDecoder:
+    def test_envelope_decoder_detects_ook_elements(self):
+        """Verify envelope mode can distinguish on/off keying."""
+        sample_rate = 48000
+        wpm = 15
+        dit_dur = 1.2 / wpm
+
+        def ook_on(duration):
+            n = int(sample_rate * duration)
+            return struct.pack(f'<{n}h', *([int(0.7 * 32767)] * n))
+
+        def ook_off(duration):
+            n = int(sample_rate * duration)
+            return b'\x00\x00' * n
+
+        # Generate dit-dah (A = .-)
+        audio = (
+            ook_off(0.3)
+            + ook_on(dit_dur)
+            + ook_off(dit_dur)
+            + ook_on(3 * dit_dur)
+            + ook_off(0.5)
+        )
+
+        decoder = MorseDecoder(
+            sample_rate=sample_rate,
+            tone_freq=700.0,
+            wpm=wpm,
+            detect_mode='envelope',
+        )
+        events = decoder.process_block(audio)
+        events.extend(decoder.flush())
+        elements = [e['element'] for e in events if e.get('type') == 'morse_element']
+
+        assert '.' in elements
+        assert '-' in elements
+
+    def test_envelope_metrics_have_zero_snr(self):
+        """Envelope mode metrics should report zero SNR fields."""
+        decoder = MorseDecoder(
+            sample_rate=8000,
+            detect_mode='envelope',
+        )
+        metrics = decoder.get_metrics()
+        assert metrics['detect_mode'] == 'envelope'
+        assert metrics['snr'] == 0.0
+        assert metrics['noise_ref'] == 0.0
+
+    def test_goertzel_mode_unchanged(self):
+        """Default goertzel mode still works as before."""
+        decoder = MorseDecoder(sample_rate=8000, wpm=15)
+        assert decoder.detect_mode == 'goertzel'
+        metrics = decoder.get_metrics()
+        assert 'detect_mode' in metrics
+        assert metrics['detect_mode'] == 'goertzel'
 
 
 class TestTimingAndWpmEstimator:

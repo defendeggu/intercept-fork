@@ -55,9 +55,9 @@ app.secret_key = "signals_intelligence_secret" # Required for flash messages
 
 # Set up rate limiting
 limiter = Limiter(
-    key_func=get_remote_address, # Identifies the user by their IP
+    key_func=get_remote_address,
     app=app,
-    storage_uri="memory://", # Use RAM memory (change to redis:// etc. for distributed setups)
+    storage_uri="memory://",
 )
 
 # Disable Werkzeug debugger PIN (not needed for local development tool)
@@ -928,6 +928,102 @@ def _ensure_self_signed_cert(cert_dir: str) -> tuple:
     return cert_path, key_path
 
 
+_app_initialized = False
+
+
+def _init_app() -> None:
+    """Initialize blueprints, database, and websockets.
+
+    Safe to call multiple times — subsequent calls are no-ops.
+    Called automatically at module level for gunicorn, and also
+    from main() for the Flask dev server path.
+
+    Heavy/network operations (TLE updates, process cleanup) are
+    deferred to a background thread so the worker can serve
+    requests immediately.
+    """
+    global _app_initialized
+    if _app_initialized:
+        return
+    _app_initialized = True
+
+    import os
+
+    # Initialize database for settings storage
+    from utils.database import init_db
+    init_db()
+
+    # Register blueprints (essential — without these, all routes 404)
+    from routes import register_blueprints
+    register_blueprints(app)
+
+    # Initialize WebSocket for audio streaming
+    try:
+        from routes.audio_websocket import init_audio_websocket
+        init_audio_websocket(app)
+    except ImportError:
+        pass
+
+    # Initialize KiwiSDR WebSocket audio proxy
+    try:
+        from routes.websdr import init_websdr_audio
+        init_websdr_audio(app)
+    except ImportError:
+        pass
+
+    # Initialize WebSocket for waterfall streaming
+    try:
+        from routes.waterfall_websocket import init_waterfall_websocket
+        init_waterfall_websocket(app)
+    except ImportError:
+        pass
+
+    # Defer heavy/network operations so the worker can serve requests immediately
+    import threading
+
+    def _deferred_init():
+        """Run heavy initialization after a short delay."""
+        import time
+        time.sleep(1)  # Let the worker start serving first
+
+        # Clean up stale processes from previous runs
+        try:
+            cleanup_stale_processes()
+            cleanup_stale_dump1090()
+        except Exception as e:
+            logger.warning(f"Stale process cleanup failed: {e}")
+
+        # Register and start database cleanup
+        try:
+            from utils.database import (
+                cleanup_old_signal_history,
+                cleanup_old_timeline_entries,
+                cleanup_old_dsc_alerts,
+                cleanup_old_payloads
+            )
+            cleanup_manager.register_db_cleanup(cleanup_old_signal_history, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_timeline_entries, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_dsc_alerts, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_payloads, interval_multiplier=1440)
+            cleanup_manager.start()
+        except Exception as e:
+            logger.warning(f"Cleanup manager init failed: {e}")
+
+        # Initialize TLE auto-refresh (must be after blueprint registration)
+        try:
+            from routes.satellite import init_tle_auto_refresh
+            if not os.environ.get('TESTING'):
+                init_tle_auto_refresh()
+        except Exception as e:
+            logger.warning(f"Failed to initialize TLE auto-refresh: {e}")
+
+    threading.Thread(target=_deferred_init, daemon=True).start()
+
+
+# Auto-initialize when imported (e.g. by gunicorn)
+_init_app()
+
+
 def main() -> None:
     """Main entry point."""
     import argparse
@@ -1009,81 +1105,8 @@ def main() -> None:
         print("Running as root - full capabilities enabled")
         print()
 
-    # Clean up any stale processes from previous runs
-    cleanup_stale_processes()
-    cleanup_stale_dump1090()
-
-    # Initialize database for settings storage
-    from utils.database import init_db
-    init_db()
-
-    # Register database cleanup functions
-    from utils.database import (
-        cleanup_old_signal_history,
-        cleanup_old_timeline_entries,
-        cleanup_old_dsc_alerts,
-        cleanup_old_payloads
-    )
-    cleanup_manager.register_db_cleanup(cleanup_old_signal_history, interval_multiplier=1440)  # Every 24 hours
-    cleanup_manager.register_db_cleanup(cleanup_old_timeline_entries, interval_multiplier=1440)  # Every 24 hours
-    cleanup_manager.register_db_cleanup(cleanup_old_dsc_alerts, interval_multiplier=1440)  # Every 24 hours
-    cleanup_manager.register_db_cleanup(cleanup_old_payloads, interval_multiplier=1440)  # Every 24 hours
-
-    # Start automatic cleanup of stale data entries
-    cleanup_manager.start()
-
-    # Register blueprints
-    from routes import register_blueprints
-    register_blueprints(app)
-
-    # Initialize TLE auto-refresh (must be after blueprint registration)
-    try:
-        from routes.satellite import init_tle_auto_refresh
-        import os
-        if not os.environ.get('TESTING'):
-            init_tle_auto_refresh()
-    except Exception as e:
-        logger.warning(f"Failed to initialize TLE auto-refresh: {e}")
-
-    # Update TLE data in background thread (non-blocking)
-    def update_tle_background():
-        try:
-            from routes.satellite import refresh_tle_data
-            print("Updating satellite TLE data from CelesTrak...")
-            updated = refresh_tle_data()
-            if updated:
-                print(f"TLE data updated for: {', '.join(updated)}")
-            else:
-                print("TLE update: No satellites updated (may be offline)")
-        except Exception as e:
-            print(f"TLE update failed (will use cached data): {e}")
-
-    tle_thread = threading.Thread(target=update_tle_background, daemon=True)
-    tle_thread.start()
-
-    # Initialize WebSocket for audio streaming
-    try:
-        from routes.audio_websocket import init_audio_websocket
-        init_audio_websocket(app)
-        print("WebSocket audio streaming enabled")
-    except ImportError as e:
-        print(f"WebSocket audio disabled (install flask-sock): {e}")
-
-    # Initialize KiwiSDR WebSocket audio proxy
-    try:
-        from routes.websdr import init_websdr_audio
-        init_websdr_audio(app)
-        print("KiwiSDR audio proxy enabled")
-    except ImportError as e:
-        print(f"KiwiSDR audio proxy disabled: {e}")
-
-    # Initialize WebSocket for waterfall streaming
-    try:
-        from routes.waterfall_websocket import init_waterfall_websocket
-        init_waterfall_websocket(app)
-        print("WebSocket waterfall streaming enabled")
-    except ImportError as e:
-        print(f"WebSocket waterfall disabled: {e}")
+    # Ensure app is initialized (no-op if already done by module-level call)
+    _init_app()
 
     # Configure SSL if HTTPS is enabled
     ssl_context = None

@@ -28,12 +28,11 @@ docker compose --profile basic up -d --build
 # Initial setup (installs dependencies and configures SDR tools)
 ./setup.sh
 
-# Run the application (requires sudo for SDR/network access)
-sudo -E venv/bin/python intercept.py
+# Run with production server (gunicorn + gevent, handles concurrent SSE/WebSocket)
+sudo ./start.sh
 
-# Or activate venv first
-source venv/bin/activate
-sudo -E python intercept.py
+# Or for quick local dev (Flask dev server)
+sudo -E venv/bin/python intercept.py
 ```
 
 ### Testing
@@ -69,8 +68,9 @@ mypy .
 ## Architecture
 
 ### Entry Points
-- `intercept.py` - Main entry point script
-- `app.py` - Flask application initialization, global state management, process lifecycle, SSE streaming infrastructure
+- `start.sh` - Production startup script (gunicorn + gevent auto-detection, CLI flags, HTTPS, fallback to Flask dev server)
+- `intercept.py` - Direct Flask dev server entry point (quick local development)
+- `app.py` - Flask application initialization, global state management, process lifecycle, SSE streaming infrastructure, conditional gevent monkey-patch
 
 ### Route Blueprints (routes/)
 Each signal type has its own Flask blueprint:
@@ -121,7 +121,7 @@ Each signal type has its own Flask blueprint:
 
 ### Key Patterns
 
-**Server-Sent Events (SSE)**: All real-time features stream via SSE endpoints (`/stream_pager`, `/stream_sensor`, etc.). Pattern uses `queue.Queue` with timeout and keepalive messages.
+**Server-Sent Events (SSE)**: All real-time features stream via SSE endpoints (`/stream_pager`, `/stream_sensor`, etc.). Pattern uses `queue.Queue` with timeout and keepalive messages. Under gunicorn + gevent, each SSE connection is a lightweight greenlet instead of an OS thread.
 
 **Process Management**: External decoders run as subprocesses with output threads feeding queues. Use `safe_terminate()` for cleanup. Global locks prevent race conditions.
 
@@ -152,7 +152,7 @@ Each signal type has its own Flask blueprint:
 - **Mode Integration**: Each mode needs entries in `index.html` at ~12 points: CSS include, welcome card, partial include, visuals container, JS include, `validModes` set, `modeGroups` map, classList toggle, `modeNames`, visuals display toggle, titles, and init call in `switchMode()`
 
 ### Docker
-- `Dockerfile` - Single-stage build with all SDR tools compiled from source (dump1090, AIS-catcher, slowrx, SatDump, etc.)
+- `Dockerfile` - Single-stage build with all SDR tools compiled from source (dump1090, AIS-catcher, slowrx, SatDump, etc.). CMD runs `start.sh` (gunicorn + gevent)
 - `docker-compose.yml` - Two profiles: `basic` (standalone) and `history` (with Postgres for ADS-B)
 - `build-multiarch.sh` - Multi-arch build script for amd64 + arm64 (RPi5)
 - Data persisted via `./data:/app/data` volume mount

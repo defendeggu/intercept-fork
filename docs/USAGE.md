@@ -172,7 +172,7 @@ Set the following environment variables (Docker recommended):
 ```bash
 INTERCEPT_ADSB_AUTO_START=true \
 INTERCEPT_SHARED_OBSERVER_LOCATION=false \
-sudo -E venv/bin/python intercept.py
+sudo ./start.sh
 ```
 
 **Docker example (.env)**
@@ -518,9 +518,27 @@ INTERCEPT can be configured via environment variables:
 | `INTERCEPT_LOG_LEVEL` | `WARNING` | Log level (DEBUG, INFO, WARNING, ERROR) |
 | `INTERCEPT_DEFAULT_GAIN` | `40` | Default RTL-SDR gain |
 
-Example: `INTERCEPT_PORT=8080 sudo -E venv/bin/python intercept.py`
+Example: `INTERCEPT_PORT=8080 sudo ./start.sh`
 
 ## Command-line Options
+
+### Production server (recommended)
+
+```
+sudo ./start.sh --help
+
+  -p, --port PORT    Port to listen on (default: 5050)
+  -H, --host HOST    Host to bind to (default: 0.0.0.0)
+  -d, --debug        Run in debug mode (Flask dev server)
+  --https            Enable HTTPS with self-signed certificate
+  --check-deps       Check dependencies and exit
+```
+
+> **Note:** `sudo` is required for SDR hardware access, WiFi monitor mode, and Bluetooth low-level operations.
+
+`start.sh` auto-detects gunicorn + gevent and runs a production WSGI server with cooperative greenlets — this handles multiple SSE streams and WebSocket connections concurrently without blocking. Falls back to the Flask dev server if gunicorn is not installed.
+
+### Development server
 
 ```
 python3 intercept.py --help

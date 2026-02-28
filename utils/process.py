@@ -104,13 +104,29 @@ def _signal_handler(signum, frame):
     sys.exit(0)
 
 
-# Only register signal handlers if we're not in a thread
-try:
-    signal.signal(signal.SIGTERM, _signal_handler)
-    signal.signal(signal.SIGINT, _signal_handler)
-except ValueError:
-    # Can't set signal handlers from a thread
-    pass
+# Only register signal handlers when running standalone (not under gunicorn).
+# Gunicorn manages its own SIGINT/SIGTERM handling for graceful shutdown;
+# overriding those signals causes KeyboardInterrupt in the wrong context.
+def _is_under_gunicorn():
+    """Check if we're running inside a gunicorn worker."""
+    try:
+        import gunicorn.arbiter  # noqa: F401
+        # If gunicorn is importable AND we were invoked via gunicorn, the
+        # arbiter will have installed its own signal handlers already.
+        # Check the current SIGTERM handler — if it's not the default,
+        # gunicorn (or another manager) owns signals.
+        current = signal.getsignal(signal.SIGTERM)
+        return current not in (signal.SIG_DFL, signal.SIG_IGN, None)
+    except ImportError:
+        return False
+
+if not _is_under_gunicorn():
+    try:
+        signal.signal(signal.SIGTERM, _signal_handler)
+        signal.signal(signal.SIGINT, _signal_handler)
+    except ValueError:
+        # Can't set signal handlers from a thread
+        pass
 
 
 def cleanup_stale_processes() -> None:

@@ -1784,6 +1784,13 @@ const BluetoothMode = (function() {
      */
     function destroy() {
         stopEventStream();
+        devices.clear();
+        pendingDeviceIds.clear();
+        if (deviceContainer) {
+            deviceContainer.innerHTML = '';
+        }
+        const countEl = document.getElementById('btDeviceListCount');
+        if (countEl) countEl.textContent = '0';
     }
 })();
 

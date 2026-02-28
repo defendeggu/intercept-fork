@@ -1,6 +1,8 @@
 # INTERCEPT - Signal Intelligence Platform
 # Docker Compose configuration for easy deployment
 #
+# Uses gunicorn + gevent production server via start.sh (handles concurrent SSE/WebSocket)
+#
 # Basic usage (build locally):
 #   docker compose --profile basic up -d --build
 #
