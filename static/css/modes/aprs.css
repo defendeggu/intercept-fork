@@ -60,7 +60,7 @@
     gap: 4px;
 }
 .aprs-strip .strip-select {
-    background: rgba(0,0,0,0.3);
+    background: var(--bg-dark);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 4px 8px;
@@ -325,4 +325,51 @@
 }
 .aprs-meter-status.no-signal {
     color: var(--accent-yellow);
+}
+
+/* APRS map markers (flat SVG icons) */
+.aprs-map-marker-wrap {
+    background: transparent;
+    border: none;
+}
+
+.aprs-map-marker {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 7px 2px 5px;
+    border-radius: 999px;
+    border: 1px solid rgba(74, 158, 255, 0.35);
+    background: rgba(10, 18, 28, 0.88);
+    color: var(--text-primary);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.aprs-map-marker-icon {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    color: var(--accent-cyan);
+}
+
+.aprs-map-marker-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+    fill: currentColor;
+}
+
+.aprs-map-marker-label {
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+}
+
+.aprs-map-marker.vehicle .aprs-map-marker-icon {
+    color: var(--accent-green);
+}
+
+.aprs-map-marker.tower .aprs-map-marker-icon {
+    color: var(--accent-cyan);
 }

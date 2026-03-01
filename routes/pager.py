@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import os
 import pathlib
 import re
 import pty
 import queue
 import select
+import struct
 import subprocess
 import threading
 import time
@@ -22,8 +24,9 @@ from utils.validation import (
     validate_frequency, validate_device_index, validate_gain, validate_ppm,
     validate_rtl_tcp_host, validate_rtl_tcp_port
 )
-from utils.sse import format_sse
-from utils.process import safe_terminate, register_process
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
+from utils.process import safe_terminate, register_process, unregister_process
 from utils.sdr import SDRFactory, SDRType, SDRValidationError
 from utils.dependencies import get_tool_path
 from utils.database import store_pager_message, get_pager_messages, get_pager_message_count
@@ -34,6 +37,7 @@ pager_bp = Blueprint('pager', __name__)
 pager_active_device: int | None = None
 # Track the current decoding frequency (MHz) for DB storage
 pager_active_frequency: float | None = None
+pager_active_sdr_type: str | None = None
 
 
 def parse_multimon_output(line: str) -> dict[str, str] | None:
@@ -108,6 +112,77 @@ def log_message(msg: dict[str, Any]) -> None:
         logger.error(f"Failed to log message: {e}")
 
 
+def _encode_scope_waveform(samples: tuple[int, ...], window_size: int = 256) -> list[int]:
+    """Compress recent PCM samples into a signed 8-bit waveform for SSE."""
+    if not samples:
+        return []
+
+    window = samples[-window_size:] if len(samples) > window_size else samples
+    waveform: list[int] = []
+    for sample in window:
+        # Convert int16 PCM to int8 range for lightweight transport.
+        packed = int(round(sample / 256))
+        waveform.append(max(-127, min(127, packed)))
+    return waveform
+
+
+def audio_relay_thread(
+    rtl_stdout,
+    multimon_stdin,
+    output_queue: queue.Queue,
+    stop_event: threading.Event,
+) -> None:
+    """Relay audio from rtl_fm to multimon-ng while computing signal levels.
+
+    Reads raw 16-bit LE PCM from *rtl_stdout*, writes every chunk straight
+    through to *multimon_stdin*, and every ~100 ms pushes an RMS / peak scope
+    event plus a compact waveform sample onto *output_queue*.
+    """
+    CHUNK = 4096  # bytes – 2048 samples at 16-bit mono
+    INTERVAL = 0.1  # seconds between scope updates
+    last_scope = time.monotonic()
+
+    try:
+        while not stop_event.is_set():
+            data = rtl_stdout.read(CHUNK)
+            if not data:
+                break
+
+            # Forward audio untouched
+            try:
+                multimon_stdin.write(data)
+                multimon_stdin.flush()
+            except (BrokenPipeError, OSError):
+                break
+
+            # Compute scope levels every ~100 ms
+            now = time.monotonic()
+            if now - last_scope >= INTERVAL:
+                last_scope = now
+                try:
+                    n_samples = len(data) // 2
+                    if n_samples == 0:
+                        continue
+                    samples = struct.unpack(f'<{n_samples}h', data[:n_samples * 2])
+                    peak = max(abs(s) for s in samples)
+                    rms = int(math.sqrt(sum(s * s for s in samples) / n_samples))
+                    output_queue.put_nowait({
+                        'type': 'scope',
+                        'rms': rms,
+                        'peak': peak,
+                        'waveform': _encode_scope_waveform(samples),
+                    })
+                except (struct.error, ValueError, queue.Full):
+                    pass
+    except Exception as e:
+        logger.debug(f"Audio relay error: {e}")
+    finally:
+        try:
+            multimon_stdin.close()
+        except OSError:
+            pass
+
+
 def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
     """Stream decoder output to queue using PTY for unbuffered output."""
     try:
@@ -161,19 +236,43 @@ def stream_decoder(master_fd: int, process: subprocess.Popen[bytes]) -> None:
     except Exception as e:
         app_module.output_queue.put({'type': 'error', 'text': str(e)})
     finally:
+        global pager_active_device, pager_active_sdr_type
         try:
             os.close(master_fd)
         except OSError:
             pass
-        process.wait()
+        # Signal relay thread to stop
+        with app_module.process_lock:
+            stop_relay = getattr(app_module.current_process, '_stop_relay', None)
+        if stop_relay:
+            stop_relay.set()
+        # Cleanup companion rtl_fm process and decoder
+        with app_module.process_lock:
+            rtl_proc = getattr(app_module.current_process, '_rtl_process', None)
+        for proc in [rtl_proc, process]:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                unregister_process(proc)
         app_module.output_queue.put({'type': 'status', 'text': 'stopped'})
         with app_module.process_lock:
             app_module.current_process = None
+        # Release SDR device
+        if pager_active_device is not None:
+            app_module.release_sdr_device(pager_active_device, pager_active_sdr_type or 'rtlsdr')
+            pager_active_device = None
+            pager_active_sdr_type = None
 
 
 @pager_bp.route('/start', methods=['POST'])
 def start_decoding() -> Response:
-    global pager_active_device, pager_active_frequency
+    global pager_active_device, pager_active_frequency, pager_active_sdr_type
 
     with app_module.process_lock:
         if app_module.current_process:
@@ -204,10 +303,13 @@ def start_decoding() -> Response:
         rtl_tcp_host = data.get('rtl_tcp_host')
         rtl_tcp_port = data.get('rtl_tcp_port', 1234)
 
+        # Get SDR type early so we can pass it to claim/release
+        sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
         # Claim local device if not using remote rtl_tcp
         if not rtl_tcp_host:
             device_int = int(device)
-            error = app_module.claim_sdr_device(device_int, 'pager')
+            error = app_module.claim_sdr_device(device_int, 'pager', sdr_type_str)
             if error:
                 return jsonify({
                     'status': 'error',
@@ -215,14 +317,16 @@ def start_decoding() -> Response:
                     'message': error
                 }), 409
             pager_active_device = device_int
+            pager_active_sdr_type = sdr_type_str
 
         # Validate protocols
         valid_protocols = ['POCSAG512', 'POCSAG1200', 'POCSAG2400', 'FLEX']
         protocols = data.get('protocols', valid_protocols)
         if not isinstance(protocols, list):
             if pager_active_device is not None:
-                app_module.release_sdr_device(pager_active_device)
+                app_module.release_sdr_device(pager_active_device, pager_active_sdr_type or 'rtlsdr')
                 pager_active_device = None
+                pager_active_sdr_type = None
             return jsonify({'status': 'error', 'message': 'Protocols must be a list'}), 400
         protocols = [p for p in protocols if p in valid_protocols]
         if not protocols:
@@ -247,8 +351,7 @@ def start_decoding() -> Response:
             elif proto == 'FLEX':
                 decoders.extend(['-a', 'FLEX'])
 
-        # Get SDR type and build command via abstraction layer
-        sdr_type_str = data.get('sdr_type', 'rtlsdr')
+        # Build command via SDR abstraction layer
         try:
             sdr_type = SDRType(sdr_type_str)
         except ValueError:
@@ -298,6 +401,7 @@ def start_decoding() -> Response:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(rtl_process)
 
             # Start a thread to monitor rtl_fm stderr for errors
             def monitor_rtl_stderr():
@@ -316,18 +420,30 @@ def start_decoding() -> Response:
 
             multimon_process = subprocess.Popen(
                 multimon_cmd,
-                stdin=rtl_process.stdout,
+                stdin=subprocess.PIPE,
                 stdout=slave_fd,
                 stderr=slave_fd,
                 close_fds=True
             )
+            register_process(multimon_process)
 
             os.close(slave_fd)
-            rtl_process.stdout.close()
+
+            # Spawn audio relay thread between rtl_fm and multimon-ng
+            stop_relay = threading.Event()
+            relay = threading.Thread(
+                target=audio_relay_thread,
+                args=(rtl_process.stdout, multimon_process.stdin,
+                      app_module.output_queue, stop_relay),
+            )
+            relay.daemon = True
+            relay.start()
 
             app_module.current_process = multimon_process
             app_module.current_process._rtl_process = rtl_process
             app_module.current_process._master_fd = master_fd
+            app_module.current_process._stop_relay = stop_relay
+            app_module.current_process._relay_thread = relay
 
             # Start output thread with PTY master fd
             thread = threading.Thread(target=stream_decoder, args=(master_fd, multimon_process))
@@ -339,25 +455,49 @@ def start_decoding() -> Response:
             return jsonify({'status': 'started', 'command': full_cmd})
 
         except FileNotFoundError as e:
+            # Kill orphaned rtl_fm process
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if pager_active_device is not None:
-                app_module.release_sdr_device(pager_active_device)
+                app_module.release_sdr_device(pager_active_device, pager_active_sdr_type or 'rtlsdr')
                 pager_active_device = None
+                pager_active_sdr_type = None
             return jsonify({'status': 'error', 'message': f'Tool not found: {e.filename}'})
         except Exception as e:
+            # Kill orphaned rtl_fm process if it was started
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if pager_active_device is not None:
-                app_module.release_sdr_device(pager_active_device)
+                app_module.release_sdr_device(pager_active_device, pager_active_sdr_type or 'rtlsdr')
                 pager_active_device = None
+                pager_active_sdr_type = None
             return jsonify({'status': 'error', 'message': str(e)})
 
 
 @pager_bp.route('/stop', methods=['POST'])
 def stop_decoding() -> Response:
-    global pager_active_device
+    global pager_active_device, pager_active_sdr_type
 
     with app_module.process_lock:
         if app_module.current_process:
+            # Signal audio relay thread to stop
+            if hasattr(app_module.current_process, '_stop_relay'):
+                app_module.current_process._stop_relay.set()
+
             # Kill rtl_fm process first
             if hasattr(app_module.current_process, '_rtl_process'):
                 try:
@@ -387,8 +527,9 @@ def stop_decoding() -> Response:
 
             # Release device from registry
             if pager_active_device is not None:
-                app_module.release_sdr_device(pager_active_device)
+                app_module.release_sdr_device(pager_active_device, pager_active_sdr_type or 'rtlsdr')
                 pager_active_device = None
+                pager_active_sdr_type = None
 
             return jsonify({'status': 'stopped'})
 
@@ -440,24 +581,19 @@ def toggle_logging() -> Response:
 
 @pager_bp.route('/stream')
 def stream() -> Response:
-    import json
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('pager', msg, msg.get('type'))
 
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0  # Send keepalive every 30 seconds instead of 1 second
-
-        while True:
-            try:
-                msg = app_module.output_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.output_queue,
+            channel_key='pager',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

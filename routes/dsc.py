@@ -35,10 +35,17 @@ from utils.database import (
     get_dsc_alert_summary,
 )
 from utils.dsc.parser import parse_dsc_message
-from utils.sse import format_sse
-from utils.validation import validate_device_index, validate_gain
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
+from utils.validation import (
+    validate_device_index,
+    validate_gain,
+    validate_rtl_tcp_host,
+    validate_rtl_tcp_port,
+)
 from utils.sdr import SDRFactory, SDRType
 from utils.dependencies import get_tool_path
+from utils.process import register_process, unregister_process
 
 logger = logging.getLogger('intercept.dsc')
 
@@ -49,6 +56,7 @@ dsc_running = False
 
 # Track which device is being used
 dsc_active_device: int | None = None
+dsc_active_sdr_type: str | None = None
 
 
 def _get_dsc_decoder_path() -> str | None:
@@ -169,17 +177,35 @@ def stream_dsc_decoder(master_fd: int, decoder_process: subprocess.Popen) -> Non
             'error': str(e)
         })
     finally:
+        global dsc_active_device, dsc_active_sdr_type
         try:
             os.close(master_fd)
         except OSError:
             pass
-        decoder_process.wait()
         dsc_running = False
+        # Cleanup both processes
+        with app_module.dsc_lock:
+            rtl_proc = app_module.dsc_rtl_process
+        for proc in [rtl_proc, decoder_process]:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                unregister_process(proc)
         app_module.dsc_queue.put({'type': 'status', 'status': 'stopped'})
-
         with app_module.dsc_lock:
             app_module.dsc_process = None
             app_module.dsc_rtl_process = None
+        # Release SDR device
+        if dsc_active_device is not None:
+            app_module.release_sdr_device(dsc_active_device, dsc_active_sdr_type or 'rtlsdr')
+            dsc_active_device = None
+            dsc_active_sdr_type = None
 
 
 def _store_critical_alert(msg: dict) -> None:
@@ -312,18 +338,32 @@ def start_decoding() -> Response:
                 'message': str(e)
             }), 400
 
-        # Check if device is available using centralized registry
-        global dsc_active_device
-        device_int = int(device)
-        error = app_module.claim_sdr_device(device_int, 'dsc')
-        if error:
-            return jsonify({
-                'status': 'error',
-                'error_type': 'DEVICE_BUSY',
-                'message': error
-            }), 409
+        # Get SDR type from request
+        sdr_type_str = data.get('sdr_type', 'rtlsdr')
 
-        dsc_active_device = device_int
+        # Check for rtl_tcp (remote SDR) connection
+        rtl_tcp_host = data.get('rtl_tcp_host')
+        rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
+        try:
+            sdr_type = SDRType(sdr_type_str)
+        except ValueError:
+            sdr_type = SDRType.RTL_SDR
+
+        # Check if device is available using centralized registry (skip for remote rtl_tcp)
+        global dsc_active_device, dsc_active_sdr_type
+        if not rtl_tcp_host:
+            device_int = int(device)
+            error = app_module.claim_sdr_device(device_int, 'dsc', sdr_type_str)
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error
+                }), 409
+
+            dsc_active_device = device_int
+            dsc_active_sdr_type = sdr_type_str
 
         # Clear queue
         while not app_module.dsc_queue.empty():
@@ -332,22 +372,32 @@ def start_decoding() -> Response:
             except queue.Empty:
                 break
 
-        # Build rtl_fm command
-        rtl_fm_path = tools['rtl_fm']['path']
+        # Build rtl_fm command via SDR abstraction layer
         decoder_path = tools['dsc_decoder']['path']
 
-        # rtl_fm command for DSC decoding
-        # DSC uses narrow FM at 156.525 MHz with 48kHz sample rate
-        rtl_cmd = [
-            rtl_fm_path,
-            '-f', f'{DSC_VHF_FREQUENCY_MHZ}M',
-            '-s', str(DSC_SAMPLE_RATE),
-            '-d', str(device),
-            '-g', str(gain),
-            '-M', 'fm',           # FM demodulation
-            '-l', '0',            # No squelch for DSC
-            '-E', 'dc'            # DC blocking filter
-        ]
+        if rtl_tcp_host:
+            try:
+                rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+                rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+            except ValueError as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 400
+            sdr_device = SDRFactory.create_network_device(rtl_tcp_host, rtl_tcp_port)
+            logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+        else:
+            sdr_device = SDRFactory.create_default_device(sdr_type, index=int(device))
+
+        builder = SDRFactory.get_builder(sdr_device.sdr_type)
+        rtl_cmd = list(builder.build_fm_demod_command(
+            device=sdr_device,
+            frequency_mhz=DSC_VHF_FREQUENCY_MHZ,
+            sample_rate=DSC_SAMPLE_RATE,
+            gain=float(gain) if gain and str(gain) != '0' else None,
+            modulation='fm',
+            squelch=0,
+        ))
+        # Ensure trailing '-' for stdin piping and add DC blocking filter
+        if rtl_cmd and rtl_cmd[-1] == '-':
+            rtl_cmd = rtl_cmd[:-1] + ['-E', 'dc', '-']
 
         # Decoder command
         decoder_cmd = [decoder_path]
@@ -362,6 +412,7 @@ def start_decoding() -> Response:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(rtl_process)
 
             # Start stderr monitor thread
             stderr_thread = threading.Thread(
@@ -382,6 +433,7 @@ def start_decoding() -> Response:
                 stderr=slave_fd,
                 close_fds=True
             )
+            register_process(decoder_process)
 
             os.close(slave_fd)
             rtl_process.stdout.close()
@@ -408,19 +460,39 @@ def start_decoding() -> Response:
             })
 
         except FileNotFoundError as e:
+            # Kill orphaned rtl_fm process
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if dsc_active_device is not None:
-                app_module.release_sdr_device(dsc_active_device)
+                app_module.release_sdr_device(dsc_active_device, dsc_active_sdr_type or 'rtlsdr')
                 dsc_active_device = None
+                dsc_active_sdr_type = None
             return jsonify({
                 'status': 'error',
                 'message': f'Tool not found: {e.filename}'
             }), 400
         except Exception as e:
+            # Kill orphaned rtl_fm process if it was started
+            try:
+                rtl_process.terminate()
+                rtl_process.wait(timeout=2)
+            except Exception:
+                try:
+                    rtl_process.kill()
+                except Exception:
+                    pass
             # Release device on failure
             if dsc_active_device is not None:
-                app_module.release_sdr_device(dsc_active_device)
+                app_module.release_sdr_device(dsc_active_device, dsc_active_sdr_type or 'rtlsdr')
                 dsc_active_device = None
+                dsc_active_sdr_type = None
             logger.error(f"Failed to start DSC decoder: {e}")
             return jsonify({
                 'status': 'error',
@@ -431,7 +503,7 @@ def start_decoding() -> Response:
 @dsc_bp.route('/stop', methods=['POST'])
 def stop_decoding() -> Response:
     """Stop DSC decoder."""
-    global dsc_running, dsc_active_device
+    global dsc_running, dsc_active_device, dsc_active_sdr_type
 
     with app_module.dsc_lock:
         if not app_module.dsc_process:
@@ -470,8 +542,9 @@ def stop_decoding() -> Response:
 
         # Release device from registry
         if dsc_active_device is not None:
-            app_module.release_sdr_device(dsc_active_device)
+            app_module.release_sdr_device(dsc_active_device, dsc_active_sdr_type or 'rtlsdr')
             dsc_active_device = None
+            dsc_active_sdr_type = None
 
         return jsonify({'status': 'stopped'})
 
@@ -479,22 +552,19 @@ def stop_decoding() -> Response:
 @dsc_bp.route('/stream')
 def stream() -> Response:
     """SSE stream for real-time DSC messages."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('dsc', msg, msg.get('type'))
 
-        while True:
-            try:
-                msg = app_module.dsc_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.dsc_queue,
+            channel_key='dsc',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

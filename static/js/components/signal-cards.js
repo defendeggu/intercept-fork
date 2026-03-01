@@ -302,7 +302,13 @@ const SignalCards = (function() {
      */
     function formatRelativeTime(timestamp) {
         if (!timestamp) return '';
-        const date = new Date(timestamp);
+        let date = new Date(timestamp);
+        // Handle time-only strings like "HH:MM:SS" (from pager/sensor backends)
+        if (isNaN(date.getTime()) && /^\d{1,2}:\d{2}(:\d{2})?$/.test(timestamp)) {
+            const today = new Date();
+            date = new Date(today.toDateString() + ' ' + timestamp);
+        }
+        if (isNaN(date.getTime())) return timestamp;
         const now = new Date();
         const diff = Math.floor((now - date) / 1000);
 

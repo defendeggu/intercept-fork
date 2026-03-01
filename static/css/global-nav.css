@@ -30,7 +30,7 @@
     border-bottom: 1px solid var(--border-color, #202833);
     padding: 0 20px;
     position: relative;
-    z-index: 100;
+    z-index: 1100;
     backdrop-filter: blur(10px);
 }
 
@@ -434,6 +434,6 @@ a.nav-dashboard-btn:hover {
 }
 
 .nav-dashboard-btn .nav-label {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-family: var(--font-mono, 'Roboto Condensed', 'Arial Narrow', sans-serif);
     letter-spacing: 0.5px;
 }

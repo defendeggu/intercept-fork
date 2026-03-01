@@ -25,11 +25,11 @@ import subprocess
 
 from typing import Any
 
-from flask import Flask, render_template, jsonify, send_file, Response, request,redirect, url_for, flash, session
+from flask import Flask, render_template, jsonify, send_file, Response, request,redirect, url_for, flash, session, send_from_directory
 from werkzeug.security import check_password_hash
-from config import VERSION, CHANGELOG, SHARED_OBSERVER_LOCATION_ENABLED
+from config import VERSION, CHANGELOG, SHARED_OBSERVER_LOCATION_ENABLED, DEFAULT_LATITUDE, DEFAULT_LONGITUDE
 from utils.dependencies import check_tool, check_all_dependencies, TOOL_DEPENDENCIES
-from utils.process import cleanup_stale_processes
+from utils.process import cleanup_stale_processes, cleanup_stale_dump1090
 from utils.sdr import SDRFactory
 from utils.cleanup import DataStore, cleanup_manager
 from utils.constants import (
@@ -55,9 +55,9 @@ app.secret_key = "signals_intelligence_secret" # Required for flash messages
 
 # Set up rate limiting
 limiter = Limiter(
-    key_func=get_remote_address, # Identifies the user by their IP
+    key_func=get_remote_address,
     app=app,
-    storage_uri="memory://", # Use RAM memory (change to redis:// etc. for distributed setups)
+    storage_uri="memory://",
 )
 
 # Disable Werkzeug debugger PIN (not needed for local development tool)
@@ -100,11 +100,24 @@ def add_security_headers(response):
 def inject_offline_settings():
     """Inject offline settings into all templates."""
     from utils.database import get_setting
+
+    # Privacy-first defaults: keep dashboard assets/fonts local to avoid
+    # third-party tracker/storage defenses in strict browsers.
+    assets_source = str(get_setting('offline.assets_source', 'local') or 'local').lower()
+    fonts_source = str(get_setting('offline.fonts_source', 'local') or 'local').lower()
+    if assets_source not in ('local', 'cdn'):
+        assets_source = 'local'
+    if fonts_source not in ('local', 'cdn'):
+        fonts_source = 'local'
+    # Force local delivery for core dashboard pages.
+    assets_source = 'local'
+    fonts_source = 'local'
+
     return {
         'offline_settings': {
             'enabled': get_setting('offline.enabled', False),
-            'assets_source': get_setting('offline.assets_source', 'cdn'),
-            'fonts_source': get_setting('offline.fonts_source', 'cdn'),
+            'assets_source': assets_source,
+            'fonts_source': fonts_source,
             'tile_provider': get_setting('offline.tile_provider', 'cartodb_dark_cyan'),
             'tile_server_url': get_setting('offline.tile_server_url', '')
         }
@@ -150,6 +163,11 @@ acars_process = None
 acars_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 acars_lock = threading.Lock()
 
+# VDL2 aircraft datalink
+vdl2_process = None
+vdl2_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+vdl2_lock = threading.Lock()
+
 # APRS amateur radio tracking
 aprs_process = None
 aprs_rtl_process = None
@@ -172,15 +190,23 @@ dsc_rtl_process = None
 dsc_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 dsc_lock = threading.Lock()
 
-# DMR / Digital Voice
-dmr_process = None
-dmr_rtl_process = None
-dmr_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
-dmr_lock = threading.Lock()
-
 # TSCM (Technical Surveillance Countermeasures)
 tscm_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 tscm_lock = threading.Lock()
+
+# SubGHz Transceiver (HackRF)
+subghz_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+subghz_lock = threading.Lock()
+
+# Radiosonde weather balloon tracking
+radiosonde_process = None
+radiosonde_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+radiosonde_lock = threading.Lock()
+
+# CW/Morse code decoder
+morse_process = None
+morse_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+morse_lock = threading.Lock()
 
 # Deauth Attack Detection
 deauth_detector = None
@@ -236,44 +262,63 @@ cleanup_manager.register(deauth_alerts)
 # SDR DEVICE REGISTRY
 # ============================================
 # Tracks which mode is using which SDR device to prevent conflicts
-# Key: device_index (int), Value: mode_name (str)
-sdr_device_registry: dict[int, str] = {}
+# Key: "sdr_type:device_index" (str), Value: mode_name (str)
+sdr_device_registry: dict[str, str] = {}
 sdr_device_registry_lock = threading.Lock()
 
 
-def claim_sdr_device(device_index: int, mode_name: str) -> str | None:
+def claim_sdr_device(device_index: int, mode_name: str, sdr_type: str = 'rtlsdr') -> str | None:
     """Claim an SDR device for a mode.
+
+    Checks the in-app registry first, then probes the USB device to
+    catch stale handles held by external processes (e.g. a leftover
+    rtl_fm from a previous crash).
 
     Args:
         device_index: The SDR device index to claim
         mode_name: Name of the mode claiming the device (e.g., 'sensor', 'rtlamr')
+        sdr_type: SDR type string (e.g., 'rtlsdr', 'hackrf', 'limesdr')
 
     Returns:
         Error message if device is in use, None if successfully claimed
     """
+    key = f"{sdr_type}:{device_index}"
     with sdr_device_registry_lock:
-        if device_index in sdr_device_registry:
-            in_use_by = sdr_device_registry[device_index]
-            return f'SDR device {device_index} is in use by {in_use_by}. Stop {in_use_by} first or use a different device.'
-        sdr_device_registry[device_index] = mode_name
+        if key in sdr_device_registry:
+            in_use_by = sdr_device_registry[key]
+            return f'SDR device {sdr_type}:{device_index} is in use by {in_use_by}. Stop {in_use_by} first or use a different device.'
+
+        # Probe the USB device to catch external processes holding the handle
+        if sdr_type == 'rtlsdr':
+            try:
+                from utils.sdr.detection import probe_rtlsdr_device
+                usb_error = probe_rtlsdr_device(device_index)
+                if usb_error:
+                    return usb_error
+            except Exception:
+                pass  # If probe fails, let the caller proceed normally
+
+        sdr_device_registry[key] = mode_name
         return None
 
 
-def release_sdr_device(device_index: int) -> None:
+def release_sdr_device(device_index: int, sdr_type: str = 'rtlsdr') -> None:
     """Release an SDR device from the registry.
 
     Args:
         device_index: The SDR device index to release
+        sdr_type: SDR type string (e.g., 'rtlsdr', 'hackrf', 'limesdr')
     """
+    key = f"{sdr_type}:{device_index}"
     with sdr_device_registry_lock:
-        sdr_device_registry.pop(device_index, None)
+        sdr_device_registry.pop(key, None)
 
 
-def get_sdr_device_status() -> dict[int, str]:
+def get_sdr_device_status() -> dict[str, str]:
     """Get current SDR device allocations.
 
     Returns:
-        Dictionary mapping device indices to mode names
+        Dictionary mapping 'sdr_type:device_index' keys to mode names
     """
     with sdr_device_registry_lock:
         return dict(sdr_device_registry)
@@ -290,6 +335,10 @@ def require_login():
 
     # Allow audio streaming endpoints without session auth
     if request.path.startswith('/listening/audio/'):
+        return None
+
+    # Allow WebSocket upgrade requests (page load already required auth)
+    if request.path.startswith('/ws/'):
         return None
 
     # Controller API endpoints use API key auth, not session auth
@@ -352,12 +401,26 @@ def index() -> str:
         version=VERSION,
         changelog=CHANGELOG,
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+        default_latitude=DEFAULT_LATITUDE,
+        default_longitude=DEFAULT_LONGITUDE,
     )
 
 
 @app.route('/favicon.svg')
 def favicon() -> Response:
     return send_file('favicon.svg', mimetype='image/svg+xml')
+
+
+@app.route('/sw.js')
+def service_worker() -> Response:
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
+
+@app.route('/manifest.json')
+def pwa_manifest() -> Response:
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
 
 
 @app.route('/devices')
@@ -376,8 +439,9 @@ def get_devices_status() -> Response:
     result = []
     for device in devices:
         d = device.to_dict()
-        d['in_use'] = device.index in registry
-        d['used_by'] = registry.get(device.index)
+        key = f"{device.sdr_type.value}:{device.index}"
+        d['in_use'] = key in registry
+        d['used_by'] = registry.get(key)
         result.append(d)
 
     return jsonify(result)
@@ -623,10 +687,75 @@ def export_bluetooth() -> Response:
         })
 
 
+def _get_subghz_active() -> bool:
+    """Check if SubGHz manager has an active process."""
+    try:
+        from utils.subghz import get_subghz_manager
+        return get_subghz_manager().active_mode != 'idle'
+    except Exception:
+        return False
+
+
+def _get_bluetooth_health() -> tuple[bool, int]:
+    """Return Bluetooth active state and best-effort device count."""
+    legacy_running = bt_process is not None and (bt_process.poll() is None if bt_process else False)
+    scanner_running = False
+    scanner_count = 0
+
+    try:
+        from utils.bluetooth.scanner import _scanner_instance as bt_scanner
+        if bt_scanner is not None:
+            scanner_running = bool(bt_scanner.is_scanning)
+            scanner_count = int(bt_scanner.device_count)
+    except Exception:
+        scanner_running = False
+        scanner_count = 0
+
+    locate_running = False
+    try:
+        from utils.bt_locate import get_locate_session
+        session = get_locate_session()
+        if session and getattr(session, 'active', False):
+            scanner = getattr(session, '_scanner', None)
+            locate_running = bool(scanner and scanner.is_scanning)
+    except Exception:
+        locate_running = False
+
+    return (legacy_running or scanner_running or locate_running), max(len(bt_devices), scanner_count)
+
+
+def _get_wifi_health() -> tuple[bool, int, int]:
+    """Return WiFi active state and best-effort network/client counts."""
+    legacy_running = wifi_process is not None and (wifi_process.poll() is None if wifi_process else False)
+    scanner_running = False
+    scanner_networks = 0
+    scanner_clients = 0
+
+    try:
+        from utils.wifi.scanner import _scanner_instance as wifi_scanner
+        if wifi_scanner is not None:
+            status = wifi_scanner.get_status()
+            scanner_running = bool(status.is_scanning)
+            scanner_networks = int(status.networks_found or 0)
+            scanner_clients = int(status.clients_found or 0)
+    except Exception:
+        scanner_running = False
+        scanner_networks = 0
+        scanner_clients = 0
+
+    return (
+        legacy_running or scanner_running,
+        max(len(wifi_networks), scanner_networks),
+        max(len(wifi_clients), scanner_clients),
+    )
+
+
 @app.route('/health')
 def health_check() -> Response:
     """Health check endpoint for monitoring."""
     import time
+    bt_active, bt_device_count = _get_bluetooth_health()
+    wifi_active, wifi_network_count, wifi_client_count = _get_wifi_health()
     return jsonify({
         'status': 'healthy',
         'version': VERSION,
@@ -637,18 +766,21 @@ def health_check() -> Response:
             'adsb': adsb_process is not None and (adsb_process.poll() is None if adsb_process else False),
             'ais': ais_process is not None and (ais_process.poll() is None if ais_process else False),
             'acars': acars_process is not None and (acars_process.poll() is None if acars_process else False),
+            'vdl2': vdl2_process is not None and (vdl2_process.poll() is None if vdl2_process else False),
             'aprs': aprs_process is not None and (aprs_process.poll() is None if aprs_process else False),
-            'wifi': wifi_process is not None and (wifi_process.poll() is None if wifi_process else False),
-            'bluetooth': bt_process is not None and (bt_process.poll() is None if bt_process else False),
+            'wifi': wifi_active,
+            'bluetooth': bt_active,
             'dsc': dsc_process is not None and (dsc_process.poll() is None if dsc_process else False),
-            'dmr': dmr_process is not None and (dmr_process.poll() is None if dmr_process else False),
+            'radiosonde': radiosonde_process is not None and (radiosonde_process.poll() is None if radiosonde_process else False),
+            'morse': morse_process is not None and (morse_process.poll() is None if morse_process else False),
+            'subghz': _get_subghz_active(),
         },
         'data': {
             'aircraft_count': len(adsb_aircraft),
             'vessel_count': len(ais_vessels),
-            'wifi_networks_count': len(wifi_networks),
-            'wifi_clients_count': len(wifi_clients),
-            'bt_devices_count': len(bt_devices),
+            'wifi_networks_count': wifi_network_count,
+            'wifi_clients_count': wifi_client_count,
+            'bt_devices_count': bt_device_count,
             'dsc_messages_count': len(dsc_messages),
         }
     })
@@ -658,20 +790,24 @@ def health_check() -> Response:
 def kill_all() -> Response:
     """Kill all decoder, WiFi, and Bluetooth processes."""
     global current_process, sensor_process, wifi_process, adsb_process, ais_process, acars_process
+    global vdl2_process, morse_process, radiosonde_process
     global aprs_process, aprs_rtl_process, dsc_process, dsc_rtl_process, bt_process
-    global dmr_process, dmr_rtl_process
 
-    # Import adsb and ais modules to reset their state
+    # Import modules to reset their state
     from routes import adsb as adsb_module
     from routes import ais as ais_module
+    from routes import radiosonde as radiosonde_module
     from utils.bluetooth import reset_bluetooth_scanner
 
     killed = []
     processes_to_kill = [
         'rtl_fm', 'multimon-ng', 'rtl_433',
         'airodump-ng', 'aireplay-ng', 'airmon-ng',
-        'dump1090', 'acarsdec', 'direwolf', 'AIS-catcher',
-        'hcitool', 'bluetoothctl', 'dsd'
+        'dump1090', 'acarsdec', 'dumpvdl2', 'direwolf', 'AIS-catcher',
+        'hcitool', 'bluetoothctl', 'satdump',
+        'rtl_tcp', 'rtl_power', 'rtlamr', 'ffmpeg',
+        'hackrf_transfer', 'hackrf_sweep',
+        'auto_rx'
     ]
 
     for proc in processes_to_kill:
@@ -701,9 +837,22 @@ def kill_all() -> Response:
         ais_process = None
         ais_module.ais_running = False
 
+    # Reset Radiosonde state
+    with radiosonde_lock:
+        radiosonde_process = None
+        radiosonde_module.radiosonde_running = False
+
     # Reset ACARS state
     with acars_lock:
         acars_process = None
+
+    # Reset VDL2 state
+    with vdl2_lock:
+        vdl2_process = None
+
+    # Reset Morse state
+    with morse_lock:
+        morse_process = None
 
     # Reset APRS state
     with aprs_lock:
@@ -714,11 +863,6 @@ def kill_all() -> Response:
     with dsc_lock:
         dsc_process = None
         dsc_rtl_process = None
-
-    # Reset DMR state
-    with dmr_lock:
-        dmr_process = None
-        dmr_rtl_process = None
 
     # Reset Bluetooth state (legacy)
     with bt_lock:
@@ -736,7 +880,14 @@ def kill_all() -> Response:
     # Reset Bluetooth v2 scanner
     try:
         reset_bluetooth_scanner()
-        killed.append('bluetooth_scanner')
+        killed.append('bluetooth')
+    except Exception:
+        pass
+
+    # Reset SubGHz state
+    try:
+        from utils.subghz import get_subghz_manager
+        get_subghz_manager().stop_all()
     except Exception:
         pass
 
@@ -745,6 +896,132 @@ def kill_all() -> Response:
         sdr_device_registry.clear()
 
     return jsonify({'status': 'killed', 'processes': killed})
+
+
+def _ensure_self_signed_cert(cert_dir: str) -> tuple:
+    """Generate a self-signed certificate if one doesn't already exist.
+
+    Returns (cert_path, key_path) tuple.
+    """
+    cert_path = os.path.join(cert_dir, 'intercept.crt')
+    key_path = os.path.join(cert_dir, 'intercept.key')
+
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        print(f"Using existing SSL certificate: {cert_path}")
+        return cert_path, key_path
+
+    os.makedirs(cert_dir, exist_ok=True)
+    print("Generating self-signed SSL certificate...")
+
+    import subprocess
+    result = subprocess.run([
+        'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+        '-keyout', key_path, '-out', cert_path,
+        '-days', '365', '-nodes',
+        '-subj', '/CN=intercept/O=INTERCEPT/C=US',
+    ], capture_output=True, text=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to generate SSL certificate: {result.stderr}")
+
+    print(f"SSL certificate generated: {cert_path}")
+    return cert_path, key_path
+
+
+_app_initialized = False
+
+
+def _init_app() -> None:
+    """Initialize blueprints, database, and websockets.
+
+    Safe to call multiple times — subsequent calls are no-ops.
+    Called automatically at module level for gunicorn, and also
+    from main() for the Flask dev server path.
+
+    Heavy/network operations (TLE updates, process cleanup) are
+    deferred to a background thread so the worker can serve
+    requests immediately.
+    """
+    global _app_initialized
+    if _app_initialized:
+        return
+    _app_initialized = True
+
+    import os
+
+    # Initialize database for settings storage
+    from utils.database import init_db
+    init_db()
+
+    # Register blueprints (essential — without these, all routes 404)
+    from routes import register_blueprints
+    register_blueprints(app)
+
+    # Initialize WebSocket for audio streaming
+    try:
+        from routes.audio_websocket import init_audio_websocket
+        init_audio_websocket(app)
+    except ImportError:
+        pass
+
+    # Initialize KiwiSDR WebSocket audio proxy
+    try:
+        from routes.websdr import init_websdr_audio
+        init_websdr_audio(app)
+    except ImportError:
+        pass
+
+    # Initialize WebSocket for waterfall streaming
+    try:
+        from routes.waterfall_websocket import init_waterfall_websocket
+        init_waterfall_websocket(app)
+    except ImportError:
+        pass
+
+    # Defer heavy/network operations so the worker can serve requests immediately
+    import threading
+
+    def _deferred_init():
+        """Run heavy initialization after a short delay."""
+        import time
+        time.sleep(1)  # Let the worker start serving first
+
+        # Clean up stale processes from previous runs
+        try:
+            cleanup_stale_processes()
+            cleanup_stale_dump1090()
+        except Exception as e:
+            logger.warning(f"Stale process cleanup failed: {e}")
+
+        # Register and start database cleanup
+        try:
+            from utils.database import (
+                cleanup_old_signal_history,
+                cleanup_old_timeline_entries,
+                cleanup_old_dsc_alerts,
+                cleanup_old_payloads
+            )
+            cleanup_manager.register_db_cleanup(cleanup_old_signal_history, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_timeline_entries, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_dsc_alerts, interval_multiplier=1440)
+            cleanup_manager.register_db_cleanup(cleanup_old_payloads, interval_multiplier=1440)
+            cleanup_manager.start()
+        except Exception as e:
+            logger.warning(f"Cleanup manager init failed: {e}")
+
+        # Initialize TLE auto-refresh (must be after blueprint registration)
+        try:
+            from routes.satellite import init_tle_auto_refresh
+            if not os.environ.get('TESTING'):
+                init_tle_auto_refresh()
+        except Exception as e:
+            logger.warning(f"Failed to initialize TLE auto-refresh: {e}")
+
+    threading.Thread(target=_deferred_init, daemon=True).start()
+
+
+# Auto-initialize when imported (e.g. by gunicorn)
+_init_app()
 
 
 def main() -> None:
@@ -772,6 +1049,12 @@ def main() -> None:
         action='store_true',
         default=config.DEBUG,
         help='Enable debug mode'
+    )
+    parser.add_argument(
+        '--https',
+        action='store_true',
+        default=config.HTTPS,
+        help='Enable HTTPS with self-signed certificate'
     )
     parser.add_argument(
         '--check-deps',
@@ -822,53 +1105,21 @@ def main() -> None:
         print("Running as root - full capabilities enabled")
         print()
 
-    # Clean up any stale processes from previous runs
-    cleanup_stale_processes()
+    # Ensure app is initialized (no-op if already done by module-level call)
+    _init_app()
 
-    # Initialize database for settings storage
-    from utils.database import init_db
-    init_db()
+    # Configure SSL if HTTPS is enabled
+    ssl_context = None
+    if args.https:
+        cert_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'certs')
+        if config.SSL_CERT and config.SSL_KEY:
+            ssl_context = (config.SSL_CERT, config.SSL_KEY)
+            print(f"Using provided SSL certificate: {config.SSL_CERT}")
+        else:
+            ssl_context = _ensure_self_signed_cert(cert_dir)
 
-    # Start automatic cleanup of stale data entries
-    cleanup_manager.start()
-
-    # Register blueprints
-    from routes import register_blueprints
-    register_blueprints(app)
-
-    # Update TLE data in background thread (non-blocking)
-    def update_tle_background():
-        try:
-            from routes.satellite import refresh_tle_data
-            print("Updating satellite TLE data from CelesTrak...")
-            updated = refresh_tle_data()
-            if updated:
-                print(f"TLE data updated for: {', '.join(updated)}")
-            else:
-                print("TLE update: No satellites updated (may be offline)")
-        except Exception as e:
-            print(f"TLE update failed (will use cached data): {e}")
-
-    tle_thread = threading.Thread(target=update_tle_background, daemon=True)
-    tle_thread.start()
-
-    # Initialize WebSocket for audio streaming
-    try:
-        from routes.audio_websocket import init_audio_websocket
-        init_audio_websocket(app)
-        print("WebSocket audio streaming enabled")
-    except ImportError as e:
-        print(f"WebSocket audio disabled (install flask-sock): {e}")
-
-    # Initialize KiwiSDR WebSocket audio proxy
-    try:
-        from routes.websdr import init_websdr_audio
-        init_websdr_audio(app)
-        print("KiwiSDR audio proxy enabled")
-    except ImportError as e:
-        print(f"KiwiSDR audio proxy disabled: {e}")
-
-    print(f"Open http://localhost:{args.port} in your browser")
+    protocol = 'https' if ssl_context else 'http'
+    print(f"Open {protocol}://localhost:{args.port} in your browser")
     print()
     print("Press Ctrl+C to stop")
     print()
@@ -880,4 +1131,5 @@ def main() -> None:
         debug=args.debug,
         threaded=True,
         load_dotenv=False,
+        ssl_context=ssl_context,
     )

@@ -105,6 +105,7 @@ class TSCMReport:
     # Statistics
     total_devices_scanned: int = 0
     wifi_devices: int = 0
+    wifi_clients: int = 0
     bluetooth_devices: int = 0
     rf_signals: int = 0
     new_devices: int = 0
@@ -203,6 +204,7 @@ def generate_executive_summary(report: TSCMReport) -> str:
     lines.append("SCAN STATISTICS:")
     lines.append(f"  - Total devices scanned: {report.total_devices_scanned}")
     lines.append(f"    - WiFi access points: {report.wifi_devices}")
+    lines.append(f"    - WiFi clients: {report.wifi_clients}")
     lines.append(f"    - Bluetooth devices: {report.bluetooth_devices}")
     lines.append(f"    - RF signals: {report.rf_signals}")
     lines.append("")
@@ -430,6 +432,7 @@ def generate_technical_annex_json(report: TSCMReport) -> dict:
         'statistics': {
             'total_devices': report.total_devices_scanned,
             'wifi_devices': report.wifi_devices,
+            'wifi_clients': report.wifi_clients,
             'bluetooth_devices': report.bluetooth_devices,
             'rf_signals': report.rf_signals,
             'new_devices': report.new_devices,
@@ -784,15 +787,17 @@ class TSCMReportBuilder:
     def add_statistics(
         self,
         wifi: int = 0,
+        wifi_clients: int = 0,
         bluetooth: int = 0,
         rf: int = 0,
         new: int = 0,
         missing: int = 0
     ) -> 'TSCMReportBuilder':
         self.report.wifi_devices = wifi
+        self.report.wifi_clients = wifi_clients
         self.report.bluetooth_devices = bluetooth
         self.report.rf_signals = rf
-        self.report.total_devices_scanned = wifi + bluetooth + rf
+        self.report.total_devices_scanned = wifi + wifi_clients + bluetooth + rf
         self.report.new_devices = new
         self.report.missing_devices = missing
         return self
@@ -895,6 +900,10 @@ def generate_report(
     if wifi_count is None:
         wifi_count = len(results.get('wifi_devices', results.get('wifi', [])))
 
+    wifi_client_count = results.get('wifi_client_count')
+    if wifi_client_count is None:
+        wifi_client_count = len(results.get('wifi_clients', []))
+
     bt_count = results.get('bt_count')
     if bt_count is None:
         bt_count = len(results.get('bt_devices', results.get('bluetooth', [])))
@@ -905,6 +914,7 @@ def generate_report(
 
     builder.add_statistics(
         wifi=wifi_count,
+        wifi_clients=wifi_client_count,
         bluetooth=bt_count,
         rf=rf_count,
         new=baseline_diff.get('summary', {}).get('new_devices', 0) if baseline_diff else 0,

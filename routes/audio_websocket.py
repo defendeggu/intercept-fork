@@ -1,10 +1,11 @@
 """WebSocket-based audio streaming for SDR."""
 
+import json
+import shutil
+import socket
 import subprocess
 import threading
 import time
-import shutil
-import json
 from flask import Flask
 
 # Try to import flask-sock
@@ -40,6 +41,12 @@ def find_ffmpeg():
     return shutil.which('ffmpeg')
 
 
+def _rtl_fm_demod_mode(modulation):
+    """Map UI modulation names to rtl_fm demod tokens."""
+    mod = str(modulation or '').lower().strip()
+    return 'wbfm' if mod == 'wfm' else mod
+
+
 def kill_audio_processes():
     """Kill any running audio processes."""
     global audio_process, rtl_process
@@ -65,12 +72,6 @@ def kill_audio_processes():
             except:
                 pass
         rtl_process = None
-
-    # Kill any orphaned processes
-    try:
-        subprocess.run(['pkill', '-9', '-f', 'rtl_fm'], capture_output=True, timeout=1)
-    except:
-        pass
 
     time.sleep(0.3)
 
@@ -111,7 +112,7 @@ def start_audio_stream(config):
 
     rtl_cmd = [
         rtl_fm,
-        '-M', mod,
+        '-M', _rtl_fm_demod_mode(mod),
         '-f', str(freq_hz),
         '-s', str(sample_rate),
         '-r', str(resample_rate),
@@ -257,4 +258,19 @@ def init_audio_websocket(app: Flask):
         finally:
             with process_lock:
                 kill_audio_processes()
+            # Complete WebSocket close handshake, then shut down the
+            # raw socket so Werkzeug cannot write its HTTP 200 response
+            # on top of the WebSocket stream.
+            try:
+                ws.close()
+            except Exception:
+                pass
+            try:
+                ws.sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                ws.sock.close()
+            except Exception:
+                pass
             logger.info("WebSocket audio client disconnected")

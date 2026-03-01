@@ -5,9 +5,9 @@ DSC (Digital Selective Calling) decoder.
 Decodes VHF DSC signals per ITU-R M.493. Reads 48kHz 16-bit signed
 audio from stdin (from rtl_fm) and outputs JSON messages to stdout.
 
-DSC uses 100 baud FSK with:
-- Mark (1): 1800 Hz
-- Space (0): 1200 Hz
+DSC uses 1200 bps FSK on a 1700 Hz subcarrier with:
+- Mark (1): 2100 Hz
+- Space (0): 1300 Hz
 
 Frame structure:
 1. Dot pattern: 200 bits alternating 1/0 for synchronization
@@ -42,6 +42,9 @@ from .constants import (
     DSC_AUDIO_SAMPLE_RATE,
     FORMAT_CODES,
     DISTRESS_NATURE_CODES,
+    VALID_EOS,
+    TELECOMMAND_FORMATS,
+    MIN_SYMBOLS_FOR_FORMAT,
 )
 
 # Configure logging
@@ -57,7 +60,7 @@ class DSCDecoder:
     """
     DSC FSK decoder.
 
-    Demodulates 100 baud FSK audio and decodes DSC protocol.
+    Demodulates 1200 bps FSK audio and decodes DSC protocol.
     """
 
     def __init__(self, sample_rate: int = DSC_AUDIO_SAMPLE_RATE):
@@ -66,13 +69,13 @@ class DSCDecoder:
         self.samples_per_bit = sample_rate // self.baud_rate
 
         # FSK frequencies
-        self.mark_freq = DSC_MARK_FREQ  # 1800 Hz = binary 1
-        self.space_freq = DSC_SPACE_FREQ  # 1200 Hz = binary 0
+        self.mark_freq = DSC_MARK_FREQ  # 2100 Hz = binary 1
+        self.space_freq = DSC_SPACE_FREQ  # 1300 Hz = binary 0
 
-        # Bandpass filter for DSC band (1100-1900 Hz)
+        # Bandpass filter for DSC band (1100-2300 Hz)
         nyq = sample_rate / 2
         low = 1100 / nyq
-        high = 1900 / nyq
+        high = 2300 / nyq
         self.bp_b, self.bp_a = scipy_signal.butter(4, [low, high], btype='band')
 
         # Build FSK correlators
@@ -221,13 +224,14 @@ class DSCDecoder:
         Detect DSC dot pattern for synchronization.
 
         The dot pattern is at least 200 alternating bits (1010101...).
-        We look for at least 20 consecutive alternations.
+        We require at least 100 consecutive alternations to avoid
+        false sync triggers from noise.
         """
-        if len(self.bit_buffer) < 40:
+        if len(self.bit_buffer) < 200:
             return False
 
-        # Check last 40 bits for alternating pattern
-        last_bits = self.bit_buffer[-40:]
+        # Check last 200 bits for alternating pattern
+        last_bits = self.bit_buffer[-200:]
         alternations = 0
 
         for i in range(1, len(last_bits)):
@@ -236,7 +240,7 @@ class DSCDecoder:
             else:
                 alternations = 0
 
-            if alternations >= 20:
+            if alternations >= 100:
                 return True
 
         return False
@@ -262,13 +266,37 @@ class DSCDecoder:
             if end <= len(self.message_bits):
                 symbol_bits = self.message_bits[start:end]
                 symbol_value = self._bits_to_symbol(symbol_bits)
+                if symbol_value == -1:
+                    logger.debug("DSC symbol check bit failure, aborting decode")
+                    return None
                 symbols.append(symbol_value)
 
-        # Look for EOS (End of Sequence) - symbol 127
+        # Strip phasing sequence (RX/DX symbols 120-126) from the
+        # start of the message. Per ITU-R M.493, after the dot pattern
+        # there are 7 phasing symbols before the format specifier.
+        # Bound to max 7 — if more are present, this is a bad sync.
+        msg_start = 0
+        for i, sym in enumerate(symbols):
+            if 120 <= sym <= 126:
+                msg_start = i + 1
+            else:
+                break
+        if msg_start > 7:
+            logger.debug("DSC bad sync: >7 phasing symbols stripped")
+            return None
+        symbols = symbols[msg_start:]
+
+        if len(symbols) < 5:
+            return None
+
+        # Look for EOS (End of Sequence) - symbols 117, 122, or 127
+        # EOS must appear after at least MIN_SYMBOLS_FOR_FORMAT symbols
         eos_found = False
         eos_index = -1
         for i, sym in enumerate(symbols):
-            if sym == 127:  # EOS symbol
+            if sym in VALID_EOS:
+                if i < MIN_SYMBOLS_FOR_FORMAT:
+                    continue  # Too early — not a real EOS
                 eos_found = True
                 eos_index = i
                 break
@@ -285,7 +313,9 @@ class DSCDecoder:
         Convert 10 bits to symbol value.
 
         DSC uses 10-bit symbols: 7 information bits + 3 error bits.
-        We extract the 7-bit value.
+        The 3 check bits provide parity such that the total number of
+        '1' bits across all 10 bits should be even (even parity).
+        Returns -1 if the check bits are invalid.
         """
         if len(bits) != 10:
             return -1
@@ -295,6 +325,11 @@ class DSCDecoder:
         for i in range(7):
             if bits[i]:
                 value |= (1 << i)
+
+        # Validate check bits: total number of 1s should be even
+        ones = sum(bits)
+        if ones % 2 != 0:
+            return -1
 
         return value
 
@@ -323,26 +358,31 @@ class DSCDecoder:
             format_code = symbols[0]
             format_text = FORMAT_CODES.get(format_code, f'UNKNOWN-{format_code}')
 
-            # Determine category from format
-            category = 'ROUTINE'
-            if format_code == 100:
+            # Derive category from format specifier per ITU-R M.493
+            if format_code == 120:
                 category = 'DISTRESS'
-            elif format_code == 106:
-                category = 'DISTRESS_ACK'
-            elif format_code == 108:
-                category = 'DISTRESS_RELAY'
-            elif format_code == 118:
-                category = 'SAFETY'
-            elif format_code == 120:
-                category = 'URGENCY'
+            elif format_code == 123:
+                category = 'ALL_SHIPS_URGENCY_SAFETY'
             elif format_code == 102:
                 category = 'ALL_SHIPS'
+            elif format_code == 116:
+                category = 'GROUP'
+            elif format_code == 112:
+                category = 'INDIVIDUAL'
+            elif format_code == 114:
+                category = 'INDIVIDUAL_ACK'
+            else:
+                category = FORMAT_CODES.get(format_code, 'UNKNOWN')
 
             # Decode MMSI from symbols 1-5 (destination/address)
             dest_mmsi = self._decode_mmsi(symbols[1:6])
+            if dest_mmsi is None:
+                return None
 
             # Decode self-ID from symbols 6-10 (source)
             source_mmsi = self._decode_mmsi(symbols[6:11])
+            if source_mmsi is None:
+                return None
 
             message = {
                 'type': 'dsc',
@@ -371,8 +411,9 @@ class DSCDecoder:
                     if position:
                         message['position'] = position
 
-            # Telecommand fields (usually last two before EOS)
-            if len(remaining) >= 2:
+            # Telecommand fields (last two before EOS) — only for formats
+            # that carry telecommand fields per ITU-R M.493
+            if format_code in TELECOMMAND_FORMATS and len(remaining) >= 2:
                 message['telecommand1'] = remaining[-2]
                 message['telecommand2'] = remaining[-1]
 
@@ -386,27 +427,29 @@ class DSCDecoder:
             logger.warning(f"DSC decode error: {e}")
             return None
 
-    def _decode_mmsi(self, symbols: list[int]) -> str:
+    def _decode_mmsi(self, symbols: list[int]) -> str | None:
         """
         Decode MMSI from 5 DSC symbols.
 
         Each symbol represents 2 BCD digits (00-99).
         5 symbols = 10 digits, but MMSI is 9 digits (first symbol has leading 0).
+        Returns None if any symbol is out of valid BCD range.
         """
         if len(symbols) < 5:
-            return '000000000'
+            return None
 
         digits = []
         for sym in symbols:
             if sym < 0 or sym > 99:
-                sym = 0
+                return None
             # Each symbol is 2 BCD digits
             digits.append(f'{sym:02d}')
 
         mmsi = ''.join(digits)
-        # MMSI is 9 digits, might need to trim leading zero
+        # MMSI is 9 digits - trim the leading digit from the 10-digit
+        # BCD result since the first symbol's high digit is always 0
         if len(mmsi) > 9:
-            mmsi = mmsi[-9:]
+            mmsi = mmsi[1:]
 
         return mmsi.zfill(9)
 

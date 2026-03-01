@@ -1,0 +1,687 @@
+/* ============================================
+   WeFax (Weather Fax) Mode Styles
+   Amber/gold theme (#ffaa00) for HF
+   ============================================ */
+
+/* Place WeFax sidebar panel above the shared SDR Device section
+   while keeping the collapse button at the very top. */
+#wefaxMode.active {
+    order: -1;
+}
+.sidebar:has(#wefaxMode.active) > .sidebar-collapse-btn {
+    order: -2;
+}
+
+/* --- Stats Strip --- */
+.wefax-stats-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--bg-card, #0e1117);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.wefax-strip-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wefax-strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.wefax-strip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #444;
+    flex-shrink: 0;
+}
+
+.wefax-strip-dot.scanning { background: #ffaa00; animation: wefax-pulse 1.5s ease-in-out infinite; }
+.wefax-strip-dot.phasing  { background: #ffcc44; animation: wefax-pulse 0.8s ease-in-out infinite; }
+.wefax-strip-dot.receiving { background: #00cc66; animation: wefax-pulse 1s ease-in-out infinite; }
+.wefax-strip-dot.complete { background: #00cc66; }
+.wefax-strip-dot.error    { background: #f44; }
+
+@keyframes wefax-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.wefax-strip-status-text {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px;
+    color: var(--text-primary, #e0e0e0);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wefax-strip-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 4px;
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    background: var(--bg-primary, #161b22);
+    color: var(--text-primary, #e0e0e0);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+
+.wefax-strip-btn.start { color: #ffaa00; border-color: #ffaa0044; }
+.wefax-strip-btn.start:hover { background: #ffaa0015; border-color: #ffaa00; }
+.wefax-strip-btn.start.wefax-strip-btn-error {
+    border-color: #ffaa00;
+    color: #ffaa00;
+    box-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
+    animation: wefax-pulse 0.6s ease-in-out 3;
+}
+
+.wefax-strip-btn.stop { color: #f44; border-color: #f4444444; }
+.wefax-strip-btn.stop:hover { background: #f4441a; border-color: #f44; }
+
+.wefax-strip-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color, #1e2a3a);
+}
+
+.wefax-strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.wefax-strip-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    font-variant-numeric: tabular-nums;
+}
+
+.wefax-strip-value.accent-amber { color: #ffaa00; }
+
+.wefax-strip-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 8px;
+    color: var(--text-dim, #555);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* --- Schedule Toggle --- */
+.wefax-schedule-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--text-dim, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wefax-schedule-toggle input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #ffaa00;
+}
+
+.wefax-schedule-toggle input:checked + span {
+    color: #ffaa00;
+}
+
+/* --- Visuals Container --- */
+.wefax-visuals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+/* --- Main Row --- */
+.wefax-main-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+/* --- Schedule Timeline --- */
+.wefax-schedule-panel {
+    background: var(--bg-card, #0e1117);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.wefax-schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color, #1e2a3a);
+}
+
+.wefax-schedule-title {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffaa00;
+}
+
+.wefax-schedule-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.wefax-schedule-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-color, #1e2a3a)11;
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+}
+
+.wefax-schedule-entry:last-child { border-bottom: none; }
+
+.wefax-schedule-entry.active {
+    background: #ffaa0010;
+    border-left: 3px solid #ffaa00;
+}
+
+.wefax-schedule-entry.upcoming {
+    background: #ffaa0008;
+}
+
+.wefax-schedule-entry.past {
+    opacity: 0.4;
+}
+
+.wefax-schedule-time {
+    color: #ffaa00;
+    min-width: 45px;
+    font-variant-numeric: tabular-nums;
+}
+
+.wefax-schedule-content {
+    color: var(--text-primary, #e0e0e0);
+    flex: 1;
+}
+
+.wefax-schedule-badge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--border-color, #1e2a3a);
+    color: var(--text-dim, #555);
+}
+
+.wefax-schedule-badge.live {
+    background: #ffaa0030;
+    color: #ffaa00;
+    font-weight: 600;
+}
+
+.wefax-schedule-badge.soon {
+    background: #ffaa0015;
+    color: #ffcc66;
+}
+
+.wefax-schedule-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-dim, #555);
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+}
+
+/* --- Live Section --- */
+.wefax-live-section {
+    background: var(--bg-card, #0e1117);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.wefax-live-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color, #1e2a3a);
+}
+
+.wefax-live-title {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffaa00;
+}
+
+.wefax-live-content {
+    padding: 12px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wefax-idle-state {
+    text-align: center;
+    color: var(--text-dim, #555);
+}
+
+.wefax-idle-state svg {
+    width: 48px;
+    height: 48px;
+    color: #ffaa0033;
+    margin-bottom: 12px;
+}
+
+.wefax-idle-state h4 {
+    margin: 0 0 4px;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 13px;
+}
+
+.wefax-idle-state p {
+    margin: 0;
+    font-size: 11px;
+}
+
+.wefax-live-preview {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 4px;
+    image-rendering: pixelated;
+}
+
+/* --- Gallery Section --- */
+.wefax-gallery-section {
+    background: var(--bg-card, #0e1117);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.wefax-gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color, #1e2a3a);
+}
+
+.wefax-gallery-title {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffaa00;
+}
+
+.wefax-gallery-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wefax-gallery-count {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    color: var(--text-dim, #555);
+}
+
+.wefax-gallery-clear-btn {
+    font-family: var(--font-mono, monospace);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: none;
+    border: 1px solid var(--border-color, #1e2a3a);
+    color: var(--text-dim, #555);
+    padding: 2px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.wefax-gallery-clear-btn:hover {
+    border-color: #f44;
+    color: #f44;
+}
+
+.wefax-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.wefax-gallery-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim, #555);
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    grid-column: 1 / -1;
+}
+
+.wefax-gallery-item {
+    position: relative;
+    background: var(--bg-primary, #161b22);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.wefax-gallery-item img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    cursor: pointer;
+    display: block;
+}
+
+.wefax-gallery-item img:hover {
+    opacity: 0.85;
+}
+
+.wefax-gallery-meta {
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-family: var(--font-mono, monospace);
+    font-size: 9px;
+    color: var(--text-dim, #555);
+}
+
+.wefax-gallery-actions {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.wefax-gallery-item:hover .wefax-gallery-actions {
+    opacity: 1;
+}
+
+.wefax-gallery-action {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    border: none;
+    background: rgba(0, 0, 0, 0.7);
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.wefax-gallery-action:hover { color: #fff; }
+.wefax-gallery-action.delete:hover { color: #f44; }
+
+/* --- Countdown Bar + Timeline --- */
+.wefax-countdown-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--bg-secondary, #141820);
+    border: 1px solid var(--border-color, #1e2a3a);
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.wefax-countdown-next {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.wefax-countdown-boxes {
+    display: flex;
+    gap: 4px;
+}
+
+.wefax-countdown-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px;
+    background: var(--bg-primary, #0d1117);
+    border: 1px solid var(--border-color, #2a3040);
+    border-radius: 4px;
+    min-width: 40px;
+}
+
+.wefax-countdown-box.imminent {
+    border-color: #ffaa00;
+    box-shadow: 0 0 8px rgba(255, 170, 0, 0.2);
+}
+
+.wefax-countdown-box.active {
+    border-color: #ffaa00;
+    box-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
+    animation: wefax-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes wefax-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(255, 170, 0, 0.3); }
+    50% { box-shadow: 0 0 16px rgba(255, 170, 0, 0.5); }
+}
+
+.wefax-cd-value {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+    color: var(--text-primary, #e0e0e0);
+    line-height: 1;
+}
+
+.wefax-cd-unit {
+    font-size: 8px;
+    color: var(--text-dim, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.wefax-countdown-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wefax-countdown-content {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffaa00;
+    font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+}
+
+.wefax-countdown-detail {
+    font-size: 10px;
+    color: var(--text-dim, #666);
+    font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+}
+
+.wefax-timeline {
+    flex: 1;
+    position: relative;
+    height: 36px;
+    min-width: 200px;
+}
+
+.wefax-timeline-track {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    right: 0;
+    height: 16px;
+    background: var(--bg-primary, #0d1117);
+    border: 1px solid var(--border-color, #2a3040);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.wefax-timeline-broadcast {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(255, 170, 0, 0.5);
+    border-radius: 2px;
+    cursor: default;
+    opacity: 0.8;
+    min-width: 2px;
+}
+
+.wefax-timeline-broadcast:hover {
+    opacity: 1;
+}
+
+.wefax-timeline-broadcast.active {
+    background: rgba(255, 170, 0, 0.85);
+    border: 1px solid #ffaa00;
+}
+
+.wefax-timeline-cursor {
+    position: absolute;
+    top: 2px;
+    width: 2px;
+    height: 20px;
+    background: #ff4444;
+    border-radius: 1px;
+    z-index: 2;
+}
+
+.wefax-timeline-labels {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    color: var(--text-dim, #666);
+    font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+}
+
+/* --- Image Modal --- */
+.wefax-image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 40px;
+}
+
+.wefax-image-modal.show {
+    display: flex;
+}
+
+.wefax-image-modal img {
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.wefax-modal-toolbar {
+    position: absolute;
+    top: 20px;
+    right: 60px;
+    display: flex;
+    gap: 8px;
+    z-index: 1;
+}
+
+.wefax-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+}
+
+.wefax-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.wefax-modal-btn.delete:hover {
+    background: var(--accent-red, #ff3366);
+    border-color: var(--accent-red, #ff3366);
+}
+
+.wefax-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+    z-index: 1;
+}
+
+.wefax-modal-close:hover {
+    opacity: 1;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .wefax-main-row {
+        grid-template-columns: 1fr;
+    }
+}

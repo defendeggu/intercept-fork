@@ -401,7 +401,7 @@ const Meshtastic = (function() {
 
         // Position is nested in the response
         const pos = info.position;
-        if (pos && pos.latitude && pos.longitude) {
+        if (pos && pos.latitude !== undefined && pos.latitude !== null && pos.longitude !== undefined && pos.longitude !== null) {
             if (posRow) posRow.style.display = 'flex';
             if (posEl) posEl.textContent = `${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`;
         } else {
@@ -2295,7 +2295,8 @@ const Meshtastic = (function() {
         // Store & Forward
         showStoreForwardModal,
         requestStoreForward,
-        closeStoreForwardModal
+        closeStoreForwardModal,
+        destroy
     };
 
     /**
@@ -2305,6 +2306,13 @@ const Meshtastic = (function() {
         if (meshMap) {
             setTimeout(() => meshMap.invalidateSize(), 100);
         }
+    }
+
+    /**
+     * Destroy — tear down SSE, timers, and event listeners for clean mode switching.
+     */
+    function destroy() {
+        stopStream();
     }
 })();
 

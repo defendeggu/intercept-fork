@@ -5,8 +5,8 @@
 }
 
 :root {
-    --font-sans: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
-    --font-mono: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --font-sans: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --bg-dark: #0b1118;
     --bg-panel: #101823;
     --bg-card: #151f2b;

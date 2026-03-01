@@ -1,0 +1,129 @@
+<!-- WEFAX MODE -->
+<div id="wefaxMode" class="mode-content">
+    <div class="section">
+        <h3>WeFax Decoder</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Decode HF weather fax (radiofax) from maritime and aviation weather services.
+            Stations broadcast weather charts on fixed schedules via HF radio.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Station</h3>
+        <div class="form-group">
+            <label>Station</label>
+            <select id="wefaxStation" onchange="WeFax.onStationChange()">
+                <option value="">Select a station...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Frequency (kHz)</label>
+            <select id="wefaxFrequency">
+                <option value="">Select station first</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Settings</h3>
+        <div class="form-group">
+            <label>IOC (Index of Cooperation)</label>
+            <select id="wefaxIOC">
+                <option value="576" selected>576 (Standard)</option>
+                <option value="288">288 (Half)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>LPM (Lines Per Minute)</label>
+            <select id="wefaxLPM">
+                <option value="120" selected>120 (Standard)</option>
+                <option value="60">60 (Slow)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Gain (dB)</label>
+            <input type="number" id="wefaxGain" value="40" step="1" min="0" max="50">
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="wefaxDirectSampling" checked>
+            <label for="wefaxDirectSampling" style="margin: 0; cursor: pointer;">Direct Sampling (Q-branch, required for HF)</label>
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="wefaxAutoUsbAlign" checked>
+            <label for="wefaxAutoUsbAlign" style="margin: 0; cursor: pointer;">Auto USB align listed carrier frequencies (-1.9 kHz)</label>
+        </div>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: -4px;">
+            Disable this if your source already provides USB dial frequencies.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Auto Capture</h3>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="wefaxSidebarAutoSchedule"
+                   onchange="WeFax.toggleScheduler(this)">
+            <label for="wefaxSidebarAutoSchedule" style="margin: 0; cursor: pointer;">Auto-capture scheduled broadcasts</label>
+        </div>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+            Automatically decode at scheduled broadcast times.
+        </p>
+    </div>
+
+    <!-- Antenna Guide -->
+    <div class="section">
+        <h3>HF Antenna Guide</h3>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+            <p style="margin-bottom: 8px; color: #ffaa00; font-weight: 600;">
+                HF band (2&ndash;30 MHz) &mdash; requires HF antenna + direct sampling SDR
+            </p>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: #ffaa00; font-size: 12px;">Requirements</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">SDR:</strong> RTL-SDR (direct sampling), HackRF, LimeSDR, Airspy, or SDRPlay</li>
+                    <li><strong style="color: var(--text-primary);">Antenna:</strong> Long wire (10m+), random wire, or dipole for target band</li>
+                    <li><strong style="color: var(--text-primary);">Mode:</strong> USB (Upper Sideband) demodulation</li>
+                    <li><strong style="color: var(--text-primary);">Signals:</strong> Moderate &mdash; HF propagation varies by time of day</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                <strong style="color: #ffaa00; font-size: 12px;">Quick Reference</strong>
+                <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Protocol</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">AM Facsimile (ITU-T T.4)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Carrier</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">1900 Hz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Deviation</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">&plusmn;400 Hz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Black / White</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">1500 / 2300 Hz</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Start / Stop tone</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">300 / 450 Hz</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Resources</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <a href="https://www.weather.gov/marine/radiofax_charts" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                NWS Radiofax Charts
+            </a>
+            <a href="https://www.nws.noaa.gov/os/marine/rfax.pdf" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                NOAA Radiofax Schedule (PDF)
+            </a>
+        </div>
+    </div>
+</div>

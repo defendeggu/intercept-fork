@@ -166,7 +166,9 @@
 
 {% block navigation %}
 {# Include the unified nav partial with active_mode set #}
+{% if not embedded %}
 {% include 'partials/nav.html' with context %}
+{% endif %}
 {% endblock %}
 
 {% block main %}

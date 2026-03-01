@@ -58,6 +58,59 @@
         </div>
     </div>
 
+    <!-- Antenna Guide -->
+    <div class="section">
+        <h3>Antenna Guide</h3>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+            <p style="margin-bottom: 8px; color: var(--accent-cyan); font-weight: 600;">
+                ISM 900 MHz band &mdash; stock antenna is close but not optimal
+            </p>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Stock Telescopic Antenna</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">912 MHz:</strong> Extend to ~8.2 cm (quarter-wave). The stock antenna is close enough to work</li>
+                    <li><strong style="color: var(--text-primary);">Range:</strong> Most meters transmit at ~100 mW, expect 50&ndash;200 m range with stock antenna</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Upgraded Options</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Ground Plane:</strong> 8.2 cm vertical + four 8.2 cm radials at 45&deg; on SMA connector</li>
+                    <li><strong style="color: var(--text-primary);">Yagi:</strong> Directional for targeting specific meters at distance (~$15&ndash;25)</li>
+                    <li><strong style="color: var(--text-primary);">Placement:</strong> Near a window facing the meters. Line-of-sight matters most</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Quick Reference</strong>
+                <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Frequency (NA)</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">912 MHz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Frequency (EU)</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">868 MHz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">912 MHz &lambda;/4</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">8.2 cm</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Meter TX power</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">~100 mW</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Polarization</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">Vertical</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <button class="run-btn" id="startRtlamrBtn" onclick="startRtlamrDecoding()">
         Start Listening
     </button>

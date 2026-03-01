@@ -1,0 +1,249 @@
+<!-- WEATHER SATELLITE MODE -->
+<div id="weatherSatMode" class="mode-content">
+    <div class="section">
+        <h3>Weather Satellite Decoder</h3>
+        <div class="alpha-mode-notice">
+            ALPHA: Weather Satellite capture is experimental and may fail depending on SatDump version, SDR driver support, and pass conditions.
+        </div>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Receive and decode weather images from NOAA and Meteor satellites.
+            Uses SatDump for live SDR capture and image processing.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Satellite</h3>
+        <div class="form-group">
+            <label>Select Satellite</label>
+            <select id="weatherSatSelect" class="mode-select">
+                <option value="METEOR-M2-3" selected>Meteor-M2-3 (137.900 MHz LRPT)</option>
+                <option value="METEOR-M2-4">Meteor-M2-4 (137.900 MHz LRPT)</option>
+                <option value="NOAA-15" disabled>NOAA-15 (137.620 MHz APT) [DEFUNCT]</option>
+                <option value="NOAA-18" disabled>NOAA-18 (137.9125 MHz APT) [DEFUNCT]</option>
+                <option value="NOAA-19" disabled>NOAA-19 (137.100 MHz APT) [DEFUNCT]</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Gain (dB)</label>
+            <input type="number" id="weatherSatGain" value="40" step="0.1" min="0" max="50">
+        </div>
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="weatherSatBiasT" style="width: auto;">
+                Bias-T (power LNA)
+            </label>
+        </div>
+    </div>
+
+    <!-- Antenna Guide - detailed -->
+    <div class="section">
+        <h3>Antenna Guide</h3>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+
+            <p style="margin-bottom: 10px; color: var(--accent-cyan); font-weight: 600;">
+                137 MHz band &mdash; your stock SDR antenna will NOT work.
+            </p>
+            <p style="margin-bottom: 10px;">
+                Weather satellites transmit at 137.1&ndash;137.9 MHz. The quarter-wave
+                at this frequency is <strong style="color: var(--text-primary);">~53 cm</strong>,
+                far longer than the small telescopic antenna shipped with most SDRs
+                (tuned for ~1 GHz). You need a purpose-built antenna.
+            </p>
+
+            <!-- V-Dipole -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">V-Dipole (Easiest &mdash; ~$5)</strong>
+
+                <div style="margin: 8px 0; padding: 8px; background: var(--bg-tertiary); border-radius: 3px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; font-size: 10px; color: var(--text-secondary); white-space: pre; line-height: 1.3; text-align: center;">   coax to SDR
+       |
+    ===+===  feed point
+   /       \
+  /  120    \
+ /           \
+/     deg     \
+53.4cm    53.4cm</div>
+
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Element length:</strong> 53.4 cm each (quarter wavelength at 137 MHz)</li>
+                    <li><strong style="color: var(--text-primary);">Angle:</strong> 120&deg; between elements (not 180&deg;)</li>
+                    <li><strong style="color: var(--text-primary);">Material:</strong> Any stiff wire, coat hanger, or copper rod</li>
+                    <li><strong style="color: var(--text-primary);">Orientation:</strong> Lay flat or tilt 30&deg; toward expected pass direction</li>
+                    <li><strong style="color: var(--text-primary);">Polarization:</strong> The 120&deg; angle gives partial RHCP match to satellite signal</li>
+                    <li><strong style="color: var(--text-primary);">Connection:</strong> Solder elements to coax center + shield, connect to SDR via SMA</li>
+                </ul>
+                <p style="margin-top: 6px; color: var(--text-dim); font-style: italic;">
+                    Best starter antenna. Good enough for clear NOAA images with a direct overhead pass.
+                </p>
+            </div>
+
+            <!-- Turnstile -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Turnstile / Crossed Dipole (~$10-15)</strong>
+
+                <div style="margin: 8px 0; padding: 8px; background: var(--bg-tertiary); border-radius: 3px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; font-size: 10px; color: var(--text-secondary); white-space: pre; line-height: 1.3; text-align: center;">       53.4cm
+    &lt;---------&gt;
+    ====+====  dipole 1
+        |
+    ====+====  dipole 2
+    &lt;---------&gt;
+     90 deg rotated
+     + reflector below</div>
+
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Elements:</strong> Two crossed dipoles, each 53.4 cm per side (4 elements total)</li>
+                    <li><strong style="color: var(--text-primary);">Angle:</strong> 90&deg; between the two dipole pairs</li>
+                    <li><strong style="color: var(--text-primary);">Phasing:</strong> Feed dipole 2 with a 90&deg; delay (quarter-wave coax section ~37 cm of RG-58)</li>
+                    <li><strong style="color: var(--text-primary);">Reflector:</strong> Place ~52 cm below elements (ground plane or wire grid)</li>
+                    <li><strong style="color: var(--text-primary);">Polarization:</strong> Circular (RHCP) &mdash; matches satellite transmission</li>
+                </ul>
+                <p style="margin-top: 6px; color: var(--text-dim); font-style: italic;">
+                    Better than V-dipole. The reflector rejects ground noise and the RHCP phasing matches the satellite signal.
+                </p>
+            </div>
+
+            <!-- QFH -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: #00ff88; font-size: 12px;">QFH &mdash; Quadrifilar Helix (Best &mdash; ~$20-30)</strong>
+
+                <div style="margin: 8px 0; padding: 8px; background: var(--bg-tertiary); border-radius: 3px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; font-size: 10px; color: var(--text-secondary); white-space: pre; line-height: 1.3; text-align: center;">     ___
+    /   \   two helix loops
+   |  |  |  twisted 90 deg
+   |  |  |  around a mast
+    \___/
+      |
+    coax</div>
+
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Design:</strong> Two bifilar helical loops, offset 90&deg;</li>
+                    <li><strong style="color: var(--text-primary);">Material:</strong> Copper pipe (10mm), copper wire, or coax outer shield</li>
+                    <li><strong style="color: var(--text-primary);">Total height:</strong> ~46 cm (for 137 MHz)</li>
+                    <li><strong style="color: var(--text-primary);">Loop dimensions:</strong> Use a QFH calculator for exact bending measurements</li>
+                    <li><strong style="color: var(--text-primary);">Polarization:</strong> True RHCP omnidirectional &mdash; ideal for overhead satellite passes</li>
+                    <li><strong style="color: var(--text-primary);">Gain pattern:</strong> Hemispherical upward coverage, rejects ground interference</li>
+                </ul>
+                <p style="margin-top: 6px; color: var(--text-dim); font-style: italic;">
+                    Gold standard for weather satellite reception. No tracking needed &mdash; covers the whole sky.
+                </p>
+            </div>
+
+            <!-- Placement & LNA -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Placement & LNA</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Location:</strong> OUTDOORS with clear sky view is critical. Roof/balcony/open field.</li>
+                    <li><strong style="color: var(--text-primary);">Height:</strong> Higher is better but not critical &mdash; clear horizon line matters more</li>
+                    <li><strong style="color: var(--text-primary);">Antenna up:</strong> Point the antenna straight UP (zenith) for best overhead coverage</li>
+                    <li><strong style="color: var(--text-primary);">Avoid:</strong> Metal roofs, power lines, buildings blocking the sky</li>
+                    <li><strong style="color: var(--text-primary);">Coax length:</strong> Keep short (&lt;10m). Signal loss at 137 MHz is ~3 dB per 10m of RG-58</li>
+                    <li><strong style="color: var(--text-primary);">LNA:</strong> Mount at the antenna feed point, NOT at the SDR end.
+                        Recommended: Nooelec SAWbird+ NOAA (137 MHz filtered LNA, ~$30)</li>
+                    <li><strong style="color: var(--text-primary);">Bias-T:</strong> Enable the Bias-T checkbox above if your LNA is powered via the coax from the SDR</li>
+                </ul>
+            </div>
+
+            <!-- Quick reference -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Quick Reference</strong>
+                <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Wavelength (137 MHz)</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">218.8 cm</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Quarter wave (element length)</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">53.4 cm</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Best pass elevation</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">&gt; 30&deg;</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Typical pass duration</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">10-15 min</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Polarization</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">RHCP</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">NOAA (APT) bandwidth</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">~40 kHz</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Meteor (LRPT) bandwidth</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">~140 kHz</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3 onclick="this.parentElement.querySelector('.wxsat-test-decode-body').classList.toggle('collapsed'); this.querySelector('.wxsat-collapse-icon').classList.toggle('collapsed')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+            Test Decode (File)
+            <span class="wxsat-collapse-icon collapsed" style="font-size: 10px; transition: transform 0.2s; display: inline-block;">&#9660;</span>
+        </h3>
+        <div class="wxsat-test-decode-body collapsed" style="overflow: hidden;">
+            <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px;">
+                Decode a pre-recorded IQ or WAV file without SDR hardware.
+                Run <code style="font-size: 10px;">./download-weather-sat-samples.sh</code> to fetch sample files.
+            </p>
+            <div class="form-group">
+                <label>Satellite</label>
+                <select id="wxsatTestSatSelect" class="mode-select">
+                    <option value="METEOR-M2-3" selected>Meteor-M2-3 (LRPT)</option>
+                    <option value="METEOR-M2-4">Meteor-M2-4 (LRPT)</option>
+                    <option value="NOAA-15">NOAA-15 (APT)</option>
+                    <option value="NOAA-18">NOAA-18 (APT)</option>
+                    <option value="NOAA-19">NOAA-19 (APT)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>File Path (server-side)</label>
+                <input type="text" id="wxsatTestFilePath" value="data/weather_sat/samples/noaa_apt_argentina.wav" style="font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; font-size: 11px;">
+            </div>
+            <div class="form-group">
+                <label>Sample Rate</label>
+                <select id="wxsatTestSampleRate" class="mode-select">
+                    <option value="11025">11025 Hz (WAV audio APT)</option>
+                    <option value="48000">48000 Hz (WAV audio APT)</option>
+                    <option value="500000">500 kHz (IQ LRPT)</option>
+                    <option value="1000000" selected>1 MHz (IQ default)</option>
+                    <option value="2000000">2 MHz (IQ wideband)</option>
+                </select>
+            </div>
+            <button class="mode-btn" onclick="WeatherSat.testDecode()" style="width: 100%; margin-top: 4px;">
+                Test Decode
+            </button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Auto-Scheduler</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px;">
+            Automatically capture satellite passes based on predictions.
+            Set your location above and toggle AUTO in the strip bar.
+        </p>
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="wxsatSidebarAutoSchedule" onchange="WeatherSat.toggleScheduler(this)" style="width: auto;">
+                Enable Auto-Capture
+            </label>
+        </div>
+        <div id="wxsatSchedulerStatus" style="font-size: 11px; color: var(--text-dim); font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; margin-top: 4px;">
+            Disabled
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Resources</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <a href="https://github.com/SatDump/SatDump" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                SatDump Documentation
+            </a>
+            <a href="https://www.rtl-sdr.com/rtl-sdr-tutorial-receiving-noaa-weather-satellite-images/" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                NOAA Reception Guide
+            </a>
+        </div>
+    </div>
+</div>

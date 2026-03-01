@@ -60,6 +60,8 @@ from utils.tscm.device_identity import (
     ingest_ble_dict,
     ingest_wifi_dict,
 )
+from utils.event_pipeline import process_event
+from utils.sse import sse_stream_fanout
 
 # Import unified Bluetooth scanner helper for TSCM integration
 try:
@@ -550,6 +552,12 @@ def _start_sweep_internal(
     }
 
 
+@tscm_bp.route('/status')
+def tscm_status():
+    """Check if any TSCM operation is currently running."""
+    return jsonify({'running': _sweep_running})
+
+
 @tscm_bp.route('/sweep/start', methods=['POST'])
 def start_sweep():
     """Start a TSCM sweep."""
@@ -622,20 +630,17 @@ def sweep_status():
 @tscm_bp.route('/sweep/stream')
 def sweep_stream():
     """SSE stream for real-time sweep updates."""
-    def generate():
-        while True:
-            try:
-                if tscm_queue:
-                    msg = tscm_queue.get(timeout=1)
-                    yield f"data: {json.dumps(msg)}\n\n"
-                else:
-                    time.sleep(1)
-                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-            except queue.Empty:
-                yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('tscm', msg, msg.get('type'))
 
     return Response(
-        generate(),
+        sse_stream_fanout(
+            source_queue=tscm_queue,
+            channel_key='tscm',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
@@ -1072,6 +1077,32 @@ def _scan_wifi_networks(interface: str) -> list[dict]:
         return []
 
 
+def _scan_wifi_clients(interface: str) -> list[dict]:
+    """
+    Get WiFi client observations from the unified WiFi scanner.
+
+    Clients are only available when monitor-mode scanning is active.
+    """
+    try:
+        from utils.wifi import get_wifi_scanner
+
+        scanner = get_wifi_scanner()
+        if interface:
+            try:
+                if not scanner._is_monitor_mode_interface(interface):
+                    return []
+            except Exception:
+                return []
+
+        return [client.to_dict() for client in scanner.clients]
+    except ImportError as e:
+        logger.error(f"Failed to import wifi scanner: {e}")
+        return []
+    except Exception as e:
+        logger.exception(f"WiFi client scan failed: {e}")
+        return []
+
+
 def _scan_bluetooth_devices(interface: str, duration: int = 10) -> list[dict]:
     """
     Scan for Bluetooth devices with manufacturer data detection.
@@ -1314,7 +1345,7 @@ def _scan_rf_signals(
     sweep_ranges: list[dict] | None = None
 ) -> list[dict]:
     """
-    Scan for RF signals using SDR (rtl_power).
+    Scan for RF signals using SDR (rtl_power or hackrf_sweep).
 
     Scans common surveillance frequency bands:
     - 88-108 MHz: FM broadcast (potential FM bugs)
@@ -1344,38 +1375,49 @@ def _scan_rf_signals(
 
     logger.info(f"Starting RF scan (device={sdr_device})")
 
+    # Detect available SDR devices and sweep tools
     rtl_power_path = shutil.which('rtl_power')
-    if not rtl_power_path:
-        logger.warning("rtl_power not found in PATH, RF scanning unavailable")
+    hackrf_sweep_path = shutil.which('hackrf_sweep')
+
+    sdr_type = None
+    sweep_tool_path = None
+
+    try:
+        from utils.sdr import SDRFactory
+        from utils.sdr.base import SDRType
+        devices = SDRFactory.detect_devices()
+        rtlsdr_available = any(d.sdr_type == SDRType.RTL_SDR for d in devices)
+        hackrf_available = any(d.sdr_type == SDRType.HACKRF for d in devices)
+    except ImportError:
+        rtlsdr_available = False
+        hackrf_available = False
+
+    # Pick the best available SDR + sweep tool combo
+    if rtlsdr_available and rtl_power_path:
+        sdr_type = 'rtlsdr'
+        sweep_tool_path = rtl_power_path
+        logger.info(f"Using RTL-SDR with rtl_power at: {rtl_power_path}")
+    elif hackrf_available and hackrf_sweep_path:
+        sdr_type = 'hackrf'
+        sweep_tool_path = hackrf_sweep_path
+        logger.info(f"Using HackRF with hackrf_sweep at: {hackrf_sweep_path}")
+    elif rtl_power_path:
+        # Tool exists but no device detected — try anyway (detection may have failed)
+        sdr_type = 'rtlsdr'
+        sweep_tool_path = rtl_power_path
+        logger.info(f"No SDR detected but rtl_power found, attempting RTL-SDR scan")
+    elif hackrf_sweep_path:
+        sdr_type = 'hackrf'
+        sweep_tool_path = hackrf_sweep_path
+        logger.info(f"No SDR detected but hackrf_sweep found, attempting HackRF scan")
+
+    if not sweep_tool_path:
+        logger.warning("No supported sweep tool found (rtl_power or hackrf_sweep)")
         _emit_event('rf_status', {
             'status': 'error',
-            'message': 'rtl_power not installed. Install rtl-sdr package for RF scanning.',
+            'message': 'No SDR sweep tool installed. Install rtl-sdr (rtl_power) or HackRF (hackrf_sweep) for RF scanning.',
         })
         return signals
-
-    logger.info(f"Found rtl_power at: {rtl_power_path}")
-
-    # Test if RTL-SDR device is accessible
-    rtl_test_path = shutil.which('rtl_test')
-    if rtl_test_path:
-        try:
-            test_result = subprocess.run(
-                [rtl_test_path, '-t'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if 'No supported devices found' in test_result.stderr or test_result.returncode != 0:
-                logger.warning("No RTL-SDR device found")
-                _emit_event('rf_status', {
-                    'status': 'error',
-                    'message': 'No RTL-SDR device connected. Connect an RTL-SDR dongle for RF scanning.',
-                })
-                return signals
-        except subprocess.TimeoutExpired:
-            pass  # Device might be busy, continue anyway
-        except Exception as e:
-            logger.debug(f"rtl_test check failed: {e}")
 
     # Define frequency bands to scan (in Hz)
     # Format: (start_freq, end_freq, bin_size, description)
@@ -1417,7 +1459,7 @@ def _scan_rf_signals(
 
     try:
         # Build device argument
-        device_arg = ['-d', str(sdr_device if sdr_device is not None else 0)]
+        device_idx = sdr_device if sdr_device is not None else 0
 
         # Scan each band and look for strong signals
         for start_freq, end_freq, bin_size, band_name in scan_bands:
@@ -1427,15 +1469,27 @@ def _scan_rf_signals(
             logger.info(f"Scanning {band_name} ({start_freq/1e6:.1f}-{end_freq/1e6:.1f} MHz)")
 
             try:
-                # Run rtl_power for a quick sweep of this band
-                cmd = [
-                    rtl_power_path,
-                    '-f', f'{start_freq}:{end_freq}:{bin_size}',
-                    '-g', '40',           # Gain
-                    '-i', '1',            # Integration interval (1 second)
-                    '-1',                 # Single shot mode
-                    '-c', '20%',          # Crop 20% of edges
-                ] + device_arg + [tmp_path]
+                # Build sweep command based on SDR type
+                if sdr_type == 'hackrf':
+                    cmd = [
+                        sweep_tool_path,
+                        '-f', f'{int(start_freq / 1e6)}:{int(end_freq / 1e6)}',
+                        '-w', str(bin_size),
+                        '-1',  # Single sweep
+                    ]
+                    output_mode = 'stdout'
+                else:
+                    cmd = [
+                        sweep_tool_path,
+                        '-f', f'{start_freq}:{end_freq}:{bin_size}',
+                        '-g', '40',           # Gain
+                        '-i', '1',            # Integration interval (1 second)
+                        '-1',                 # Single shot mode
+                        '-c', '20%',          # Crop 20% of edges
+                        '-d', str(device_idx),
+                        tmp_path,
+                    ]
+                    output_mode = 'file'
 
                 logger.debug(f"Running: {' '.join(cmd)}")
 
@@ -1447,9 +1501,14 @@ def _scan_rf_signals(
                 )
 
                 if result.returncode != 0:
-                    logger.warning(f"rtl_power returned {result.returncode}: {result.stderr}")
+                    logger.warning(f"{os.path.basename(sweep_tool_path)} returned {result.returncode}: {result.stderr}")
 
-                # Parse the CSV output
+                # For HackRF, write stdout CSV data to temp file for unified parsing
+                if output_mode == 'stdout' and result.stdout:
+                    with open(tmp_path, 'w') as f:
+                        f.write(result.stdout)
+
+                # Parse the CSV output (same format for both rtl_power and hackrf_sweep)
                 if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
                     with open(tmp_path, 'r') as f:
                         for line in f:
@@ -1457,13 +1516,12 @@ def _scan_rf_signals(
                             if len(parts) >= 7:
                                 try:
                                     # CSV format: date, time, hz_low, hz_high, hz_step, samples, db_values...
-                                    hz_low = int(parts[2])
-                                    hz_high = int(parts[3])
-                                    hz_step = float(parts[4])
+                                    hz_low = int(parts[2].strip())
+                                    hz_high = int(parts[3].strip())
+                                    hz_step = float(parts[4].strip())
                                     db_values = [float(x) for x in parts[6:] if x.strip()]
 
                                     # Find peaks above noise floor
-                                    # RTL-SDR dongles have higher noise figures, so use permissive thresholds
                                     noise_floor = sum(db_values) / len(db_values) if db_values else -100
                                     threshold = noise_floor + 6  # Signal must be 6dB above noise
 
@@ -1606,6 +1664,7 @@ def _run_sweep(
         threats_found = 0
         severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
         all_wifi = {}  # Use dict for deduplication by BSSID
+        all_wifi_clients = {}  # Use dict for deduplication by client MAC
         all_bt = {}    # Use dict for deduplication by MAC
         all_rf = []
 
@@ -1702,6 +1761,7 @@ def _run_sweep(
                                     'channel': network.get('channel', ''),
                                     'signal': network.get('power', ''),
                                     'security': network.get('privacy', ''),
+                                    'vendor': network.get('vendor'),
                                     'is_threat': is_threat,
                                     'is_new': not classification.get('in_baseline', False),
                                     'classification': profile.risk_level.value,
@@ -1715,6 +1775,77 @@ def _run_sweep(
                                 })
                         except Exception as e:
                             logger.error(f"WiFi device processing error for {network.get('bssid', '?')}: {e}")
+
+                    # WiFi clients (monitor mode only)
+                    try:
+                        wifi_clients = _scan_wifi_clients(wifi_interface)
+                        for client in wifi_clients:
+                            mac = (client.get('mac') or '').upper()
+                            if not mac or mac in all_wifi_clients:
+                                continue
+                            all_wifi_clients[mac] = client
+
+                            rssi_val = client.get('rssi_current')
+                            if rssi_val is None:
+                                rssi_val = client.get('rssi_median') or client.get('rssi_ema')
+
+                            client_device = {
+                                'mac': mac,
+                                'vendor': client.get('vendor'),
+                                'name': client.get('vendor') or 'WiFi Client',
+                                'rssi': rssi_val,
+                                'associated_bssid': client.get('associated_bssid'),
+                                'probed_ssids': client.get('probed_ssids', []),
+                                'probe_count': client.get('probe_count', len(client.get('probed_ssids', []))),
+                                'is_client': True,
+                            }
+
+                            try:
+                                timeline_manager.add_observation(
+                                    identifier=mac,
+                                    protocol='wifi',
+                                    rssi=rssi_val,
+                                    name=client_device.get('vendor') or f'WiFi Client {mac[-5:]}',
+                                    attributes={'client': True, 'associated_bssid': client_device.get('associated_bssid')}
+                                )
+                            except Exception as e:
+                                logger.debug(f"WiFi client timeline observation error: {e}")
+                            _maybe_store_timeline(
+                                identifier=mac,
+                                protocol='wifi',
+                                rssi=rssi_val,
+                                attributes={'client': True, 'associated_bssid': client_device.get('associated_bssid')}
+                            )
+
+                            profile = correlation.analyze_wifi_device(client_device)
+                            client_device['classification'] = profile.risk_level.value
+                            client_device['score'] = profile.total_score
+                            client_device['score_modifier'] = profile.score_modifier
+                            client_device['known_device'] = profile.known_device
+                            client_device['known_device_name'] = profile.known_device_name
+                            client_device['indicators'] = [
+                                {'type': i.type.value, 'desc': i.description}
+                                for i in profile.indicators
+                            ]
+                            client_device['recommended_action'] = profile.recommended_action
+
+                            # Feed to identity engine for MAC-randomization resistant clustering
+                            try:
+                                wifi_obs = {
+                                    'timestamp': datetime.now().isoformat(),
+                                    'src_mac': mac,
+                                    'bssid': client_device.get('associated_bssid'),
+                                    'rssi': rssi_val,
+                                    'frame_type': 'probe_request',
+                                    'probed_ssids': client_device.get('probed_ssids', []),
+                                }
+                                ingest_wifi_dict(wifi_obs)
+                            except Exception as e:
+                                logger.debug(f"Identity engine WiFi client ingest error: {e}")
+
+                            _emit_event('wifi_client', client_device)
+                    except Exception as e:
+                        logger.debug(f"WiFi client scan error: {e}")
                 except Exception as e:
                     last_wifi_scan = current_time
                     logger.error(f"WiFi scan error: {e}")
@@ -1793,6 +1924,9 @@ def _run_sweep(
                                     'name': device.get('name', 'Unknown'),
                                     'device_type': device.get('type', ''),
                                     'rssi': device.get('rssi', ''),
+                                    'manufacturer': device.get('manufacturer'),
+                                    'tracker': device.get('tracker'),
+                                    'tracker_type': device.get('tracker_type'),
                                     'is_threat': is_threat,
                                     'is_new': not classification.get('in_baseline', False),
                                     'classification': profile.risk_level.value,
@@ -1921,6 +2055,7 @@ def _run_sweep(
                 comparator = BaselineComparator(baseline)
                 baseline_comparison = comparator.compare_all(
                     wifi_devices=list(all_wifi.values()),
+                    wifi_clients=list(all_wifi_clients.values()),
                     bt_devices=list(all_bt.values()),
                     rf_signals=all_rf
                 )
@@ -1936,6 +2071,7 @@ def _run_sweep(
 
             if verbose_results:
                 wifi_payload = list(all_wifi.values())
+                wifi_client_payload = list(all_wifi_clients.values())
                 bt_payload = list(all_bt.values())
                 rf_payload = list(all_rf)
             else:
@@ -1951,6 +2087,28 @@ def _run_sweep(
                     }
                     for d in all_wifi.values()
                 ]
+                wifi_client_payload = []
+                for client in all_wifi_clients.values():
+                    mac = client.get('mac') or client.get('address')
+                    if isinstance(mac, str):
+                        mac = mac.upper()
+                    probed_ssids = client.get('probed_ssids') or []
+                    rssi = client.get('rssi')
+                    if rssi is None:
+                        rssi = client.get('rssi_current')
+                    if rssi is None:
+                        rssi = client.get('rssi_median')
+                    if rssi is None:
+                        rssi = client.get('rssi_ema')
+                    wifi_client_payload.append({
+                        'mac': mac,
+                        'vendor': client.get('vendor'),
+                        'rssi': rssi,
+                        'associated_bssid': client.get('associated_bssid'),
+                        'is_associated': client.get('is_associated'),
+                        'probed_ssids': probed_ssids,
+                        'probe_count': client.get('probe_count', len(probed_ssids)),
+                    })
                 bt_payload = [
                     {
                         'mac': d.get('mac') or d.get('address'),
@@ -1975,9 +2133,11 @@ def _run_sweep(
                 status='completed',
                 results={
                     'wifi_devices': wifi_payload,
+                    'wifi_clients': wifi_client_payload,
                     'bt_devices': bt_payload,
                     'rf_signals': rf_payload,
                     'wifi_count': len(all_wifi),
+                    'wifi_client_count': len(all_wifi_clients),
                     'bt_count': len(all_bt),
                     'rf_count': len(all_rf),
                     'severity_counts': severity_counts,
@@ -2005,6 +2165,7 @@ def _run_sweep(
                     'total_new': baseline_comparison['total_new'],
                     'total_missing': baseline_comparison['total_missing'],
                     'wifi': baseline_comparison.get('wifi'),
+                    'wifi_clients': baseline_comparison.get('wifi_clients'),
                     'bluetooth': baseline_comparison.get('bluetooth'),
                     'rf': baseline_comparison.get('rf'),
                 })
@@ -2022,6 +2183,7 @@ def _run_sweep(
                 'sweep_id': _current_sweep_id,
                 'threats_found': threats_found,
                 'wifi_count': len(all_wifi),
+                'wifi_client_count': len(all_wifi_clients),
                 'bt_count': len(all_bt),
                 'rf_count': len(all_rf),
                 'severity_counts': severity_counts,
@@ -2169,6 +2331,7 @@ def compare_against_baseline():
 
     Expects JSON body with:
     - wifi_devices: list of WiFi devices (optional)
+    - wifi_clients: list of WiFi clients (optional)
     - bt_devices: list of Bluetooth devices (optional)
     - rf_signals: list of RF signals (optional)
 
@@ -2177,12 +2340,14 @@ def compare_against_baseline():
     data = request.get_json() or {}
 
     wifi_devices = data.get('wifi_devices')
+    wifi_clients = data.get('wifi_clients')
     bt_devices = data.get('bt_devices')
     rf_signals = data.get('rf_signals')
 
     # Use the convenience function that gets active baseline
     comparison = get_comparison_for_active_baseline(
         wifi_devices=wifi_devices,
+        wifi_clients=wifi_clients,
         bt_devices=bt_devices,
         rf_signals=rf_signals
     )
@@ -2276,7 +2441,10 @@ def feed_wifi():
     """Feed WiFi device data for baseline recording."""
     data = request.get_json()
     if data:
-        _baseline_recorder.add_wifi_device(data)
+        if data.get('is_client'):
+            _baseline_recorder.add_wifi_client(data)
+        else:
+            _baseline_recorder.add_wifi_device(data)
     return jsonify({'status': 'success'})
 
 
@@ -2928,12 +3096,14 @@ def get_baseline_diff(baseline_id: int, sweep_id: int):
             results = json.loads(results)
 
         current_wifi = results.get('wifi_devices', [])
+        current_wifi_clients = results.get('wifi_clients', [])
         current_bt = results.get('bt_devices', [])
         current_rf = results.get('rf_signals', [])
 
         diff = calculate_baseline_diff(
             baseline=baseline,
             current_wifi=current_wifi,
+            current_wifi_clients=current_wifi_clients,
             current_bt=current_bt,
             current_rf=current_rf,
             sweep_id=sweep_id

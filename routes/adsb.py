@@ -38,11 +38,13 @@ from config import (
     SHARED_OBSERVER_LOCATION_ENABLED,
 )
 from utils.logging import adsb_logger as logger
+from utils.process import write_dump1090_pid, clear_dump1090_pid, cleanup_stale_dump1090
 from utils.validation import (
     validate_device_index, validate_gain,
     validate_rtl_tcp_host, validate_rtl_tcp_port
 )
 from utils.sse import format_sse
+from utils.event_pipeline import process_event
 from utils.sdr import SDRFactory, SDRType
 from utils.constants import (
     ADSB_SBS_PORT,
@@ -70,10 +72,16 @@ adsb_last_message_time = None
 adsb_bytes_received = 0
 adsb_lines_received = 0
 adsb_active_device = None  # Track which device index is being used
+adsb_active_sdr_type: str | None = None
 _sbs_error_logged = False  # Suppress repeated connection error logs
 
 # Track ICAOs already looked up in aircraft database (avoid repeated lookups)
 _looked_up_icaos: set[str] = set()
+
+# Per-client SSE queues for ADS-B stream fanout.
+_adsb_stream_subscribers: set[queue.Queue] = set()
+_adsb_stream_subscribers_lock = threading.Lock()
+_ADSB_STREAM_CLIENT_QUEUE_SIZE = 500
 
 # Load aircraft database at module init
 aircraft_db.load_database()
@@ -199,6 +207,31 @@ def _parse_int_param(value: str | None, default: int, min_value: int | None = No
     if max_value is not None:
         parsed = min(max_value, parsed)
     return parsed
+
+
+def _broadcast_adsb_update(payload: dict[str, Any]) -> None:
+    """Fan out a payload to all active ADS-B SSE subscribers."""
+    with _adsb_stream_subscribers_lock:
+        subscribers = tuple(_adsb_stream_subscribers)
+
+    for subscriber in subscribers:
+        try:
+            subscriber.put_nowait(payload)
+        except queue.Full:
+            # Drop oldest queued event for that client and try once more.
+            try:
+                subscriber.get_nowait()
+                subscriber.put_nowait(payload)
+            except (queue.Empty, queue.Full):
+                # Client queue remains saturated; skip this payload.
+                continue
+
+
+def _adsb_stream_queue_depth() -> int:
+    """Best-effort aggregate queue depth across connected ADS-B SSE clients."""
+    with _adsb_stream_subscribers_lock:
+        subscribers = tuple(_adsb_stream_subscribers)
+    return sum(subscriber.qsize() for subscriber in subscribers)
 
 
 def _get_active_session() -> dict[str, Any] | None:
@@ -347,10 +380,62 @@ def parse_sbs_stream(service_addr):
             adsb_bytes_received = 0
             adsb_lines_received = 0
 
+            def flush_pending_updates(force: bool = False) -> None:
+                nonlocal last_update
+                if not pending_updates:
+                    return
+
+                now = time.time()
+                if not force and now - last_update < ADSB_UPDATE_INTERVAL:
+                    return
+
+                captured_at = datetime.now(timezone.utc)
+                for update_icao in tuple(pending_updates):
+                    if update_icao in app_module.adsb_aircraft:
+                        snapshot = app_module.adsb_aircraft[update_icao]
+                        _broadcast_adsb_update({
+                            'type': 'aircraft',
+                            **snapshot
+                        })
+                        adsb_snapshot_writer.enqueue({
+                            'captured_at': captured_at,
+                            'icao': update_icao,
+                            'callsign': snapshot.get('callsign'),
+                            'registration': snapshot.get('registration'),
+                            'type_code': snapshot.get('type_code'),
+                            'type_desc': snapshot.get('type_desc'),
+                            'altitude': snapshot.get('altitude'),
+                            'speed': snapshot.get('speed'),
+                            'heading': snapshot.get('heading'),
+                            'vertical_rate': snapshot.get('vertical_rate'),
+                            'lat': snapshot.get('lat'),
+                            'lon': snapshot.get('lon'),
+                            'squawk': snapshot.get('squawk'),
+                            'source_host': service_addr,
+                            'snapshot': snapshot,
+                        })
+                        # Geofence check
+                        _gf_lat = snapshot.get('lat')
+                        _gf_lon = snapshot.get('lon')
+                        if _gf_lat is not None and _gf_lon is not None:
+                            try:
+                                from utils.geofence import get_geofence_manager
+                                for _gf_evt in get_geofence_manager().check_position(
+                                    update_icao, 'aircraft', _gf_lat, _gf_lon,
+                                    {'callsign': snapshot.get('callsign'), 'altitude': snapshot.get('altitude')}
+                                ):
+                                    process_event('adsb', _gf_evt, 'geofence')
+                            except Exception:
+                                pass
+
+                pending_updates.clear()
+                last_update = now
+
             while adsb_using_service:
                 try:
                     data = sock.recv(SOCKET_BUFFER_SIZE).decode('utf-8', errors='ignore')
                     if not data:
+                        flush_pending_updates(force=True)
                         logger.warning("SBS connection closed (no data)")
                         break
                     adsb_bytes_received += len(data)
@@ -437,6 +522,12 @@ def parse_sbs_stream(service_addr):
                             if parts[16]:
                                 try:
                                     aircraft['vertical_rate'] = int(float(parts[16]))
+                                    if abs(aircraft['vertical_rate']) > 4000:
+                                        process_event('adsb', {
+                                            'type': 'vertical_rate_anomaly', 'icao': icao,
+                                            'callsign': aircraft.get('callsign', ''),
+                                            'vertical_rate': aircraft['vertical_rate'],
+                                        }, 'vertical_rate_anomaly')
                                 except (ValueError, TypeError):
                                     pass
 
@@ -454,44 +545,49 @@ def parse_sbs_stream(service_addr):
                         elif msg_type == '6' and len(parts) > 17:
                             if parts[17]:
                                 aircraft['squawk'] = parts[17]
+                                sq = parts[17].strip()
+                                _EMERGENCY_SQUAWKS = {'7700': 'General Emergency', '7600': 'Comms Failure', '7500': 'Hijack'}
+                                if sq in _EMERGENCY_SQUAWKS:
+                                    process_event('adsb', {
+                                        'type': 'squawk_emergency', 'icao': icao,
+                                        'callsign': aircraft.get('callsign', ''),
+                                        'squawk': sq, 'meaning': _EMERGENCY_SQUAWKS[sq],
+                                    }, 'squawk_emergency')
+
+                        elif msg_type == '2' and len(parts) > 15:
+                            if parts[11]:
+                                try:
+                                    aircraft['altitude'] = int(float(parts[11]))
+                                except (ValueError, TypeError):
+                                    pass
+                            if parts[12]:
+                                try:
+                                    aircraft['speed'] = int(float(parts[12]))
+                                except (ValueError, TypeError):
+                                    pass
+                            if parts[13]:
+                                try:
+                                    aircraft['heading'] = int(float(parts[13]))
+                                except (ValueError, TypeError):
+                                    pass
+                            if parts[14] and parts[15]:
+                                try:
+                                    aircraft['lat'] = float(parts[14])
+                                    aircraft['lon'] = float(parts[15])
+                                except (ValueError, TypeError):
+                                    pass
 
                         app_module.adsb_aircraft.set(icao, aircraft)
                         pending_updates.add(icao)
                         adsb_messages_received += 1
                         adsb_last_message_time = time.time()
-
-                        now = time.time()
-                        if now - last_update >= ADSB_UPDATE_INTERVAL:
-                            for update_icao in pending_updates:
-                                if update_icao in app_module.adsb_aircraft:
-                                    snapshot = app_module.adsb_aircraft[update_icao]
-                                    app_module.adsb_queue.put({
-                                        'type': 'aircraft',
-                                        **snapshot
-                                    })
-                                    adsb_snapshot_writer.enqueue({
-                                        'captured_at': datetime.now(timezone.utc),
-                                        'icao': update_icao,
-                                        'callsign': snapshot.get('callsign'),
-                                        'registration': snapshot.get('registration'),
-                                        'type_code': snapshot.get('type_code'),
-                                        'type_desc': snapshot.get('type_desc'),
-                                        'altitude': snapshot.get('altitude'),
-                                        'speed': snapshot.get('speed'),
-                                        'heading': snapshot.get('heading'),
-                                        'vertical_rate': snapshot.get('vertical_rate'),
-                                        'lat': snapshot.get('lat'),
-                                        'lon': snapshot.get('lon'),
-                                        'squawk': snapshot.get('squawk'),
-                                        'source_host': service_addr,
-                                        'snapshot': snapshot,
-                                    })
-                            pending_updates.clear()
-                            last_update = now
+                        flush_pending_updates()
 
                 except socket.timeout:
+                    flush_pending_updates()
                     continue
 
+            flush_pending_updates(force=True)
             sock.close()
             adsb_connected = False
         except OSError as e:
@@ -551,7 +647,7 @@ def adsb_status():
         'last_message_time': adsb_last_message_time,
         'aircraft_count': len(app_module.adsb_aircraft),
         'aircraft': dict(app_module.adsb_aircraft),  # Full aircraft data
-        'queue_size': app_module.adsb_queue.qsize(),
+        'queue_size': _adsb_stream_queue_depth(),
         'dump1090_path': find_dump1090(),
         'dump1090_running': dump1090_running,
         'port_30003_open': check_dump1090_service() is not None
@@ -579,7 +675,7 @@ def adsb_session():
 @adsb_bp.route('/start', methods=['POST'])
 def start_adsb():
     """Start ADS-B tracking."""
-    global adsb_using_service, adsb_active_device
+    global adsb_using_service, adsb_active_device, adsb_active_sdr_type
 
     with app_module.adsb_lock:
         if adsb_using_service:
@@ -590,7 +686,7 @@ def start_adsb():
                 'session': session
             }), 409
 
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     start_source = data.get('source')
     started_by = request.remote_addr
 
@@ -632,6 +728,9 @@ def start_adsb():
             'session': session
         })
 
+    # Kill any stale app-spawned dump1090 from a previous run before checking the port
+    cleanup_stale_dump1090()
+
     # Check if dump1090 is already running externally (e.g., user started it manually)
     existing_service = check_dump1090_service()
     if existing_service:
@@ -659,6 +758,7 @@ def start_adsb():
         sdr_type = SDRType(sdr_type_str)
     except ValueError:
         sdr_type = SDRType.RTL_SDR
+        sdr_type_str = sdr_type.value
 
     # For RTL-SDR, use dump1090. For other hardware, need readsb with SoapySDR
     if sdr_type == SDRType.RTL_SDR:
@@ -684,17 +784,22 @@ def start_adsb():
             except (ProcessLookupError, OSError):
                 pass
         app_module.adsb_process = None
+        clear_dump1090_pid()
         logger.info("Killed stale ADS-B process")
 
     # Check if device is available before starting local dump1090
     device_int = int(device)
-    error = app_module.claim_sdr_device(device_int, 'adsb')
+    error = app_module.claim_sdr_device(device_int, 'adsb', sdr_type_str)
     if error:
         return jsonify({
             'status': 'error',
             'error_type': 'DEVICE_BUSY',
             'message': error
         }), 409
+
+    # Track claimed device immediately so stop_adsb() can always release it
+    adsb_active_device = device
+    adsb_active_sdr_type = sdr_type_str
 
     # Create device object and build command via abstraction layer
     sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
@@ -720,12 +825,26 @@ def start_adsb():
             stderr=subprocess.PIPE,
             start_new_session=True  # Create new process group for clean shutdown
         )
+        write_dump1090_pid(app_module.adsb_process.pid)
 
-        time.sleep(DUMP1090_START_WAIT)
+        # Poll for dump1090 readiness instead of blind sleep
+        dump1090_ready = False
+        poll_interval = 0.1
+        elapsed = 0.0
+        while elapsed < DUMP1090_START_WAIT:
+            if app_module.adsb_process.poll() is not None:
+                break  # Process exited early — handle below
+            if check_dump1090_service():
+                dump1090_ready = True
+                break
+            time.sleep(poll_interval)
+            elapsed += poll_interval
 
         if app_module.adsb_process.poll() is not None:
             # Process exited - release device and get error message
-            app_module.release_sdr_device(device_int)
+            app_module.release_sdr_device(device_int, sdr_type_str)
+            adsb_active_device = None
+            adsb_active_sdr_type = None
             stderr_output = ''
             if app_module.adsb_process.stderr:
                 try:
@@ -771,7 +890,6 @@ def start_adsb():
             })
 
         adsb_using_service = True
-        adsb_active_device = device  # Track which device is being used
         thread = threading.Thread(target=parse_sbs_stream, args=(f'localhost:{ADSB_SBS_PORT}',), daemon=True)
         thread.start()
 
@@ -791,15 +909,17 @@ def start_adsb():
         })
     except Exception as e:
         # Release device on failure
-        app_module.release_sdr_device(device_int)
+        app_module.release_sdr_device(device_int, sdr_type_str)
+        adsb_active_device = None
+        adsb_active_sdr_type = None
         return jsonify({'status': 'error', 'message': str(e)})
 
 
 @adsb_bp.route('/stop', methods=['POST'])
 def stop_adsb():
     """Stop ADS-B tracking."""
-    global adsb_using_service, adsb_active_device
-    data = request.json or {}
+    global adsb_using_service, adsb_active_device, adsb_active_sdr_type
+    data = request.get_json(silent=True) or {}
     stop_source = data.get('source')
     stopped_by = request.remote_addr
 
@@ -818,14 +938,16 @@ def stop_adsb():
                 except (ProcessLookupError, OSError):
                     pass
             app_module.adsb_process = None
+            clear_dump1090_pid()
             logger.info("ADS-B process stopped")
 
         # Release device from registry
         if adsb_active_device is not None:
-            app_module.release_sdr_device(adsb_active_device)
+            app_module.release_sdr_device(adsb_active_device, adsb_active_sdr_type or 'rtlsdr')
 
         adsb_using_service = False
         adsb_active_device = None
+        adsb_active_sdr_type = None
 
     app_module.adsb_aircraft.clear()
     _looked_up_icaos.clear()
@@ -836,19 +958,39 @@ def stop_adsb():
 @adsb_bp.route('/stream')
 def stream_adsb():
     """SSE stream for ADS-B aircraft."""
+    client_queue: queue.Queue = queue.Queue(maxsize=_ADSB_STREAM_CLIENT_QUEUE_SIZE)
+    with _adsb_stream_subscribers_lock:
+        _adsb_stream_subscribers.add(client_queue)
+
+    # Prime new clients with current known aircraft so they don't wait for the
+    # next positional update before rendering.
+    for snapshot in list(app_module.adsb_aircraft.values()):
+        try:
+            client_queue.put_nowait({'type': 'aircraft', **snapshot})
+        except queue.Full:
+            break
+
     def generate():
         last_keepalive = time.time()
 
-        while True:
-            try:
-                msg = app_module.adsb_queue.get(timeout=SSE_QUEUE_TIMEOUT)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= SSE_KEEPALIVE_INTERVAL:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
+        try:
+            while True:
+                try:
+                    msg = client_queue.get(timeout=SSE_QUEUE_TIMEOUT)
+                    last_keepalive = time.time()
+                    try:
+                        process_event('adsb', msg, msg.get('type'))
+                    except Exception:
+                        pass
+                    yield format_sse(msg)
+                except queue.Empty:
+                    now = time.time()
+                    if now - last_keepalive >= SSE_KEEPALIVE_INTERVAL:
+                        yield format_sse({'type': 'keepalive'})
+                        last_keepalive = now
+        finally:
+            with _adsb_stream_subscribers_lock:
+                _adsb_stream_subscribers.discard(client_queue)
 
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
@@ -859,10 +1001,12 @@ def stream_adsb():
 @adsb_bp.route('/dashboard')
 def adsb_dashboard():
     """Popout ADS-B dashboard."""
+    embedded = request.args.get('embedded', 'false') == 'true'
     return render_template(
         'adsb_dashboard.html',
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
         adsb_auto_start=ADSB_AUTO_START,
+        embedded=embedded,
     )
 
 
@@ -1091,3 +1235,17 @@ def aircraft_photo(registration: str):
     except Exception as e:
         logger.debug(f"Error fetching aircraft photo: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@adsb_bp.route('/aircraft/<icao>/messages')
+def get_aircraft_messages(icao: str):
+    """Get correlated ACARS/VDL2 messages for an aircraft."""
+    if not icao or not all(c in '0123456789ABCDEFabcdef' for c in icao):
+        return jsonify({'status': 'error', 'message': 'Invalid ICAO'}), 400
+
+    aircraft = app_module.adsb_aircraft.get(icao.upper())
+    callsign = aircraft.get('callsign') if aircraft else None
+
+    from utils.flight_correlator import get_flight_correlator
+    messages = get_flight_correlator().get_messages_for_aircraft(icao=icao.upper(), callsign=callsign)
+    return jsonify({'status': 'success', 'icao': icao.upper(), **messages})

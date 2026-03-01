@@ -1,0 +1,733 @@
+{
+  "stations": [
+    {
+      "name": "USCG Kodiak",
+      "callsign": "NOJ",
+      "country": "US",
+      "city": "Kodiak, AK",
+      "coordinates": [57.78, -152.50],
+      "frequencies": [
+        {"khz": 2054, "description": "Night"},
+        {"khz": 4298, "description": "Primary"},
+        {"khz": 8459, "description": "Day"},
+        {"khz": 12412.5, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "03:40", "duration_min": 148, "content": "Chart Series 1"},
+        {"utc": "09:50", "duration_min": 138, "content": "Chart Series 2"},
+        {"utc": "15:40", "duration_min": 148, "content": "Chart Series 3"},
+        {"utc": "21:50", "duration_min": 98, "content": "Chart Series 4"}
+      ]
+    },
+    {
+      "name": "USCG Boston",
+      "callsign": "NMF",
+      "country": "US",
+      "city": "Boston, MA",
+      "coordinates": [42.36, -71.04],
+      "frequencies": [
+        {"khz": 4235, "description": "Night"},
+        {"khz": 6340.5, "description": "Primary"},
+        {"khz": 9110, "description": "Day"},
+        {"khz": 12750, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "02:30", "duration_min": 20, "content": "Wind/Wave Analysis"},
+        {"utc": "04:38", "duration_min": 20, "content": "Sea State Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "09:30", "duration_min": 20, "content": "48-Hour Surface Prog"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "14:00", "duration_min": 20, "content": "24-Hour Surface Prog"},
+        {"utc": "16:00", "duration_min": 20, "content": "Sea State Analysis"},
+        {"utc": "18:10", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "22:00", "duration_min": 20, "content": "Satellite Image"}
+      ]
+    },
+    {
+      "name": "USCG New Orleans",
+      "callsign": "NMG",
+      "country": "US",
+      "city": "New Orleans, LA",
+      "coordinates": [29.95, -90.07],
+      "frequencies": [
+        {"khz": 4317.9, "description": "Night"},
+        {"khz": 8503.9, "description": "Primary"},
+        {"khz": 12789.9, "description": "Day"},
+        {"khz": 17146.4, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "03:00", "duration_min": 20, "content": "24-Hour Surface Prog"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "09:00", "duration_min": 20, "content": "Sea State Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:00", "duration_min": 20, "content": "48-Hour Surface Prog"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "21:00", "duration_min": 20, "content": "Tropical Analysis"}
+      ]
+    },
+    {
+      "name": "USCG Pt. Reyes",
+      "callsign": "NMC",
+      "country": "US",
+      "city": "Pt. Reyes, CA",
+      "coordinates": [38.07, -122.97],
+      "frequencies": [
+        {"khz": 4346, "description": "Night"},
+        {"khz": 8682, "description": "Primary"},
+        {"khz": 12786, "description": "Day"},
+        {"khz": 17151.2, "description": "Extended"},
+        {"khz": 22527, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "01:40", "duration_min": 20, "content": "Wind/Wave Analysis"},
+        {"utc": "06:55", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "11:20", "duration_min": 20, "content": "48-Hour Surface Prog"},
+        {"utc": "14:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:40", "duration_min": 20, "content": "Sea State Analysis"},
+        {"utc": "23:20", "duration_min": 20, "content": "Satellite Image"}
+      ]
+    },
+    {
+      "name": "USCG Honolulu",
+      "callsign": "KVM70",
+      "country": "US",
+      "city": "Honolulu, HI",
+      "coordinates": [21.31, -157.86],
+      "frequencies": [
+        {"khz": 9982.5, "description": "Primary"},
+        {"khz": 11090, "description": "Day"},
+        {"khz": 16135, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "05:19", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "17:19", "duration_min": 20, "content": "Sea State Analysis"}
+      ]
+    },
+    {
+      "name": "RN Northwood",
+      "callsign": "GYA",
+      "country": "GB",
+      "city": "Northwood, London",
+      "coordinates": [51.63, -0.42],
+      "frequencies": [
+        {"khz": 2618.5, "description": "Night"},
+        {"khz": 3280.5, "description": "Night Alt"},
+        {"khz": 4610, "description": "Primary"},
+        {"khz": 6834, "description": "Day Alt"},
+        {"khz": 8040, "description": "Day"},
+        {"khz": 11086.5, "description": "Extended"},
+        {"khz": 12390, "description": "Persian Gulf"},
+        {"khz": 18261, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "03:30", "duration_min": 20, "content": "24-Hour Surface Prog"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "08:00", "duration_min": 20, "content": "Sea State Forecast"},
+        {"utc": "09:30", "duration_min": 20, "content": "Extended Forecast"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:30", "duration_min": 20, "content": "48-Hour Surface Prog"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "19:00", "duration_min": 20, "content": "Wave Period Forecast"},
+        {"utc": "21:30", "duration_min": 20, "content": "Extended Forecast"}
+      ]
+    },
+    {
+      "name": "DWD Hamburg/Pinneberg",
+      "callsign": "DDH",
+      "country": "DE",
+      "city": "Pinneberg",
+      "coordinates": [53.66, 9.80],
+      "frequencies": [
+        {"khz": 3855, "description": "Night (DDH3, 10kW)"},
+        {"khz": 7880, "description": "Primary (DDK3, 20kW)"},
+        {"khz": 13882.5, "description": "Day (DDK6, 20kW)"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "04:30", "duration_min": 20, "content": "Surface Analysis N. Atlantic"},
+        {"utc": "07:15", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "09:30", "duration_min": 20, "content": "Surface Analysis Europe"},
+        {"utc": "10:07", "duration_min": 20, "content": "Sea State North Sea"},
+        {"utc": "13:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:20", "duration_min": 20, "content": "Extended Prog"},
+        {"utc": "15:40", "duration_min": 20, "content": "Sea Ice Chart"},
+        {"utc": "16:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "21:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "21:15", "duration_min": 20, "content": "Surface Prog"}
+      ]
+    },
+    {
+      "name": "JMA Tokyo",
+      "callsign": "JMH",
+      "country": "JP",
+      "city": "Tokyo",
+      "coordinates": [35.69, 139.69],
+      "frequencies": [
+        {"khz": 3622.5, "description": "Night"},
+        {"khz": 7795, "description": "Primary"},
+        {"khz": 13988.5, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "01:30", "duration_min": 20, "content": "24-Hour Prog"},
+        {"utc": "03:00", "duration_min": 20, "content": "Satellite Image"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "07:30", "duration_min": 20, "content": "Wave Analysis"},
+        {"utc": "09:00", "duration_min": 20, "content": "Satellite Image"},
+        {"utc": "10:19", "duration_min": 20, "content": "Tropical Cyclone Info"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:00", "duration_min": 20, "content": "Satellite Image"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "21:00", "duration_min": 20, "content": "48-Hour Prog"}
+      ]
+    },
+    {
+      "name": "Kyodo News Tokyo",
+      "callsign": "JJC",
+      "country": "JP",
+      "city": "Tokyo",
+      "coordinates": [35.69, 139.69],
+      "frequencies": [
+        {"khz": 4316, "description": "Night"},
+        {"khz": 8467.5, "description": "Primary"},
+        {"khz": 12745.5, "description": "Day"},
+        {"khz": 16971, "description": "Extended"},
+        {"khz": 17069.6, "description": "DX"},
+        {"khz": 22542, "description": "DX 2"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Press Photo/News Fax"},
+        {"utc": "04:00", "duration_min": 20, "content": "Press Photo/News Fax"},
+        {"utc": "08:00", "duration_min": 20, "content": "Press Photo/News Fax"},
+        {"utc": "12:00", "duration_min": 20, "content": "Press Photo/News Fax"},
+        {"utc": "16:00", "duration_min": 20, "content": "Press Photo/News Fax"},
+        {"utc": "20:00", "duration_min": 20, "content": "Press Photo/News Fax"}
+      ]
+    },
+    {
+      "name": "Kagoshima Fisheries",
+      "callsign": "JFX",
+      "country": "JP",
+      "city": "Kagoshima",
+      "coordinates": [31.60, 130.56],
+      "frequencies": [
+        {"khz": 4274, "description": "Night"},
+        {"khz": 8658, "description": "Primary"},
+        {"khz": 13074, "description": "Day"},
+        {"khz": 16907.5, "description": "Extended"},
+        {"khz": 22559.6, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Sea Surface Temp"},
+        {"utc": "04:00", "duration_min": 20, "content": "Fishing Forecast"},
+        {"utc": "08:00", "duration_min": 20, "content": "Sea Surface Temp"},
+        {"utc": "12:00", "duration_min": 20, "content": "Current Chart"},
+        {"utc": "16:00", "duration_min": 20, "content": "Fishing Forecast"},
+        {"utc": "20:00", "duration_min": 20, "content": "Sea Surface Temp"}
+      ]
+    },
+    {
+      "name": "KMA Seoul",
+      "callsign": "HLL2",
+      "country": "KR",
+      "city": "Seoul",
+      "coordinates": [37.57, 126.98],
+      "frequencies": [
+        {"khz": 3585, "description": "Night"},
+        {"khz": 5857.5, "description": "Primary"},
+        {"khz": 7433.5, "description": "Day"},
+        {"khz": 9165, "description": "Extended"},
+        {"khz": 13570, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "03:00", "duration_min": 20, "content": "24-Hour Prog"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "09:00", "duration_min": 20, "content": "Satellite Image"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:00", "duration_min": 20, "content": "Sea State Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "21:00", "duration_min": 20, "content": "48-Hour Prog"}
+      ]
+    },
+    {
+      "name": "Taipei Met",
+      "callsign": "BMF",
+      "country": "TW",
+      "city": "Taipei",
+      "coordinates": [25.03, 121.57],
+      "frequencies": [
+        {"khz": 4616, "description": "Primary"},
+        {"khz": 8140, "description": "Day"},
+        {"khz": 13900, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Bangkok Met",
+      "callsign": "HSW64",
+      "country": "TH",
+      "city": "Bangkok",
+      "coordinates": [13.76, 100.50],
+      "frequencies": [
+        {"khz": 7396.8, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Shanghai Met",
+      "callsign": "XSG",
+      "country": "CN",
+      "city": "Shanghai",
+      "coordinates": [31.23, 121.47],
+      "frequencies": [
+        {"khz": 4170, "description": "Night"},
+        {"khz": 8302, "description": "Primary"},
+        {"khz": 12382, "description": "Day"},
+        {"khz": 16559, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Guangzhou Radio",
+      "callsign": "XSQ",
+      "country": "CN",
+      "city": "Guangzhou",
+      "coordinates": [23.13, 113.26],
+      "frequencies": [
+        {"khz": 4199.8, "description": "Night"},
+        {"khz": 8412.5, "description": "Primary"},
+        {"khz": 12629.3, "description": "Day"},
+        {"khz": 16826.3, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Singapore Met",
+      "callsign": "9VF",
+      "country": "SG",
+      "city": "Singapore",
+      "coordinates": [1.35, 103.82],
+      "frequencies": [
+        {"khz": 16035, "description": "Primary"},
+        {"khz": 17430, "description": "Alternate"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "New Delhi Met",
+      "callsign": "ATP",
+      "country": "IN",
+      "city": "New Delhi",
+      "coordinates": [28.61, 77.21],
+      "frequencies": [
+        {"khz": 7405, "description": "Night"},
+        {"khz": 14842, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Murmansk Met",
+      "callsign": "RBW",
+      "country": "RU",
+      "city": "Murmansk",
+      "coordinates": [68.97, 33.09],
+      "frequencies": [
+        {"khz": 6445.5, "description": "Night"},
+        {"khz": 7907, "description": "Primary"},
+        {"khz": 8444, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "07:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "08:00", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "14:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "14:30", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "20:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "St. Petersburg Met",
+      "callsign": "RDD78",
+      "country": "RU",
+      "city": "St. Petersburg",
+      "coordinates": [59.93, 30.32],
+      "frequencies": [
+        {"khz": 2640, "description": "Night"},
+        {"khz": 4212, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Athens Met",
+      "callsign": "SVJ4",
+      "country": "GR",
+      "city": "Athens",
+      "coordinates": [37.97, 23.73],
+      "frequencies": [
+        {"khz": 4482.9, "description": "Night"},
+        {"khz": 8106.9, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis Med"},
+        {"utc": "09:00", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis Med"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis Med"}
+      ]
+    },
+    {
+      "name": "Charleville Met",
+      "callsign": "VMC",
+      "country": "AU",
+      "city": "Charleville, QLD",
+      "coordinates": [-26.41, 146.24],
+      "frequencies": [
+        {"khz": 2628, "description": "Night"},
+        {"khz": 5100, "description": "Primary"},
+        {"khz": 11030, "description": "Day"},
+        {"khz": 13920, "description": "Extended"},
+        {"khz": 20469, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "03:00", "duration_min": 20, "content": "Prognosis"},
+        {"utc": "06:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "09:00", "duration_min": 20, "content": "Sea/Swell Chart"},
+        {"utc": "12:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "19:00", "duration_min": 20, "content": "Prognosis"}
+      ]
+    },
+    {
+      "name": "Wiluna Met",
+      "callsign": "VMW",
+      "country": "AU",
+      "city": "Wiluna, WA",
+      "coordinates": [-26.59, 120.23],
+      "frequencies": [
+        {"khz": 5755, "description": "Night"},
+        {"khz": 7535, "description": "Primary"},
+        {"khz": 10555, "description": "Day"},
+        {"khz": 15615, "description": "Extended"},
+        {"khz": 18060, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "11:00", "duration_min": 20, "content": "Prognosis"},
+        {"utc": "18:00", "duration_min": 20, "content": "MSLP Analysis"},
+        {"utc": "21:00", "duration_min": 20, "content": "Sea/Swell Chart"}
+      ]
+    },
+    {
+      "name": "NZ MetService",
+      "callsign": "ZKLF",
+      "country": "NZ",
+      "city": "Auckland",
+      "coordinates": [-36.85, 174.76],
+      "frequencies": [
+        {"khz": 3247.4, "description": "Night"},
+        {"khz": 5807, "description": "Primary"},
+        {"khz": 9459, "description": "Day"},
+        {"khz": 13550.5, "description": "Extended"},
+        {"khz": 16340.1, "description": "DX"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "CFH Halifax",
+      "callsign": "CFH",
+      "country": "CA",
+      "city": "Halifax, NS",
+      "coordinates": [44.65, -63.57],
+      "frequencies": [
+        {"khz": 4271, "description": "Night"},
+        {"khz": 6496.4, "description": "Primary"},
+        {"khz": 10536, "description": "Day"},
+        {"khz": 13510, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "03:00", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "06:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "18:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "22:22", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "23:01", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "CCG Iqaluit",
+      "callsign": "VFF",
+      "country": "CA",
+      "city": "Iqaluit, NU",
+      "coordinates": [63.75, -68.52],
+      "frequencies": [
+        {"khz": 3253, "description": "Night"},
+        {"khz": 7710, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:10", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "05:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "07:00", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "10:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "11:00", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "21:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "23:30", "duration_min": 20, "content": "Ice Chart"}
+      ]
+    },
+    {
+      "name": "CCG Inuvik",
+      "callsign": "VFA",
+      "country": "CA",
+      "city": "Inuvik, NT",
+      "coordinates": [68.36, -133.72],
+      "frequencies": [
+        {"khz": 4292, "description": "Night"},
+        {"khz": 8457.8, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "02:00", "duration_min": 20, "content": "Ice Chart"},
+        {"utc": "16:30", "duration_min": 20, "content": "Ice Chart"}
+      ]
+    },
+    {
+      "name": "CCG Sydney",
+      "callsign": "VCO",
+      "country": "CA",
+      "city": "Sydney, NS",
+      "coordinates": [46.14, -60.19],
+      "frequencies": [
+        {"khz": 4416, "description": "Night"},
+        {"khz": 6915.1, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "11:21", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "11:42", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "17:41", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "22:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "23:31", "duration_min": 20, "content": "Surface Prog"}
+      ]
+    },
+    {
+      "name": "Cape Naval",
+      "callsign": "ZSJ",
+      "country": "ZA",
+      "city": "Cape Town",
+      "coordinates": [-33.92, 18.42],
+      "frequencies": [
+        {"khz": 4014, "description": "Night"},
+        {"khz": 7508, "description": "Primary"},
+        {"khz": 13538, "description": "Day"},
+        {"khz": 18238, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "04:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "05:00", "duration_min": 20, "content": "Sea State"},
+        {"utc": "06:30", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "07:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "08:00", "duration_min": 20, "content": "Satellite Image"},
+        {"utc": "10:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "11:00", "duration_min": 20, "content": "Sea State"},
+        {"utc": "15:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "15:40", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "22:30", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Valparaiso Naval",
+      "callsign": "CBV",
+      "country": "CL",
+      "city": "Valparaiso",
+      "coordinates": [-33.05, -71.62],
+      "frequencies": [
+        {"khz": 4228, "description": "Night"},
+        {"khz": 8677, "description": "Primary"},
+        {"khz": 17146.4, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "11:15", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "11:30", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "16:30", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "16:45", "duration_min": 20, "content": "Sea State"},
+        {"utc": "19:15", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "19:30", "duration_min": 20, "content": "Surface Prog"},
+        {"utc": "22:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "23:10", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "23:25", "duration_min": 20, "content": "Sea State"}
+      ]
+    },
+    {
+      "name": "Magallanes Naval",
+      "callsign": "CBM",
+      "country": "CL",
+      "city": "Punta Arenas",
+      "coordinates": [-53.16, -70.91],
+      "frequencies": [
+        {"khz": 4322, "description": "Night"},
+        {"khz": 8696, "description": "Primary"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "01:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "13:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Rio de Janeiro Naval",
+      "callsign": "PWZ33",
+      "country": "BR",
+      "city": "Rio de Janeiro",
+      "coordinates": [-22.91, -43.17],
+      "frequencies": [
+        {"khz": 12665, "description": "Primary"},
+        {"khz": 16978, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "07:45", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "16:30", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Dakar Met",
+      "callsign": "6VU",
+      "country": "SN",
+      "city": "Dakar",
+      "coordinates": [14.69, -17.44],
+      "frequencies": [
+        {"khz": 13667.5, "description": "Primary"},
+        {"khz": 19750, "description": "Day"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Surface Analysis"},
+        {"utc": "12:00", "duration_min": 20, "content": "Surface Analysis"}
+      ]
+    },
+    {
+      "name": "Misaki Fisheries",
+      "callsign": "JFC",
+      "country": "JP",
+      "city": "Miura",
+      "coordinates": [35.14, 139.62],
+      "frequencies": [
+        {"khz": 8616, "description": "Primary"},
+        {"khz": 13074, "description": "Day"},
+        {"khz": 17231, "description": "Extended"}
+      ],
+      "ioc": 576,
+      "lpm": 120,
+      "schedule": [
+        {"utc": "00:00", "duration_min": 20, "content": "Sea Surface Temp"},
+        {"utc": "06:00", "duration_min": 20, "content": "Current Chart"},
+        {"utc": "12:00", "duration_min": 20, "content": "Fishing Forecast"},
+        {"utc": "18:00", "duration_min": 20, "content": "Sea Surface Temp"}
+      ]
+    }
+  ]
+}

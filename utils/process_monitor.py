@@ -112,6 +112,8 @@ class ProcessMonitor:
 
     def _check_all_processes(self) -> None:
         """Check health of all registered processes."""
+        # Collect crashed processes under lock, handle restarts outside
+        crashed: list[tuple[str, ProcessInfo]] = []
         with self._lock:
             for name, info in list(self.processes.items()):
                 if not info.enabled:
@@ -126,10 +128,14 @@ class ProcessMonitor:
                     logger.warning(
                         f"Process '{name}' terminated with code {return_code}"
                     )
-                    self._handle_crash(name, info)
+                    crashed.append((name, info))
+
+        # Handle restarts outside lock (involves sleeps and callbacks)
+        for name, info in crashed:
+            self._handle_crash(name, info)
 
     def _handle_crash(self, name: str, info: ProcessInfo) -> None:
-        """Handle a crashed process."""
+        """Handle a crashed process. Must be called WITHOUT holding self._lock."""
         if info.restart_callback is None:
             logger.info(f"No restart callback for '{name}', skipping auto-restart")
             return
@@ -139,7 +145,8 @@ class ProcessMonitor:
                 f"Process '{name}' exceeded max restarts ({info.max_restarts}), "
                 "disabling auto-restart"
             )
-            info.enabled = False
+            with self._lock:
+                info.enabled = False
             return
 
         # Calculate backoff with exponential increase
@@ -149,18 +156,20 @@ class ProcessMonitor:
             f"(attempt {info.restart_count + 1}/{info.max_restarts})"
         )
 
-        # Wait for backoff period
+        # Wait for backoff period outside lock
         time.sleep(backoff)
 
         # Attempt restart
         try:
             info.restart_callback()
-            info.restart_count += 1
-            info.last_restart = datetime.now()
+            with self._lock:
+                info.restart_count += 1
+                info.last_restart = datetime.now()
             logger.info(f"Successfully restarted '{name}'")
         except Exception as e:
             logger.error(f"Failed to restart '{name}': {e}")
-            info.restart_count += 1
+            with self._lock:
+                info.restart_count += 1
 
     def get_status(self) -> Dict[str, Any]:
         """

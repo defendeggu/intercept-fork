@@ -289,19 +289,6 @@ const SignalGuess = (function() {
             regions: ['GLOBAL']
         },
 
-        // LoRaWAN
-        {
-            label: 'LoRaWAN / LoRa Device',
-            tags: ['iot', 'lora', 'lpwan', 'telemetry'],
-            description: 'LoRa long-range IoT device',
-            frequencyRanges: [[863000000, 870000000], [902000000, 928000000]],
-            modulationHints: ['LoRa', 'CSS', 'FSK'],
-            bandwidthRange: [125000, 500000],
-            baseScore: 11,
-            isBurstType: true,
-            regions: ['UK/EU', 'US']
-        },
-
         // Key Fob
         {
             label: 'Remote Control / Key Fob',

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Generator
@@ -38,8 +39,26 @@ logger = logging.getLogger('intercept.controller')
 
 controller_bp = Blueprint('controller', __name__, url_prefix='/controller')
 
-# Multi-agent data queue for combined SSE stream
-agent_data_queue: queue.Queue = queue.Queue(maxsize=1000)
+# Multi-agent SSE fanout state (per-client queues).
+_agent_stream_subscribers: set[queue.Queue] = set()
+_agent_stream_subscribers_lock = threading.Lock()
+_AGENT_STREAM_CLIENT_QUEUE_SIZE = 500
+
+
+def _broadcast_agent_data(payload: dict) -> None:
+    """Fan out an ingested payload to all active /controller/stream/all clients."""
+    with _agent_stream_subscribers_lock:
+        subscribers = tuple(_agent_stream_subscribers)
+
+    for subscriber in subscribers:
+        try:
+            subscriber.put_nowait(payload)
+        except queue.Full:
+            try:
+                subscriber.get_nowait()
+                subscriber.put_nowait(payload)
+            except (queue.Empty, queue.Full):
+                continue
 
 
 # =============================================================================
@@ -625,19 +644,16 @@ def ingest_push_data():
             received_at=data.get('received_at')
         )
 
-        # Emit to SSE stream
-        try:
-            agent_data_queue.put_nowait({
-                'type': 'agent_data',
-                'agent_id': agent['id'],
-                'agent_name': agent_name,
-                'scan_type': data.get('scan_type'),
-                'interface': data.get('interface'),
-                'payload': data.get('payload'),
-                'received_at': data.get('received_at') or datetime.now(timezone.utc).isoformat()
-            })
-        except queue.Full:
-            logger.warning("Agent data queue full, data may be lost")
+        # Emit to SSE stream (fanout to all connected clients)
+        _broadcast_agent_data({
+            'type': 'agent_data',
+            'agent_id': agent['id'],
+            'agent_name': agent_name,
+            'scan_type': data.get('scan_type'),
+            'interface': data.get('interface'),
+            'payload': data.get('payload'),
+            'received_at': data.get('received_at') or datetime.now(timezone.utc).isoformat()
+        })
 
         return jsonify({
             'status': 'accepted',
@@ -681,20 +697,28 @@ def stream_all_agents():
     This endpoint streams push data as it arrives from agents.
     Each message is tagged with agent_id and agent_name.
     """
+    client_queue: queue.Queue = queue.Queue(maxsize=_AGENT_STREAM_CLIENT_QUEUE_SIZE)
+    with _agent_stream_subscribers_lock:
+        _agent_stream_subscribers.add(client_queue)
+
     def generate() -> Generator[str, None, None]:
         last_keepalive = time.time()
         keepalive_interval = 30.0
 
-        while True:
-            try:
-                msg = agent_data_queue.get(timeout=1.0)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
+        try:
+            while True:
+                try:
+                    msg = client_queue.get(timeout=1.0)
+                    last_keepalive = time.time()
+                    yield format_sse(msg)
+                except queue.Empty:
+                    now = time.time()
+                    if now - last_keepalive >= keepalive_interval:
+                        yield format_sse({'type': 'keepalive'})
+                        last_keepalive = now
+        finally:
+            with _agent_stream_subscribers_lock:
+                _agent_stream_subscribers.discard(client_queue)
 
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'

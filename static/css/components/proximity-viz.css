@@ -13,13 +13,11 @@
 }
 
 .radar-device {
-    transition: transform 0.2s ease;
-    transform-origin: center center;
     cursor: pointer;
 }
 
-.radar-device:hover {
-    transform: scale(1.2);
+.radar-device:hover .radar-dot {
+    filter: brightness(1.5);
 }
 
 /* Invisible larger hit area to prevent hover flicker */

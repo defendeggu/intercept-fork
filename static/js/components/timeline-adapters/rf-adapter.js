@@ -1,7 +1,7 @@
 /**
  * RF Signal Timeline Adapter
  * Normalizes RF signal data for the Activity Timeline component
- * Used by: Listening Post, TSCM
+ * Used by: Spectrum Waterfall, TSCM
  */
 
 const RFTimelineAdapter = (function() {
@@ -158,12 +158,12 @@ const RFTimelineAdapter = (function() {
     }
 
     /**
-     * Create timeline configuration for Listening Post mode
+     * Create timeline configuration for spectrum waterfall mode.
      */
-    function getListeningPostConfig() {
+    function getWaterfallConfig() {
         return {
-            title: 'Signal Activity',
-            mode: 'listening-post',
+            title: 'Spectrum Activity',
+            mode: 'waterfall',
             visualMode: 'enriched',
             collapsed: false,
             showAnnotations: true,
@@ -186,6 +186,11 @@ const RFTimelineAdapter = (function() {
             maxItems: 50,
             maxDisplayedLanes: 12
         };
+    }
+
+    // Backward compatibility alias for legacy callers.
+    function getListeningPostConfig() {
+        return getWaterfallConfig();
     }
 
     /**
@@ -224,6 +229,7 @@ const RFTimelineAdapter = (function() {
         categorizeFrequency: categorizeFrequency,
 
         // Configuration presets
+        getWaterfallConfig: getWaterfallConfig,
         getListeningPostConfig: getListeningPostConfig,
         getTscmConfig: getTscmConfig,
 

@@ -5,8 +5,8 @@
 }
 
 :root {
-    --font-sans: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
-    --font-mono: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --font-sans: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --bg-dark: #0b1118;
     --bg-panel: #101823;
     --bg-card: #151f2b;
@@ -27,12 +27,36 @@
     --radar-bg: #101823;
 }
 
+[data-theme="light"] {
+    --bg-dark: #f4f7fb;
+    --bg-panel: #e9eef5;
+    --bg-card: #ffffff;
+    --border-color: #d1d9e6;
+    --border-glow: #1f5fa8;
+    --text-primary: #122034;
+    --text-secondary: #3a4a5f;
+    --text-dim: #6b7c93;
+    --accent-green: #1f8a57;
+    --accent-cyan: #1f5fa8;
+    --accent-orange: #b5863a;
+    --accent-red: #c74444;
+    --accent-yellow: #b5863a;
+    --accent-amber: #b5863a;
+    --grid-line: rgba(31, 95, 168, 0.12);
+    --noise-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='40'%20height='40'%20viewBox='0%200%2040%2040'%3E%3Cg%20fill='%23000000'%20fill-opacity='0.05'%3E%3Ccircle%20cx='3'%20cy='5'%20r='1'/%3E%3Ccircle%20cx='11'%20cy='9'%20r='1'/%3E%3Ccircle%20cx='18'%20cy='3'%20r='1'/%3E%3Ccircle%20cx='26'%20cy='12'%20r='1'/%3E%3Ccircle%20cx='34'%20cy='6'%20r='1'/%3E%3Ccircle%20cx='7'%20cy='19'%20r='1'/%3E%3Ccircle%20cx='15'%20cy='24'%20r='1'/%3E%3Ccircle%20cx='28'%20cy='22'%20r='1'/%3E%3Ccircle%20cx='36'%20cy='18'%20r='1'/%3E%3Ccircle%20cx='5'%20cy='33'%20r='1'/%3E%3Ccircle%20cx='19'%20cy='32'%20r='1'/%3E%3Ccircle%20cx='31'%20cy='34'%20r='1'/%3E%3C/g%3E%3C/svg%3E");
+    --radar-cyan: #1f5fa8;
+    --radar-bg: #e9eef5;
+}
+
 body {
     font-family: var(--font-sans);
     background: var(--bg-dark);
     color: var(--text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
+    height: 100dvh;
+    height: 100vh; /* Fallback */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* Animated radar sweep background */
@@ -227,16 +251,14 @@ body {
 }
 
 /* Main dashboard grid - Mobile first */
-/* Header ~52px + Nav 44px + Stats strip ~55px = ~151px, using 160px for safety */
 .dashboard {
     position: relative;
     z-index: 10;
     display: flex;
     flex-direction: column;
     gap: 0;
-    height: calc(100dvh - 160px);
-    height: calc(100vh - 160px); /* Fallback */
-    min-height: 400px;
+    flex: 1;
+    min-height: 0;
 }
 
 /* Tablet: Two-column layout */
@@ -249,10 +271,26 @@ body {
     }
 }
 
-/* Desktop: Full layout with ACARS */
+/* Desktop: Full layout with ACARS/VDL2 + map + sidebar */
 @media (min-width: 1024px) {
     .dashboard {
         grid-template-columns: auto 1fr 300px;
+    }
+}
+
+/* Left sidebars wrapper (ACARS + VDL2) */
+.left-sidebars {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    .left-sidebars {
+        display: flex;
+        flex-direction: row;
+        grid-column: 1;
+        grid-row: 1;
+        height: 100%;
+        overflow: hidden;
     }
 }
 
@@ -267,12 +305,10 @@ body {
     min-height: 0;
 }
 
-/* Show ACARS sidebar on desktop */
-@media (min-width: 1024px) {
-    .acars-sidebar {
-        display: flex;
-        max-height: calc(100dvh - 160px);
-    }
+/* Show ACARS sidebar inside wrapper */
+.left-sidebars .acars-sidebar {
+    display: flex;
+    height: 100%;
 }
 
 .acars-collapse-btn {
@@ -419,6 +455,335 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* VDL2 sidebar (left of map, after ACARS) - Collapsible */
+.vdl2-sidebar {
+    display: none;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    flex-direction: row;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+}
+
+/* Show VDL2 sidebar inside wrapper */
+.left-sidebars .vdl2-sidebar {
+    display: flex;
+    height: 100%;
+}
+
+.vdl2-collapse-btn {
+    width: 28px;
+    min-width: 28px;
+    background: var(--bg-card);
+    border: none;
+    border-left: 1px solid var(--border-color);
+    color: var(--accent-cyan);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0;
+    transition: background 0.2s;
+}
+
+.vdl2-collapse-btn:hover {
+    background: rgba(74, 158, 255, 0.2);
+}
+
+.vdl2-collapse-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.vdl2-sidebar.collapsed .vdl2-collapse-label {
+    display: block;
+}
+
+.vdl2-sidebar:not(.collapsed) .vdl2-collapse-label {
+    display: none;
+}
+
+#vdl2CollapseIcon {
+    font-size: 10px;
+    transition: transform 0.3s;
+}
+
+.vdl2-sidebar.collapsed #vdl2CollapseIcon {
+    transform: rotate(180deg);
+}
+
+.vdl2-sidebar-content {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s ease, opacity 0.2s ease;
+    height: 100%;
+    min-height: 0;
+}
+
+.vdl2-sidebar.collapsed .vdl2-sidebar-content {
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.vdl2-sidebar .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vdl2-sidebar .panel::before {
+    display: none;
+}
+
+.vdl2-sidebar .panel-header {
+    flex-shrink: 0;
+}
+
+.vdl2-sidebar #vdl2PanelContent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vdl2-sidebar .vdl2-info,
+.vdl2-sidebar .vdl2-controls {
+    flex-shrink: 0;
+}
+
+.vdl2-sidebar .vdl2-messages {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.vdl2-sidebar .vdl2-btn {
+    background: var(--accent-green);
+    border: none;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 4px;
+}
+
+.vdl2-sidebar .vdl2-btn:hover {
+    background: #1db954;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+}
+
+.vdl2-sidebar .vdl2-btn.active {
+    background: var(--accent-red);
+}
+
+.vdl2-sidebar .vdl2-btn.active:hover {
+    background: #dc2626;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.vdl2-message-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 10px;
+    animation: fadeIn 0.3s ease;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.vdl2-message-item:hover {
+    background: rgba(74, 158, 255, 0.08);
+}
+
+/* VDL2 Message Modal */
+.vdl2-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: vdl2ModalFadeIn 0.15s ease;
+}
+
+@keyframes vdl2ModalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.vdl2-modal {
+    background: var(--bg-panel, #1a1a2e);
+    border: 1px solid var(--accent-cyan, #4a9eff);
+    border-radius: 8px;
+    width: 520px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 1px var(--accent-cyan, #4a9eff);
+    animation: vdl2ModalSlideIn 0.15s ease;
+}
+
+@keyframes vdl2ModalSlideIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.vdl2-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.vdl2-modal-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-cyan, #4a9eff);
+    letter-spacing: 0.5px;
+}
+
+.vdl2-modal-time {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.vdl2-modal-close {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    margin-left: 12px;
+}
+
+.vdl2-modal-close:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--accent-red, #ef4444);
+    color: var(--accent-red, #ef4444);
+}
+
+.vdl2-modal-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.vdl2-modal-section {
+    margin-bottom: 14px;
+}
+
+.vdl2-modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.vdl2-modal-section-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+}
+
+.vdl2-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+}
+
+.vdl2-modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.vdl2-modal-field-label {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+.vdl2-modal-field-value {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.vdl2-modal-msg-body {
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.vdl2-modal-raw-toggle {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--accent-cyan, #4a9eff);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+
+.vdl2-modal-raw-toggle:hover {
+    opacity: 1;
+}
+
+.vdl2-modal-raw-json {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+
 /* Panels */
 .panel {
     background: var(--bg-panel);
@@ -495,6 +860,8 @@ body {
     position: relative;
     flex: 1;
     min-height: 300px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 @media (min-width: 768px) {
@@ -526,40 +893,90 @@ body {
     display: block;
 }
 
-#radarOverlayCanvas {
+.map-crosshair-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     pointer-events: none;
-    z-index: 500;
-    display: none;
+    overflow: hidden;
+    z-index: 1200;
+    --crosshair-x-start: 100%;
+    --crosshair-y-start: 100%;
+    --crosshair-x-end: 50%;
+    --crosshair-y-end: 50%;
+    --crosshair-duration: 1500ms;
 }
 
-#radarOverlayCanvas.active {
-    display: block;
-}
-
-#radarScope {
+.map-crosshair-line {
     position: absolute;
+    opacity: 0;
+    background: var(--accent-cyan);
+    box-shadow: none;
+    will-change: transform, opacity;
+}
+
+.map-crosshair-vertical {
     top: 0;
+    bottom: 0;
+    width: 1px;
     left: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
-    background: var(--radar-bg);
+    transform: translateX(var(--crosshair-x-start));
 }
 
-#radarScope.active {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.map-crosshair-horizontal {
+    left: 0;
+    right: 0;
+    height: 1px;
+    top: 0;
+    transform: translateY(var(--crosshair-y-start));
 }
 
-#radarCanvas {
-    max-width: 100%;
-    max-height: 100%;
+.map-crosshair-overlay.active .map-crosshair-vertical {
+    animation: mapCrosshairSweepX var(--crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+.map-crosshair-overlay.active .map-crosshair-horizontal {
+    animation: mapCrosshairSweepY var(--crosshair-duration) cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
+}
+
+@keyframes mapCrosshairSweepX {
+    0% {
+        transform: translateX(var(--crosshair-x-start));
+        opacity: 0;
+    }
+    12% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(var(--crosshair-x-end));
+        opacity: 0;
+    }
+}
+
+@keyframes mapCrosshairSweepY {
+    0% {
+        transform: translateY(var(--crosshair-y-start));
+        opacity: 0;
+    }
+    12% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(var(--crosshair-y-end));
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .map-crosshair-overlay.active .map-crosshair-vertical,
+    .map-crosshair-overlay.active .map-crosshair-horizontal {
+        animation-duration: 220ms;
+    }
 }
 
 /* Right sidebar - Mobile first */
@@ -588,51 +1005,21 @@ body {
     }
 }
 
-/* View toggle */
-.view-toggle {
-    display: flex;
-    padding: 10px;
-    gap: 8px;
-    background: var(--bg-panel);
-    border-bottom: 1px solid rgba(74, 158, 255, 0.2);
-}
-
-.view-btn {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid rgba(74, 158, 255, 0.3);
-    background: transparent;
-    color: var(--text-secondary);
-    font-family: 'Orbitron', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.view-btn:hover {
-    border-color: var(--accent-cyan);
-    color: var(--accent-cyan);
-}
-
-.view-btn.active {
-    background: var(--accent-cyan);
-    border-color: var(--accent-cyan);
-    color: var(--bg-dark);
-}
-
 /* Selected aircraft panel */
 .selected-aircraft {
     flex-shrink: 0;
-    max-height: 480px;
+    max-height: 280px;
     overflow-y: auto;
 }
 
+@media (min-height: 900px) {
+    .selected-aircraft {
+        max-height: 340px;
+    }
+}
+
 .selected-info {
-    padding: 12px;
+    padding: 8px;
 }
 
 #aircraftPhotoContainer {
@@ -640,7 +1027,7 @@ body {
 }
 
 #aircraftPhotoContainer img {
-    max-height: 140px;
+    max-height: 100px;
     width: 100%;
     object-fit: cover;
     border-radius: 6px;
@@ -649,24 +1036,24 @@ body {
 
 .selected-callsign {
     font-family: 'Orbitron', monospace;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--accent-cyan);
     text-shadow: 0 0 15px var(--accent-cyan);
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .telemetry-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    gap: 4px;
 }
 
 .telemetry-item {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
-    padding: 8px;
+    padding: 5px 8px;
     border-left: 2px solid var(--accent-cyan);
 }
 
@@ -776,9 +1163,10 @@ body {
     gap: 8px;
     padding: 8px 15px;
     background: var(--bg-panel);
-    border-top: 1px solid rgba(74, 158, 255, 0.3);
+    border-top: none;
     font-size: 11px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .controls-bar > .control-group {
@@ -858,7 +1246,7 @@ body {
 
 .control-group select {
     padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-dark);
     border: 1px solid rgba(74, 158, 255, 0.3);
     border-radius: 4px;
     color: var(--accent-cyan);
@@ -907,6 +1295,15 @@ body {
 .control-group.airband-group {
     background: rgba(245, 158, 11, 0.05);
     border-color: rgba(245, 158, 11, 0.2);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.control-group.airband-group > .control-group-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
 }
 
 .control-group.airband-group .control-group-label {
@@ -1010,6 +1407,7 @@ body {
 /* Custom scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -1019,6 +1417,15 @@ body {
 ::-webkit-scrollbar-thumb {
     background: var(--accent-cyan);
     border-radius: 3px;
+}
+
+/* Hide scrollbar on controls bar */
+.controls-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.controls-bar {
+    scrollbar-width: none;
 }
 
 /* No aircraft message */
@@ -1289,7 +1696,7 @@ body {
         display: flex !important;
         flex-direction: column !important;
         height: auto !important;
-        min-height: calc(100dvh - 160px);
+        min-height: 400px;
         overflow-y: auto !important;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -1487,6 +1894,10 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-top: 1px;
+}
+
+.strip-stat.source-stat .strip-value {
+    font-size: 14px;
 }
 
 .strip-stat.session-stat {
@@ -1779,6 +2190,9 @@ body {
 .strip-btn {
     position: relative;
     z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: rgba(74, 158, 255, 0.1);
     border: 1px solid rgba(74, 158, 255, 0.2);
     color: var(--text-primary);
@@ -1789,6 +2203,12 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    text-decoration: none;
+}
+
+.strip-btn svg {
+    flex-shrink: 0;
+    opacity: 0.7;
 }
 
 .strip-btn:hover:not(:disabled) {

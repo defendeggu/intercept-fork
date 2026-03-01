@@ -13,34 +13,51 @@ from typing import Generator
 
 from flask import Blueprint, jsonify, request, Response, send_file
 
+import app as app_module
 from utils.logging import get_logger
-from utils.sse import format_sse
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
 from utils.sstv import (
     get_sstv_decoder,
     is_sstv_available,
     ISS_SSTV_FREQ,
-    DecodeProgress,
-    DopplerInfo,
 )
 
 logger = get_logger('intercept.sstv')
 
 sstv_bp = Blueprint('sstv', __name__, url_prefix='/sstv')
 
+# ISS SSTV runs on a fixed downlink; allow a small entry tolerance so users
+# can type nearby values and still land on the canonical center frequency.
+ISS_SSTV_MODULATION = 'fm'
+ISS_SSTV_FREQUENCIES = (ISS_SSTV_FREQ,)
+ISS_SSTV_FREQ_TOLERANCE_MHZ = 0.05
+
 # Queue for SSE progress streaming
 _sstv_queue: queue.Queue = queue.Queue(maxsize=100)
 
+# Track which device is being used
+sstv_active_device: int | None = None
 
-def _progress_callback(progress: DecodeProgress) -> None:
-    """Callback to queue progress updates for SSE stream."""
+
+def _progress_callback(data: dict) -> None:
+    """Callback to queue progress/scope updates for SSE stream."""
     try:
-        _sstv_queue.put_nowait(progress.to_dict())
+        _sstv_queue.put_nowait(data)
     except queue.Full:
         try:
             _sstv_queue.get_nowait()
-            _sstv_queue.put_nowait(progress.to_dict())
+            _sstv_queue.put_nowait(data)
         except queue.Empty:
             pass
+
+
+def _normalize_iss_frequency(frequency_mhz: float) -> float | None:
+    """Snap near-match user input to a supported ISS SSTV center frequency."""
+    for supported in ISS_SSTV_FREQUENCIES:
+        if abs(frequency_mhz - supported) <= ISS_SSTV_FREQ_TOLERANCE_MHZ:
+            return supported
+    return None
 
 
 @sstv_bp.route('/status')
@@ -59,6 +76,7 @@ def get_status():
         'decoder': decoder.decoder_available,
         'running': decoder.is_running,
         'iss_frequency': ISS_SSTV_FREQ,
+        'modulation': ISS_SSTV_MODULATION,
         'image_count': len(decoder.get_images()),
         'doppler_enabled': decoder.doppler_enabled,
     }
@@ -79,6 +97,7 @@ def start_decoder():
     JSON body (optional):
         {
             "frequency": 145.800,  // Frequency in MHz (default: ISS 145.800)
+            "modulation": "fm",    // ISS mode is FM-only
             "device": 0,           // RTL-SDR device index
             "latitude": 40.7128,   // Observer latitude for Doppler correction
             "longitude": -74.0060  // Observer longitude for Doppler correction
@@ -103,6 +122,7 @@ def start_decoder():
         return jsonify({
             'status': 'already_running',
             'frequency': ISS_SSTV_FREQ,
+            'modulation': ISS_SSTV_MODULATION,
             'doppler_enabled': decoder.doppler_enabled
         })
 
@@ -116,18 +136,29 @@ def start_decoder():
     # Get parameters
     data = request.get_json(silent=True) or {}
     frequency = data.get('frequency', ISS_SSTV_FREQ)
+    modulation = str(data.get('modulation', ISS_SSTV_MODULATION)).strip().lower()
     device_index = data.get('device', 0)
     latitude = data.get('latitude')
     longitude = data.get('longitude')
 
+    # Validate modulation (ISS mode is FM-only)
+    if modulation != ISS_SSTV_MODULATION:
+        return jsonify({
+            'status': 'error',
+            'message': f'Modulation must be {ISS_SSTV_MODULATION} for ISS SSTV mode'
+        }), 400
+
     # Validate frequency
     try:
         frequency = float(frequency)
-        if not (100 <= frequency <= 500):  # VHF range
+        normalized_frequency = _normalize_iss_frequency(frequency)
+        if normalized_frequency is None:
+            supported = ', '.join(f'{freq:.3f}' for freq in ISS_SSTV_FREQUENCIES)
             return jsonify({
                 'status': 'error',
-                'message': 'Frequency must be between 100-500 MHz'
+                'message': f'Supported ISS SSTV frequency: {supported} MHz FM'
             }), 400
+        frequency = normalized_frequency
     except (TypeError, ValueError):
         return jsonify({
             'status': 'error',
@@ -158,19 +189,34 @@ def start_decoder():
         latitude = None
         longitude = None
 
+    # Claim SDR device
+    global sstv_active_device
+    device_int = int(device_index)
+    error = app_module.claim_sdr_device(device_int, 'sstv')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error
+        }), 409
+
     # Set callback and start
     decoder.set_callback(_progress_callback)
     success = decoder.start(
         frequency=frequency,
         device_index=device_index,
         latitude=latitude,
-        longitude=longitude
+        longitude=longitude,
+        modulation=ISS_SSTV_MODULATION,
     )
 
     if success:
+        sstv_active_device = device_int
+
         result = {
             'status': 'started',
             'frequency': frequency,
+            'modulation': ISS_SSTV_MODULATION,
             'device': device_index,
             'doppler_enabled': decoder.doppler_enabled
         }
@@ -181,6 +227,8 @@ def start_decoder():
 
         return jsonify(result)
     else:
+        # Release device on failure
+        app_module.release_sdr_device(device_int)
         return jsonify({
             'status': 'error',
             'message': 'Failed to start decoder'
@@ -195,8 +243,15 @@ def stop_decoder():
     Returns:
         JSON confirmation.
     """
+    global sstv_active_device
     decoder = get_sstv_decoder()
     decoder.stop()
+
+    # Release device from registry
+    if sstv_active_device is not None:
+        app_module.release_sdr_device(sstv_active_device)
+        sstv_active_device = None
+
     return jsonify({'status': 'stopped'})
 
 
@@ -287,6 +342,73 @@ def get_image(filename: str):
     return send_file(image_path, mimetype='image/png')
 
 
+@sstv_bp.route('/images/<filename>/download')
+def download_image(filename: str):
+    """
+    Download a decoded SSTV image file.
+
+    Args:
+        filename: Image filename
+
+    Returns:
+        Image file as attachment or 404.
+    """
+    decoder = get_sstv_decoder()
+
+    # Security: only allow alphanumeric filenames with .png extension
+    if not filename.replace('_', '').replace('-', '').replace('.', '').isalnum():
+        return jsonify({'status': 'error', 'message': 'Invalid filename'}), 400
+
+    if not filename.endswith('.png'):
+        return jsonify({'status': 'error', 'message': 'Only PNG files supported'}), 400
+
+    image_path = decoder._output_dir / filename
+
+    if not image_path.exists():
+        return jsonify({'status': 'error', 'message': 'Image not found'}), 404
+
+    return send_file(image_path, mimetype='image/png', as_attachment=True, download_name=filename)
+
+
+@sstv_bp.route('/images/<filename>', methods=['DELETE'])
+def delete_image(filename: str):
+    """
+    Delete a decoded SSTV image.
+
+    Args:
+        filename: Image filename
+
+    Returns:
+        JSON confirmation.
+    """
+    decoder = get_sstv_decoder()
+
+    # Security: only allow alphanumeric filenames with .png extension
+    if not filename.replace('_', '').replace('-', '').replace('.', '').isalnum():
+        return jsonify({'status': 'error', 'message': 'Invalid filename'}), 400
+
+    if not filename.endswith('.png'):
+        return jsonify({'status': 'error', 'message': 'Only PNG files supported'}), 400
+
+    if decoder.delete_image(filename):
+        return jsonify({'status': 'ok'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Image not found'}), 404
+
+
+@sstv_bp.route('/images', methods=['DELETE'])
+def delete_all_images():
+    """
+    Delete all decoded SSTV images.
+
+    Returns:
+        JSON with count of deleted images.
+    """
+    decoder = get_sstv_decoder()
+    count = decoder.delete_all_images()
+    return jsonify({'status': 'ok', 'deleted': count})
+
+
 @sstv_bp.route('/stream')
 def stream_progress():
     """
@@ -300,22 +422,19 @@ def stream_progress():
     Returns:
         SSE stream (text/event-stream)
     """
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('sstv', msg, msg.get('type'))
 
-        while True:
-            try:
-                progress = _sstv_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse(progress)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=_sstv_queue,
+            channel_key='sstv',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

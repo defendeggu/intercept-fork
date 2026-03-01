@@ -55,6 +55,74 @@
                 </a>
             </div>
         </div>
+
+        <!-- Antenna Guide -->
+        <div class="section">
+            <h3>Antenna Guide</h3>
+            <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+                <p style="margin-bottom: 8px; color: var(--accent-cyan); font-weight: 600;">
+                    LoRa ISM band &mdash; frequency depends on region
+                </p>
+
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                    <strong style="color: var(--accent-cyan); font-size: 12px;">Stock Device Antenna</strong>
+                    <ul style="margin: 6px 0 0 14px; padding: 0;">
+                        <li><strong style="color: var(--text-primary);">Most devices:</strong> Ship with a small 915/868 MHz stubby antenna</li>
+                        <li><strong style="color: var(--text-primary);">Works for:</strong> Short range (&lt; 1 km) urban, indoor testing</li>
+                        <li><strong style="color: var(--text-primary);">Upgrade:</strong> Replace with tuned antenna for 5&ndash;20x range improvement</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                    <strong style="color: #00ff88; font-size: 12px;">Recommended Upgrades</strong>
+                    <ul style="margin: 6px 0 0 14px; padding: 0;">
+                        <li><strong style="color: var(--text-primary);">Whip antenna:</strong> ~$8&ndash;15, tuned 915/868 MHz, SMA connector</li>
+                        <li><strong style="color: var(--text-primary);">Ground plane:</strong> 8.2 cm vertical + 4 radials (915 MHz) on SMA</li>
+                        <li><strong style="color: var(--text-primary);">Yagi:</strong> ~$15&ndash;30, directional, great for point-to-point links</li>
+                        <li><strong style="color: var(--text-primary);">Collinear:</strong> ~$20&ndash;40, omnidirectional with higher gain (~5&ndash;8 dBi)</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                    <strong style="color: var(--accent-cyan); font-size: 12px;">Placement Tips</strong>
+                    <ul style="margin: 6px 0 0 14px; padding: 0;">
+                        <li><strong style="color: var(--text-primary);">Height wins:</strong> Elevating antenna 10m can double or triple range</li>
+                        <li><strong style="color: var(--text-primary);">Line of sight:</strong> LoRa works best with clear LOS to other nodes</li>
+                        <li><strong style="color: var(--text-primary);">Connector:</strong> Most devices use SMA or RP-SMA &mdash; check before buying</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                    <strong style="color: var(--accent-cyan); font-size: 12px;">Quick Reference</strong>
+                    <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 3px 4px; color: var(--text-dim);">US / Americas</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">915 MHz</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 3px 4px; color: var(--text-dim);">EU / UK / India</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">868 MHz</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 3px 4px; color: var(--text-dim);">915 MHz &lambda;/4</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">8.2 cm</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 3px 4px; color: var(--text-dim);">868 MHz &lambda;/4</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">8.6 cm</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 3px 4px; color: var(--text-dim);">Modulation</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">LoRa (CSS)</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 3px 4px; color: var(--text-dim);">Typical range</td>
+                            <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">1&ndash;15 km</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

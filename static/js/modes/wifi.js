@@ -69,6 +69,40 @@ const WiFiMode = (function() {
         return true;
     }
 
+    function getChannelPresetList(preset) {
+        switch (preset) {
+            case '2.4-common':
+                return '1,6,11';
+            case '2.4-all':
+                return '1,2,3,4,5,6,7,8,9,10,11,12,13';
+            case '5-low':
+                return '36,40,44,48';
+            case '5-mid':
+                return '52,56,60,64';
+            case '5-high':
+                return '149,153,157,161,165';
+            default:
+                return '';
+        }
+    }
+
+    function buildChannelConfig() {
+        const preset = document.getElementById('wifiChannelPreset')?.value || '';
+        const listInput = document.getElementById('wifiChannelList')?.value || '';
+        const singleInput = document.getElementById('wifiChannel')?.value || '';
+
+        const listValue = listInput.trim();
+        const presetValue = getChannelPresetList(preset);
+
+        const channels = listValue || presetValue || '';
+        const channel = channels ? null : (singleInput.trim() ? parseInt(singleInput.trim()) : null);
+
+        return {
+            channels: channels || null,
+            channel: Number.isFinite(channel) ? channel : null,
+        };
+    }
+
     // ==========================================================================
     // State
     // ==========================================================================
@@ -90,6 +124,19 @@ const WiFiMode = (function() {
     let selectedNetwork = null;
     let currentFilter = 'all';
     let currentSort = { field: 'rssi', order: 'desc' };
+    let renderFramePending = false;
+    const pendingRender = {
+        table: false,
+        stats: false,
+        radar: false,
+        chart: false,
+        detail: false,
+    };
+    const listenersBound = {
+        scanTabs: false,
+        filters: false,
+        sort: false,
+    };
 
     // Agent state
     let showAllAgentsMode = false;  // Show combined results from all agents
@@ -122,6 +169,7 @@ const WiFiMode = (function() {
         initSortControls();
         initProximityRadar();
         initChannelChart();
+        scheduleRender({ table: true, stats: true, radar: true, chart: true });
 
         // Check if already scanning
         checkScanStatus();
@@ -331,12 +379,14 @@ const WiFiMode = (function() {
     // ==========================================================================
 
     function initScanModeTabs() {
+        if (listenersBound.scanTabs) return;
         if (elements.scanModeQuick) {
             elements.scanModeQuick.addEventListener('click', () => setScanMode('quick'));
         }
         if (elements.scanModeDeep) {
             elements.scanModeDeep.addEventListener('click', () => setScanMode('deep'));
         }
+        listenersBound.scanTabs = true;
     }
 
     function setScanMode(mode) {
@@ -463,7 +513,7 @@ const WiFiMode = (function() {
         try {
             const iface = elements.interfaceSelect?.value || null;
             const band = document.getElementById('wifiBand')?.value || 'all';
-            const channel = document.getElementById('wifiChannel')?.value || null;
+            const channelConfig = buildChannelConfig();
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
 
             let response;
@@ -476,7 +526,8 @@ const WiFiMode = (function() {
                         interface: iface,
                         scan_type: 'deep',
                         band: band === 'abg' ? 'all' : band === 'bg' ? '2.4' : '5',
-                        channel: channel ? parseInt(channel) : null,
+                        channel: channelConfig.channel,
+                        channels: channelConfig.channels,
                     }),
                 });
             } else {
@@ -486,7 +537,8 @@ const WiFiMode = (function() {
                     body: JSON.stringify({
                         interface: iface,
                         band: band === 'abg' ? 'all' : band === 'bg' ? '2.4' : '5',
-                        channel: channel ? parseInt(channel) : null,
+                        channel: channelConfig.channel,
+                        channels: channelConfig.channels,
                     }),
                 });
             }
@@ -538,20 +590,35 @@ const WiFiMode = (function() {
             eventSource = null;
         }
 
+        // Update UI immediately so mode transitions are responsive even if the
+        // backend needs extra time to terminate subprocesses.
+        setScanning(false);
+
         // Stop scan on server (local or agent)
         const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
+        const timeoutMs = isAgentMode ? 8000 : 2200;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
         try {
             if (isAgentMode) {
-                await fetch(`/controller/agents/${currentAgent}/wifi/stop`, { method: 'POST' });
+                await fetch(`/controller/agents/${currentAgent}/wifi/stop`, {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             } else if (scanMode === 'deep') {
-                await fetch(`${CONFIG.apiBase}/scan/stop`, { method: 'POST' });
+                await fetch(`${CONFIG.apiBase}/scan/stop`, {
+                    method: 'POST',
+                    ...(controller ? { signal: controller.signal } : {}),
+                });
             }
         } catch (error) {
             console.warn('[WiFiMode] Error stopping scan:', error);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
         }
-
-        setScanning(false);
     }
 
     function setScanning(scanning, mode = null) {
@@ -662,10 +729,7 @@ const WiFiMode = (function() {
         }
 
         // Update UI
-        updateNetworkTable();
-        updateStats();
-        updateProximityRadar();
-        updateChannelChart();
+        scheduleRender({ table: true, stats: true, radar: true, chart: true });
 
         // Callbacks
         result.access_points.forEach(ap => {
@@ -876,17 +940,20 @@ const WiFiMode = (function() {
 
     function handleNetworkUpdate(network) {
         networks.set(network.bssid, network);
-        updateNetworkRow(network);
-        updateStats();
-        updateProximityRadar();
-        updateChannelChart();
+        scheduleRender({
+            table: true,
+            stats: true,
+            radar: true,
+            chart: true,
+            detail: selectedNetwork === network.bssid,
+        });
 
         if (onNetworkUpdate) onNetworkUpdate(network);
     }
 
     function handleClientUpdate(client) {
         clients.set(client.mac, client);
-        updateStats();
+        scheduleRender({ stats: true });
 
         // Update client display if this client belongs to the selected network
         updateClientInList(client);
@@ -908,7 +975,10 @@ const WiFiMode = (function() {
         if (network) {
             network.revealed_essid = revealedSsid;
             network.display_name = `${revealedSsid} (revealed)`;
-            updateNetworkRow(network);
+            scheduleRender({
+                table: true,
+                detail: selectedNetwork === bssid,
+            });
 
             // Show notification
             showInfo(`Hidden SSID revealed: ${revealedSsid}`);
@@ -920,6 +990,7 @@ const WiFiMode = (function() {
     // ==========================================================================
 
     function initNetworkFilters() {
+        if (listenersBound.filters) return;
         if (!elements.networkFilters) return;
 
         elements.networkFilters.addEventListener('click', (e) => {
@@ -928,6 +999,7 @@ const WiFiMode = (function() {
                 setNetworkFilter(filter);
             }
         });
+        listenersBound.filters = true;
     }
 
     function setNetworkFilter(filter) {
@@ -944,6 +1016,7 @@ const WiFiMode = (function() {
     }
 
     function initSortControls() {
+        if (listenersBound.sort) return;
         if (!elements.networkTable) return;
 
         elements.networkTable.addEventListener('click', (e) => {
@@ -958,6 +1031,44 @@ const WiFiMode = (function() {
                 }
                 updateNetworkTable();
             }
+        });
+
+        if (elements.networkTableBody) {
+            elements.networkTableBody.addEventListener('click', (e) => {
+                const row = e.target.closest('tr[data-bssid]');
+                if (!row) return;
+                selectNetwork(row.dataset.bssid);
+            });
+        }
+        listenersBound.sort = true;
+    }
+
+    function scheduleRender(flags = {}) {
+        pendingRender.table = pendingRender.table || Boolean(flags.table);
+        pendingRender.stats = pendingRender.stats || Boolean(flags.stats);
+        pendingRender.radar = pendingRender.radar || Boolean(flags.radar);
+        pendingRender.chart = pendingRender.chart || Boolean(flags.chart);
+        pendingRender.detail = pendingRender.detail || Boolean(flags.detail);
+
+        if (renderFramePending) return;
+        renderFramePending = true;
+
+        requestAnimationFrame(() => {
+            renderFramePending = false;
+
+            if (pendingRender.table) updateNetworkTable();
+            if (pendingRender.stats) updateStats();
+            if (pendingRender.radar) updateProximityRadar();
+            if (pendingRender.chart) updateChannelChart();
+            if (pendingRender.detail && selectedNetwork) {
+                updateDetailPanel(selectedNetwork, { refreshClients: false });
+            }
+
+            pendingRender.table = false;
+            pendingRender.stats = false;
+            pendingRender.radar = false;
+            pendingRender.chart = false;
+            pendingRender.detail = false;
         });
     }
 
@@ -1018,19 +1129,41 @@ const WiFiMode = (function() {
             }
         });
 
+        if (filtered.length === 0) {
+            let message = 'Start scanning to discover networks';
+            let type = 'empty';
+            if (isScanning) {
+                message = 'Scanning for networks...';
+                type = 'loading';
+            } else if (networks.size > 0) {
+                message = 'No networks match current filters';
+            }
+            if (typeof renderCollectionState === 'function') {
+                renderCollectionState(elements.networkTableBody, {
+                    type,
+                    message,
+                    columns: 7,
+                });
+            } else {
+                elements.networkTableBody.innerHTML = `<tr class="wifi-network-placeholder"><td colspan="7"><div class="placeholder-text">${escapeHtml(message)}</div></td></tr>`;
+            }
+            return;
+        }
+
         // Render table
         elements.networkTableBody.innerHTML = filtered.map(n => createNetworkRow(n)).join('');
     }
 
     function createNetworkRow(network) {
         const rssi = network.rssi_current;
+        const security = network.security || 'Unknown';
         const signalClass = rssi >= -50 ? 'signal-strong' :
                            rssi >= -70 ? 'signal-medium' :
                            rssi >= -85 ? 'signal-weak' : 'signal-very-weak';
 
-        const securityClass = network.security === 'Open' ? 'security-open' :
-                              network.security === 'WEP' ? 'security-wep' :
-                              network.security.includes('WPA3') ? 'security-wpa3' : 'security-wpa';
+        const securityClass = security === 'Open' ? 'security-open' :
+                              security === 'WEP' ? 'security-wep' :
+                              security.includes('WPA3') ? 'security-wpa3' : 'security-wpa';
 
         const hiddenBadge = network.is_hidden ? '<span class="badge badge-hidden">Hidden</span>' : '';
         const newBadge = network.is_new ? '<span class="badge badge-new">New</span>' : '';
@@ -1042,7 +1175,10 @@ const WiFiMode = (function() {
         return `
             <tr class="wifi-network-row ${network.bssid === selectedNetwork ? 'selected' : ''}"
                 data-bssid="${escapeHtml(network.bssid)}"
-                onclick="WiFiMode.selectNetwork('${escapeHtml(network.bssid)}')">
+                role="button"
+                tabindex="0"
+                data-keyboard-activate="true"
+                aria-label="Select network ${escapeHtml(network.display_name || network.essid || '[Hidden]')}">
                 <td class="col-essid">
                     <span class="essid">${escapeHtml(network.display_name || network.essid || '[Hidden]')}</span>
                     ${hiddenBadge}${newBadge}
@@ -1050,10 +1186,10 @@ const WiFiMode = (function() {
                 <td class="col-bssid"><code>${escapeHtml(network.bssid)}</code></td>
                 <td class="col-channel">${network.channel || '-'}</td>
                 <td class="col-rssi">
-                    <span class="rssi-value ${signalClass}">${rssi !== null ? rssi : '-'}</span>
+                    <span class="rssi-value ${signalClass}">${rssi != null ? rssi : '-'}</span>
                 </td>
                 <td class="col-security">
-                    <span class="security-badge ${securityClass}">${escapeHtml(network.security)}</span>
+                    <span class="security-badge ${securityClass}">${escapeHtml(security)}</span>
                 </td>
                 <td class="col-clients">${network.client_count || 0}</td>
                 <td class="col-agent">
@@ -1064,13 +1200,10 @@ const WiFiMode = (function() {
     }
 
     function updateNetworkRow(network) {
-        const row = elements.networkTableBody?.querySelector(`tr[data-bssid="${network.bssid}"]`);
-        if (row) {
-            row.outerHTML = createNetworkRow(network);
-        } else {
-            // Add new row
-            updateNetworkTable();
-        }
+        scheduleRender({
+            table: true,
+            detail: selectedNetwork === network.bssid,
+        });
     }
 
     function selectNetwork(bssid) {
@@ -1094,7 +1227,8 @@ const WiFiMode = (function() {
     // Detail Panel
     // ==========================================================================
 
-    function updateDetailPanel(bssid) {
+    function updateDetailPanel(bssid, options = {}) {
+        const { refreshClients = true } = options;
         if (!elements.detailDrawer) return;
 
         const network = networks.get(bssid);
@@ -1141,7 +1275,9 @@ const WiFiMode = (function() {
         elements.detailDrawer.classList.add('open');
 
         // Fetch and display clients for this network
-        fetchClientsForNetwork(network.bssid);
+        if (refreshClients) {
+            fetchClientsForNetwork(network.bssid);
+        }
     }
 
     function closeDetail() {
@@ -1160,6 +1296,12 @@ const WiFiMode = (function() {
 
     async function fetchClientsForNetwork(bssid) {
         if (!elements.detailClientList) return;
+        const listContainer = elements.detailClientList.querySelector('.wifi-client-list');
+
+        if (listContainer && typeof renderCollectionState === 'function') {
+            renderCollectionState(listContainer, { type: 'loading', message: 'Loading clients...' });
+            elements.detailClientList.style.display = 'block';
+        }
 
         try {
             const isAgentMode = typeof currentAgent !== 'undefined' && currentAgent !== 'local';
@@ -1173,8 +1315,12 @@ const WiFiMode = (function() {
             }
 
             if (!response.ok) {
-                // Hide client list on error
-                elements.detailClientList.style.display = 'none';
+                if (listContainer && typeof renderCollectionState === 'function') {
+                    renderCollectionState(listContainer, { type: 'empty', message: 'Client list unavailable' });
+                    elements.detailClientList.style.display = 'block';
+                } else {
+                    elements.detailClientList.style.display = 'none';
+                }
                 return;
             }
 
@@ -1187,11 +1333,23 @@ const WiFiMode = (function() {
                 renderClientList(clientList, bssid);
                 elements.detailClientList.style.display = 'block';
             } else {
-                elements.detailClientList.style.display = 'none';
+                const countBadge = document.getElementById('wifiClientCountBadge');
+                if (countBadge) countBadge.textContent = '0';
+                if (listContainer && typeof renderCollectionState === 'function') {
+                    renderCollectionState(listContainer, { type: 'empty', message: 'No associated clients' });
+                    elements.detailClientList.style.display = 'block';
+                } else {
+                    elements.detailClientList.style.display = 'none';
+                }
             }
         } catch (error) {
             console.debug('[WiFiMode] Error fetching clients:', error);
-            elements.detailClientList.style.display = 'none';
+            if (listContainer && typeof renderCollectionState === 'function') {
+                renderCollectionState(listContainer, { type: 'empty', message: 'Client list unavailable' });
+                elements.detailClientList.style.display = 'block';
+            } else {
+                elements.detailClientList.style.display = 'none';
+            }
         }
     }
 
@@ -1556,11 +1714,10 @@ const WiFiMode = (function() {
         probeRequests = [];
         channelStats = [];
         recommendations = [];
-
-        updateNetworkTable();
-        updateStats();
-        updateProximityRadar();
-        updateChannelChart();
+        if (selectedNetwork) {
+            closeDetail();
+        }
+        scheduleRender({ table: true, stats: true, radar: true, chart: true });
     }
 
     /**
@@ -1607,10 +1764,10 @@ const WiFiMode = (function() {
             }
         });
         clientsToRemove.forEach(mac => clients.delete(mac));
-
-        updateNetworkTable();
-        updateStats();
-        updateProximityRadar();
+        if (selectedNetwork && !networks.has(selectedNetwork)) {
+            closeDetail();
+        }
+        scheduleRender({ table: true, stats: true, radar: true, chart: true });
     }
 
     /**
@@ -1654,7 +1811,28 @@ const WiFiMode = (function() {
         onNetworkUpdate: (cb) => { onNetworkUpdate = cb; },
         onClientUpdate: (cb) => { onClientUpdate = cb; },
         onProbeRequest: (cb) => { onProbeRequest = cb; },
+
+        // Lifecycle
+        destroy,
     };
+
+    /**
+     * Destroy — close SSE stream and clear polling timers for clean mode switching.
+     */
+    function destroy() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+        if (agentPollTimer) {
+            clearInterval(agentPollTimer);
+            agentPollTimer = null;
+        }
+    }
 })();
 
 // Auto-initialize when DOM is ready

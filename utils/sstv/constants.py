@@ -59,15 +59,15 @@ VIS_CODES: dict[int, str] = {
     40:  'Martin2',
     60:  'Scottie1',
     56:  'Scottie2',
-    93:  'PD120',
-    95:  'PD180',
+    95:  'PD120',
+    97:  'PD180',
     # Less common but recognized
     4:   'Robot24',
     36:  'Martin3',
     52:  'Scottie3',
-    55:  'ScottieDX',
-    113: 'PD240',
-    96:  'PD90',
+    76:  'ScottieDX',
+    96:  'PD240',
+    99:  'PD90',
     98:  'PD160',
 }
 

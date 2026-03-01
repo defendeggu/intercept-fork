@@ -58,7 +58,6 @@ class TestHealthEndpoint:
         assert 'wifi' in processes
         assert 'bluetooth' in processes
 
-
 class TestDevicesEndpoint:
     """Tests for devices endpoint."""
 

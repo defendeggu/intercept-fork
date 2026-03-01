@@ -1,0 +1,126 @@
+<!-- GPS MODE -->
+<div id="gpsMode" class="mode-content">
+    <div class="section">
+        <h3>GPS Receiver</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Display live GPS data from gpsd &mdash; satellite sky view, signal strengths, position, velocity, DOP values, and timing.
+        </p>
+    </div>
+
+    <!-- Connection -->
+    <div class="section">
+        <h3>Connection</h3>
+        <div class="gps-connection-status">
+            <span class="gps-status-dot" id="gpsStatusDot"></span>
+            <span class="gps-status-text" id="gpsStatusText">Disconnected</span>
+        </div>
+        <div id="gpsDevicePath" style="font-size: 10px; color: var(--text-dim); margin-top: 4px; font-family: var(--font-mono);"></div>
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <button class="run-btn" id="gpsConnectBtn" onclick="GPS.connect()">Connect</button>
+            <button class="stop-btn" id="gpsDisconnectBtn" onclick="GPS.disconnect()" style="display: none;">Disconnect</button>
+        </div>
+    </div>
+
+    <!-- Fix Info -->
+    <div class="section">
+        <h3>Fix</h3>
+        <div class="gps-info-grid">
+            <div class="gps-info-item">
+                <span class="gps-info-label">Fix Type</span>
+                <span class="gps-info-value" id="gpsFixType">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Satellites</span>
+                <span class="gps-info-value"><span id="gpsSatUsed">-</span> / <span id="gpsSatTotal">-</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Position -->
+    <div class="section">
+        <h3>Position</h3>
+        <div class="gps-info-grid">
+            <div class="gps-info-item">
+                <span class="gps-info-label">Latitude</span>
+                <span class="gps-info-value gps-mono" id="gpsLat">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Longitude</span>
+                <span class="gps-info-value gps-mono" id="gpsLon">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Altitude</span>
+                <span class="gps-info-value gps-mono" id="gpsAlt">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Speed</span>
+                <span class="gps-info-value gps-mono" id="gpsSpeed">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Heading</span>
+                <span class="gps-info-value gps-mono" id="gpsHeading">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">Climb</span>
+                <span class="gps-info-value gps-mono" id="gpsClimb">---</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOP Values -->
+    <div class="section">
+        <h3>Dilution of Precision</h3>
+        <div class="gps-info-grid">
+            <div class="gps-info-item">
+                <span class="gps-info-label">HDOP</span>
+                <span class="gps-info-value gps-mono" id="gpsHdop">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">VDOP</span>
+                <span class="gps-info-value gps-mono" id="gpsVdop">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">PDOP</span>
+                <span class="gps-info-value gps-mono" id="gpsPdop">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">TDOP</span>
+                <span class="gps-info-value gps-mono" id="gpsTdop">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">GDOP</span>
+                <span class="gps-info-value gps-mono" id="gpsGdop">---</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Estimates -->
+    <div class="section">
+        <h3>Error Estimates</h3>
+        <div class="gps-info-grid">
+            <div class="gps-info-item">
+                <span class="gps-info-label">EPH (horiz)</span>
+                <span class="gps-info-value gps-mono" id="gpsEph">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">EPV (vert)</span>
+                <span class="gps-info-value gps-mono" id="gpsEpv">---</span>
+            </div>
+            <div class="gps-info-item">
+                <span class="gps-info-label">EPS (speed)</span>
+                <span class="gps-info-value gps-mono" id="gpsEps">---</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timing -->
+    <div class="section">
+        <h3>GPS Time</h3>
+        <div class="gps-info-grid">
+            <div class="gps-info-item" style="grid-column: 1 / -1;">
+                <span class="gps-info-label">UTC</span>
+                <span class="gps-info-value gps-mono" id="gpsTime" style="font-size: 14px;">---</span>
+            </div>
+        </div>
+    </div>
+</div>

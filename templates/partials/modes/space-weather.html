@@ -1,0 +1,71 @@
+<!-- SPACE WEATHER MODE -->
+<div id="spaceWeatherMode" class="mode-content">
+    <div class="section">
+        <h3>Space Weather Monitor</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Real-time solar and geomagnetic data from NOAA SWPC, NASA SDO, and HamQSL.
+            No SDR hardware required — data is fetched from public APIs.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Quick Status</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif;">
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">SFI</span>
+                <span id="swSidebarSfi" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">Kp</span>
+                <span id="swSidebarKp" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">A-Index</span>
+                <span id="swSidebarA" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">SSN</span>
+                <span id="swSidebarSsn" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">Wind</span>
+                <span id="swSidebarWind" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: var(--bg-primary); border-radius: 3px;">
+                <span style="color: var(--text-dim);">Bz</span>
+                <span id="swSidebarBz" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Refresh</h3>
+        <button class="mode-btn" onclick="SpaceWeather.refresh()" style="width: 100%; margin-bottom: 8px;">
+            Refresh Now
+        </button>
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="swAutoRefresh" checked onchange="SpaceWeather.toggleAutoRefresh()" style="width: auto;">
+                Auto-refresh (5 min)
+            </label>
+        </div>
+        <div id="swLastUpdate" style="font-size: 10px; color: var(--text-dim); font-family: 'Roboto Condensed', 'Arial Narrow', sans-serif; margin-top: 4px;">
+            Not yet loaded
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Resources</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                NOAA Space Weather
+            </a>
+            <a href="https://sdo.gsfc.nasa.gov/" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                NASA SDO
+            </a>
+            <a href="https://www.hamqsl.com/solar.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+                HamQSL Solar Data
+            </a>
+        </div>
+    </div>
+</div>

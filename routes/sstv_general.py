@@ -13,10 +13,11 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
+import app as app_module
 from utils.logging import get_logger
-from utils.sse import format_sse
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
 from utils.sstv import (
-    DecodeProgress,
     get_general_sstv_decoder,
 )
 
@@ -26,6 +27,9 @@ sstv_general_bp = Blueprint('sstv_general', __name__, url_prefix='/sstv-general'
 
 # Queue for SSE progress streaming
 _sstv_general_queue: queue.Queue = queue.Queue(maxsize=100)
+
+# Track which device is being used
+_sstv_general_active_device: int | None = None
 
 # Predefined SSTV frequencies
 SSTV_FREQUENCIES = [
@@ -40,7 +44,7 @@ SSTV_FREQUENCIES = [
     {'band': '15 m', 'frequency': 21.340, 'modulation': 'usb', 'notes': 'International calling frequency', 'type': 'Terrestrial HF'},
     {'band': '10 m', 'frequency': 28.680, 'modulation': 'usb', 'notes': 'International calling frequency', 'type': 'Terrestrial HF'},
     {'band': '6 m', 'frequency': 50.950, 'modulation': 'usb', 'notes': 'SSTV calling (less common)', 'type': 'Terrestrial VHF'},
-    {'band': '2 m', 'frequency': 145.625, 'modulation': 'fm', 'notes': 'Australia/common simplex (FM sometimes used)', 'type': 'Terrestrial VHF'},
+    {'band': '2 m', 'frequency': 145.500, 'modulation': 'fm', 'notes': 'Australia/common simplex (FM sometimes used)', 'type': 'Terrestrial VHF'},
     {'band': '70 cm', 'frequency': 433.775, 'modulation': 'fm', 'notes': 'Australia/common simplex', 'type': 'Terrestrial UHF'},
 ]
 
@@ -48,14 +52,14 @@ SSTV_FREQUENCIES = [
 _FREQ_MODULATION_MAP = {entry['frequency']: entry['modulation'] for entry in SSTV_FREQUENCIES}
 
 
-def _progress_callback(progress: DecodeProgress) -> None:
-    """Callback to queue progress updates for SSE stream."""
+def _progress_callback(data: dict) -> None:
+    """Callback to queue progress/scope updates for SSE stream."""
     try:
-        _sstv_general_queue.put_nowait(progress.to_dict())
+        _sstv_general_queue.put_nowait(data)
     except queue.Full:
         try:
             _sstv_general_queue.get_nowait()
-            _sstv_general_queue.put_nowait(progress.to_dict())
+            _sstv_general_queue.put_nowait(data)
         except queue.Empty:
             pass
 
@@ -150,6 +154,17 @@ def start_decoder():
             'message': 'Modulation must be fm, usb, or lsb',
         }), 400
 
+    # Claim SDR device
+    global _sstv_general_active_device
+    device_int = int(device_index)
+    error = app_module.claim_sdr_device(device_int, 'sstv_general')
+    if error:
+        return jsonify({
+            'status': 'error',
+            'error_type': 'DEVICE_BUSY',
+            'message': error,
+        }), 409
+
     # Set callback and start
     decoder.set_callback(_progress_callback)
     success = decoder.start(
@@ -159,6 +174,7 @@ def start_decoder():
     )
 
     if success:
+        _sstv_general_active_device = device_int
         return jsonify({
             'status': 'started',
             'frequency': frequency,
@@ -166,6 +182,7 @@ def start_decoder():
             'device': device_index,
         })
     else:
+        app_module.release_sdr_device(device_int)
         return jsonify({
             'status': 'error',
             'message': 'Failed to start decoder',
@@ -175,8 +192,14 @@ def start_decoder():
 @sstv_general_bp.route('/stop', methods=['POST'])
 def stop_decoder():
     """Stop general SSTV decoder."""
+    global _sstv_general_active_device
     decoder = get_general_sstv_decoder()
     decoder.stop()
+
+    if _sstv_general_active_device is not None:
+        app_module.release_sdr_device(_sstv_general_active_device)
+        _sstv_general_active_device = None
+
     return jsonify({'status': 'stopped'})
 
 
@@ -217,25 +240,68 @@ def get_image(filename: str):
     return send_file(image_path, mimetype='image/png')
 
 
+@sstv_general_bp.route('/images/<filename>/download')
+def download_image(filename: str):
+    """Download a decoded SSTV image file."""
+    decoder = get_general_sstv_decoder()
+
+    # Security: only allow alphanumeric filenames with .png extension
+    if not filename.replace('_', '').replace('-', '').replace('.', '').isalnum():
+        return jsonify({'status': 'error', 'message': 'Invalid filename'}), 400
+
+    if not filename.endswith('.png'):
+        return jsonify({'status': 'error', 'message': 'Only PNG files supported'}), 400
+
+    image_path = decoder._output_dir / filename
+
+    if not image_path.exists():
+        return jsonify({'status': 'error', 'message': 'Image not found'}), 404
+
+    return send_file(image_path, mimetype='image/png', as_attachment=True, download_name=filename)
+
+
+@sstv_general_bp.route('/images/<filename>', methods=['DELETE'])
+def delete_image(filename: str):
+    """Delete a decoded SSTV image."""
+    decoder = get_general_sstv_decoder()
+
+    # Security: only allow alphanumeric filenames with .png extension
+    if not filename.replace('_', '').replace('-', '').replace('.', '').isalnum():
+        return jsonify({'status': 'error', 'message': 'Invalid filename'}), 400
+
+    if not filename.endswith('.png'):
+        return jsonify({'status': 'error', 'message': 'Only PNG files supported'}), 400
+
+    if decoder.delete_image(filename):
+        return jsonify({'status': 'ok'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Image not found'}), 404
+
+
+@sstv_general_bp.route('/images', methods=['DELETE'])
+def delete_all_images():
+    """Delete all decoded SSTV images."""
+    decoder = get_general_sstv_decoder()
+    count = decoder.delete_all_images()
+    return jsonify({'status': 'ok', 'deleted': count})
+
+
 @sstv_general_bp.route('/stream')
 def stream_progress():
     """SSE stream of SSTV decode progress."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('sstv_general', msg, msg.get('type'))
 
-        while True:
-            try:
-                progress = _sstv_general_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse(progress)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=_sstv_general_queue,
+            channel_key='sstv_general',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

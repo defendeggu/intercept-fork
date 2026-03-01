@@ -20,23 +20,23 @@ from flask import Blueprint, jsonify, request, Response
 import app as app_module
 from utils.logging import sensor_logger as logger
 from utils.validation import validate_device_index, validate_gain, validate_ppm
-from utils.sse import format_sse
+from utils.sdr import SDRFactory, SDRType
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
 from utils.constants import (
     PROCESS_TERMINATE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
     PROCESS_START_WAIT,
 )
+from utils.process import register_process, unregister_process
 
 acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
 # Default VHF ACARS frequencies (MHz) - common worldwide
 DEFAULT_ACARS_FREQUENCIES = [
-    '131.550',  # Primary worldwide
-    '130.025',  # Secondary USA/Canada
-    '129.125',  # USA
-    '131.525',  # Europe
-    '131.725',  # Europe secondary
+    '131.725',  # North America
+    '131.825',  # North America
 ]
 
 # Message counter for statistics
@@ -45,6 +45,7 @@ acars_last_message_time = None
 
 # Track which device is being used
 acars_active_device: int | None = None
+acars_active_sdr_type: str | None = None
 
 
 def find_acarsdec():
@@ -126,6 +127,13 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
 
                 app_module.acars_queue.put(data)
 
+                # Feed flight correlator
+                try:
+                    from utils.flight_correlator import get_flight_correlator
+                    get_flight_correlator().add_acars_message(data)
+                except Exception:
+                    pass
+
                 # Log if enabled
                 if app_module.logging_enabled:
                     try:
@@ -144,9 +152,25 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
         logger.error(f"ACARS stream error: {e}")
         app_module.acars_queue.put({'type': 'error', 'message': str(e)})
     finally:
+        global acars_active_device, acars_active_sdr_type
+        # Ensure process is terminated
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        unregister_process(process)
         app_module.acars_queue.put({'type': 'status', 'status': 'stopped'})
         with app_module.acars_lock:
             app_module.acars_process = None
+        # Release SDR device
+        if acars_active_device is not None:
+            app_module.release_sdr_device(acars_active_device, acars_active_sdr_type or 'rtlsdr')
+            acars_active_device = None
+            acars_active_sdr_type = None
 
 
 @acars_bp.route('/tools')
@@ -178,7 +202,7 @@ def acars_status() -> Response:
 @acars_bp.route('/start', methods=['POST'])
 def start_acars() -> Response:
     """Start ACARS decoder."""
-    global acars_message_count, acars_last_message_time, acars_active_device
+    global acars_message_count, acars_last_message_time, acars_active_device, acars_active_sdr_type
 
     with app_module.acars_lock:
         if app_module.acars_process and app_module.acars_process.poll() is None:
@@ -205,9 +229,12 @@ def start_acars() -> Response:
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
+    # Resolve SDR type for device selection
+    sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
     # Check if device is available
     device_int = int(device)
-    error = app_module.claim_sdr_device(device_int, 'acars')
+    error = app_module.claim_sdr_device(device_int, 'acars', sdr_type_str)
     if error:
         return jsonify({
             'status': 'error',
@@ -216,6 +243,7 @@ def start_acars() -> Response:
         }), 409
 
     acars_active_device = device_int
+    acars_active_sdr_type = sdr_type_str
 
     # Get frequencies - use provided or defaults
     frequencies = data.get('frequencies', DEFAULT_ACARS_FREQUENCIES)
@@ -233,12 +261,20 @@ def start_acars() -> Response:
     acars_message_count = 0
     acars_last_message_time = None
 
+    try:
+        sdr_type = SDRType(sdr_type_str)
+    except ValueError:
+        sdr_type = SDRType.RTL_SDR
+
+    is_soapy = sdr_type not in (SDRType.RTL_SDR,)
+
     # Build acarsdec command
     # Different forks have different syntax:
     # - TLeconte v4+: acarsdec -j -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
     # - TLeconte v3: acarsdec -o 4 -g <gain> -p <ppm> -r <device> <freq1> <freq2> ...
     # - f00b4r0 (DragonOS): acarsdec --output json:file:- -g <gain> -p <ppm> -r <device> <freq1> ...
-    # Note: gain/ppm must come BEFORE -r
+    # SoapySDR devices: TLeconte uses -d <device_string>, f00b4r0 uses --soapysdr <device_string>
+    # Note: gain/ppm must come BEFORE -r/-d
     json_flag = get_acarsdec_json_flag(acarsdec_path)
     cmd = [acarsdec_path]
     if json_flag == '--output':
@@ -249,21 +285,33 @@ def start_acars() -> Response:
     else:
         cmd.extend(['-o', '4'])  # JSON output (TLeconte v3.x)
 
-    # Add gain if not auto (must be before -r)
+    # Add gain if not auto (must be before -r/-d)
     if gain and str(gain) != '0':
         cmd.extend(['-g', str(gain)])
 
-    # Add PPM correction if specified (must be before -r)
+    # Add PPM correction if specified (must be before -r/-d)
     if ppm and str(ppm) != '0':
         cmd.extend(['-p', str(ppm)])
 
     # Add device and frequencies
-    # f00b4r0 uses --rtlsdr <device>, TLeconte uses -r <device>
-    if json_flag == '--output':
+    if is_soapy:
+        # SoapySDR device (SDRplay, LimeSDR, Airspy, etc.)
+        sdr_device = SDRFactory.create_default_device(sdr_type, index=device_int)
+        # Build SoapySDR driver string (e.g., "driver=sdrplay,serial=...")
+        builder = SDRFactory.get_builder(sdr_type)
+        device_str = builder._build_device_string(sdr_device)
+        if json_flag == '--output':
+            cmd.extend(['-m', '256'])
+            cmd.extend(['--soapysdr', device_str])
+        else:
+            cmd.extend(['-d', device_str])
+    elif json_flag == '--output':
+        # f00b4r0 fork RTL-SDR: --rtlsdr <device>
         # Use 3.2 MS/s sample rate for wider bandwidth (handles NA frequency span)
         cmd.extend(['-m', '256'])
         cmd.extend(['--rtlsdr', str(device)])
     else:
+        # TLeconte fork RTL-SDR: -r <device>
         cmd.extend(['-r', str(device)])
     cmd.extend(frequencies)
 
@@ -299,8 +347,9 @@ def start_acars() -> Response:
         if process.poll() is not None:
             # Process died - release device
             if acars_active_device is not None:
-                app_module.release_sdr_device(acars_active_device)
+                app_module.release_sdr_device(acars_active_device, acars_active_sdr_type or 'rtlsdr')
                 acars_active_device = None
+                acars_active_sdr_type = None
             stderr = ''
             if process.stderr:
                 stderr = process.stderr.read().decode('utf-8', errors='replace')
@@ -311,6 +360,7 @@ def start_acars() -> Response:
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         app_module.acars_process = process
+        register_process(process)
 
         # Start output streaming thread
         thread = threading.Thread(
@@ -330,8 +380,9 @@ def start_acars() -> Response:
     except Exception as e:
         # Release device on failure
         if acars_active_device is not None:
-            app_module.release_sdr_device(acars_active_device)
+            app_module.release_sdr_device(acars_active_device, acars_active_sdr_type or 'rtlsdr')
             acars_active_device = None
+            acars_active_sdr_type = None
         logger.error(f"Failed to start ACARS decoder: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -339,7 +390,7 @@ def start_acars() -> Response:
 @acars_bp.route('/stop', methods=['POST'])
 def stop_acars() -> Response:
     """Stop ACARS decoder."""
-    global acars_active_device
+    global acars_active_device, acars_active_sdr_type
 
     with app_module.acars_lock:
         if not app_module.acars_process:
@@ -360,8 +411,9 @@ def stop_acars() -> Response:
 
     # Release device from registry
     if acars_active_device is not None:
-        app_module.release_sdr_device(acars_active_device)
+        app_module.release_sdr_device(acars_active_device, acars_active_sdr_type or 'rtlsdr')
         acars_active_device = None
+        acars_active_sdr_type = None
 
     return jsonify({'status': 'stopped'})
 
@@ -369,21 +421,19 @@ def stop_acars() -> Response:
 @acars_bp.route('/stream')
 def stream_acars() -> Response:
     """SSE stream for ACARS messages."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('acars', msg, msg.get('type'))
 
-        while True:
-            try:
-                msg = app_module.acars_queue.get(timeout=SSE_QUEUE_TIMEOUT)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= SSE_KEEPALIVE_INTERVAL:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.acars_queue,
+            channel_key='acars',
+            timeout=SSE_QUEUE_TIMEOUT,
+            keepalive_interval=SSE_KEEPALIVE_INTERVAL,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     return response
@@ -395,7 +445,7 @@ def get_frequencies() -> Response:
     return jsonify({
         'default': DEFAULT_ACARS_FREQUENCIES,
         'regions': {
-            'north_america': ['129.125', '130.025', '130.450', '131.550'],
+            'north_america': ['131.725', '131.825'],
             'europe': ['131.525', '131.725', '131.550'],
             'asia_pacific': ['131.550', '131.450'],
         }

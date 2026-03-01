@@ -1,0 +1,70 @@
+<!-- SYSTEM HEALTH MODE -->
+<div id="systemMode" class="mode-content">
+    <div class="section">
+        <h3>System Health</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Real-time monitoring of host resources, active decoders, and SDR hardware.
+            Auto-connects when entering this mode.
+        </p>
+    </div>
+
+    <!-- Quick Status Grid -->
+    <div class="section">
+        <h3>Quick Status</h3>
+        <div class="sys-quick-grid">
+            <div class="sys-quick-item">
+                <span class="sys-quick-label">CPU</span>
+                <span class="sys-quick-value" id="sysQuickCpu">--%</span>
+            </div>
+            <div class="sys-quick-item">
+                <span class="sys-quick-label">Temp</span>
+                <span class="sys-quick-value" id="sysQuickTemp">--&deg;C</span>
+            </div>
+            <div class="sys-quick-item">
+                <span class="sys-quick-label">RAM</span>
+                <span class="sys-quick-value" id="sysQuickRam">--%</span>
+            </div>
+            <div class="sys-quick-item">
+                <span class="sys-quick-label">Disk</span>
+                <span class="sys-quick-value" id="sysQuickDisk">--%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network & Location -->
+    <div class="section">
+        <h3>Network</h3>
+        <div id="sysQuickNet" style="font-size: 11px; color: var(--text-dim);">--</div>
+    </div>
+
+    <!-- Battery (shown only when available) -->
+    <div class="section" id="sysQuickBatterySection" style="display: none;">
+        <h3>Battery</h3>
+        <div id="sysQuickBattery" style="font-size: 11px; color: var(--text-dim);">--</div>
+    </div>
+
+    <!-- Location -->
+    <div class="section">
+        <h3>Location</h3>
+        <div id="sysQuickLocation" style="font-size: 11px; color: var(--text-dim);">--</div>
+    </div>
+
+    <!-- SDR Devices -->
+    <div class="section">
+        <h3>SDR Devices</h3>
+        <div id="sysSdrList" style="font-size: 11px; color: var(--text-dim);">
+            Scanning&hellip;
+        </div>
+        <button class="run-btn" style="width: 100%; margin-top: 8px;" onclick="SystemHealth.refreshSdr()">
+            Rescan SDR
+        </button>
+    </div>
+
+    <!-- Active Processes -->
+    <div class="section">
+        <h3>Active Processes</h3>
+        <div id="sysProcessList" style="font-size: 11px; color: var(--text-dim);">
+            Waiting for data&hellip;
+        </div>
+    </div>
+</div>

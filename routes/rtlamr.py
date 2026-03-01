@@ -17,8 +17,9 @@ from utils.logging import sensor_logger as logger
 from utils.validation import (
     validate_frequency, validate_device_index, validate_gain, validate_ppm
 )
-from utils.sse import format_sse
-from utils.process import safe_terminate, register_process
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
+from utils.process import safe_terminate, register_process, unregister_process
 
 rtlamr_bp = Blueprint('rtlamr', __name__)
 
@@ -61,10 +62,37 @@ def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
     except Exception as e:
         app_module.rtlamr_queue.put({'type': 'error', 'text': str(e)})
     finally:
-        process.wait()
+        global rtl_tcp_process, rtlamr_active_device
+        # Ensure rtlamr process is terminated
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        unregister_process(process)
+        # Kill companion rtl_tcp process
+        with rtl_tcp_lock:
+            if rtl_tcp_process:
+                try:
+                    rtl_tcp_process.terminate()
+                    rtl_tcp_process.wait(timeout=2)
+                except Exception:
+                    try:
+                        rtl_tcp_process.kill()
+                    except Exception:
+                        pass
+                unregister_process(rtl_tcp_process)
+                rtl_tcp_process = None
         app_module.rtlamr_queue.put({'type': 'status', 'text': 'stopped'})
         with app_module.rtlamr_lock:
             app_module.rtlamr_process = None
+        # Release SDR device
+        if rtlamr_active_device is not None:
+            app_module.release_sdr_device(rtlamr_active_device)
+            rtlamr_active_device = None
 
 
 @rtlamr_bp.route('/start_rtlamr', methods=['POST'])
@@ -110,38 +138,47 @@ def start_rtlamr() -> Response:
         output_format = data.get('format', 'json')
         
         # Start rtl_tcp first
+        rtl_tcp_just_started = False
+        rtl_tcp_cmd_str = ''
         with rtl_tcp_lock:
             if not rtl_tcp_process:
                 logger.info("Starting rtl_tcp server...")
                 try:
                     rtl_tcp_cmd = ['rtl_tcp', '-a', '0.0.0.0']
-                    
+
                     # Add device index if not 0
                     if device and device != '0':
                         rtl_tcp_cmd.extend(['-d', str(device)])
-                    
+
                     # Add gain if not auto
                     if gain and gain != '0':
                         rtl_tcp_cmd.extend(['-g', str(gain)])
-                    
+
                     # Add PPM correction if not 0
                     if ppm and ppm != '0':
                         rtl_tcp_cmd.extend(['-p', str(ppm)])
-                    
+
                     rtl_tcp_process = subprocess.Popen(
                         rtl_tcp_cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE
                     )
-                    
-                    # Wait a moment for rtl_tcp to start
-                    time.sleep(3)
-                    
-                    logger.info(f"rtl_tcp started: {' '.join(rtl_tcp_cmd)}")
-                    app_module.rtlamr_queue.put({'type': 'info', 'text': f'rtl_tcp: {" ".join(rtl_tcp_cmd)}'})
+                    register_process(rtl_tcp_process)
+                    rtl_tcp_just_started = True
+                    rtl_tcp_cmd_str = ' '.join(rtl_tcp_cmd)
                 except Exception as e:
                     logger.error(f"Failed to start rtl_tcp: {e}")
+                    # Release SDR device on rtl_tcp failure
+                    if rtlamr_active_device is not None:
+                        app_module.release_sdr_device(rtlamr_active_device)
+                        rtlamr_active_device = None
                     return jsonify({'status': 'error', 'message': f'Failed to start rtl_tcp: {e}'}), 500
+
+        # Wait for rtl_tcp to start outside lock
+        if rtl_tcp_just_started:
+            time.sleep(3)
+            logger.info(f"rtl_tcp started: {rtl_tcp_cmd_str}")
+            app_module.rtlamr_queue.put({'type': 'info', 'text': f'rtl_tcp: {rtl_tcp_cmd_str}'})
 
         # Build rtlamr command
         cmd = [
@@ -174,6 +211,7 @@ def start_rtlamr() -> Response:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            register_process(app_module.rtlamr_process)
 
             # Start output thread
             thread = threading.Thread(target=stream_rtlamr_output, args=(app_module.rtlamr_process,))
@@ -224,25 +262,34 @@ def start_rtlamr() -> Response:
 def stop_rtlamr() -> Response:
     global rtl_tcp_process, rtlamr_active_device
 
+    # Grab process refs inside locks, clear state, then terminate outside
+    rtlamr_proc = None
     with app_module.rtlamr_lock:
         if app_module.rtlamr_process:
-            app_module.rtlamr_process.terminate()
-            try:
-                app_module.rtlamr_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                app_module.rtlamr_process.kill()
+            rtlamr_proc = app_module.rtlamr_process
             app_module.rtlamr_process = None
 
+    if rtlamr_proc:
+        rtlamr_proc.terminate()
+        try:
+            rtlamr_proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            rtlamr_proc.kill()
+
     # Also stop rtl_tcp
+    tcp_proc = None
     with rtl_tcp_lock:
         if rtl_tcp_process:
-            rtl_tcp_process.terminate()
-            try:
-                rtl_tcp_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                rtl_tcp_process.kill()
+            tcp_proc = rtl_tcp_process
             rtl_tcp_process = None
-            logger.info("rtl_tcp stopped")
+
+    if tcp_proc:
+        tcp_proc.terminate()
+        try:
+            tcp_proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            tcp_proc.kill()
+        logger.info("rtl_tcp stopped")
 
     # Release device from registry
     if rtlamr_active_device is not None:
@@ -254,22 +301,19 @@ def stop_rtlamr() -> Response:
 
 @rtlamr_bp.route('/stream_rtlamr')
 def stream_rtlamr() -> Response:
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('rtlamr', msg, msg.get('type'))
 
-        while True:
-            try:
-                msg = app_module.rtlamr_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.rtlamr_queue,
+            channel_key='rtlamr',
+            timeout=1.0,
+            keepalive_interval=30.0,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

@@ -14,30 +14,26 @@ from __future__ import annotations
 # =============================================================================
 
 FORMAT_CODES = {
-    100: 'DISTRESS',       # All ships distress alert
-    102: 'ALL_SHIPS',      # All ships call
-    104: 'GROUP',          # Group call
-    106: 'DISTRESS_ACK',   # Distress acknowledgement
-    108: 'DISTRESS_RELAY', # Distress relay
-    110: 'GEOGRAPHIC',     # Geographic area call
-    112: 'INDIVIDUAL',     # Individual call
-    114: 'INDIVIDUAL_ACK', # Individual acknowledgement
-    116: 'ROUTINE',        # Routine call
-    118: 'SAFETY',         # Safety call
-    120: 'URGENCY',        # Urgency call
+    102: 'ALL_SHIPS',              # All ships call
+    112: 'INDIVIDUAL',             # Individual call
+    114: 'INDIVIDUAL_ACK',         # Individual acknowledgement
+    116: 'GROUP',                  # Group call (including geographic area)
+    120: 'DISTRESS',               # Distress alert
+    123: 'ALL_SHIPS_URGENCY_SAFETY',  # All ships urgency/safety
 }
+
+# Valid ITU-R M.493 format specifiers
+VALID_FORMAT_SPECIFIERS = {102, 112, 114, 116, 120, 123}
+
+# Valid EOS (End of Sequence) symbols per ITU-R M.493
+VALID_EOS = {117, 122, 127}
 
 # Category priority (lower = higher priority)
 CATEGORY_PRIORITY = {
     'DISTRESS': 0,
-    'DISTRESS_ACK': 1,
-    'DISTRESS_RELAY': 2,
-    'URGENCY': 3,
-    'SAFETY': 4,
-    'ROUTINE': 5,
+    'ALL_SHIPS_URGENCY_SAFETY': 2,
     'ALL_SHIPS': 5,
     'GROUP': 5,
-    'GEOGRAPHIC': 5,
     'INDIVIDUAL': 5,
     'INDIVIDUAL_ACK': 5,
 }
@@ -92,6 +88,15 @@ TELECOMMAND_CODES = {
     200: 'F3E_G3E_SIMPLEX',    # Simplex VHF telephony requested
     201: 'POLL_RESPONSE',      # Poll response
 }
+
+# Full 0-127 telecommand lookup (maps unknown codes to "UNKNOWN")
+TELECOMMAND_CODES_FULL = {i: TELECOMMAND_CODES.get(i, "UNKNOWN") for i in range(128)}
+
+# Format codes that carry telecommand fields
+TELECOMMAND_FORMATS = {112, 114, 116, 120, 123}
+
+# Minimum symbols (after phasing strip) before an EOS can be accepted
+MIN_SYMBOLS_FOR_FORMAT = 12
 
 
 # =============================================================================
@@ -453,11 +458,11 @@ VHF_CHANNELS = {
 # DSC Modulation Parameters
 # =============================================================================
 
-DSC_BAUD_RATE = 100  # 100 baud per ITU-R M.493
+DSC_BAUD_RATE = 1200  # 1200 bps per ITU-R M.493
 
-# FSK tone frequencies (Hz)
-DSC_MARK_FREQ = 1800  # B (mark) - binary 1
-DSC_SPACE_FREQ = 1200  # Y (space) - binary 0
+# FSK tone frequencies (Hz) on 1700 Hz subcarrier
+DSC_MARK_FREQ = 2100  # B (mark) - binary 1
+DSC_SPACE_FREQ = 1300  # Y (space) - binary 0
 
 # Audio sample rate for decoding
 DSC_AUDIO_SAMPLE_RATE = 48000

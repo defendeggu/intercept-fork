@@ -28,14 +28,16 @@ body {
     color: var(--text-primary);
     background-color: var(--bg-primary);
     background-image:
+        radial-gradient(1200px 620px at 8% -12%, var(--ambient-top-left), transparent 62%),
+        radial-gradient(980px 560px at 92% -16%, var(--ambient-top-right), transparent 64%),
+        radial-gradient(900px 520px at 50% 126%, var(--ambient-bottom), transparent 68%),
         var(--noise-image),
-        radial-gradient(circle at 15% 0%, var(--grid-dot), transparent 45%),
-        linear-gradient(180deg, var(--grid-dot), transparent 35%),
         linear-gradient(var(--grid-line) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 40px 40px, auto, auto, 48px 48px, 48px 48px;
+    background-size: auto, auto, auto, 40px 40px, 48px 48px, 48px 48px;
     background-attachment: fixed;
     min-height: 100vh;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% if offline_settings.tile_provider in ['cartodb_dark', 'cartodb_dark_cyan'] %}map-cyber-enabled{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ais_dashboard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
@@ -54,8 +54,10 @@
         </div>
     </header>
 
+    {% if not embedded %}
     {% set active_mode = 'ais' %}
     {% include 'partials/nav.html' with context %}
+    {% endif %}
 
     <div class="stats-strip">
         <div class="stats-strip-inner">
@@ -750,7 +752,7 @@
                 stats.fastestSpeed = data.speed;
             }
 
-            if (data.lat && data.lon) {
+            if (data.lat !== undefined && data.lat !== null && data.lon !== undefined && data.lon !== null) {
                 const dist = calculateDistance(observerLocation.lat, observerLocation.lon, data.lat, data.lon);
                 if (dist > stats.maxRange) stats.maxRange = dist;
                 if (dist < stats.closestDistance) stats.closestDistance = dist;
@@ -1019,7 +1021,7 @@
             gpsEventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'position' && data.latitude && data.longitude) {
+                    if (data.type === 'position' && data.latitude !== undefined && data.latitude !== null && data.longitude !== undefined && data.longitude !== null) {
                         updateLocationFromGps(data);
                     }
                 } catch (e) {
@@ -1177,6 +1179,19 @@
             const isAgentMode = typeof aisCurrentAgent !== 'undefined' && aisCurrentAgent !== 'local';
             dscCurrentAgent = isAgentMode ? aisCurrentAgent : null;
 
+            // Check for remote SDR (only for local mode)
+            const remoteConfig = (!isAgentMode && typeof getRemoteSDRConfig === 'function')
+                ? getRemoteSDRConfig() : null;
+            if (remoteConfig === false) return; // Validation failed
+
+            const requestBody = { device, gain };
+
+            // Add rtl_tcp params if using remote SDR
+            if (remoteConfig) {
+                requestBody.rtl_tcp_host = remoteConfig.host;
+                requestBody.rtl_tcp_port = remoteConfig.port;
+            }
+
             // Determine endpoint based on agent mode
             const endpoint = isAgentMode
                 ? `/controller/agents/${aisCurrentAgent}/dsc/start`
@@ -1185,7 +1200,7 @@
             fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device, gain })
+                body: JSON.stringify(requestBody)
             })
             .then(r => r.json())
             .then(data => {
@@ -1345,7 +1360,7 @@
             }
 
             // Add position marker if coordinates present
-            if (data.latitude && data.longitude) {
+            if (data.latitude !== undefined && data.latitude !== null && data.longitude !== undefined && data.longitude !== null) {
                 addDscPositionMarker(data);
             }
 
@@ -1562,7 +1577,7 @@
     <!-- Help Modal -->
     {% include 'partials/help-modal.html' %}
 
-    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}?v={{ version }}&r=maptheme17"></script>
 
     <!-- Agent Manager -->
     <script src="{{ url_for('static', filename='js/core/agents.js') }}"></script>
@@ -1600,7 +1615,7 @@
                         const gps = typeof data.agent.gps_coords === 'string'
                             ? JSON.parse(data.agent.gps_coords)
                             : data.agent.gps_coords;
-                        if (gps.lat && gps.lon) {
+                        if (gps.lat !== undefined && gps.lat !== null && gps.lon !== undefined && gps.lon !== null) {
                             document.getElementById('obsLat').value = gps.lat.toFixed(4);
                             document.getElementById('obsLon').value = gps.lon.toFixed(4);
                             updateObserverLoc();

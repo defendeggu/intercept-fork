@@ -5,8 +5,10 @@ from __future__ import annotations
 import csv
 import json
 import os
+import pty
 import queue
 import re
+import select
 import shutil
 import subprocess
 import tempfile
@@ -14,14 +16,22 @@ import threading
 import time
 from datetime import datetime
 from subprocess import PIPE, STDOUT
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 
 from flask import Blueprint, jsonify, request, Response
 
 import app as app_module
 from utils.logging import sensor_logger as logger
-from utils.validation import validate_device_index, validate_gain, validate_ppm
-from utils.sse import format_sse
+from utils.validation import (
+    validate_device_index,
+    validate_gain,
+    validate_ppm,
+    validate_rtl_tcp_host,
+    validate_rtl_tcp_port,
+)
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
+from utils.sdr import SDRFactory, SDRType
 from utils.constants import (
     PROCESS_TERMINATE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
@@ -33,6 +43,7 @@ aprs_bp = Blueprint('aprs', __name__, url_prefix='/aprs')
 
 # Track which SDR device is being used
 aprs_active_device: int | None = None
+aprs_active_sdr_type: str | None = None
 
 # APRS frequencies by region (MHz)
 APRS_FREQUENCIES = {
@@ -45,6 +56,8 @@ APRS_FREQUENCIES = {
     'brazil': '145.570',
     'japan': '144.640',
     'china': '144.640',
+    'iss': '145.825',
+    'sonate2': '145.825',
 }
 
 # Statistics
@@ -52,6 +65,7 @@ aprs_packet_count = 0
 aprs_station_count = 0
 aprs_last_packet_time = None
 aprs_stations = {}  # callsign -> station data
+APRS_MAX_STATIONS = 500  # Limit tracked stations to prevent memory growth
 
 # Meter rate limiting
 _last_meter_time = 0.0
@@ -75,6 +89,11 @@ def find_rtl_fm() -> Optional[str]:
     return shutil.which('rtl_fm')
 
 
+def find_rx_fm() -> Optional[str]:
+    """Find SoapySDR rx_fm binary."""
+    return shutil.which('rx_fm')
+
+
 def find_rtl_power() -> Optional[str]:
     """Find rtl_power binary for spectrum scanning."""
     return shutil.which('rtl_power')
@@ -93,10 +112,33 @@ ADEVICE stdin null
 CHANNEL 0
 MYCALL N0CALL
 MODEM 1200
+FIX_BITS 1
+AGWPORT 0
+KISSPORT 0
 """
     with open(DIREWOLF_CONFIG_PATH, 'w') as f:
         f.write(config)
     return DIREWOLF_CONFIG_PATH
+
+
+def normalize_aprs_output_line(line: str) -> str:
+    """Normalize a decoder output line to raw APRS packet format.
+
+    Handles common decoder prefixes:
+    - multimon-ng: ``AFSK1200: ...``
+    - direwolf tags: ``[0.4] ...``, ``[0L] ...``, etc.
+    """
+    if not line:
+        return ''
+
+    normalized = line.strip()
+    if normalized.startswith('AFSK1200:'):
+        normalized = normalized[9:].strip()
+
+    # Strip one or more leading bracket tags emitted by decoders.
+    # Examples: [0.4], [0L], [NONE]
+    normalized = re.sub(r'^(?:\[[^\]]+\]\s*)+', '', normalized)
+    return normalized
 
 
 def parse_aprs_packet(raw_packet: str) -> Optional[dict]:
@@ -115,10 +157,15 @@ def parse_aprs_packet(raw_packet: str) -> Optional[dict]:
     - User-defined formats
     """
     try:
+        raw_packet = normalize_aprs_output_line(raw_packet)
+        if not raw_packet:
+            return None
+
         # Basic APRS packet format: CALLSIGN>PATH:DATA
         # Example: N0CALL-9>APRS,TCPIP*:@092345z4903.50N/07201.75W_090/000g005t077
 
-        match = re.match(r'^([A-Z0-9-]+)>([^:]+):(.+)$', raw_packet, re.IGNORECASE)
+        # Source callsigns can include tactical suffixes like "/1" on some stations.
+        match = re.match(r'^([A-Z0-9/\-]+)>([^:]+):(.+)$', raw_packet, re.IGNORECASE)
         if not match:
             return None
 
@@ -433,6 +480,109 @@ def parse_position(data: str) -> Optional[dict]:
                 result['altitude'] = int(alt_match.group(1))  # feet
 
             return result
+
+        # Legacy/no-decimal variant occasionally seen in degraded decodes:
+        # DDMMN/DDDMMW (symbol chars still present between/after coords).
+        nodot_match = re.match(
+            r'^(\d{2})(\d{2})([NS])(.)(\d{3})(\d{2})([EW])(.)?',
+            data
+        )
+        if nodot_match:
+            lat_deg = int(nodot_match.group(1))
+            lat_min = float(nodot_match.group(2))
+            lat_dir = nodot_match.group(3)
+            symbol_table = nodot_match.group(4)
+            lon_deg = int(nodot_match.group(5))
+            lon_min = float(nodot_match.group(6))
+            lon_dir = nodot_match.group(7)
+            symbol_code = nodot_match.group(8) or ''
+
+            lat = lat_deg + lat_min / 60.0
+            if lat_dir == 'S':
+                lat = -lat
+
+            lon = lon_deg + lon_min / 60.0
+            if lon_dir == 'W':
+                lon = -lon
+
+            result = {
+                'lat': round(lat, 6),
+                'lon': round(lon, 6),
+                'symbol': symbol_table + symbol_code,
+            }
+
+            remaining = data[13:] if len(data) > 13 else ''
+
+            cs_match = re.search(r'(\d{3})/(\d{3})', remaining)
+            if cs_match:
+                result['course'] = int(cs_match.group(1))
+                result['speed'] = int(cs_match.group(2))
+
+            alt_match = re.search(r'/A=(-?\d+)', remaining)
+            if alt_match:
+                result['altitude'] = int(alt_match.group(1))
+
+            return result
+
+        # Fallback: tolerate APRS ambiguity spaces in minute fields.
+        # Example: 4903.  N/07201.  W
+        if len(data) >= 18:
+            lat_field = data[0:7]
+            lat_dir = data[7]
+            symbol_table = data[8] if len(data) > 8 else ''
+            lon_field = data[9:17] if len(data) >= 17 else ''
+            lon_dir = data[17] if len(data) > 17 else ''
+            symbol_code = data[18] if len(data) > 18 else ''
+
+            if (
+                len(lat_field) == 7
+                and len(lon_field) == 8
+                and lat_dir in ('N', 'S')
+                and lon_dir in ('E', 'W')
+            ):
+                lat_deg_txt = lat_field[:2]
+                lat_min_txt = lat_field[2:].replace(' ', '0')
+                lon_deg_txt = lon_field[:3]
+                lon_min_txt = lon_field[3:].replace(' ', '0')
+
+                if (
+                    lat_deg_txt.isdigit()
+                    and lon_deg_txt.isdigit()
+                    and re.match(r'^\d{2}\.\d+$', lat_min_txt)
+                    and re.match(r'^\d{2}\.\d+$', lon_min_txt)
+                ):
+                    lat_deg = int(lat_deg_txt)
+                    lon_deg = int(lon_deg_txt)
+                    lat_min = float(lat_min_txt)
+                    lon_min = float(lon_min_txt)
+
+                    lat = lat_deg + lat_min / 60.0
+                    if lat_dir == 'S':
+                        lat = -lat
+
+                    lon = lon_deg + lon_min / 60.0
+                    if lon_dir == 'W':
+                        lon = -lon
+
+                    result = {
+                        'lat': round(lat, 6),
+                        'lon': round(lon, 6),
+                        'symbol': symbol_table + symbol_code,
+                    }
+
+                    # Keep same extension parsing behavior as primary branch.
+                    remaining = data[19:] if len(data) > 19 else ''
+
+                    cs_match = re.search(r'(\d{3})/(\d{3})', remaining)
+                    if cs_match:
+                        result['course'] = int(cs_match.group(1))
+                        result['speed'] = int(cs_match.group(2))
+
+                    alt_match = re.search(r'/A=(-?\d+)', remaining)
+                    if alt_match:
+                        result['altitude'] = int(alt_match.group(1))
+
+                    return result
 
     except Exception as e:
         logger.debug(f"Failed to parse position: {e}")
@@ -1299,19 +1449,23 @@ def should_send_meter_update(level: int) -> bool:
     return False
 
 
-def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subprocess.Popen) -> None:
+def stream_aprs_output(master_fd: int, rtl_process: subprocess.Popen, decoder_process: subprocess.Popen) -> None:
     """Stream decoded APRS packets and audio level meter to queue.
 
-    This function reads from the decoder's stdout (text mode, line-buffered).
-    The decoder's stderr is merged into stdout (STDOUT) to avoid deadlocks.
-    rtl_fm's stderr is captured via PIPE with a monitor thread.
+    Reads from a PTY master fd to get line-buffered output from the decoder,
+    avoiding the 15-minute pipe buffering delay. Uses select() + os.read()
+    to poll the PTY (same pattern as pager.py).
 
     Outputs two types of messages to the queue:
     - type='aprs': Decoded APRS packets
     - type='meter': Audio level meter readings (rate-limited)
     """
     global aprs_packet_count, aprs_station_count, aprs_last_packet_time, aprs_stations
-    global _last_meter_time, _last_meter_level
+    global _last_meter_time, _last_meter_level, aprs_active_device, aprs_active_sdr_type
+
+    # Capture the device claimed by THIS session so the finally block only
+    # releases our own device, not one claimed by a subsequent start.
+    my_device = aprs_active_device
 
     # Reset meter state
     _last_meter_time = 0.0
@@ -1320,73 +1474,114 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
     try:
         app_module.aprs_queue.put({'type': 'status', 'status': 'started'})
 
-        # Read line-by-line in text mode. Empty string '' signals EOF.
-        for line in iter(decoder_process.stdout.readline, ''):
-            line = line.strip()
-            if not line:
-                continue
+        # Read from PTY using select() for non-blocking reads.
+        # PTY forces the decoder to line-buffer, so output arrives immediately
+        # instead of waiting for a full 4-8KB pipe buffer to fill.
+        buffer = ""
+        while True:
+            try:
+                ready, _, _ = select.select([master_fd], [], [], 1.0)
+            except Exception:
+                break
 
-            # Check for audio level line first (for signal meter)
-            audio_level = parse_audio_level(line)
-            if audio_level is not None:
-                if should_send_meter_update(audio_level):
-                    meter_msg = {
-                        'type': 'meter',
-                        'level': audio_level,
-                        'ts': datetime.utcnow().isoformat() + 'Z'
-                    }
-                    app_module.aprs_queue.put(meter_msg)
-                continue  # Audio level lines are not packets
+            if ready:
+                try:
+                    data = os.read(master_fd, 1024)
+                    if not data:
+                        break
+                    buffer += data.decode('utf-8', errors='replace')
+                except OSError:
+                    break
 
-            # multimon-ng prefixes decoded packets with "AFSK1200: "
-            if line.startswith('AFSK1200:'):
-                line = line[9:].strip()
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    line = line.strip()
+                    if not line:
+                        continue
 
-            # direwolf often prefixes packets with "[0.4] " or similar audio level indicator
-            # Strip any leading bracket prefix like "[0.4] " before parsing
-            line = re.sub(r'^\[\d+\.\d+\]\s*', '', line)
+                    # Check for audio level line first (for signal meter)
+                    audio_level = parse_audio_level(line)
+                    if audio_level is not None:
+                        if should_send_meter_update(audio_level):
+                            meter_msg = {
+                                'type': 'meter',
+                                'level': audio_level,
+                                'ts': datetime.utcnow().isoformat() + 'Z'
+                            }
+                            app_module.aprs_queue.put(meter_msg)
+                        continue  # Audio level lines are not packets
 
-            # Skip non-packet lines (APRS format: CALL>PATH:DATA)
-            if '>' not in line or ':' not in line:
-                continue
+                    # Normalize decoder prefixes (multimon/direwolf) before parsing.
+                    line = normalize_aprs_output_line(line)
 
-            packet = parse_aprs_packet(line)
-            if packet:
-                aprs_packet_count += 1
-                aprs_last_packet_time = time.time()
+                    # Skip non-packet lines (APRS format: CALL>PATH:DATA)
+                    if '>' not in line or ':' not in line:
+                        continue
 
-                # Track unique stations
-                callsign = packet.get('callsign')
-                if callsign and callsign not in aprs_stations:
-                    aprs_station_count += 1
+                    packet = parse_aprs_packet(line)
+                    if packet:
+                        aprs_packet_count += 1
+                        aprs_last_packet_time = time.time()
 
-                # Update station data
-                if callsign:
-                    aprs_stations[callsign] = {
-                        'callsign': callsign,
-                        'lat': packet.get('lat'),
-                        'lon': packet.get('lon'),
-                        'symbol': packet.get('symbol'),
-                        'last_seen': packet.get('timestamp'),
-                        'packet_type': packet.get('packet_type'),
-                    }
+                        # Track unique stations
+                        callsign = packet.get('callsign')
+                        if callsign and callsign not in aprs_stations:
+                            aprs_station_count += 1
 
-                app_module.aprs_queue.put(packet)
+                        # Update station data, preserving last known coordinates when
+                        # packets do not contain position fields.
+                        if callsign:
+                            existing = aprs_stations.get(callsign, {})
+                            packet_lat = packet.get('lat')
+                            packet_lon = packet.get('lon')
+                            aprs_stations[callsign] = {
+                                'callsign': callsign,
+                                'lat': packet_lat if packet_lat is not None else existing.get('lat'),
+                                'lon': packet_lon if packet_lon is not None else existing.get('lon'),
+                                'symbol': packet.get('symbol') or existing.get('symbol'),
+                                'last_seen': packet.get('timestamp'),
+                                'packet_type': packet.get('packet_type'),
+                            }
+                            # Geofence check
+                            _aprs_lat = packet_lat
+                            _aprs_lon = packet_lon
+                            if _aprs_lat is not None and _aprs_lon is not None:
+                                try:
+                                    from utils.geofence import get_geofence_manager
+                                    for _gf_evt in get_geofence_manager().check_position(
+                                        callsign, 'aprs_station', _aprs_lat, _aprs_lon,
+                                        {'callsign': callsign}
+                                    ):
+                                        process_event('aprs', _gf_evt, 'geofence')
+                                except Exception:
+                                    pass
+                            # Evict oldest stations when limit is exceeded
+                            if len(aprs_stations) > APRS_MAX_STATIONS:
+                                oldest = min(
+                                    aprs_stations,
+                                    key=lambda k: aprs_stations[k].get('last_seen', ''),
+                                )
+                                del aprs_stations[oldest]
 
-                # Log if enabled
-                if app_module.logging_enabled:
-                    try:
-                        with open(app_module.log_file_path, 'a') as f:
-                            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                            f.write(f"{ts} | APRS | {json.dumps(packet)}\n")
-                    except Exception:
-                        pass
+                        app_module.aprs_queue.put(packet)
+
+                        # Log if enabled
+                        if app_module.logging_enabled:
+                            try:
+                                with open(app_module.log_file_path, 'a') as f:
+                                    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                    f.write(f"{ts} | APRS | {json.dumps(packet)}\n")
+                            except Exception:
+                                pass
 
     except Exception as e:
         logger.error(f"APRS stream error: {e}")
         app_module.aprs_queue.put({'type': 'error', 'message': str(e)})
     finally:
-        global aprs_active_device
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
         app_module.aprs_queue.put({'type': 'status', 'status': 'stopped'})
         # Cleanup processes
         for proc in [rtl_process, decoder_process]:
@@ -1398,24 +1593,28 @@ def stream_aprs_output(rtl_process: subprocess.Popen, decoder_process: subproces
                     proc.kill()
                 except Exception:
                     pass
-        # Release SDR device
-        if aprs_active_device is not None:
-            app_module.release_sdr_device(aprs_active_device)
+        # Release SDR device — only if it's still ours (not reclaimed by a new start)
+        if my_device is not None and aprs_active_device == my_device:
+            app_module.release_sdr_device(my_device, aprs_active_sdr_type or 'rtlsdr')
             aprs_active_device = None
+            aprs_active_sdr_type = None
 
 
 @aprs_bp.route('/tools')
 def check_aprs_tools() -> Response:
     """Check for APRS decoding tools."""
     has_rtl_fm = find_rtl_fm() is not None
+    has_rx_fm = find_rx_fm() is not None
     has_direwolf = find_direwolf() is not None
     has_multimon = find_multimon_ng() is not None
+    has_fm_demod = has_rtl_fm or has_rx_fm
 
     return jsonify({
         'rtl_fm': has_rtl_fm,
+        'rx_fm': has_rx_fm,
         'direwolf': has_direwolf,
         'multimon_ng': has_multimon,
-        'ready': has_rtl_fm and (has_direwolf or has_multimon),
+        'ready': has_fm_demod and (has_direwolf or has_multimon),
         'decoder': 'direwolf' if has_direwolf else ('multimon-ng' if has_multimon else None)
     })
 
@@ -1445,11 +1644,29 @@ def get_stations() -> Response:
     })
 
 
+@aprs_bp.route('/data')
+def aprs_data() -> Response:
+    """Get APRS data snapshot for remote controller polling compatibility."""
+    running = False
+    if app_module.aprs_process:
+        running = app_module.aprs_process.poll() is None
+
+    return jsonify({
+        'status': 'success',
+        'running': running,
+        'stations': list(aprs_stations.values()),
+        'count': len(aprs_stations),
+        'packet_count': aprs_packet_count,
+        'station_count': aprs_station_count,
+        'last_packet_time': aprs_last_packet_time,
+    })
+
+
 @aprs_bp.route('/start', methods=['POST'])
 def start_aprs() -> Response:
     """Start APRS decoder."""
     global aprs_packet_count, aprs_station_count, aprs_last_packet_time, aprs_stations
-    global aprs_active_device
+    global aprs_active_device, aprs_active_sdr_type
 
     with app_module.aprs_lock:
         if app_module.aprs_process and app_module.aprs_process.poll() is None:
@@ -1457,14 +1674,6 @@ def start_aprs() -> Response:
                 'status': 'error',
                 'message': 'APRS decoder already running'
             }), 409
-
-    # Check for required tools
-    rtl_fm_path = find_rtl_fm()
-    if not rtl_fm_path:
-        return jsonify({
-            'status': 'error',
-            'message': 'rtl_fm not found. Install with: sudo apt install rtl-sdr'
-        }), 400
 
     # Check for decoder (prefer direwolf, fallback to multimon-ng)
     direwolf_path = find_direwolf()
@@ -1486,15 +1695,40 @@ def start_aprs() -> Response:
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
-    # Reserve SDR device to prevent conflicts with other modes
-    error = app_module.reserve_sdr_device(device, 'APRS')
-    if error:
-        return jsonify({
-            'status': 'error',
-            'error_type': 'DEVICE_BUSY',
-            'message': error
-        }), 409
-    aprs_active_device = device
+    # Check for rtl_tcp (remote SDR) connection
+    rtl_tcp_host = data.get('rtl_tcp_host')
+    rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
+    sdr_type_str = str(data.get('sdr_type', 'rtlsdr')).lower()
+    try:
+        sdr_type = SDRType(sdr_type_str)
+    except ValueError:
+        sdr_type = SDRType.RTL_SDR
+
+    if sdr_type == SDRType.RTL_SDR:
+        if find_rtl_fm() is None:
+            return jsonify({
+                'status': 'error',
+                'message': 'rtl_fm not found. Install with: sudo apt install rtl-sdr'
+            }), 400
+    else:
+        if find_rx_fm() is None:
+            return jsonify({
+                'status': 'error',
+                'message': f'rx_fm not found. Install SoapySDR tools for {sdr_type.value}.'
+            }), 400
+
+    # Reserve SDR device to prevent conflicts (skip for remote rtl_tcp)
+    if not rtl_tcp_host:
+        error = app_module.claim_sdr_device(device, 'aprs', sdr_type_str)
+        if error:
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': error
+            }), 409
+        aprs_active_device = device
+        aprs_active_sdr_type = sdr_type_str
 
     # Get frequency for region
     region = data.get('region', 'north_america')
@@ -1516,28 +1750,39 @@ def start_aprs() -> Response:
     aprs_last_packet_time = None
     aprs_stations = {}
 
-    # Build rtl_fm command for APRS (narrowband FM at 22050 Hz for AFSK1200)
-    freq_hz = f"{float(frequency)}M"
-    rtl_cmd = [
-        rtl_fm_path,
-        '-f', freq_hz,
-        '-M', 'nfm',             # Narrowband FM for APRS
-        '-s', '22050',           # Sample rate matching direwolf -r 22050
-        '-E', 'dc',              # Enable DC blocking filter for cleaner audio
-        '-A', 'fast',            # Fast AGC for packet bursts
-        '-d', str(device),
-    ]
+    # Build FM demod command for APRS (AFSK1200 @ 22050 Hz) via SDR abstraction.
+    try:
+        if rtl_tcp_host:
+            try:
+                rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+                rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+            except ValueError as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 400
+            sdr_device = SDRFactory.create_network_device(rtl_tcp_host, rtl_tcp_port)
+            logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+        else:
+            sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
+        builder = SDRFactory.get_builder(sdr_device.sdr_type)
+        rtl_cmd = builder.build_fm_demod_command(
+            device=sdr_device,
+            frequency_mhz=float(frequency),
+            sample_rate=22050,
+            gain=float(gain) if gain and str(gain) != '0' else None,
+            ppm=int(ppm) if ppm and str(ppm) != '0' else None,
+            modulation='nfm' if sdr_type == SDRType.RTL_SDR else 'fm',
+            squelch=None,
+            bias_t=bool(data.get('bias_t', False)),
+        )
 
-    # Gain: 0 means auto, otherwise set specific gain
-    if gain and str(gain) != '0':
-        rtl_cmd.extend(['-g', str(gain)])
-
-    # PPM frequency correction
-    if ppm and str(ppm) != '0':
-        rtl_cmd.extend(['-p', str(ppm)])
-
-    # Output raw audio to stdout
-    rtl_cmd.append('-')
+        if sdr_type == SDRType.RTL_SDR and rtl_cmd and rtl_cmd[-1] == '-':
+            # APRS benefits from DC blocking + fast AGC on rtl_fm.
+            rtl_cmd = rtl_cmd[:-1] + ['-E', 'dc', '-A', 'fast', '-']
+    except Exception as e:
+        if aprs_active_device is not None:
+            app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
+            aprs_active_device = None
+            aprs_active_sdr_type = None
+        return jsonify({'status': 'error', 'message': f'Failed to build SDR command: {e}'}), 500
 
     # Build decoder command
     if direwolf_path:
@@ -1590,18 +1835,24 @@ def start_aprs() -> Response:
         rtl_stderr_thread = threading.Thread(target=monitor_rtl_stderr, daemon=True)
         rtl_stderr_thread.start()
 
+        # Create a pseudo-terminal for decoder output.  PTY forces the
+        # decoder to line-buffer its stdout, avoiding the 15-minute delay
+        # caused by full pipe buffering (~4-8KB) on small APRS packets.
+        master_fd, slave_fd = pty.openpty()
+
         # Start decoder with stdin wired to rtl_fm's stdout.
-        # Use text mode with line buffering for reliable line-by-line reading.
-        # Merge stderr into stdout to avoid blocking on unbuffered stderr.
+        # stdout/stderr go to the PTY slave so output is line-buffered.
         decoder_process = subprocess.Popen(
             decoder_cmd,
             stdin=rtl_process.stdout,
-            stdout=PIPE,
-            stderr=STDOUT,
-            text=True,
-            bufsize=1,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
             start_new_session=True
         )
+
+        # Close slave fd in parent — decoder owns it now.
+        os.close(slave_fd)
 
         # Close rtl_fm's stdout in parent so decoder owns it exclusively.
         # This ensures proper EOF propagation when rtl_fm terminates.
@@ -1624,38 +1875,56 @@ def start_aprs() -> Response:
                 error_msg += f': {stderr_output[:200]}'
             logger.error(error_msg)
             try:
+                os.close(master_fd)
+            except OSError:
+                pass
+            try:
                 decoder_process.kill()
             except Exception:
                 pass
             if aprs_active_device is not None:
-                app_module.release_sdr_device(aprs_active_device)
+                app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
                 aprs_active_device = None
+                aprs_active_sdr_type = None
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         if decoder_process.poll() is not None:
-            # Decoder exited early - capture any output
-            error_output = decoder_process.stdout.read()[:500] if decoder_process.stdout else ''
+            # Decoder exited early - capture any output from PTY
+            error_output = ''
+            try:
+                ready, _, _ = select.select([master_fd], [], [], 0.5)
+                if ready:
+                    raw = os.read(master_fd, 500)
+                    error_output = raw.decode('utf-8', errors='replace')
+            except Exception:
+                pass
             error_msg = f'{decoder_name} failed to start'
             if error_output:
                 error_msg += f': {error_output}'
             logger.error(error_msg)
             try:
+                os.close(master_fd)
+            except OSError:
+                pass
+            try:
                 rtl_process.kill()
             except Exception:
                 pass
             if aprs_active_device is not None:
-                app_module.release_sdr_device(aprs_active_device)
+                app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
                 aprs_active_device = None
+                aprs_active_sdr_type = None
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         # Store references for status checks and cleanup
         app_module.aprs_process = decoder_process
         app_module.aprs_rtl_process = rtl_process
+        app_module.aprs_master_fd = master_fd
 
         # Start background thread to read decoder output and push to queue
         thread = threading.Thread(
             target=stream_aprs_output,
-            args=(rtl_process, decoder_process),
+            args=(master_fd, rtl_process, decoder_process),
             daemon=True
         )
         thread.start()
@@ -1665,21 +1934,23 @@ def start_aprs() -> Response:
             'frequency': frequency,
             'region': region,
             'device': device,
+            'sdr_type': sdr_type.value,
             'decoder': decoder_name
         })
 
     except Exception as e:
         logger.error(f"Failed to start APRS decoder: {e}")
         if aprs_active_device is not None:
-            app_module.release_sdr_device(aprs_active_device)
+            app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
             aprs_active_device = None
+            aprs_active_sdr_type = None
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @aprs_bp.route('/stop', methods=['POST'])
 def stop_aprs() -> Response:
     """Stop APRS decoder."""
-    global aprs_active_device
+    global aprs_active_device, aprs_active_sdr_type
 
     with app_module.aprs_lock:
         processes_to_stop = []
@@ -1705,14 +1976,23 @@ def stop_aprs() -> Response:
             except Exception as e:
                 logger.error(f"Error stopping APRS process: {e}")
 
+        # Close PTY master fd
+        if hasattr(app_module, 'aprs_master_fd') and app_module.aprs_master_fd is not None:
+            try:
+                os.close(app_module.aprs_master_fd)
+            except OSError:
+                pass
+            app_module.aprs_master_fd = None
+
         app_module.aprs_process = None
         if hasattr(app_module, 'aprs_rtl_process'):
             app_module.aprs_rtl_process = None
 
         # Release SDR device
         if aprs_active_device is not None:
-            app_module.release_sdr_device(aprs_active_device)
+            app_module.release_sdr_device(aprs_active_device, aprs_active_sdr_type or 'rtlsdr')
             aprs_active_device = None
+            aprs_active_sdr_type = None
 
     return jsonify({'status': 'stopped'})
 
@@ -1720,21 +2000,19 @@ def stop_aprs() -> Response:
 @aprs_bp.route('/stream')
 def stream_aprs() -> Response:
     """SSE stream for APRS packets."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('aprs', msg, msg.get('type'))
 
-        while True:
-            try:
-                msg = app_module.aprs_queue.get(timeout=SSE_QUEUE_TIMEOUT)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= SSE_KEEPALIVE_INTERVAL:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.aprs_queue,
+            channel_key='aprs',
+            timeout=SSE_QUEUE_TIMEOUT,
+            keepalive_interval=SSE_KEEPALIVE_INTERVAL,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     return response

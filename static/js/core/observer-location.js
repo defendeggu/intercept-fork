@@ -1,7 +1,9 @@
 // Shared observer location helper for map-based modules.
 // Default: shared location enabled unless explicitly disabled via config.
 window.ObserverLocation = (function() {
-    const DEFAULT_LOCATION = { lat: 51.5074, lon: -0.1278 };
+    const DEFAULT_LOCATION = (window.INTERCEPT_DEFAULT_LAT && window.INTERCEPT_DEFAULT_LON)
+        ? { lat: window.INTERCEPT_DEFAULT_LAT, lon: window.INTERCEPT_DEFAULT_LON }
+        : { lat: 51.5074, lon: -0.1278 };
     const SHARED_KEY = 'observerLocation';
     const AIS_KEY = 'ais_observerLocation';
     const LEGACY_LAT_KEY = 'observerLat';
@@ -39,6 +41,10 @@ window.ObserverLocation = (function() {
         const lon = localStorage.getItem(LEGACY_LON_KEY);
         if (!lat || !lon) return null;
         return normalize(lat, lon);
+    }
+
+    function hasStoredLocation() {
+        return !!(readKey(SHARED_KEY) || readKey(AIS_KEY) || readLegacyLatLon());
     }
 
     function getShared() {
@@ -93,6 +99,7 @@ window.ObserverLocation = (function() {
 
     return {
         isSharedEnabled,
+        hasStoredLocation,
         getShared,
         setShared,
         getForModule,

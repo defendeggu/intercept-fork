@@ -1,0 +1,197 @@
+<!-- MORSE CODE MODE -->
+<div id="morseMode" class="mode-content">
+    <div class="section">
+        <h3>CW/Morse Decoder</h3>
+        <p class="info-text morse-mode-help">
+            Decode CW (continuous wave) Morse code. Supports HF amateur bands (USB + Goertzel tone
+            detection) and ISM/UHF OOK signals (AM + envelope detection).
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Detection Mode</h3>
+        <div class="form-group">
+            <div style="display: flex; gap: 4px;">
+                <button class="preset-btn morseDetectBtn" id="morseDetectGoertzel"
+                        onclick="MorseMode.setDetectMode('goertzel')"
+                        style="flex: 1; background: var(--accent); color: #000;">CW Tone</button>
+                <button class="preset-btn morseDetectBtn" id="morseDetectEnvelope"
+                        onclick="MorseMode.setDetectMode('envelope')"
+                        style="flex: 1;">OOK Envelope</button>
+            </div>
+            <input type="hidden" id="morseDetectMode" value="goertzel">
+            <p id="morseDetectHint" class="info-text" style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
+                CW Tone: HF bands, USB demod, Goertzel filter. For amateur CW.
+            </p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Frequency</h3>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="number" id="morseFrequency" value="14.060" step="0.001" min="0.5" max="1766" placeholder="e.g., 14.060">
+            <span class="help-text morse-help-text">Enter CW center frequency in MHz (e.g., 7.030 for 40m).</span>
+        </div>
+        <div class="form-group">
+            <label>Band Presets</label>
+            <div class="morse-presets" id="morseHFPresets">
+                <button class="preset-btn" onclick="MorseMode.setFreq(3.560)">80m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(7.030)">40m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(10.116)">30m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(14.060)">20m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(18.080)">17m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(21.060)">15m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(24.910)">12m</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(28.060)">10m</button>
+            </div>
+            <div class="morse-presets" id="morseISMPresets" style="display: none; flex-wrap: wrap; gap: 4px;">
+                <button class="preset-btn" onclick="MorseMode.setFreq(315.000)">315</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(433.300)">433.3</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(433.920)">433.9</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(868.000)">868</button>
+                <button class="preset-btn" onclick="MorseMode.setFreq(915.000)">915</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Device</h3>
+        <div class="form-group">
+            <label>Gain (dB)</label>
+            <input type="number" id="morseGain" value="40" step="1" min="0" max="60">
+        </div>
+        <div class="form-group">
+            <label>PPM Correction</label>
+            <input type="number" id="morsePPM" value="0" step="1" min="-200" max="200">
+        </div>
+    </div>
+
+    <div class="section" id="morseToneFreqGroup">
+        <h3>CW Detector</h3>
+        <div class="form-group">
+            <label>Tone Frequency: <span id="morseToneFreqLabel">700</span> Hz</label>
+            <input type="range" id="morseToneFreq" value="700" min="300" max="1200" step="10"
+                   oninput="MorseMode.updateToneLabel(this.value)">
+        </div>
+        <div class="form-group">
+            <label>Bandwidth</label>
+            <select id="morseBandwidth">
+                <option value="50">50 Hz</option>
+                <option value="100">100 Hz</option>
+                <option value="200" selected>200 Hz</option>
+                <option value="400">400 Hz</option>
+            </select>
+        </div>
+        <div class="form-group checkbox-group">
+            <label><input type="checkbox" id="morseAutoToneTrack" checked> Auto Tone Track</label>
+            <label><input type="checkbox" id="morseToneLock"> Hold Tone Lock</label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Threshold + WPM</h3>
+        <div class="form-group">
+            <label>Threshold Mode</label>
+            <select id="morseThresholdMode" onchange="MorseMode.onThresholdModeChange()">
+                <option value="auto" selected>Auto</option>
+                <option value="manual">Manual</option>
+            </select>
+        </div>
+        <div class="form-group" id="morseThresholdAutoRow">
+            <label>Threshold Multiplier</label>
+            <input type="number" id="morseThresholdMultiplier" value="2.8" min="1.1" max="8" step="0.1">
+        </div>
+        <div class="form-group" id="morseThresholdOffsetRow">
+            <label>Threshold Offset</label>
+            <input type="number" id="morseThresholdOffset" value="0" min="0" step="0.1">
+        </div>
+        <div class="form-group" id="morseManualThresholdRow" style="display: none;">
+            <label>Manual Threshold</label>
+            <input type="number" id="morseManualThreshold" value="0" min="0" step="0.1">
+        </div>
+        <div class="form-group">
+            <label>Minimum Signal Gate</label>
+            <input type="number" id="morseSignalGate" value="0.05" min="0" max="1" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>WPM Mode</label>
+            <select id="morseWpmMode" onchange="MorseMode.onWpmModeChange()">
+                <option value="auto" selected>Auto</option>
+                <option value="manual">Manual</option>
+            </select>
+        </div>
+        <div class="form-group" id="morseWpmManualRow" style="display: none;">
+            <label>Manual Speed: <span id="morseWpmLabel">15</span> WPM</label>
+            <input type="range" id="morseWpm" value="15" min="5" max="50" step="1"
+                   oninput="MorseMode.updateWpmLabel(this.value)">
+        </div>
+        <div class="form-group checkbox-group">
+            <label><input type="checkbox" id="morseWpmLock"> Lock WPM Estimator</label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Output</h3>
+        <div class="form-group checkbox-group">
+            <label><input type="checkbox" id="morseShowRaw" checked> Show Raw Morse</label>
+            <label><input type="checkbox" id="morseShowDiag"> Show Decoder Logs</label>
+        </div>
+        <div class="morse-actions-row">
+            <button class="btn btn-sm btn-ghost" id="morseCalibrateBtn" onclick="MorseMode.calibrate()">Reset / Calibrate</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Decode WAV File</h3>
+        <div class="morse-file-row">
+            <input type="file" id="morseFileInput" accept="audio/wav,.wav">
+            <button class="btn btn-sm btn-ghost" id="morseDecodeFileBtn" onclick="MorseMode.decodeFile()">Decode File</button>
+        </div>
+        <span class="help-text morse-help-text">Runs the same CW decoder pipeline against uploaded WAV audio.</span>
+    </div>
+
+    <div class="section">
+        <h3 style="cursor: pointer;" onclick="this.parentElement.querySelector('.morse-ref-grid').classList.toggle('collapsed')">
+            Morse Reference <span class="morse-ref-toggle">(click to toggle)</span>
+        </h3>
+        <div class="morse-ref-grid collapsed">
+            <div>A .-</div><div>B -...</div><div>C -.-.</div><div>D -..</div>
+            <div>E .</div><div>F ..-.</div><div>G --.</div><div>H ....</div>
+            <div>I ..</div><div>J .---</div><div>K -.-</div><div>L .-..</div>
+            <div>M --</div><div>N -.</div><div>O ---</div><div>P .--.</div>
+            <div>Q --.-</div><div>R .-.</div><div>S ...</div><div>T -</div>
+            <div>U ..-</div><div>V ...-</div><div>W .--</div><div>X -..-</div>
+            <div>Y -.--</div><div>Z --..</div>
+            <div class="morse-ref-divider">0 -----</div>
+            <div class="morse-ref-divider">1 .----</div>
+            <div>2 ..---</div><div>3 ...--</div><div>4 ....-</div>
+            <div>5 .....</div><div>6 -....</div><div>7 --...</div>
+            <div>8 ---..</div><div>9 ----.</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="morse-status">
+            <span id="morseStatusIndicator" class="status-dot"></span>
+            <span id="morseStatusText">Standby</span>
+            <span id="morseCharCount">0 chars</span>
+        </div>
+    </div>
+
+    <div class="section" id="morseHFNote">
+        <p class="info-text morse-hf-note">
+            CW on HF (1-30 MHz) requires an HF-capable SDR path (direct sampling or upconverter)
+            and an appropriate antenna.
+        </p>
+    </div>
+    <div class="section" id="morseEnvelopeNote" style="display: none;">
+        <p class="info-text" style="font-size: 11px; color: #ffaa00; line-height: 1.5;">
+            OOK Envelope mode uses AM demodulation to detect carrier on/off keying.
+            Suitable for ISM-band (315/433/868/915 MHz) Morse transmitters.
+        </p>
+    </div>
+
+    <button class="run-btn" id="morseStartBtn" onclick="MorseMode.start()">Start Decoder</button>
+    <button class="stop-btn" id="morseStopBtn" onclick="MorseMode.stop()" style="display: none;">Stop Decoder</button>
+</div>

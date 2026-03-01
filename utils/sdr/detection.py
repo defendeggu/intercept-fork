@@ -10,11 +10,27 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from typing import Optional
 
 from .base import SDRCapabilities, SDRDevice, SDRType
 
 logger = logging.getLogger(__name__)
+
+# Cache HackRF detection results so polling endpoints don't repeatedly run
+# hackrf_info while the device is actively streaming in SubGHz mode.
+_hackrf_cache: list[SDRDevice] = []
+_hackrf_cache_ts: float = 0.0
+_HACKRF_CACHE_TTL_SECONDS = 3.0
+
+
+def _hackrf_probe_blocked() -> bool:
+    """Return True when probing HackRF would interfere with an active stream."""
+    try:
+        from utils.subghz import get_subghz_manager
+        return get_subghz_manager().active_mode in {'rx', 'decode', 'tx', 'sweep'}
+    except Exception:
+        return False
 
 
 def _check_tool(name: str) -> bool:
@@ -100,6 +116,8 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
             ['rtl_test', '-t'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5,
             env=env 
         )
@@ -107,7 +125,8 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
 
         # Parse device info from rtl_test output
         # Format: "0:  Realtek, RTL2838UHIDIR, SN: 00000001"
-        device_pattern = r'(\d+):\s+(.+?)(?:,\s*SN:\s*(\S+))?$'
+        # Require a non-empty serial to avoid matching malformed lines like "SN:".
+        device_pattern = r'(\d+):\s+(.+?),\s*SN:\s*(\S+)\s*$'
 
         from .rtlsdr import RTLSDRCommandBuilder
 
@@ -119,7 +138,7 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
                     sdr_type=SDRType.RTL_SDR,
                     index=int(match.group(1)),
                     name=match.group(2).strip().rstrip(','),
-                    serial=match.group(3) or 'N/A',
+                    serial=match.group(3),
                     driver='rtlsdr',
                     capabilities=RTLSDRCommandBuilder.CAPABILITIES
                 ))
@@ -301,9 +320,22 @@ def detect_hackrf_devices() -> list[SDRDevice]:
 
     Fallback for when SoapySDR is not available.
     """
+    global _hackrf_cache, _hackrf_cache_ts
+    now = time.time()
+
+    # While HackRF is actively streaming in SubGHz mode, skip probe calls.
+    # Re-running hackrf_info during active RX/TX can disrupt the USB stream.
+    if _hackrf_probe_blocked():
+        return list(_hackrf_cache)
+
+    if _hackrf_cache and (now - _hackrf_cache_ts) < _HACKRF_CACHE_TTL_SECONDS:
+        return list(_hackrf_cache)
+
     devices: list[SDRDevice] = []
 
     if not _check_tool('hackrf_info'):
+        _hackrf_cache = devices
+        _hackrf_cache_ts = now
         return devices
 
     try:
@@ -315,17 +347,21 @@ def detect_hackrf_devices() -> list[SDRDevice]:
         )
 
         # Parse hackrf_info output
-        # Look for "Serial number:" lines
-        serial_pattern = r'Serial number:\s*(\S+)'
+        # Extract board name from "Board ID Number: X (Name)" and serial
         from .hackrf import HackRFCommandBuilder
 
+        serial_pattern = r'Serial number:\s*(\S+)'
+        board_pattern = r'Board ID Number:\s*\d+\s*\(([^)]+)\)'
+
         serials_found = re.findall(serial_pattern, result.stdout)
+        boards_found = re.findall(board_pattern, result.stdout)
 
         for i, serial in enumerate(serials_found):
+            board_name = boards_found[i] if i < len(boards_found) else 'HackRF'
             devices.append(SDRDevice(
                 sdr_type=SDRType.HACKRF,
                 index=i,
-                name=f'HackRF One',
+                name=board_name,
                 serial=serial,
                 driver='hackrf',
                 capabilities=HackRFCommandBuilder.CAPABILITIES
@@ -333,10 +369,12 @@ def detect_hackrf_devices() -> list[SDRDevice]:
 
         # Fallback: check if any HackRF found without serial
         if not devices and 'Found HackRF' in result.stdout:
+            board_match = re.search(board_pattern, result.stdout)
+            board_name = board_match.group(1) if board_match else 'HackRF'
             devices.append(SDRDevice(
                 sdr_type=SDRType.HACKRF,
                 index=0,
-                name='HackRF One',
+                name=board_name,
                 serial='Unknown',
                 driver='hackrf',
                 capabilities=HackRFCommandBuilder.CAPABILITIES
@@ -345,7 +383,113 @@ def detect_hackrf_devices() -> list[SDRDevice]:
     except Exception as e:
         logger.debug(f"HackRF detection error: {e}")
 
+    _hackrf_cache = list(devices)
+    _hackrf_cache_ts = now
     return devices
+
+
+def probe_rtlsdr_device(device_index: int) -> str | None:
+    """Probe whether an RTL-SDR device is available at the USB level.
+
+    Runs a quick ``rtl_test`` invocation targeting a single device to
+    check for USB claim errors that indicate the device is held by an
+    external process (or a stale handle from a previous crash).
+
+    Args:
+        device_index: The RTL-SDR device index to probe.
+
+    Returns:
+        An error message string if the device cannot be opened,
+        or ``None`` if the device is available.
+    """
+    if not _check_tool('rtl_test'):
+        # Can't probe without rtl_test — let the caller proceed and
+        # surface errors from the actual decoder process instead.
+        return None
+
+    try:
+        import os
+        import platform
+        env = os.environ.copy()
+
+        if platform.system() == 'Darwin':
+            lib_paths = ['/usr/local/lib', '/opt/homebrew/lib']
+            current_ld = env.get('DYLD_LIBRARY_PATH', '')
+            env['DYLD_LIBRARY_PATH'] = ':'.join(
+                lib_paths + [current_ld] if current_ld else lib_paths
+            )
+
+        # Use Popen with early termination instead of run() with full timeout.
+        # rtl_test prints device info to stderr quickly, then keeps running
+        # its test loop. We kill it as soon as we see success or failure.
+        proc = subprocess.Popen(
+            ['rtl_test', '-d', str(device_index), '-t'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+
+        import select
+        error_found = False
+        device_found = False
+        deadline = time.monotonic() + 3.0
+
+        try:
+            while time.monotonic() < deadline:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Wait for stderr output with timeout
+                ready, _, _ = select.select(
+                    [proc.stderr], [], [], min(remaining, 0.1)
+                )
+                if ready:
+                    line = proc.stderr.readline()
+                    if not line:
+                        break  # EOF — process closed stderr
+                    # Check for no-device messages first (before success check,
+                    # since "No supported devices found" also contains "Found" + "device")
+                    if 'no supported devices' in line.lower() or 'no matching devices' in line.lower():
+                        error_found = True
+                        break
+                    if 'usb_claim_interface' in line or 'Failed to open' in line:
+                        error_found = True
+                        break
+                    if 'Found' in line and 'device' in line.lower():
+                        # Device opened successfully — no need to wait longer
+                        device_found = True
+                        break
+                if proc.poll() is not None:
+                    break  # Process exited
+            if not device_found and not error_found and proc.poll() is not None and proc.returncode != 0:
+                # rtl_test exited with error and we never saw a success message
+                error_found = True
+        finally:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+            proc.wait()
+            if device_found:
+                # Allow the kernel to fully release the USB interface
+                # before the caller opens the device with dump1090/rtl_fm/etc.
+                time.sleep(0.5)
+
+        if error_found:
+            logger.warning(
+                f"RTL-SDR device {device_index} USB probe failed: "
+                f"device busy or unavailable"
+            )
+            return (
+                f'SDR device {device_index} is not available — '
+                f'check that the RTL-SDR is connected and not in use by another process.'
+            )
+
+    except Exception as e:
+        logger.debug(f"RTL-SDR probe error for device {device_index}: {e}")
+
+    return None
 
 
 def detect_all_devices() -> list[SDRDevice]:

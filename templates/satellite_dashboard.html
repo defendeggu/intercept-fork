@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% if offline_settings.tile_provider in ['cartodb_dark', 'cartodb_dark_cyan'] %}map-cyber-enabled{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/satellite_dashboard.css') }}">
     <script>
@@ -74,8 +74,10 @@
         </div>
     </header>
 
+    {% if not embedded %}
     {% set active_mode = 'satellite' %}
     {% include 'partials/nav.html' with context %}
+    {% endif %}
 
     <main class="dashboard">
         <!-- Polar Plot -->
@@ -107,12 +109,8 @@
                 <label>TARGET:</label>
                 <select id="satSelect" onchange="onSatelliteChange()">
                     <option value="25544">ISS (ZARYA)</option>
-                    <option value="25338">NOAA 15</option>
-                    <option value="28654">NOAA 18</option>
-                    <option value="33591">NOAA 19</option>
                     <option value="40069">METEOR-M2</option>
-                    <option value="43013">NOAA 20</option>
-                    <option value="54234">METEOR-M2-3</option>
+                    <option value="57166">METEOR-M2-3</option>
                 </select>
             </div>
 
@@ -273,15 +271,41 @@
         let currentLocationSource = 'local';
         let agents = [];
 
-        const satellites = {
+        let satellites = {
             25544: { name: 'ISS (ZARYA)', color: '#00ffff' },
-            25338: { name: 'NOAA 15', color: '#00ff00' },
-            28654: { name: 'NOAA 18', color: '#ff6600' },
-            33591: { name: 'NOAA 19', color: '#ff3366' },
             40069: { name: 'METEOR-M2', color: '#9370DB' },
-            43013: { name: 'NOAA 20', color: '#00ffaa' },
-            54234: { name: 'METEOR-M2-3', color: '#ff00ff' }
+            57166: { name: 'METEOR-M2-3', color: '#ff00ff' }
         };
+
+        const satColors = ['#00ffff', '#9370DB', '#ff00ff', '#00ff00', '#ff6600', '#ffff00', '#ff69b4', '#7b68ee'];
+
+        function loadDashboardSatellites() {
+            fetch('/satellite/tracked?enabled=true')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success' && data.satellites && data.satellites.length > 0) {
+                        const newSats = {};
+                        const select = document.getElementById('satSelect');
+                        select.innerHTML = '';
+                        data.satellites.forEach((sat, i) => {
+                            const norad = parseInt(sat.norad_id);
+                            newSats[norad] = {
+                                name: sat.name,
+                                color: satellites[norad]?.color || satColors[i % satColors.length]
+                            };
+                            const opt = document.createElement('option');
+                            opt.value = norad;
+                            opt.textContent = sat.name;
+                            select.appendChild(opt);
+                        });
+                        satellites = newSats;
+                        // Default to ISS if available
+                        if (newSats[25544]) select.value = '25544';
+                        selectedSatellite = parseInt(select.value);
+                    }
+                })
+                .catch(() => {});
+        }
 
         function onSatelliteChange() {
             const select = document.getElementById('satSelect');
@@ -339,6 +363,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            loadDashboardSatellites();
             setupEmbeddedMode();
             const usedShared = applySharedObserverLocation();
             initGroundMap();
@@ -586,11 +611,17 @@
             const cy = canvas.height / 2;
             const radius = Math.max(10, Math.min(cx, cy) - 40);
 
-            ctx.fillStyle = '#0a0a0f';
+            const cs = getComputedStyle(document.documentElement);
+            const bgColor = cs.getPropertyValue('--bg-card').trim() || '#0a0a0f';
+            const accentCyan = cs.getPropertyValue('--accent-cyan').trim() || '#00d4ff';
+            const accentRed = cs.getPropertyValue('--accent-red').trim() || '#ff4444';
+            const textDim = cs.getPropertyValue('--text-dim').trim() || 'rgba(0,212,255,0.4)';
+
+            ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Elevation rings
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.15)';
+            ctx.strokeStyle = accentCyan + '26'; // ~15% opacity
             ctx.lineWidth = 1;
             for (let el = 30; el <= 90; el += 30) {
                 const r = radius * (1 - el / 90);
@@ -598,20 +629,20 @@
                 ctx.arc(cx, cy, r, 0, Math.PI * 2);
                 ctx.stroke();
 
-                ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                ctx.font = '10px Space Mono';
+                ctx.fillStyle = textDim;
+                ctx.font = '10px Roboto Condensed';
                 ctx.fillText(el + '°', cx + 5, cy - r + 12);
             }
 
             // Horizon
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+            ctx.strokeStyle = accentCyan + '4D'; // ~30% opacity
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(cx, cy, radius, 0, Math.PI * 2);
             ctx.stroke();
 
             // Cardinal lines
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.1)';
+            ctx.strokeStyle = accentCyan + '1A'; // ~10% opacity
             ctx.lineWidth = 1;
             for (let az = 0; az < 360; az += 45) {
                 const angle = (az - 90) * Math.PI / 180;
@@ -624,10 +655,10 @@
             // Cardinal labels
             ctx.font = 'bold 14px Orbitron';
             const labels = [
-                { text: 'N', az: 0, color: '#ff4444' },
-                { text: 'E', az: 90, color: '#00d4ff' },
-                { text: 'S', az: 180, color: '#00d4ff' },
-                { text: 'W', az: 270, color: '#00d4ff' }
+                { text: 'N', az: 0, color: accentRed },
+                { text: 'E', az: 90, color: accentCyan },
+                { text: 'S', az: 180, color: accentCyan },
+                { text: 'W', az: 270, color: accentCyan }
             ];
             labels.forEach(l => {
                 const angle = (l.az - 90) * Math.PI / 180;
@@ -940,7 +971,12 @@
                     }
                 }
             } catch (err) {
-                console.error('Position update error:', err);
+                const transient = (typeof window.isTransientOrOffline === 'function' && window.isTransientOrOffline(err)) ||
+                    (typeof navigator !== 'undefined' && navigator.onLine === false) ||
+                    /failed to fetch|network io suspended|networkerror|timeout/i.test(String((err && err.message) || err || ''));
+                if (!transient) {
+                    console.error('Position update error:', err);
+                }
             }
         }
 
@@ -955,10 +991,18 @@
             const cy = canvas.height / 2;
             const radius = Math.max(10, Math.min(cx, cy) - 40);
 
-            ctx.fillStyle = '#0a0a0f';
+            const cs = getComputedStyle(document.documentElement);
+            const bgColor = cs.getPropertyValue('--bg-card').trim() || '#0a0a0f';
+            const accentCyan = cs.getPropertyValue('--accent-cyan').trim() || '#00d4ff';
+            const accentRed = cs.getPropertyValue('--accent-red').trim() || '#ff4444';
+            const accentGreen = cs.getPropertyValue('--accent-green').trim() || '#00ff88';
+            const textPrimary = cs.getPropertyValue('--text-primary').trim() || '#fff';
+            const textDim = cs.getPropertyValue('--text-dim').trim() || 'rgba(0,212,255,0.4)';
+
+            ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.15)';
+            ctx.strokeStyle = accentCyan + '26';
             ctx.lineWidth = 1;
             for (let elRing = 30; elRing <= 90; elRing += 30) {
                 const r = radius * (1 - elRing / 90);
@@ -966,18 +1010,18 @@
                 ctx.arc(cx, cy, r, 0, Math.PI * 2);
                 ctx.stroke();
 
-                ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
-                ctx.font = '10px Space Mono';
+                ctx.fillStyle = textDim;
+                ctx.font = '10px Roboto Condensed';
                 ctx.fillText(elRing + '°', cx + 5, cy - r + 12);
             }
 
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+            ctx.strokeStyle = accentCyan + '4D';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(cx, cy, radius, 0, Math.PI * 2);
             ctx.stroke();
 
-            ctx.strokeStyle = 'rgba(0, 212, 255, 0.1)';
+            ctx.strokeStyle = accentCyan + '1A';
             ctx.lineWidth = 1;
             for (let azLine = 0; azLine < 360; azLine += 45) {
                 const angle = (azLine - 90) * Math.PI / 180;
@@ -989,10 +1033,10 @@
 
             ctx.font = 'bold 14px Orbitron';
             const labels = [
-                { text: 'N', az: 0, color: '#ff4444' },
-                { text: 'E', az: 90, color: '#00d4ff' },
-                { text: 'S', az: 180, color: '#00d4ff' },
-                { text: 'W', az: 270, color: '#00d4ff' }
+                { text: 'N', az: 0, color: accentRed },
+                { text: 'E', az: 90, color: accentCyan },
+                { text: 'S', az: 180, color: accentCyan },
+                { text: 'W', az: 270, color: accentCyan }
             ];
             labels.forEach(l => {
                 const angle = (l.az - 90) * Math.PI / 180;
@@ -1025,21 +1069,21 @@
                 ctx.arc(x, y, 10, 0, Math.PI * 2);
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.strokeStyle = '#fff';
+                ctx.strokeStyle = textPrimary;
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
                 ctx.font = 'bold 11px Orbitron';
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = textPrimary;
                 ctx.textAlign = 'center';
                 ctx.fillText(satellites[selectedSatellite]?.name || 'SAT', x, y - 20);
 
-                ctx.font = '10px Space Mono';
-                ctx.fillStyle = el > 0 ? '#00ff88' : '#ff4444';
+                ctx.font = '10px Roboto Condensed';
+                ctx.fillStyle = el > 0 ? accentGreen : accentRed;
                 ctx.fillText(el.toFixed(1) + '°', x, y + 25);
             } else {
                 ctx.font = '12px Rajdhani';
-                ctx.fillStyle = '#ff4444';
+                ctx.fillStyle = accentRed;
                 ctx.textAlign = 'center';
                 ctx.fillText('BELOW HORIZON', cx, cy + radius + 35);
             }
@@ -1052,6 +1096,11 @@
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
             const radius = Math.max(10, Math.min(cx, cy) - 40);
+
+            const cs = getComputedStyle(document.documentElement);
+            const accentRed = cs.getPropertyValue('--accent-red').trim() || '#ff4444';
+            const accentGreen = cs.getPropertyValue('--accent-green').trim() || '#00ff88';
+            const textPrimary = cs.getPropertyValue('--text-primary').trim() || '#fff';
 
             if (el > -5) {
                 const posEl = Math.max(0, el);
@@ -1074,17 +1123,17 @@
                 ctx.arc(x, y, 10, 0, Math.PI * 2);
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.strokeStyle = '#fff';
+                ctx.strokeStyle = textPrimary;
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
                 ctx.font = 'bold 11px Orbitron';
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = textPrimary;
                 ctx.textAlign = 'center';
                 ctx.fillText(satellites[selectedSatellite]?.name || 'SAT', x, y - 20);
 
-                ctx.font = '10px Space Mono';
-                ctx.fillStyle = el > 0 ? '#00ff88' : '#ff4444';
+                ctx.font = '10px Roboto Condensed';
+                ctx.fillStyle = el > 0 ? accentGreen : accentRed;
                 ctx.fillText(el.toFixed(1) + '°', x, y + 25);
             }
         }
@@ -1096,7 +1145,7 @@
     <!-- Help Modal -->
     {% include 'partials/help-modal.html' %}
 
-    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}?v={{ version }}&r=maptheme17"></script>
     <script src="{{ url_for('static', filename='js/core/global-nav.js') }}"></script>
 </body>
 </html>

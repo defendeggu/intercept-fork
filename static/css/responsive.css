@@ -114,7 +114,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: min(320px, 85vw);
+    width: min(360px, 100vw);
     height: 100dvh;
     height: 100vh; /* Fallback */
     background: var(--bg-secondary, #0f1218);
@@ -381,6 +381,33 @@
         -webkit-overflow-scrolling: touch;
     }
 
+    .sidebar {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .output-panel {
+        min-height: 58vh;
+    }
+
+    .output-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .header-controls {
+        width: 100%;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+    }
+
+    .header-controls .stats {
+        min-width: max-content;
+    }
+
     /* Container should not clip content */
     .container {
         overflow: visible;
@@ -401,7 +428,7 @@
 
     /* Visual panels should be scrollable, not clipped */
     .wifi-visuals,
-    .bt-visuals {
+    .bt-visuals-column {
         max-height: none !important;
         overflow: visible !important;
         margin-bottom: 15px;
@@ -417,7 +444,7 @@
 
     /* Visual panels should stack in single column on mobile when visible */
     .wifi-visuals,
-    .bt-visuals {
+    .bt-visuals-column {
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -437,6 +464,34 @@
 
     .wifi-visual-panel {
         grid-column: auto !important;
+    }
+
+    .bt-main-area {
+        flex-direction: column !important;
+        min-height: auto !important;
+    }
+
+    .bt-side-panels {
+        width: 100% !important;
+        flex-direction: column !important;
+    }
+
+    .bt-detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .bt-row-secondary {
+        padding-left: 0 !important;
+        white-space: normal !important;
+    }
+
+    .bt-row-actions {
+        padding-left: 0 !important;
+        justify-content: flex-start !important;
+    }
+
+    .bt-list-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 }
 

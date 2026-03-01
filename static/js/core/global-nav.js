@@ -18,6 +18,18 @@
         if (menuLink) {
             event.preventDefault();
             event.stopPropagation();
+            try {
+                const target = new URL(menuLink.href, window.location.href);
+                if (window.InterceptNavPerf && typeof window.InterceptNavPerf.markStart === 'function') {
+                    window.InterceptNavPerf.markStart({
+                        targetPath: target.pathname,
+                        trigger: 'global-nav',
+                        sourceMode: document.body?.getAttribute('data-mode') || null,
+                    });
+                }
+            } catch (_) {
+                // Ignore malformed link targets.
+            }
             window.location.href = menuLink.href;
             return;
         }

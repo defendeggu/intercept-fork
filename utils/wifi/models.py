@@ -264,6 +264,7 @@ class WiFiAccessPoint:
         return {
             'bssid': self.bssid,
             'essid': self.essid or '',
+            'vendor': self.vendor,
             'power': str(self.rssi_current) if self.rssi_current else '-100',
             'channel': str(self.channel) if self.channel else '',
             'privacy': self.security,

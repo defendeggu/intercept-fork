@@ -75,6 +75,62 @@
         </div>
     </div>
 
+    <!-- Antenna Guide -->
+    <div class="section">
+        <h3>Antenna Guide</h3>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+            <p style="margin-bottom: 8px; color: var(--accent-cyan); font-weight: 600;">
+                Pager frequencies vary by region (130&ndash;930 MHz)
+            </p>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Stock Telescopic Antenna</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Works for:</strong> UHF pager bands (~900 MHz) &mdash; the stock antenna is tuned near 1 GHz</li>
+                    <li><strong style="color: var(--text-primary);">Extend to:</strong> ~8 cm for 929 MHz (quarter-wave)</li>
+                    <li><strong style="color: var(--text-primary);">For VHF (~150 MHz):</strong> Stock antenna is too short. Build a dipole (see below)</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Simple Dipole (Best for VHF Pagers)</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">For 153 MHz:</strong> Two elements, each ~49 cm (quarter-wave)</li>
+                    <li><strong style="color: var(--text-primary);">For 929 MHz:</strong> Two elements, each ~8 cm</li>
+                    <li><strong style="color: var(--text-primary);">Formula:</strong> Element length (cm) = 7500 / frequency (MHz)</li>
+                    <li><strong style="color: var(--text-primary);">Material:</strong> Any wire, coat hanger, or copper rod</li>
+                    <li><strong style="color: var(--text-primary);">Orientation:</strong> Vertical (pager signals are vertically polarized)</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Quick Reference</strong>
+                <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Common UHF freq</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">929 MHz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Common VHF freq</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">153.350 MHz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Modulation</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">FM (NFM)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Bandwidth</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">~12.5 kHz</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Polarization</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">Vertical</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <button class="run-btn" id="startBtn" onclick="startDecoding()">
         Start Decoding
     </button>

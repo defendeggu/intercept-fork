@@ -4,21 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-INTERCEPT is a web-based Signal Intelligence (SIGINT) platform providing a unified Flask interface for software-defined radio (SDR) tools. It supports pager decoding, 433MHz sensors, ADS-B aircraft tracking, ACARS messaging, WiFi/Bluetooth scanning, and satellite tracking.
+INTERCEPT is a web-based Signal Intelligence (SIGINT) platform providing a unified Flask interface for software-defined radio (SDR) tools. It supports pager decoding, 433MHz sensors, ADS-B aircraft tracking, ACARS messaging, WiFi/Bluetooth scanning, satellite tracking, ISS SSTV decoding, AIS vessel tracking, weather satellite imagery (NOAA APT & Meteor LRPT), and Meshtastic mesh networking.
 
 ## Common Commands
 
-### Setup and Running
+### Docker (Primary)
+```bash
+# Build and run (basic profile)
+docker compose --profile basic up -d
+
+# Build and run with ADS-B history (Postgres)
+docker compose --profile history up -d
+
+# Rebuild after code changes
+docker compose --profile basic up -d --build
+
+# Multi-arch build (amd64 + arm64 for RPi)
+./build-multiarch.sh
+```
+
+### Local Setup (Alternative)
 ```bash
 # Initial setup (installs dependencies and configures SDR tools)
 ./setup.sh
 
-# Run the application (requires sudo for SDR/network access)
-sudo -E venv/bin/python intercept.py
+# Run with production server (gunicorn + gevent, handles concurrent SSE/WebSocket)
+sudo ./start.sh
 
-# Or activate venv first
-source venv/bin/activate
-sudo -E python intercept.py
+# Or for quick local dev (Flask dev server)
+sudo -E venv/bin/python intercept.py
 ```
 
 ### Testing
@@ -54,8 +68,9 @@ mypy .
 ## Architecture
 
 ### Entry Points
-- `intercept.py` - Main entry point script
-- `app.py` - Flask application initialization, global state management, process lifecycle, SSE streaming infrastructure
+- `start.sh` - Production startup script (gunicorn + gevent auto-detection, CLI flags, HTTPS, fallback to Flask dev server)
+- `intercept.py` - Direct Flask dev server entry point (quick local development)
+- `app.py` - Flask application initialization, global state management, process lifecycle, SSE streaming infrastructure, conditional gevent monkey-patch
 
 ### Route Blueprints (routes/)
 Each signal type has its own Flask blueprint:
@@ -66,8 +81,12 @@ Each signal type has its own Flask blueprint:
 - `wifi.py`, `wifi_v2.py` - WiFi scanning (legacy and unified APIs)
 - `bluetooth.py`, `bluetooth_v2.py` - Bluetooth scanning (legacy and unified APIs)
 - `satellite.py` - Pass prediction using TLE data
+- `sstv.py` - ISS SSTV image decoding via slowrx
+- `weather_sat.py` - NOAA APT & Meteor LRPT via SatDump
+- `ais.py` - AIS vessel tracking and VHF DSC distress monitoring
 - `aprs.py` - Amateur packet radio via direwolf
 - `rtlamr.py` - Utility meter reading
+- `meshtastic_routes.py` - Meshtastic LoRa mesh networking
 
 ### Core Utilities (utils/)
 
@@ -91,9 +110,18 @@ Each signal type has its own Flask blueprint:
 - Platform-agnostic scanner with parsers for airodump-ng, nmcli, iw, iwlist, airport (macOS)
 - `channel_analyzer.py` - Frequency band analysis
 
+**Weather Satellite** (`utils/weather_sat.py`):
+- Singleton `WeatherSatDecoder` using SatDump CLI for NOAA APT and Meteor LRPT
+- Subprocess management with stdout parsing, image watcher via rglob
+- Pass prediction using skyfield TLE data
+
+**SSTV Decoder** (`utils/sstv.py`):
+- ISS SSTV reception via slowrx with Doppler tracking
+- Singleton pattern, image gallery with timestamped filenames
+
 ### Key Patterns
 
-**Server-Sent Events (SSE)**: All real-time features stream via SSE endpoints (`/stream_pager`, `/stream_sensor`, etc.). Pattern uses `queue.Queue` with timeout and keepalive messages.
+**Server-Sent Events (SSE)**: All real-time features stream via SSE endpoints (`/stream_pager`, `/stream_sensor`, etc.). Pattern uses `queue.Queue` with timeout and keepalive messages. Under gunicorn + gevent, each SSE connection is a lightweight greenlet instead of an OS thread.
 
 **Process Management**: External decoders run as subprocesses with output threads feeding queues. Use `safe_terminate()` for cleanup. Global locks prevent race conditions.
 
@@ -112,9 +140,25 @@ Each signal type has its own Flask blueprint:
 | acarsdec | ACARS messages | Output parsing |
 | airmon-ng/airodump-ng | WiFi scanning | Monitor mode, CSV parsing |
 | bluetoothctl/hcitool | Bluetooth | Fallback when DBus unavailable |
+| slowrx | SSTV decoding | Subprocess with audio pipe |
+| SatDump | Weather satellites | CLI live mode, NOAA APT + Meteor LRPT |
+| AIS-catcher | AIS vessel tracking | JSON output parsing |
+| direwolf | APRS | TNC modem for packet radio |
+
+### Frontend Structure
+- **Templates**: `templates/index.html` (main SPA), `templates/partials/modes/*.html` (sidebar panels), `templates/partials/nav.html` (global nav)
+- **JS Modules**: `static/js/modes/*.js` - IIFE pattern per mode (e.g., `WeatherSat`, `SSTV`, `Meshtastic`)
+- **CSS**: `static/css/modes/*.css` - scoped styles per mode, CSS variables for theming (`--bg-card`, `--accent-cyan`, `--font-mono`)
+- **Mode Integration**: Each mode needs entries in `index.html` at ~12 points: CSS include, welcome card, partial include, visuals container, JS include, `validModes` set, `modeGroups` map, classList toggle, `modeNames`, visuals display toggle, titles, and init call in `switchMode()`
+
+### Docker
+- `Dockerfile` - Single-stage build with all SDR tools compiled from source (dump1090, AIS-catcher, slowrx, SatDump, etc.). CMD runs `start.sh` (gunicorn + gevent)
+- `docker-compose.yml` - Two profiles: `basic` (standalone) and `history` (with Postgres for ADS-B)
+- `build-multiarch.sh` - Multi-arch build script for amd64 + arm64 (RPi5)
+- Data persisted via `./data:/app/data` volume mount
 
 ### Configuration
-- `config.py` - Environment variable support with `INTERCEPT_` prefix
+- `config.py` - Environment variable support with `INTERCEPT_` prefix (e.g., `INTERCEPT_PORT`, `INTERCEPT_WEATHER_SAT_GAIN`)
 - Database: SQLite in `instance/` directory for settings, baselines, history
 
 ## Testing Notes

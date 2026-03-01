@@ -36,12 +36,12 @@ let observerLocation = (function() {
         return ObserverLocation.getForModule('observerLocation');
     }
     const saved = localStorage.getItem('observerLocation');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            if (parsed.lat && parsed.lon) return parsed;
-        } catch (e) {}
-    }
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.lat !== undefined && parsed.lat !== null && parsed.lon !== undefined && parsed.lon !== null) return parsed;
+                } catch (e) {}
+            }
     return { lat: 51.5074, lon: -0.1278 };
 })();
 
@@ -98,7 +98,7 @@ function switchMode(mode) {
     const modeMap = {
         'pager': 'pager', 'sensor': '433', 'aircraft': 'aircraft',
         'satellite': 'satellite', 'wifi': 'wifi', 'bluetooth': 'bluetooth',
-        'listening': 'listening', 'meshtastic': 'meshtastic'
+        'meshtastic': 'meshtastic'
     };
     document.querySelectorAll('.mode-nav-btn').forEach(btn => {
         const label = btn.querySelector('.nav-label');
@@ -114,7 +114,6 @@ function switchMode(mode) {
     document.getElementById('satelliteMode').classList.toggle('active', mode === 'satellite');
     document.getElementById('wifiMode').classList.toggle('active', mode === 'wifi');
     document.getElementById('bluetoothMode').classList.toggle('active', mode === 'bluetooth');
-    document.getElementById('listeningPostMode').classList.toggle('active', mode === 'listening');
     document.getElementById('aprsMode')?.classList.toggle('active', mode === 'aprs');
     document.getElementById('tscmMode')?.classList.toggle('active', mode === 'tscm');
     document.getElementById('rtlamrMode')?.classList.toggle('active', mode === 'rtlamr');
@@ -143,7 +142,6 @@ function switchMode(mode) {
         'satellite': 'SATELLITE',
         'wifi': 'WIFI',
         'bluetooth': 'BLUETOOTH',
-        'listening': 'LISTENING POST',
         'tscm': 'TSCM',
         'aprs': 'APRS',
         'meshtastic': 'MESHTASTIC'
@@ -166,7 +164,6 @@ function switchMode(mode) {
     const showRadar = document.getElementById('adsbEnableMap')?.checked;
     document.getElementById('aircraftVisuals').style.display = (mode === 'aircraft' && showRadar) ? 'grid' : 'none';
     document.getElementById('satelliteVisuals').style.display = mode === 'satellite' ? 'block' : 'none';
-    document.getElementById('listeningPostVisuals').style.display = mode === 'listening' ? 'grid' : 'none';
 
     // Update output panel title based on mode
     const titles = {
@@ -176,7 +173,6 @@ function switchMode(mode) {
         'satellite': 'Satellite Monitor',
         'wifi': 'WiFi Scanner',
         'bluetooth': 'Bluetooth Scanner',
-        'listening': 'Listening Post',
         'meshtastic': 'Meshtastic Mesh Monitor'
     };
     document.getElementById('outputTitle').textContent = titles[mode] || 'Signal Monitor';
@@ -184,7 +180,7 @@ function switchMode(mode) {
     // Show/hide Device Intelligence for modes that use it
     const reconBtn = document.getElementById('reconBtn');
     const intelBtn = document.querySelector('[onclick="exportDeviceDB()"]');
-    if (mode === 'satellite' || mode === 'aircraft' || mode === 'listening') {
+    if (mode === 'satellite' || mode === 'aircraft') {
         document.getElementById('reconPanel').style.display = 'none';
         if (reconBtn) reconBtn.style.display = 'none';
         if (intelBtn) intelBtn.style.display = 'none';
@@ -198,7 +194,7 @@ function switchMode(mode) {
 
     // Show RTL-SDR device section for modes that use it
     document.getElementById('rtlDeviceSection').style.display =
-        (mode === 'pager' || mode === 'sensor' || mode === 'aircraft' || mode === 'listening') ? 'block' : 'none';
+        (mode === 'pager' || mode === 'sensor' || mode === 'aircraft') ? 'block' : 'none';
 
     // Toggle mode-specific tool status displays
     document.getElementById('toolStatusPager').style.display = (mode === 'pager') ? 'grid' : 'none';
@@ -207,7 +203,7 @@ function switchMode(mode) {
 
     // Hide waterfall and output console for modes with their own visualizations
     document.querySelector('.waterfall-container').style.display =
-        (mode === 'satellite' || mode === 'listening' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth' || mode === 'meshtastic' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
+        (mode === 'satellite' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth' || mode === 'meshtastic' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
     document.getElementById('output').style.display =
         (mode === 'satellite' || mode === 'aircraft' || mode === 'wifi' || mode === 'bluetooth' || mode === 'meshtastic' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations') ? 'none' : 'block';
     document.querySelector('.status-bar').style.display = (mode === 'satellite' || mode === 'tscm' || mode === 'meshtastic' || mode === 'aprs' || mode === 'spystations') ? 'none' : 'flex';
@@ -226,11 +222,6 @@ function switchMode(mode) {
     } else if (mode === 'satellite') {
         if (typeof initPolarPlot === 'function') initPolarPlot();
         if (typeof initSatelliteList === 'function') initSatelliteList();
-    } else if (mode === 'listening') {
-        if (typeof checkScannerTools === 'function') checkScannerTools();
-        if (typeof checkAudioTools === 'function') checkAudioTools();
-        if (typeof populateScannerDeviceSelect === 'function') populateScannerDeviceSelect();
-        if (typeof populateAudioDeviceSelect === 'function') populateAudioDeviceSelect();
     } else if (mode === 'meshtastic') {
         if (typeof Meshtastic !== 'undefined' && Meshtastic.init) Meshtastic.init();
     }
@@ -373,7 +364,7 @@ function showInfo(text) {
 
     const infoEl = document.createElement('div');
     infoEl.className = 'info-msg';
-    infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "Space Mono", monospace; font-size: 11px; color: #888; word-break: break-all;';
+    infoEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #0a0a0a; border: 1px solid #1a1a1a; border-left: 2px solid #00d4ff; font-family: "Roboto Condensed", "Arial Narrow", sans-serif; font-size: 11px; color: #888; word-break: break-all;';
     infoEl.textContent = text;
     output.insertBefore(infoEl, output.firstChild);
 }
@@ -387,7 +378,7 @@ function showError(text) {
 
     const errorEl = document.createElement('div');
     errorEl.className = 'error-msg';
-    errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "Space Mono", monospace; font-size: 11px; color: #ff6688; word-break: break-all;';
+    errorEl.style.cssText = 'padding: 12px 15px; margin-bottom: 8px; background: #1a0a0a; border: 1px solid #2a1a1a; border-left: 2px solid #ff3366; font-family: "Roboto Condensed", "Arial Narrow", sans-serif; font-size: 11px; color: #ff6688; word-break: break-all;';
     errorEl.textContent = '⚠ ' + text;
     output.insertBefore(errorEl, output.firstChild);
 }
@@ -488,10 +479,12 @@ function initApp() {
         });
     });
 
-    // Collapse all sections by default (except SDR Device which is first)
-    document.querySelectorAll('.section').forEach((section, index) => {
-        if (index > 0) {
+    // Collapse sidebar menu sections by default, but skip headerless utility blocks.
+    document.querySelectorAll('.sidebar .section').forEach((section) => {
+        if (section.querySelector('h3')) {
             section.classList.add('collapsed');
+        } else {
+            section.classList.remove('collapsed');
         }
     });
 

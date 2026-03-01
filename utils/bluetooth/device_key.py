@@ -12,6 +12,7 @@ from typing import Optional
 from .constants import (
     ADDRESS_TYPE_PUBLIC,
     ADDRESS_TYPE_RANDOM_STATIC,
+    ADDRESS_TYPE_UUID,
 )
 
 
@@ -46,9 +47,13 @@ def generate_device_key(
     if identity_address:
         return f"id:{identity_address.upper()}"
 
-    # Priority 2: Use public or random_static addresses directly
+    # Priority 2: Use public or random_static addresses directly (not platform UUIDs)
     if address_type in (ADDRESS_TYPE_PUBLIC, ADDRESS_TYPE_RANDOM_STATIC):
         return f"mac:{address.upper()}"
+
+    # Priority 2b: CoreBluetooth UUIDs are stable per-system, use as identifier
+    if address_type == ADDRESS_TYPE_UUID:
+        return f"uuid:{address.upper()}"
 
     # Priority 3: Generate fingerprint hash for random addresses
     return _generate_fingerprint_key(address, name, manufacturer_id, service_uuids)
@@ -102,7 +107,7 @@ def is_randomized_mac(address_type: str) -> bool:
     Returns:
         True if the address is randomized, False otherwise.
     """
-    return address_type not in (ADDRESS_TYPE_PUBLIC, ADDRESS_TYPE_RANDOM_STATIC)
+    return address_type not in (ADDRESS_TYPE_PUBLIC, ADDRESS_TYPE_RANDOM_STATIC, ADDRESS_TYPE_UUID)
 
 
 def extract_key_type(device_key: str) -> str:

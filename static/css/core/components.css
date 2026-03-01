@@ -123,11 +123,12 @@
    CARDS / PANELS
    ============================================ */
 .card {
-    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
-    border: 1px solid var(--border-color);
+    background: var(--surface-panel-gradient);
+    border: 1px solid rgba(74, 163, 255, 0.24);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(5px);
 }
 
 .card-header {
@@ -135,8 +136,8 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary);
+    border-bottom: 1px solid rgba(74, 163, 255, 0.18);
+    background: linear-gradient(180deg, rgba(25, 38, 55, 0.88) 0%, rgba(17, 27, 40, 0.9) 100%);
     position: relative;
 }
 
@@ -160,11 +161,12 @@
 
 /* Panel variant (used in dashboards) */
 .panel {
-    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
-    border: 1px solid var(--border-color);
+    background: var(--surface-panel-gradient);
+    border: 1px solid rgba(74, 163, 255, 0.24);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(5px);
 }
 
 @supports (clip-path: polygon(0 0)) {
@@ -190,8 +192,8 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--border-color);
-    background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-secondary) 100%);
+    border-bottom: 1px solid rgba(74, 163, 255, 0.18);
+    background: linear-gradient(180deg, rgba(25, 38, 55, 0.88) 0%, rgba(17, 27, 40, 0.9) 100%);
     font-size: var(--text-xs);
     font-weight: var(--font-semibold);
     text-transform: uppercase;
@@ -722,7 +724,20 @@
 
 .card:hover,
 .panel:hover {
-    border-color: var(--border-light);
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-md), var(--shadow-glow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+}
+
+[data-theme="light"] .card,
+[data-theme="light"] .panel {
+    border-color: rgba(31, 95, 168, 0.24);
+}
+
+[data-theme="light"] .card-header,
+[data-theme="light"] .panel-header {
+    border-bottom-color: rgba(31, 95, 168, 0.2);
+    background: linear-gradient(180deg, rgba(243, 247, 252, 0.96) 0%, rgba(233, 239, 247, 0.95) 100%);
 }
 
 /* Stats strip value highlight on hover */

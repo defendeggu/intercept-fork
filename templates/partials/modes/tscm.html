@@ -2,7 +2,7 @@
                 <div id="tscmMode" class="mode-content">
                     <!-- Configuration -->
                     <div class="section">
-                        <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">TSCM Sweep <span style="font-size: 9px; font-weight: normal; background: var(--accent-orange); color: #000; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px;">Alpha</span></h3>
+                        <h3>TSCM Sweep <span style="font-size: 9px; font-weight: normal; background: var(--accent-orange); color: #000; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px;">Alpha</span></h3>
 
                         <div class="form-group">
                             <label>Sweep Type</label>
@@ -65,14 +65,6 @@
                         </div>
                     </div>
 
-                    <!-- Actions -->
-                    <button class="run-btn" id="startTscmBtn" onclick="startTscmSweep()" style="margin-top: 12px;">
-                        Start Sweep
-                    </button>
-                    <button class="stop-btn" id="stopTscmBtn" onclick="stopTscmSweep()" style="display: none; margin-top: 12px;">
-                        Stop Sweep
-                    </button>
-
                     <!-- Futuristic Scanner Progress -->
                     <div id="tscmProgress" class="tscm-scanner-progress" style="display: none; margin-top: 12px;">
                         <div class="scanner-ring">
@@ -115,8 +107,8 @@
                     </div>
 
                     <!-- Advanced -->
-                    <div class="section" style="margin-top: 12px;">
-                        <h3 style="margin-bottom: 12px;">Advanced</h3>
+                    <div class="section">
+                        <h3>Advanced</h3>
 
                         <div style="margin-bottom: 16px;">
                             <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary);">Baseline Recording</label>
@@ -156,8 +148,8 @@
                     </div>
 
                     <!-- Tools -->
-                    <div class="section" style="margin-top: 12px;">
-                        <h3 style="margin-bottom: 10px;">Tools</h3>
+                    <div class="section">
+                        <h3>Tools</h3>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                             <button class="preset-btn" onclick="tscmShowCapabilities()" style="font-size: 10px; padding: 8px;">
                                 Capabilities
@@ -182,4 +174,13 @@
 
                     <!-- Device Warnings -->
                     <div id="tscmDeviceWarnings" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,153,51,0.1); border: 1px solid rgba(255,153,51,0.3); border-radius: 4px;"></div>
+
+                    <div class="mode-actions-bottom">
+                        <button class="run-btn" id="startTscmBtn" onclick="startTscmSweep()">
+                            Start Sweep
+                        </button>
+                        <button class="stop-btn" id="stopTscmBtn" onclick="stopTscmSweep()" style="display: none;">
+                            Stop Sweep
+                        </button>
+                    </div>
                 </div>

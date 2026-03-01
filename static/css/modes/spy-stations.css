@@ -340,7 +340,9 @@
    MODE VISIBILITY - Ensure sidebar shows when active
    ============================================ */
 #spystationsMode.active {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
 }
 
 /* ============================================

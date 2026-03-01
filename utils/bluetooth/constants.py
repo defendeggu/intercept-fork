@@ -101,6 +101,7 @@ ADDRESS_TYPE_RANDOM = 'random'
 ADDRESS_TYPE_RANDOM_STATIC = 'random_static'
 ADDRESS_TYPE_RPA = 'rpa'  # Resolvable Private Address
 ADDRESS_TYPE_NRPA = 'nrpa'  # Non-Resolvable Private Address
+ADDRESS_TYPE_UUID = 'uuid'  # CoreBluetooth platform UUID (macOS, no real MAC available)
 
 # =============================================================================
 # PROTOCOL TYPES
@@ -278,3 +279,59 @@ MINOR_WEARABLE = {
     0x04: 'Helmet',
     0x05: 'Glasses',
 }
+
+# =============================================================================
+# BLE APPEARANCE CODES (GAP Appearance values)
+# =============================================================================
+
+BLE_APPEARANCE_NAMES: dict[int, str] = {
+    0: 'Unknown',
+    64: 'Phone',
+    128: 'Computer',
+    192: 'Watch',
+    193: 'Sports Watch',
+    256: 'Clock',
+    320: 'Display',
+    384: 'Remote Control',
+    448: 'Eye Glasses',
+    512: 'Tag',
+    576: 'Keyring',
+    640: 'Media Player',
+    704: 'Barcode Scanner',
+    768: 'Thermometer',
+    832: 'Heart Rate Sensor',
+    896: 'Blood Pressure',
+    960: 'HID',
+    961: 'Keyboard',
+    962: 'Mouse',
+    963: 'Joystick',
+    964: 'Gamepad',
+    965: 'Digitizer Tablet',
+    966: 'Card Reader',
+    967: 'Digital Pen',
+    968: 'Barcode Scanner (HID)',
+    1024: 'Glucose Monitor',
+    1088: 'Running Speed Sensor',
+    1152: 'Cycling',
+    1216: 'Control Device',
+    1280: 'Network Device',
+    1344: 'Sensor',
+    1408: 'Light Fixture',
+    1472: 'Fan',
+    1536: 'HVAC',
+    1600: 'Access Control',
+    1664: 'Motorized Device',
+    1728: 'Power Device',
+    1792: 'Light Source',
+    3136: 'Pulse Oximeter',
+    3200: 'Weight Scale',
+    3264: 'Personal Mobility',
+    5184: 'Outdoor Sports Activity',
+}
+
+
+def get_appearance_name(code: int | None) -> str | None:
+    """Look up a human-readable name for a BLE appearance code."""
+    if code is None:
+        return None
+    return BLE_APPEARANCE_NAMES.get(code)

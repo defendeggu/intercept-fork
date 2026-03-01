@@ -81,6 +81,7 @@ const Updater = {
     showUpdateToast(data) {
         // Remove existing toast if present
         this.hideToast();
+        const latestVersion = this._escape(data.latest_version || '');
 
         const toast = document.createElement('div');
         toast.className = 'update-toast';
@@ -99,7 +100,7 @@ const Updater = {
                     <button class="update-toast-close" onclick="Updater.dismissUpdate()">&times;</button>
                 </div>
                 <div class="update-toast-body">
-                    Version <strong>${data.latest_version}</strong> is ready
+                    Version <strong>${latestVersion}</strong> is ready
                 </div>
                 <div class="update-toast-actions">
                     <button class="update-toast-btn update-toast-btn-primary" onclick="Updater.showUpdateModal()">
@@ -177,6 +178,9 @@ const Updater = {
 
         const data = this._updateData;
         const releaseNotes = this._formatReleaseNotes(data.release_notes || 'No release notes available.');
+        const safeCurrentVersion = this._escape(data.current_version || '');
+        const safeLatestVersion = this._escape(data.latest_version || '');
+        const safeReleaseUrl = this._safeUrl(data.release_url || '');
 
         const modal = document.createElement('div');
         modal.className = 'update-modal-overlay';
@@ -203,7 +207,7 @@ const Updater = {
                     <div class="update-version-info">
                         <div class="update-version-current">
                             <span class="update-version-label">Current</span>
-                            <span class="update-version-value">v${data.current_version}</span>
+                            <span class="update-version-value">v${safeCurrentVersion}</span>
                         </div>
                         <div class="update-version-arrow">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -213,7 +217,7 @@ const Updater = {
                         </div>
                         <div class="update-version-latest">
                             <span class="update-version-label">Latest</span>
-                            <span class="update-version-value update-version-new">v${data.latest_version}</span>
+                            <span class="update-version-value update-version-new">v${safeLatestVersion}</span>
                         </div>
                     </div>
 
@@ -251,7 +255,7 @@ const Updater = {
                     <div class="update-result" id="updateResult" style="display: none;"></div>
                 </div>
                 <div class="update-modal-footer">
-                    <a href="${data.release_url || '#'}" target="_blank" class="update-modal-link" ${!data.release_url ? 'style="display:none"' : ''}>
+                    <a href="${safeReleaseUrl || '#'}" target="_blank" class="update-modal-link" ${!safeReleaseUrl ? 'style="display:none"' : ''}>
                         View on GitHub
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
@@ -361,6 +365,8 @@ const Updater = {
         if (!resultEl) return;
 
         resultEl.style.display = 'block';
+        const safeMessage = this._escape(data.message || data.error || 'An error occurred during the update.');
+        const safeDetails = data.details ? this._escape(String(data.details).substring(0, 200)) : '';
 
         if (success) {
             if (data.updated) {
@@ -390,7 +396,7 @@ const Updater = {
                             <line x1="12" y1="8" x2="12.01" y2="8"/>
                         </svg>
                     </div>
-                    <div class="update-result-text">${data.message || 'Already up to date.'}</div>
+                    <div class="update-result-text">${this._escape(data.message || 'Already up to date.')}</div>
                 `;
             }
         } else {
@@ -406,7 +412,7 @@ const Updater = {
                     </div>
                     <div class="update-result-text">
                         <strong>Manual update required</strong><br>
-                        ${data.message || 'Please download the latest release from GitHub.'}
+                        ${safeMessage || 'Please download the latest release from GitHub.'}
                     </div>
                 `;
             } else {
@@ -421,8 +427,8 @@ const Updater = {
                     </div>
                     <div class="update-result-text">
                         <strong>Update failed</strong><br>
-                        ${data.message || data.error || 'An error occurred during the update.'}
-                        ${data.details ? '<br><code style="font-size: 10px; margin-top: 8px; display: block;">' + data.details.substring(0, 200) + '</code>' : ''}
+                        ${safeMessage}
+                        ${safeDetails ? '<br><code style="font-size: 10px; margin-top: 8px; display: block;">' + safeDetails + '</code>' : ''}
                     </div>
                 `;
             }
@@ -465,6 +471,28 @@ const Updater = {
         html = html.replace(/(<li>.*<\/li>)+/g, '<ul>$&</ul>');
 
         return '<p>' + html + '</p>';
+    },
+
+    _escape(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    _safeUrl(url) {
+        if (!url) return '';
+        try {
+            const parsed = new URL(url, window.location.origin);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                return parsed.href;
+            }
+        } catch (e) {
+            return '';
+        }
+        return '';
     },
 
     /**

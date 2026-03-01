@@ -257,6 +257,64 @@ DSC_TERMINATE_TIMEOUT = 3
 
 
 # =============================================================================
+# SUBGHZ TRANSCEIVER (HackRF)
+# =============================================================================
+
+# Allowed ISM TX frequency bands (MHz) - transmit only within these ranges
+SUBGHZ_TX_ALLOWED_BANDS = [
+    (300.0, 348.0),    # 315 MHz ISM band
+    (387.0, 464.0),    # 433 MHz ISM band
+    (779.0, 928.0),    # 868/915 MHz ISM band
+]
+
+# HackRF frequency limits (MHz)
+SUBGHZ_FREQ_MIN_MHZ = 1.0
+SUBGHZ_FREQ_MAX_MHZ = 6000.0
+
+# HackRF gain ranges
+SUBGHZ_LNA_GAIN_MIN = 0
+SUBGHZ_LNA_GAIN_MAX = 40
+SUBGHZ_VGA_GAIN_MIN = 0
+SUBGHZ_VGA_GAIN_MAX = 62
+SUBGHZ_TX_VGA_GAIN_MIN = 0
+SUBGHZ_TX_VGA_GAIN_MAX = 47
+
+# Default sample rates available (Hz)
+SUBGHZ_SAMPLE_RATES = [2000000, 4000000, 8000000, 10000000, 20000000]
+
+# Maximum TX duration watchdog (seconds)
+SUBGHZ_TX_MAX_DURATION = 30
+
+# Sweep defaults
+SUBGHZ_SWEEP_BIN_WIDTH = 100000  # 100 kHz bins
+
+# SubGHz process termination timeout
+SUBGHZ_TERMINATE_TIMEOUT = 3
+
+# Common SubGHz preset frequencies (MHz)
+SUBGHZ_PRESETS = {
+    '315 MHz': 315.0,
+    '433.92 MHz': 433.92,
+    '868 MHz': 868.0,
+    '915 MHz': 915.0,
+}
+
+
+# =============================================================================
+# RADIOSONDE (Weather Balloon Tracking)
+# =============================================================================
+
+# UDP port for radiosonde_auto_rx telemetry broadcast
+RADIOSONDE_UDP_PORT = 55673
+
+# Radiosonde process termination timeout
+RADIOSONDE_TERMINATE_TIMEOUT = 5
+
+# Maximum age for balloon data before cleanup (30 min — balloons move slowly)
+MAX_RADIOSONDE_AGE_SECONDS = 1800
+
+
+# =============================================================================
 # DEAUTH ATTACK DETECTION
 # =============================================================================
 
@@ -274,3 +332,4 @@ MAX_DEAUTH_ALERTS_AGE_SECONDS = 300  # 5 minutes
 
 # Deauth detector sniff timeout (seconds)
 DEAUTH_SNIFF_TIMEOUT = 0.5
+

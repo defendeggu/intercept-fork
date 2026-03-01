@@ -343,22 +343,6 @@ SIGNAL_TYPES: list[SignalTypeDefinition] = [
         regions=["GLOBAL"],
     ),
 
-    # LoRaWAN
-    SignalTypeDefinition(
-        label="LoRaWAN / LoRa Device",
-        tags=["iot", "lora", "lpwan", "telemetry"],
-        description="LoRa long-range IoT device",
-        frequency_ranges=[
-            (863_000_000, 870_000_000),  # EU868
-            (902_000_000, 928_000_000),  # US915
-        ],
-        modulation_hints=["LoRa", "CSS", "FSK"],
-        bandwidth_range=(125_000, 500_000),  # LoRa spreading bandwidths
-        base_score=11,
-        is_burst_type=True,
-        regions=["UK/EU", "US"],
-    ),
-
     # Key Fob / Remote
     SignalTypeDefinition(
         label="Remote Control / Key Fob",

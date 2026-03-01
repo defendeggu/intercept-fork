@@ -354,15 +354,15 @@ class TestVISDetector:
         assert mode_name == 'Scottie1'
 
     def test_detect_pd120(self):
-        """Should detect PD120 VIS code (93)."""
+        """Should detect PD120 VIS code (95)."""
         detector = VISDetector()
-        header = generate_vis_header(93)  # PD120
+        header = generate_vis_header(95)  # PD120
         audio = np.concatenate([np.zeros(2400), header, np.zeros(2400)])
 
         result = detector.feed(audio)
         assert result is not None
         vis_code, mode_name = result
-        assert vis_code == 93
+        assert vis_code == 95
         assert mode_name == 'PD120'
 
     def test_noise_rejection(self):
@@ -395,6 +395,121 @@ class TestVISDetector:
         assert vis_code == 8
         assert mode_name == 'Robot36'
 
+    def test_noisy_leader_detection(self):
+        """Should detect VIS despite intermittent None windows in leader.
+
+        Simulates HF fading by inserting short silence gaps (which produce
+        ambiguous tone classification) into the leader tone.
+        """
+        detector = VISDetector()
+        parts = []
+
+        # Build leader1 with gaps: 50ms tone, 10ms silence, repeated
+        # Total ~300ms of leader with interruptions
+        for _ in range(6):
+            parts.append(generate_tone(FREQ_LEADER, 0.050))
+            parts.append(np.zeros(int(SAMPLE_RATE * 0.010)))  # 10ms gap
+
+        # Break (1200 Hz, 10ms)
+        parts.append(generate_tone(FREQ_SYNC, 0.010))
+
+        # Leader 2 (clean)
+        parts.append(generate_tone(FREQ_LEADER, 0.300))
+
+        # Start bit + data bits + parity + stop (standard for Robot36 = VIS 8)
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # start bit
+        vis_code = 8
+        ones_count = 0
+        for i in range(8):
+            bit = (vis_code >> i) & 1
+            if bit:
+                ones_count += 1
+                parts.append(generate_tone(FREQ_VIS_BIT_1, 0.030))
+            else:
+                parts.append(generate_tone(FREQ_VIS_BIT_0, 0.030))
+        parity = ones_count % 2
+        parts.append(generate_tone(
+            FREQ_VIS_BIT_1 if parity else FREQ_VIS_BIT_0, 0.030))
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # stop bit
+
+        audio = np.concatenate([np.zeros(2400)] + parts + [np.zeros(2400)])
+        result = detector.feed(audio)
+        assert result is not None
+        assert result[0] == 8
+        assert result[1] == 'Robot36'
+
+    def test_vis_error_correction_parity_bit(self):
+        """Should recover when only the parity bit is corrupted."""
+        detector = VISDetector()
+        # Generate Martin1 header (VIS 44) but flip the parity bit
+        parts = []
+        parts.append(generate_tone(FREQ_LEADER, 0.300))
+        parts.append(generate_tone(FREQ_SYNC, 0.010))
+        parts.append(generate_tone(FREQ_LEADER, 0.300))
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # start bit
+
+        vis_code = 44  # Martin1
+        ones_count = 0
+        for i in range(8):
+            bit = (vis_code >> i) & 1
+            if bit:
+                ones_count += 1
+                parts.append(generate_tone(FREQ_VIS_BIT_1, 0.030))
+            else:
+                parts.append(generate_tone(FREQ_VIS_BIT_0, 0.030))
+
+        # Wrong parity (flip it)
+        correct_parity = ones_count % 2
+        wrong_parity = 1 - correct_parity
+        parts.append(generate_tone(
+            FREQ_VIS_BIT_1 if wrong_parity else FREQ_VIS_BIT_0, 0.030))
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # stop bit
+
+        audio = np.concatenate([np.zeros(2400)] + parts + [np.zeros(2400)])
+        result = detector.feed(audio)
+        assert result is not None
+        assert result[0] == 44
+        assert result[1] == 'Martin1'
+
+    def test_vis_error_correction_data_bit(self):
+        """Should recover Martin1 when one data bit is flipped by HF noise.
+
+        Simulates: Martin1 (VIS 44) transmitted correctly, but bit 0 is
+        corrupted during reception. The parity bit is received correctly
+        (computed for the original code 44), so parity check fails → error
+        correction tries flipping each data bit and finds VIS 44.
+        """
+        detector = VISDetector()
+        original_code = 44   # Martin1
+        corrupted_code = 44 ^ 1  # flip bit 0 → 45
+
+        parts = []
+        parts.append(generate_tone(FREQ_LEADER, 0.300))
+        parts.append(generate_tone(FREQ_SYNC, 0.010))
+        parts.append(generate_tone(FREQ_LEADER, 0.300))
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # start bit
+
+        # Transmit corrupted data bits
+        for i in range(8):
+            bit = (corrupted_code >> i) & 1
+            if bit:
+                parts.append(generate_tone(FREQ_VIS_BIT_1, 0.030))
+            else:
+                parts.append(generate_tone(FREQ_VIS_BIT_0, 0.030))
+
+        # Parity bit computed for the ORIGINAL code (received correctly)
+        original_ones = bin(original_code).count('1')
+        parity = original_ones % 2
+        parts.append(generate_tone(
+            FREQ_VIS_BIT_1 if parity else FREQ_VIS_BIT_0, 0.030))
+        parts.append(generate_tone(FREQ_SYNC, 0.030))  # stop bit
+
+        audio = np.concatenate([np.zeros(2400)] + parts + [np.zeros(2400)])
+        result = detector.feed(audio)
+        assert result is not None
+        assert result[0] == 44
+        assert result[1] == 'Martin1'
+
 
 # ---------------------------------------------------------------------------
 # Mode spec tests
@@ -405,7 +520,7 @@ class TestModes:
 
     def test_all_vis_codes_have_modes(self):
         """All defined VIS codes should have matching mode specs."""
-        for vis_code in [8, 12, 44, 40, 60, 56, 93, 95]:
+        for vis_code in [8, 12, 44, 40, 60, 56, 95, 97, 99, 98, 96, 76]:
             mode = get_mode(vis_code)
             assert mode is not None, f"No mode for VIS code {vis_code}"
 
@@ -569,6 +684,40 @@ class TestImageDecoder:
         img = decoder.get_image()
         assert img is not None
         assert img.size == (320, 240)
+
+    def test_slant_correction_wraps_rows_without_blank_wedge(self):
+        """Slant correction should rotate rows, not introduce black fill."""
+        PIL = pytest.importorskip('PIL')
+        from utils.sstv.image_decoder import SSTVImageDecoder
+
+        decoder = SSTVImageDecoder(SCOTTIE_1)
+        decoder._sync_deviations = [float(i * 4) for i in range(SCOTTIE_1.height)]
+
+        source = np.full((SCOTTIE_1.height, SCOTTIE_1.width, 3), 128, dtype=np.uint8)
+        img = PIL.Image.fromarray(source, 'RGB')
+
+        corrected = decoder._apply_slant_correction(img)
+        corrected_arr = np.array(corrected)
+
+        # If correction clips/fills, zeros appear. Circular shift should preserve all values.
+        assert corrected_arr.min() == 128
+        assert corrected_arr.max() == 128
+
+    def test_slant_correction_skips_implausible_drift(self):
+        """Very large estimated drift should be treated as a bad fit and ignored."""
+        PIL = pytest.importorskip('PIL')
+        from utils.sstv.image_decoder import SSTVImageDecoder
+
+        decoder = SSTVImageDecoder(SCOTTIE_1)
+        decoder._sync_deviations = [float(i * 40) for i in range(SCOTTIE_1.height)]
+
+        source = np.full((SCOTTIE_1.height, SCOTTIE_1.width, 3), 177, dtype=np.uint8)
+        img = PIL.Image.fromarray(source, 'RGB')
+
+        corrected = decoder._apply_slant_correction(img)
+
+        # Implausible slope should return original image unchanged.
+        assert np.array_equal(np.array(corrected), source)
 
 
 # ---------------------------------------------------------------------------

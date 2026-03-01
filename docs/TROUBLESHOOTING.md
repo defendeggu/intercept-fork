@@ -25,7 +25,7 @@ sudo apt install python3-flask python3-requests python3-serial python3-skyfield
 # Then create venv with system packages
 python3 -m venv --system-site-packages venv
 source venv/bin/activate
-sudo venv/bin/python intercept.py
+sudo ./start.sh
 ```
 
 ### "error: externally-managed-environment" (pip blocked)
@@ -61,7 +61,7 @@ sudo apt install python3.11 python3.11-venv python3-pip
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-sudo venv/bin/python intercept.py
+sudo ./start.sh
 ```
 
 ### Alternative: Use the setup script
@@ -336,7 +336,7 @@ rtl_fm -M am -f 118000000 -s 24000 -r 24000 -g 40 2>/dev/null | \
 
 Run INTERCEPT with sudo:
 ```bash
-sudo -E venv/bin/python intercept.py
+sudo ./start.sh
 ```
 
 ### Interface not found after enabling monitor mode

@@ -18,7 +18,8 @@ import app as app_module
 from config import SHARED_OBSERVER_LOCATION_ENABLED
 from utils.logging import get_logger
 from utils.validation import validate_device_index, validate_gain
-from utils.sse import format_sse
+from utils.sse import sse_stream_fanout
+from utils.event_pipeline import process_event
 from utils.sdr import SDRFactory, SDRType
 from utils.constants import (
     AIS_TCP_PORT,
@@ -43,6 +44,7 @@ ais_connected = False
 ais_messages_received = 0
 ais_last_message_time = None
 ais_active_device = None
+ais_active_sdr_type: str | None = None
 _ais_error_logged = True
 
 # Common installation paths for AIS-catcher
@@ -123,13 +125,27 @@ def parse_ais_stream(port: int):
                     if now - last_update >= AIS_UPDATE_INTERVAL:
                         for mmsi in pending_updates:
                             if mmsi in app_module.ais_vessels:
+                                _vessel_snap = app_module.ais_vessels[mmsi]
                                 try:
                                     app_module.ais_queue.put_nowait({
                                         'type': 'vessel',
-                                        **app_module.ais_vessels[mmsi]
+                                        **_vessel_snap
                                     })
                                 except queue.Full:
                                     pass
+                                # Geofence check
+                                _v_lat = _vessel_snap.get('lat')
+                                _v_lon = _vessel_snap.get('lon')
+                                if _v_lat and _v_lon:
+                                    try:
+                                        from utils.geofence import get_geofence_manager
+                                        for _gf_evt in get_geofence_manager().check_position(
+                                            mmsi, 'vessel', _v_lat, _v_lon,
+                                            {'name': _vessel_snap.get('name'), 'ship_type': _vessel_snap.get('ship_type_text')}
+                                        ):
+                                            process_event('ais', _gf_evt, 'geofence')
+                                    except Exception:
+                                        pass
                         pending_updates.clear()
                         last_update = now
 
@@ -281,6 +297,16 @@ def process_ais_message(msg: dict) -> dict | None:
     # Timestamp
     vessel['last_seen'] = time.time()
 
+    # Check for DSC DISTRESS matching this MMSI
+    try:
+        for _dsc_key, _dsc_msg in app_module.dsc_messages.items():
+            if (str(_dsc_msg.get('source_mmsi', '')) == mmsi
+                    and _dsc_msg.get('category', '').upper() == 'DISTRESS'):
+                vessel['dsc_distress'] = True
+                break
+    except Exception:
+        pass
+
     return vessel
 
 
@@ -325,7 +351,7 @@ def ais_status():
 @ais_bp.route('/start', methods=['POST'])
 def start_ais():
     """Start AIS tracking."""
-    global ais_running, ais_active_device
+    global ais_running, ais_active_device, ais_active_sdr_type
 
     with app_module.ais_lock:
         if ais_running:
@@ -372,7 +398,7 @@ def start_ais():
 
     # Check if device is available
     device_int = int(device)
-    error = app_module.claim_sdr_device(device_int, 'ais')
+    error = app_module.claim_sdr_device(device_int, 'ais', sdr_type_str)
     if error:
         return jsonify({
             'status': 'error',
@@ -411,7 +437,7 @@ def start_ais():
 
         if app_module.ais_process.poll() is not None:
             # Release device on failure
-            app_module.release_sdr_device(device_int)
+            app_module.release_sdr_device(device_int, sdr_type_str)
             stderr_output = ''
             if app_module.ais_process.stderr:
                 try:
@@ -425,6 +451,7 @@ def start_ais():
 
         ais_running = True
         ais_active_device = device
+        ais_active_sdr_type = sdr_type_str
 
         # Start TCP parser thread
         thread = threading.Thread(target=parse_ais_stream, args=(tcp_port,), daemon=True)
@@ -438,7 +465,7 @@ def start_ais():
         })
     except Exception as e:
         # Release device on failure
-        app_module.release_sdr_device(device_int)
+        app_module.release_sdr_device(device_int, sdr_type_str)
         logger.error(f"Failed to start AIS-catcher: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -446,7 +473,7 @@ def start_ais():
 @ais_bp.route('/stop', methods=['POST'])
 def stop_ais():
     """Stop AIS tracking."""
-    global ais_running, ais_active_device
+    global ais_running, ais_active_device, ais_active_sdr_type
 
     with app_module.ais_lock:
         if app_module.ais_process:
@@ -465,10 +492,11 @@ def stop_ais():
 
         # Release device from registry
         if ais_active_device is not None:
-            app_module.release_sdr_device(ais_active_device)
+            app_module.release_sdr_device(ais_active_device, ais_active_sdr_type or 'rtlsdr')
 
         ais_running = False
         ais_active_device = None
+        ais_active_sdr_type = None
 
     app_module.ais_vessels.clear()
     return jsonify({'status': 'stopped'})
@@ -477,30 +505,47 @@ def stop_ais():
 @ais_bp.route('/stream')
 def stream_ais():
     """SSE stream for AIS vessels."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
+    def _on_msg(msg: dict[str, Any]) -> None:
+        process_event('ais', msg, msg.get('type'))
 
-        while True:
-            try:
-                msg = app_module.ais_queue.get(timeout=SSE_QUEUE_TIMEOUT)
-                last_keepalive = time.time()
-                yield format_sse(msg)
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= SSE_KEEPALIVE_INTERVAL:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    response = Response(
+        sse_stream_fanout(
+            source_queue=app_module.ais_queue,
+            channel_key='ais',
+            timeout=SSE_QUEUE_TIMEOUT,
+            keepalive_interval=SSE_KEEPALIVE_INTERVAL,
+            on_message=_on_msg,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     return response
 
 
+@ais_bp.route('/vessel/<mmsi>/dsc')
+def get_vessel_dsc(mmsi: str):
+    """Get DSC messages associated with a vessel MMSI."""
+    if not mmsi or not mmsi.isdigit():
+        return jsonify({'status': 'error', 'message': 'Invalid MMSI'}), 400
+
+    matches = []
+    try:
+        for key, msg in app_module.dsc_messages.items():
+            if str(msg.get('source_mmsi', '')) == mmsi:
+                matches.append(dict(msg))
+    except Exception:
+        pass
+
+    return jsonify({'status': 'success', 'mmsi': mmsi, 'dsc_messages': matches})
+
+
 @ais_bp.route('/dashboard')
 def ais_dashboard():
     """Popout AIS dashboard."""
+    embedded = request.args.get('embedded', 'false') == 'true'
     return render_template(
         'ais_dashboard.html',
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+        embedded=embedded,
     )

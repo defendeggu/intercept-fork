@@ -189,7 +189,7 @@ SCOTTIE_2 = SSTVMode(
 
 PD_120 = SSTVMode(
     name='PD120',
-    vis_code=93,
+    vis_code=95,
     width=640,
     height=496,
     color_model=ColorModel.YCRCB_DUAL,
@@ -207,7 +207,7 @@ PD_120 = SSTVMode(
 
 PD_180 = SSTVMode(
     name='PD180',
-    vis_code=95,
+    vis_code=97,
     width=640,
     height=496,
     color_model=ColorModel.YCRCB_DUAL,
@@ -223,6 +223,81 @@ PD_180 = SSTVMode(
     line_duration_ms=754.240,
 )
 
+PD_90 = SSTVMode(
+    name='PD90',
+    vis_code=99,
+    width=640,
+    height=496,
+    color_model=ColorModel.YCRCB_DUAL,
+    sync_position=SyncPosition.FRONT_PD,
+    sync_duration_ms=20.0,
+    sync_porch_ms=2.080,
+    channels=[
+        ChannelTiming(duration_ms=91.520),   # Y1
+        ChannelTiming(duration_ms=91.520),   # Cr
+        ChannelTiming(duration_ms=91.520),   # Cb
+        ChannelTiming(duration_ms=91.520),   # Y2
+    ],
+    line_duration_ms=388.160,
+)
+
+PD_160 = SSTVMode(
+    name='PD160',
+    vis_code=98,
+    width=640,
+    height=496,
+    color_model=ColorModel.YCRCB_DUAL,
+    sync_position=SyncPosition.FRONT_PD,
+    sync_duration_ms=20.0,
+    sync_porch_ms=2.080,
+    channels=[
+        ChannelTiming(duration_ms=152.960),  # Y1
+        ChannelTiming(duration_ms=152.960),  # Cr
+        ChannelTiming(duration_ms=152.960),  # Cb
+        ChannelTiming(duration_ms=152.960),  # Y2
+    ],
+    line_duration_ms=633.920,
+)
+
+PD_240 = SSTVMode(
+    name='PD240',
+    vis_code=96,
+    width=640,
+    height=496,
+    color_model=ColorModel.YCRCB_DUAL,
+    sync_position=SyncPosition.FRONT_PD,
+    sync_duration_ms=20.0,
+    sync_porch_ms=2.080,
+    channels=[
+        ChannelTiming(duration_ms=244.480),  # Y1
+        ChannelTiming(duration_ms=244.480),  # Cr
+        ChannelTiming(duration_ms=244.480),  # Cb
+        ChannelTiming(duration_ms=244.480),  # Y2
+    ],
+    line_duration_ms=1000.000,
+)
+
+# ---------------------------------------------------------------------------
+# Scottie DX
+# ---------------------------------------------------------------------------
+
+SCOTTIE_DX = SSTVMode(
+    name='ScottieDX',
+    vis_code=76,
+    width=320,
+    height=256,
+    color_model=ColorModel.RGB,
+    sync_position=SyncPosition.MIDDLE,
+    sync_duration_ms=9.0,
+    sync_porch_ms=1.5,
+    channels=[
+        ChannelTiming(duration_ms=345.600),  # Green
+        ChannelTiming(duration_ms=345.600),  # Blue
+        ChannelTiming(duration_ms=345.600),  # Red
+    ],
+    line_duration_ms=1050.300,
+)
+
 
 # ---------------------------------------------------------------------------
 # Mode registry
@@ -232,8 +307,8 @@ ALL_MODES: dict[int, SSTVMode] = {
     m.vis_code: m for m in [
         ROBOT_36, ROBOT_72,
         MARTIN_1, MARTIN_2,
-        SCOTTIE_1, SCOTTIE_2,
-        PD_120, PD_180,
+        SCOTTIE_1, SCOTTIE_2, SCOTTIE_DX,
+        PD_90, PD_120, PD_160, PD_180, PD_240,
     ]
 }
 

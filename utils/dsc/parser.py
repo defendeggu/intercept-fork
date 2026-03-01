@@ -19,6 +19,8 @@ from .constants import (
     TELECOMMAND_CODES,
     CATEGORY_PRIORITY,
     MID_COUNTRY_MAP,
+    VALID_FORMAT_SPECIFIERS,
+    VALID_EOS,
 )
 
 logger = logging.getLogger('intercept.dsc.parser')
@@ -139,13 +141,62 @@ def parse_dsc_message(raw_line: str) -> dict[str, Any] | None:
     if 'source_mmsi' not in data:
         return None
 
+    # ITU-R M.493 validation: format specifier must be valid
+    format_code = data.get('format')
+    if format_code not in VALID_FORMAT_SPECIFIERS:
+        logger.debug(f"Rejected DSC: invalid format specifier {format_code}")
+        return None
+
+    # Validate MMSIs
+    source_mmsi = str(data.get('source_mmsi', ''))
+    if not validate_mmsi(source_mmsi):
+        logger.debug(f"Rejected DSC: invalid source MMSI {source_mmsi}")
+        return None
+
+    dest_mmsi_val = data.get('dest_mmsi')
+    if dest_mmsi_val is not None:
+        dest_mmsi_str = str(dest_mmsi_val)
+        if not validate_mmsi(dest_mmsi_str):
+            logger.debug(f"Rejected DSC: invalid dest MMSI {dest_mmsi_str}")
+            return None
+
+    # Validate raw field structure if present
+    raw = data.get('raw')
+    if raw is not None:
+        raw_str = str(raw)
+        if not re.match(r'^\d+$', raw_str):
+            logger.debug("Rejected DSC: raw field contains non-digits")
+            return None
+        if len(raw_str) % 3 != 0:
+            logger.debug("Rejected DSC: raw field length not divisible by 3")
+            return None
+        # Last 3-digit token must be a valid EOS symbol
+        if len(raw_str) >= 3:
+            last_token = int(raw_str[-3:])
+            if last_token not in VALID_EOS:
+                logger.debug(f"Rejected DSC: raw EOS token {last_token} not valid")
+                return None
+
+    # Validate telecommand values if present (must be 100-127)
+    for tc_field in ('telecommand1', 'telecommand2'):
+        tc_val = data.get(tc_field)
+        if tc_val is not None:
+            try:
+                tc_int = int(tc_val)
+            except (ValueError, TypeError):
+                logger.debug(f"Rejected DSC: invalid {tc_field} value {tc_val}")
+                return None
+            if tc_int < 100 or tc_int > 127:
+                logger.debug(f"Rejected DSC: {tc_field} {tc_int} out of range 100-127")
+                return None
+
     # Build parsed message
     msg = {
         'type': 'dsc_message',
-        'source_mmsi': str(data.get('source_mmsi', '')),
-        'dest_mmsi': str(data.get('dest_mmsi', '')) if data.get('dest_mmsi') else None,
-        'format_code': data.get('format'),
-        'format_text': get_format_text(data.get('format', 0)),
+        'source_mmsi': source_mmsi,
+        'dest_mmsi': str(data.get('dest_mmsi', '')) if data.get('dest_mmsi') is not None else None,
+        'format_code': format_code,
+        'format_text': get_format_text(format_code),
         'category': data.get('category', 'UNKNOWN').upper(),
         'timestamp': data.get('timestamp') or datetime.utcnow().isoformat(),
     }
@@ -156,7 +207,7 @@ def parse_dsc_message(raw_line: str) -> dict[str, Any] | None:
         msg['source_country'] = country
 
     # Add distress nature if present
-    if 'nature' in data and data['nature']:
+    if data.get('nature') is not None:
         msg['nature_code'] = data['nature']
         msg['nature_of_distress'] = get_distress_nature_text(data['nature'])
 
@@ -173,16 +224,16 @@ def parse_dsc_message(raw_line: str) -> dict[str, Any] | None:
                 pass
 
     # Add telecommand info
-    if 'telecommand1' in data and data['telecommand1']:
+    if data.get('telecommand1') is not None:
         msg['telecommand1'] = data['telecommand1']
         msg['telecommand1_text'] = get_telecommand_text(data['telecommand1'])
 
-    if 'telecommand2' in data and data['telecommand2']:
+    if data.get('telecommand2') is not None:
         msg['telecommand2'] = data['telecommand2']
         msg['telecommand2_text'] = get_telecommand_text(data['telecommand2'])
 
     # Add channel if present
-    if 'channel' in data and data['channel']:
+    if data.get('channel') is not None:
         msg['channel'] = data['channel']
 
     # Add EOS (End of Sequence) info
@@ -197,7 +248,10 @@ def parse_dsc_message(raw_line: str) -> dict[str, Any] | None:
     msg['priority'] = get_category_priority(msg['category'])
 
     # Mark if this is a critical alert
-    msg['is_critical'] = msg['category'] in ('DISTRESS', 'DISTRESS_ACK', 'DISTRESS_RELAY', 'URGENCY')
+    msg['is_critical'] = msg['category'] in (
+        'DISTRESS', 'DISTRESS_ACK', 'DISTRESS_RELAY',
+        'URGENCY', 'SAFETY', 'ALL_SHIPS_URGENCY_SAFETY',
+    )
 
     return msg
 

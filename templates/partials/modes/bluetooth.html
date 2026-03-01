@@ -1,20 +1,18 @@
 <!-- BLUETOOTH MODE -->
                 <div id="bluetoothMode" class="mode-content">
-                    <!-- Capability Status -->
-                    <div id="btCapabilityStatus" class="section" style="display: none;">
-                        <!-- Populated by JavaScript with capability warnings -->
-                    </div>
-
-                    <!-- Show All Agents option (visible when agents are available) -->
-                    <div id="btShowAllAgentsContainer" class="section" style="display: none; padding: 8px;">
-                        <label class="inline-checkbox" style="font-size: 10px;">
-                            <input type="checkbox" id="btShowAllAgents" onchange="if(typeof BluetoothMode !== 'undefined') BluetoothMode.toggleShowAllAgents(this.checked)">
-                            Show devices from all agents
-                        </label>
-                    </div>
-
                     <div class="section">
                         <h3>Scanner Configuration</h3>
+                        <!-- Populated by JavaScript with capability warnings -->
+                        <div id="btCapabilityStatus" style="display: none; margin-bottom: 8px;"></div>
+
+                        <!-- Show All Agents option (visible when agents are available) -->
+                        <div id="btShowAllAgentsContainer" style="display: none; margin-bottom: 8px;">
+                            <label class="inline-checkbox" style="font-size: 10px;">
+                                <input type="checkbox" id="btShowAllAgents" onchange="if(typeof BluetoothMode !== 'undefined') BluetoothMode.toggleShowAllAgents(this.checked)">
+                                Show devices from all agents
+                            </label>
+                        </div>
+
                         <div class="form-group">
                             <label>Adapter</label>
                             <select id="btAdapterSelect">
@@ -28,6 +26,7 @@
                                 <option value="bleak">Bleak Library</option>
                                 <option value="hcitool">hcitool (Linux)</option>
                                 <option value="bluetoothctl">bluetoothctl (Linux)</option>
+                                <option value="ubertooth" id="btScanModeUbertooth" style="display:none;">Ubertooth One</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -53,6 +52,7 @@
 
                     <!-- Message Container for status cards -->
                     <div id="btMessageContainer"></div>
+                    <div id="btBaselineStatus" style="margin-top: 6px; font-size: 10px; color: var(--text-dim);">No baseline</div>
 
                     <button class="run-btn" id="startBtBtn" onclick="btStartScan()">
                         Start Scanning
@@ -61,7 +61,7 @@
                         Stop Scanning
                     </button>
 
-                    <div class="section" style="margin-top: 10px;">
+                    <div class="section">
                         <h3>Export</h3>
                         <div style="display: flex; gap: 8px;">
                             <button class="preset-btn" onclick="btExport('csv')" style="flex: 1;">

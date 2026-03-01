@@ -137,6 +137,14 @@ need_sudo() {
   fi
 }
 
+# Refresh sudo credential cache so long-running builds don't trigger
+# mid-compilation password prompts (which can fail due to TTY issues
+# inside subshells). Safe to call multiple times.
+refresh_sudo() {
+  [[ -z "${SUDO:-}" ]] && return 0
+  sudo -v 2>/dev/null || true
+}
+
 detect_os() {
   if [[ "${OSTYPE:-}" == "darwin"* ]]; then
     OS="macos"
@@ -165,6 +173,7 @@ detect_dragonos() {
 # Required tool checks (with alternates)
 # ----------------------------
 missing_required=()
+missing_recommended=()
 
 check_required() {
   local label="$1"; shift
@@ -175,6 +184,18 @@ check_required() {
   else
     warn "${label} - ${desc} (missing, required)"
     missing_required+=("$label")
+  fi
+}
+
+check_recommended() {
+  local label="$1"; shift
+  local desc="$1"; shift
+
+  if have_any "$@"; then
+    ok "${label} - ${desc}"
+  else
+    warn "${label} - ${desc} (missing, recommended)"
+    missing_recommended+=("$label")
   fi
 }
 
@@ -201,16 +222,17 @@ check_tools() {
   check_required "multimon-ng" "Pager decoder" multimon-ng
   check_required "rtl_433"     "433MHz sensor decoder" rtl_433 rtl433
   check_optional "rtlamr"      "Utility meter decoder (requires Go)" rtlamr
+  check_optional "hackrf_transfer" "HackRF SubGHz transceiver" hackrf_transfer
+  check_optional "hackrf_sweep"    "HackRF spectrum analyzer" hackrf_sweep
   check_required "dump1090"    "ADS-B decoder" dump1090
   check_required "acarsdec"    "ACARS decoder" acarsdec
+  check_optional "dumpvdl2"    "VDL2 decoder" dumpvdl2
   check_required "AIS-catcher" "AIS vessel decoder" AIS-catcher aiscatcher
+  check_optional "satdump" "Weather satellite decoder (NOAA/Meteor)" satdump
+  check_optional "auto_rx.py" "Radiosonde weather balloon decoder" auto_rx.py
   echo
   info "GPS:"
   check_required "gpsd" "GPS daemon" gpsd
-
-  echo
-  info "Digital Voice:"
-  check_optional "dsd" "Digital Speech Decoder (DMR/P25)" dsd dsd-fme
 
   echo
   info "Audio:"
@@ -288,28 +310,41 @@ install_python_deps() {
 
   # shellcheck disable=SC1091
   source venv/bin/activate
+  local PIP="venv/bin/python -m pip"
+  local PY="venv/bin/python"
 
-  python -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+  $PIP install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
   ok "Upgraded pip tooling"
 
   progress "Installing Python dependencies"
-  # Try pip install, but don't fail if apt packages already satisfied deps
-  if ! python -m pip install -r requirements.txt 2>/dev/null; then
-    warn "Some pip packages failed - checking if apt packages cover them..."
-    # Verify critical packages are available
-    python -c "import flask; import requests; from flask_limiter import Limiter" 2>/dev/null || {
-      fail "Critical Python packages (flask, requests, flask-limiter) not installed"
-      echo "Try: pip install flask requests flask-limiter"
-      exit 1
-    }
-    ok "Core Python dependencies available"
-  else
-    ok "Python dependencies installed"
-  fi
 
-  # Ensure Flask 3.0+ is installed (required for Werkzeug 3.x compatibility)
-  # System apt packages may have older Flask 2.x which is incompatible
-  python -m pip install --upgrade "flask>=3.0.0" >/dev/null 2>&1 || true
+  # Install critical packages first to avoid all-or-nothing failures
+  # (C extension packages like scipy/numpy can fail on newer Python versions
+  #  and cause pip to roll back pure-Python packages like flask)
+  info "Installing core packages..."
+  $PIP install --quiet "flask>=3.0.0" "flask-limiter>=2.5.4" "requests>=2.28.0" \
+    "Werkzeug>=3.1.5" "pyserial>=3.5" "flask-sock" "websocket-client>=1.6.0" 2>/dev/null || true
+
+  # Verify critical packages
+  $PY -c "import flask; import requests; from flask_limiter import Limiter" 2>/dev/null || {
+    fail "Critical Python packages (flask, requests, flask-limiter) not installed"
+    echo "Try: venv/bin/pip install flask requests flask-limiter"
+    exit 1
+  }
+  ok "Core Python packages installed"
+
+  # Install optional packages individually (some may fail on newer Python)
+  info "Installing optional packages..."
+  for pkg in "numpy>=1.24.0" "scipy>=1.10.0" "Pillow>=9.0.0" "skyfield>=1.45" \
+             "bleak>=0.21.0" "psycopg2-binary>=2.9.9" "meshtastic>=2.0.0" \
+             "scapy>=2.4.5" "qrcode[pil]>=7.4" "cryptography>=41.0.0" \
+             "gunicorn>=21.2.0" "gevent>=23.9.0" "psutil>=5.9.0"; do
+    pkg_name="${pkg%%>=*}"
+    if ! $PIP install "$pkg" 2>/dev/null; then
+      warn "${pkg_name} failed to install (optional - related features may be unavailable)"
+    fi
+  done
+  ok "Optional packages processed"
   echo
 }
 
@@ -372,7 +407,7 @@ install_rtlamr_from_source() {
         if [[ -w /usr/local/bin ]]; then
           ln -sf "$GOPATH/bin/rtlamr" /usr/local/bin/rtlamr
         else
-          sudo ln -sf "$GOPATH/bin/rtlamr" /usr/local/bin/rtlamr
+          $SUDO ln -sf "$GOPATH/bin/rtlamr" /usr/local/bin/rtlamr
         fi
       else
         $SUDO ln -sf "$GOPATH/bin/rtlamr" /usr/local/bin/rtlamr
@@ -414,96 +449,10 @@ install_multimon_ng_from_source_macos() {
     if [[ -w /usr/local/bin ]]; then
       install -m 0755 multimon-ng /usr/local/bin/multimon-ng
     else
-      sudo install -m 0755 multimon-ng /usr/local/bin/multimon-ng
+      refresh_sudo
+      $SUDO install -m 0755 multimon-ng /usr/local/bin/multimon-ng
     fi
     ok "multimon-ng installed successfully from source"
-  )
-}
-
-install_dsd_from_source() {
-  info "Building DSD (Digital Speech Decoder) from source..."
-  info "This requires mbelib (vocoder library) as a prerequisite."
-
-  if [[ "$OS" == "macos" ]]; then
-    brew_install cmake
-    brew_install libsndfile
-    brew_install ncurses
-    brew_install fftw
-    brew_install codec2
-    brew_install librtlsdr
-    brew_install pulseaudio || true
-  else
-    apt_install build-essential git cmake libsndfile1-dev libpulse-dev \
-      libfftw3-dev liblapack-dev libncurses-dev librtlsdr-dev libcodec2-dev
-  fi
-
-  (
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
-
-    # Step 1: Build and install mbelib (required dependency)
-    info "Building mbelib (vocoder library)..."
-    git clone https://github.com/lwvmobile/mbelib.git "$tmp_dir/mbelib" >/dev/null 2>&1 \
-      || { warn "Failed to clone mbelib"; exit 1; }
-
-    cd "$tmp_dir/mbelib"
-    git checkout ambe_tones >/dev/null 2>&1 || true
-    mkdir -p build && cd build
-
-    if cmake .. >/dev/null 2>&1 && make -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu)" >/dev/null 2>&1; then
-      if [[ "$OS" == "macos" ]]; then
-        if [[ -w /usr/local/lib ]]; then
-          make install >/dev/null 2>&1
-        else
-          sudo make install >/dev/null 2>&1
-        fi
-      else
-        $SUDO make install >/dev/null 2>&1
-        $SUDO ldconfig 2>/dev/null || true
-      fi
-      ok "mbelib installed"
-    else
-      warn "Failed to build mbelib. Cannot build DSD without it."
-      exit 1
-    fi
-
-    # Step 2: Build dsd-fme (or fall back to original dsd)
-    info "Building dsd-fme..."
-    git clone --depth 1 https://github.com/lwvmobile/dsd-fme.git "$tmp_dir/dsd-fme" >/dev/null 2>&1 \
-      || { warn "Failed to clone dsd-fme, trying original DSD...";
-           git clone --depth 1 https://github.com/szechyjs/dsd.git "$tmp_dir/dsd-fme" >/dev/null 2>&1 \
-             || { warn "Failed to clone DSD"; exit 1; }; }
-
-    cd "$tmp_dir/dsd-fme"
-    mkdir -p build && cd build
-
-    # On macOS, help cmake find Homebrew ncurses
-    local cmake_flags=""
-    if [[ "$OS" == "macos" ]]; then
-      local ncurses_prefix
-      ncurses_prefix="$(brew --prefix ncurses 2>/dev/null || echo /opt/homebrew/opt/ncurses)"
-      cmake_flags="-DCMAKE_PREFIX_PATH=$ncurses_prefix"
-    fi
-
-    info "Compiling DSD..."
-    if cmake .. $cmake_flags >/dev/null 2>&1 && make -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu)" >/dev/null 2>&1; then
-      if [[ "$OS" == "macos" ]]; then
-        if [[ -w /usr/local/bin ]]; then
-          install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null || install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null || true
-        else
-          sudo install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null || sudo install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null || true
-        fi
-      else
-        $SUDO make install >/dev/null 2>&1 \
-          || $SUDO install -m 0755 dsd-fme /usr/local/bin/dsd 2>/dev/null \
-          || $SUDO install -m 0755 dsd /usr/local/bin/dsd 2>/dev/null \
-          || true
-        $SUDO ldconfig 2>/dev/null || true
-      fi
-      ok "DSD installed successfully"
-    else
-      warn "Failed to build DSD from source. DMR/P25 decoding will not be available."
-    fi
   )
 }
 
@@ -529,7 +478,8 @@ install_dump1090_from_source_macos() {
       if [[ -w /usr/local/bin ]]; then
         install -m 0755 dump1090 /usr/local/bin/dump1090
       else
-        sudo install -m 0755 dump1090 /usr/local/bin/dump1090
+        refresh_sudo
+        $SUDO install -m 0755 dump1090 /usr/local/bin/dump1090
       fi
       ok "dump1090 installed successfully from source"
     else
@@ -555,18 +505,129 @@ install_acarsdec_from_source_macos() {
       || { warn "Failed to clone acarsdec"; exit 1; }
 
     cd "$tmp_dir/acarsdec"
+
+    # Fix compiler flags for macOS Apple Silicon (ARM64)
+    # -march=native can fail with Apple Clang on M-series chips
+    # -Ofast is deprecated in modern Clang
+    if [[ "$(uname -m)" == "arm64" ]]; then
+      sed -i '' 's/-Ofast -march=native/-O3 -ffast-math/g' CMakeLists.txt
+      info "Patched compiler flags for Apple Silicon (arm64)"
+    fi
+
+    # Fix pthread_tryjoin_np (Linux-only GNU extension) for macOS
+    # Replace with pthread_join which provides equivalent behavior
+    if grep -q 'pthread_tryjoin_np' rtl.c 2>/dev/null; then
+      sed -i '' 's/pthread_tryjoin_np(\([^,]*\), NULL)/pthread_join(\1, NULL)/g' rtl.c
+      info "Patched pthread_tryjoin_np for macOS compatibility"
+    fi
+
+    # Fix libacars linking on macOS (upstream issue #112)
+    # Use LIBACARS_LINK_LIBRARIES (full path) instead of LIBACARS_LIBRARIES (name only)
+    if grep -q 'LIBACARS_LIBRARIES' CMakeLists.txt 2>/dev/null; then
+      sed -i '' 's/${LIBACARS_LIBRARIES}/${LIBACARS_LINK_LIBRARIES}/g' CMakeLists.txt
+      info "Patched libacars linking for macOS"
+    fi
+
     mkdir -p build && cd build
 
+    # Set Homebrew paths for Apple Silicon (/opt/homebrew) or Intel (/usr/local)
+    HOMEBREW_PREFIX="$(brew --prefix)"
+    export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+    export CMAKE_PREFIX_PATH="${HOMEBREW_PREFIX}"
+
     info "Compiling acarsdec..."
-    if cmake .. -Drtl=ON >/dev/null 2>&1 && make >/dev/null 2>&1; then
+    build_log="$tmp_dir/acarsdec-build.log"
+    if cmake .. -Drtl=ON \
+         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+         -DCMAKE_C_FLAGS="-I${HOMEBREW_PREFIX}/include" \
+         -DCMAKE_EXE_LINKER_FLAGS="-L${HOMEBREW_PREFIX}/lib" \
+         >"$build_log" 2>&1 \
+       && make >>"$build_log" 2>&1; then
       if [[ -w /usr/local/bin ]]; then
         install -m 0755 acarsdec /usr/local/bin/acarsdec
       else
-        sudo install -m 0755 acarsdec /usr/local/bin/acarsdec
+        refresh_sudo
+        $SUDO install -m 0755 acarsdec /usr/local/bin/acarsdec
       fi
       ok "acarsdec installed successfully from source"
     else
       warn "Failed to build acarsdec. ACARS decoding will not be available."
+      warn "Build log (last 30 lines):"
+      tail -30 "$build_log" | while IFS= read -r line; do warn "  $line"; done
+    fi
+  )
+}
+
+install_dumpvdl2_from_source_macos() {
+  info "Building dumpvdl2 from source (with libacars dependency)..."
+
+  brew_install cmake
+  brew_install librtlsdr
+  brew_install pkg-config
+  brew_install glib
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    HOMEBREW_PREFIX="$(brew --prefix)"
+    export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+    export CMAKE_PREFIX_PATH="${HOMEBREW_PREFIX}"
+
+    # Build libacars first
+    info "Cloning libacars..."
+    git clone --depth 1 https://github.com/szpajder/libacars.git "$tmp_dir/libacars" >/dev/null 2>&1 \
+      || { warn "Failed to clone libacars"; exit 1; }
+
+    cd "$tmp_dir/libacars"
+    mkdir -p build && cd build
+
+    info "Compiling libacars..."
+    build_log="$tmp_dir/libacars-build.log"
+    if cmake .. \
+         -DCMAKE_C_FLAGS="-I${HOMEBREW_PREFIX}/include" \
+         -DCMAKE_EXE_LINKER_FLAGS="-L${HOMEBREW_PREFIX}/lib" \
+         >"$build_log" 2>&1 \
+       && make >>"$build_log" 2>&1; then
+      if [[ -w /usr/local/lib ]]; then
+        make install >>"$build_log" 2>&1
+      else
+        refresh_sudo
+        $SUDO make install >>"$build_log" 2>&1
+      fi
+      ok "libacars installed"
+    else
+      warn "Failed to build libacars."
+      tail -20 "$build_log" | while IFS= read -r line; do warn "  $line"; done
+      exit 1
+    fi
+
+    # Build dumpvdl2
+    info "Cloning dumpvdl2..."
+    git clone --depth 1 https://github.com/szpajder/dumpvdl2.git "$tmp_dir/dumpvdl2" >/dev/null 2>&1 \
+      || { warn "Failed to clone dumpvdl2"; exit 1; }
+
+    cd "$tmp_dir/dumpvdl2"
+    mkdir -p build && cd build
+
+    info "Compiling dumpvdl2..."
+    build_log="$tmp_dir/dumpvdl2-build.log"
+    if cmake .. \
+         -DCMAKE_C_FLAGS="-I${HOMEBREW_PREFIX}/include" \
+         -DCMAKE_EXE_LINKER_FLAGS="-L${HOMEBREW_PREFIX}/lib" \
+         >"$build_log" 2>&1 \
+       && make >>"$build_log" 2>&1; then
+      if [[ -w /usr/local/bin ]]; then
+        install -m 0755 src/dumpvdl2 /usr/local/bin/dumpvdl2
+      else
+        refresh_sudo
+        $SUDO install -m 0755 src/dumpvdl2 /usr/local/bin/dumpvdl2
+      fi
+      ok "dumpvdl2 installed successfully from source"
+    else
+      warn "Failed to build dumpvdl2. VDL2 decoding will not be available."
+      warn "Build log (last 30 lines):"
+      tail -30 "$build_log" | while IFS= read -r line; do warn "  $line"; done
     fi
   )
 }
@@ -595,7 +656,8 @@ install_aiscatcher_from_source_macos() {
       if [[ -w /usr/local/bin ]]; then
         install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
       else
-        sudo install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
+        refresh_sudo
+        $SUDO install -m 0755 AIS-catcher /usr/local/bin/AIS-catcher
       fi
       ok "AIS-catcher installed successfully from source"
     else
@@ -604,8 +666,215 @@ install_aiscatcher_from_source_macos() {
   )
 }
 
+install_satdump_from_source_debian() {
+  info "Building SatDump v1.2.2 from source (weather satellite decoder)..."
+
+  # Core deps — hard-fail if missing
+  apt_install build-essential git cmake pkg-config \
+    libpng-dev libtiff-dev libzstd-dev \
+    libsqlite3-dev libcurl4-openssl-dev zlib1g-dev libzmq3-dev libfftw3-dev
+
+  # libvolk: package name differs between distros
+  #   Ubuntu / Debian Trixie+: libvolk-dev
+  #   Raspberry Pi OS Bookworm / Debian Bookworm: libvolk2-dev
+  apt_try_install_any libvolk-dev libvolk2-dev \
+    || warn "libvolk not found — SatDump will build without VOLK acceleration"
+
+  # Optional SDR hardware libs — soft-fail so missing hardware doesn't abort
+  for pkg in libjemalloc-dev libnng-dev libsoapysdr-dev libhackrf-dev liblimesuite-dev; do
+    $SUDO apt-get install -y --no-install-recommends "$pkg" >/dev/null 2>&1 \
+      || warn "${pkg} not available — skipping (SatDump can build without it)"
+  done
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning SatDump v1.2.2..."
+    git clone --depth 1 --branch 1.2.2 https://github.com/SatDump/SatDump.git "$tmp_dir/SatDump" >/dev/null 2>&1 \
+      || { warn "Failed to clone SatDump"; exit 1; }
+
+    cd "$tmp_dir/SatDump"
+
+    # Patch: fix deprecated std::allocator usage for newer compilers
+    # GCC 13+ errors on deprecated allocator members in sol2.
+    # Pragmas must go in lua_utils.cpp (the instantiation site), not sol.hpp (definition site).
+    lua_utils="src-core/common/lua/lua_utils.cpp"
+    if [ -f "$lua_utils" ]; then
+      {
+        echo '#pragma GCC diagnostic push'
+        echo '#pragma GCC diagnostic ignored "-Wdeprecated"'
+        echo '#pragma GCC diagnostic ignored "-Wdeprecated-declarations"'
+        cat "$lua_utils"
+        echo  # ensure the file ends with a newline before the closing pragma
+        echo '#pragma GCC diagnostic pop'
+      } > "${lua_utils}.patched" && mv "${lua_utils}.patched" "$lua_utils"
+    fi
+
+    mkdir -p build && cd build
+
+    info "Compiling SatDump (this is a large C++ project and may take 10-30 minutes)..."
+    build_log="$tmp_dir/satdump-build.log"
+
+    # Show periodic progress while building so the user knows it's not hung
+    (
+      while true; do
+        sleep 30
+        if [ -f "$build_log" ]; then
+          local_lines=$(wc -l < "$build_log" 2>/dev/null || echo 0)
+          printf "  [*] Still compiling SatDump... (%s lines of build output so far)\n" "$local_lines"
+        fi
+      done
+    ) &
+    progress_pid=$!
+
+    if cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DCMAKE_INSTALL_LIBDIR=lib .. >"$build_log" 2>&1 \
+        && make -j "$(nproc)" >>"$build_log" 2>&1; then
+      kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null
+      $SUDO make install >/dev/null 2>&1
+      $SUDO ldconfig
+
+      # Ensure plugins are in the expected path (handles multiarch differences)
+      $SUDO mkdir -p /usr/local/lib/satdump/plugins
+      if [ -z "$(ls /usr/local/lib/satdump/plugins/*.so 2>/dev/null)" ]; then
+        for dir in /usr/local/lib/*/satdump/plugins /usr/lib/*/satdump/plugins /usr/lib/satdump/plugins; do
+          if [ -d "$dir" ] && [ -n "$(ls "$dir"/*.so 2>/dev/null)" ]; then
+            $SUDO ln -sf "$dir"/*.so /usr/local/lib/satdump/plugins/
+            break
+          fi
+        done
+      fi
+
+      ok "SatDump installed successfully."
+    else
+      kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null
+      warn "Failed to build SatDump from source. Weather satellite decoding will not be available."
+      warn "Build log (last 30 lines):"
+      tail -30 "$build_log" | while IFS= read -r line; do warn "  $line"; done
+    fi
+  )
+}
+
+install_satdump_macos() {
+  info "Installing SatDump v1.2.2 from pre-built release (weather satellite decoder)..."
+
+  # Determine architecture
+  local arch
+  arch="$(uname -m)"
+  local dmg_name
+  if [ "$arch" = "arm64" ]; then
+    dmg_name="SatDump-macOS-Silicon.dmg"
+  else
+    dmg_name="SatDump-macOS-Intel.dmg"
+  fi
+
+  local dmg_url="https://github.com/SatDump/SatDump/releases/download/1.2.2/${dmg_name}"
+  local install_dir="/usr/local/lib/satdump"
+
+  # Run in subshell to isolate EXIT trap
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'hdiutil detach "$tmp_dir/mnt" -quiet 2>/dev/null || true; rm -rf "$tmp_dir"' EXIT
+
+    info "Downloading ${dmg_name}..."
+    if ! curl -sL -o "$tmp_dir/satdump.dmg" "$dmg_url"; then
+      warn "Failed to download SatDump. Weather satellite decoding will not be available."
+      exit 1
+    fi
+
+    info "Installing SatDump..."
+    # Mount the DMG
+    hdiutil attach "$tmp_dir/satdump.dmg" -nobrowse -quiet -mountpoint "$tmp_dir/mnt" \
+      || { warn "Failed to mount SatDump DMG"; exit 1; }
+
+    local app_dir="$tmp_dir/mnt/SatDump.app"
+    if [ ! -d "$app_dir" ]; then
+      warn "SatDump.app not found in DMG"
+      exit 1
+    fi
+
+    # Install: copy app contents to /usr/local/lib/satdump
+    refresh_sudo
+    $SUDO mkdir -p "$install_dir"
+    $SUDO cp -R "$app_dir/Contents/MacOS/"* "$install_dir/"
+    $SUDO cp -R "$app_dir/Contents/Resources/"* "$install_dir/"
+
+    # Create wrapper script so satdump can find its resources via @executable_path
+    $SUDO tee /usr/local/bin/satdump >/dev/null <<'WRAPPER'
+#!/bin/sh
+exec /usr/local/lib/satdump/satdump "$@"
+WRAPPER
+    $SUDO chmod +x /usr/local/bin/satdump
+
+    hdiutil detach "$tmp_dir/mnt" -quiet 2>/dev/null
+
+    # Verify installation
+    if /usr/local/lib/satdump/satdump 2>&1 | grep -q "Usage"; then
+      ok "SatDump v1.2.2 installed successfully."
+    else
+      warn "SatDump installed but may not work correctly."
+    fi
+  )
+}
+
+install_radiosonde_auto_rx() {
+  info "Installing radiosonde_auto_rx (weather balloon decoder)..."
+  local install_dir="/opt/radiosonde_auto_rx"
+  local project_dir="$(pwd)"
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    info "Cloning radiosonde_auto_rx..."
+    if ! git clone --depth 1 https://github.com/projecthorus/radiosonde_auto_rx.git "$tmp_dir/radiosonde_auto_rx"; then
+      warn "Failed to clone radiosonde_auto_rx"
+      exit 1
+    fi
+
+    info "Installing Python dependencies..."
+    cd "$tmp_dir/radiosonde_auto_rx/auto_rx"
+    # Use project venv pip to avoid PEP 668 externally-managed-environment errors
+    if [ -x "$project_dir/venv/bin/pip" ]; then
+      "$project_dir/venv/bin/pip" install --quiet -r requirements.txt || {
+        warn "Failed to install radiosonde_auto_rx Python dependencies"
+        exit 1
+      }
+    else
+      pip3 install --quiet --break-system-packages -r requirements.txt 2>/dev/null \
+        || pip3 install --quiet -r requirements.txt || {
+        warn "Failed to install radiosonde_auto_rx Python dependencies"
+        exit 1
+      }
+    fi
+
+    info "Building radiosonde_auto_rx C decoders..."
+    if ! bash build.sh; then
+      warn "Failed to build radiosonde_auto_rx decoders"
+      exit 1
+    fi
+
+    info "Installing to ${install_dir}..."
+    refresh_sudo
+    $SUDO mkdir -p "$install_dir/auto_rx"
+    $SUDO cp -r . "$install_dir/auto_rx/"
+    $SUDO chmod +x "$install_dir/auto_rx/auto_rx.py"
+
+    ok "radiosonde_auto_rx installed to ${install_dir}"
+  )
+}
+
 install_macos_packages() {
-  TOTAL_STEPS=17
+  need_sudo
+
+  # Prime sudo credentials upfront so builds don't prompt mid-compilation
+  if [[ -n "${SUDO:-}" ]]; then
+    info "Some tools require sudo to install. You may be prompted for your password."
+    sudo -v || { fail "sudo authentication failed"; exit 1; }
+  fi
+
+  TOTAL_STEPS=22
   CURRENT_STEP=0
 
   progress "Checking Homebrew"
@@ -628,24 +897,14 @@ install_macos_packages() {
   progress "SSTV decoder"
   ok "SSTV uses built-in pure Python decoder (no external tools needed)"
 
-  progress "Installing DSD (Digital Speech Decoder, optional)"
-  if ! cmd_exists dsd && ! cmd_exists dsd-fme; then
-    echo
-    info "DSD is used for DMR, P25, NXDN, and D-STAR digital voice decoding."
-    if ask_yes_no "Do you want to install DSD?"; then
-      install_dsd_from_source || warn "DSD build failed. DMR/P25 decoding will not be available."
-    else
-      warn "Skipping DSD installation. DMR/P25 decoding will not be available."
-    fi
-  else
-    ok "DSD already installed"
-  fi
-
   progress "Installing ffmpeg"
   brew_install ffmpeg
 
   progress "Installing rtl_433"
   brew_install rtl_433
+
+  progress "Installing HackRF tools"
+  brew_install hackrf
 
   progress "Installing rtlamr (optional)"
   # rtlamr is optional - used for utility meter monitoring
@@ -675,11 +934,45 @@ install_macos_packages() {
     ok "acarsdec already installed"
   fi
 
+  progress "Installing dumpvdl2"
+  if ! cmd_exists dumpvdl2; then
+    install_dumpvdl2_from_source_macos || warn "dumpvdl2 not available. VDL2 decoding will not be available."
+  else
+    ok "dumpvdl2 already installed"
+  fi
+
   progress "Installing AIS-catcher"
   if ! cmd_exists AIS-catcher && ! cmd_exists aiscatcher; then
     (brew_install aiscatcher) || install_aiscatcher_from_source_macos || warn "AIS-catcher not available"
   else
     ok "AIS-catcher already installed"
+  fi
+
+  progress "Installing SatDump (optional)"
+  if ! cmd_exists satdump; then
+    echo
+    info "SatDump is used for weather satellite imagery (NOAA APT & Meteor LRPT)."
+    if ask_yes_no "Do you want to install SatDump?"; then
+      install_satdump_macos || warn "SatDump installation failed. Weather satellite decoding will not be available."
+    else
+      warn "Skipping SatDump installation. You can install it later if needed."
+    fi
+  else
+    ok "SatDump already installed"
+  fi
+
+  progress "Installing radiosonde_auto_rx (optional)"
+  if ! cmd_exists auto_rx.py && [ ! -f /opt/radiosonde_auto_rx/auto_rx/auto_rx.py ] \
+     || { [ -f /opt/radiosonde_auto_rx/auto_rx/auto_rx.py ] && [ ! -f /opt/radiosonde_auto_rx/auto_rx/dft_detect ]; }; then
+    echo
+    info "radiosonde_auto_rx is used for weather balloon (radiosonde) tracking."
+    if ask_yes_no "Do you want to install radiosonde_auto_rx?"; then
+      install_radiosonde_auto_rx || warn "radiosonde_auto_rx installation failed. Radiosonde tracking will not be available."
+    else
+      warn "Skipping radiosonde_auto_rx. You can install it later if needed."
+    fi
+  else
+    ok "radiosonde_auto_rx already installed"
   fi
 
   progress "Installing aircrack-ng"
@@ -755,10 +1048,13 @@ install_dump1090_from_source_debian() {
     librtlsdr-dev libusb-1.0-0-dev \
     libncurses-dev tcl-dev python3-dev
 
+  local JOBS
+  JOBS="$(nproc 2>/dev/null || echo 1)"
+
   # Run in subshell to isolate EXIT trap
   (
     tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
+    trap '{ [[ -n "${progress_pid:-}" ]] && kill "$progress_pid" 2>/dev/null && wait "$progress_pid" 2>/dev/null || true; }; rm -rf "$tmp_dir"' EXIT
 
     info "Cloning FlightAware dump1090..."
     git clone --depth 1 https://github.com/flightaware/dump1090.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
@@ -766,23 +1062,45 @@ install_dump1090_from_source_debian() {
 
     cd "$tmp_dir/dump1090"
     # Remove -Werror to prevent build failures on newer GCC versions
-    sed -i 's/-Werror//g' Makefile 2>/dev/null || sed -i '' 's/-Werror//g' Makefile
-    info "Compiling FlightAware dump1090..."
-    if make BLADERF=no RTLSDR=yes >/dev/null 2>&1; then
+    sed -i 's/-Werror//g' Makefile 2>/dev/null || true
+    info "Compiling FlightAware dump1090 (using ${JOBS} CPU cores)..."
+    build_log="$tmp_dir/dump1090-build.log"
+
+    (while true; do sleep 20; printf "  [*] Still compiling dump1090...\n"; done) &
+    progress_pid=$!
+
+    if make -j "$JOBS" BLADERF=no RTLSDR=yes >"$build_log" 2>&1; then
+      kill "$progress_pid" 2>/dev/null; wait "$progress_pid" 2>/dev/null || true; progress_pid=
       $SUDO install -m 0755 dump1090 /usr/local/bin/dump1090
       ok "dump1090 installed successfully (FlightAware)."
       exit 0
     fi
 
+    kill "$progress_pid" 2>/dev/null; wait "$progress_pid" 2>/dev/null || true; progress_pid=
     warn "FlightAware build failed. Falling back to wiedehopf/readsb..."
+    warn "Build log (last 20 lines):"
+    tail -20 "$build_log" | while IFS= read -r line; do warn "  $line"; done
+
     rm -rf "$tmp_dir/dump1090"
     git clone --depth 1 https://github.com/wiedehopf/readsb.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
       || { fail "Failed to clone wiedehopf/readsb"; exit 1; }
 
     cd "$tmp_dir/dump1090"
-    info "Compiling readsb..."
-    make RTLSDR=yes >/dev/null 2>&1 || { fail "Failed to build readsb from source (required)."; exit 1; }
+    info "Compiling readsb (using ${JOBS} CPU cores)..."
+    build_log="$tmp_dir/readsb-build.log"
 
+    (while true; do sleep 20; printf "  [*] Still compiling readsb...\n"; done) &
+    progress_pid=$!
+
+    if ! make -j "$JOBS" RTLSDR=yes >"$build_log" 2>&1; then
+      kill "$progress_pid" 2>/dev/null; wait "$progress_pid" 2>/dev/null || true; progress_pid=
+      warn "Build log (last 20 lines):"
+      tail -20 "$build_log" | while IFS= read -r line; do warn "  $line"; done
+      fail "Failed to build readsb from source (required)."
+      exit 1
+    fi
+
+    kill "$progress_pid" 2>/dev/null; wait "$progress_pid" 2>/dev/null || true; progress_pid=
     $SUDO install -m 0755 readsb /usr/local/bin/dump1090
     ok "dump1090 installed successfully (via readsb)."
   )
@@ -807,11 +1125,57 @@ install_acarsdec_from_source_debian() {
     mkdir -p build && cd build
 
     info "Compiling acarsdec..."
-    if cmake .. -Drtl=ON >/dev/null 2>&1 && make >/dev/null 2>&1; then
+    if cmake .. -Drtl=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 >/dev/null 2>&1 && make >/dev/null 2>&1; then
       $SUDO install -m 0755 acarsdec /usr/local/bin/acarsdec
       ok "acarsdec installed successfully."
     else
       warn "Failed to build acarsdec from source. ACARS decoding will not be available."
+    fi
+  )
+}
+
+install_dumpvdl2_from_source_debian() {
+  info "Building dumpvdl2 from source (with libacars dependency)..."
+
+  apt_install build-essential git cmake \
+    librtlsdr-dev libusb-1.0-0-dev libglib2.0-dev libxml2-dev
+
+  (
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    # Build libacars first
+    info "Cloning libacars..."
+    git clone --depth 1 https://github.com/szpajder/libacars.git "$tmp_dir/libacars" >/dev/null 2>&1 \
+      || { warn "Failed to clone libacars"; exit 1; }
+
+    cd "$tmp_dir/libacars"
+    mkdir -p build && cd build
+
+    info "Compiling libacars..."
+    if cmake .. >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO make install >/dev/null 2>&1
+      $SUDO ldconfig
+      ok "libacars installed"
+    else
+      warn "Failed to build libacars."
+      exit 1
+    fi
+
+    # Build dumpvdl2
+    info "Cloning dumpvdl2..."
+    git clone --depth 1 https://github.com/szpajder/dumpvdl2.git "$tmp_dir/dumpvdl2" >/dev/null 2>&1 \
+      || { warn "Failed to clone dumpvdl2"; exit 1; }
+
+    cd "$tmp_dir/dumpvdl2"
+    mkdir -p build && cd build
+
+    info "Compiling dumpvdl2..."
+    if cmake .. >/dev/null 2>&1 && make >/dev/null 2>&1; then
+      $SUDO install -m 0755 src/dumpvdl2 /usr/local/bin/dumpvdl2
+      ok "dumpvdl2 installed successfully."
+    else
+      warn "Failed to build dumpvdl2 from source. VDL2 decoding will not be available."
     fi
   )
 }
@@ -908,6 +1272,17 @@ install_rtlsdr_blog_drivers_debian() {
         $SUDO udevadm trigger || true
       fi
 
+      # Make the Blog drivers' library take priority over the apt-installed
+      # librtlsdr.  Removing apt packages is too destructive (dump1090-mutability
+      # and other tools depend on librtlsdr0 and get swept out).  Instead,
+      # prepend /usr/local/lib to ldconfig's search path — files named 00-*
+      # sort before the distro's aarch64-linux-gnu.conf — so ldconfig lists
+      # /usr/local/lib/librtlsdr.so.0 first and the dynamic linker uses it.
+      if [[ -d /etc/ld.so.conf.d ]]; then
+        echo '/usr/local/lib' | $SUDO tee /etc/ld.so.conf.d/00-local-first.conf >/dev/null
+      fi
+      $SUDO ldconfig
+
       ok "RTL-SDR Blog drivers installed successfully."
       info "These drivers provide improved support for RTL-SDR Blog V4 and other devices."
       warn "Unplug and replug your RTL-SDR devices for the new drivers to take effect."
@@ -917,6 +1292,7 @@ install_rtlsdr_blog_drivers_debian() {
       warn "See: https://github.com/rtlsdrblog/rtl-sdr-blog"
     fi
   )
+
 }
 
 setup_udev_rules_debian() {
@@ -941,24 +1317,35 @@ blacklist_kernel_drivers_debian() {
 
   if [[ -f "$blacklist_file" ]]; then
     ok "RTL-SDR kernel driver blacklist already present"
-    return 0
-  fi
-
-  info "Blacklisting conflicting DVB kernel drivers..."
-  $SUDO tee "$blacklist_file" >/dev/null <<'EOF'
+  else
+    info "Blacklisting conflicting DVB kernel drivers..."
+    $SUDO tee "$blacklist_file" >/dev/null <<'EOF'
 # Blacklist DVB-T drivers to allow rtl-sdr to access RTL2832U devices
 blacklist dvb_usb_rtl28xxu
 blacklist rtl2832
 blacklist rtl2830
 blacklist r820t
 EOF
+  fi
 
-  # Unload modules if currently loaded
+  # Always unload modules if currently loaded — this must happen even on
+  # re-runs where the blacklist file already exists, since the modules may
+  # still be live from the current boot (e.g. blacklist wasn't in initramfs).
+  local unloaded=false
   for mod in dvb_usb_rtl28xxu rtl2832 rtl2830 r820t; do
     if lsmod | grep -q "^$mod"; then
       $SUDO modprobe -r "$mod" 2>/dev/null || true
+      unloaded=true
     fi
   done
+  $unloaded && info "Unloaded conflicting DVB kernel modules from current session."
+
+  # Bake the blacklist into the initramfs so it survives reboots on
+  # Raspberry Pi OS / Debian (without this the modules can reload on boot).
+  if cmd_exists update-initramfs; then
+    info "Updating initramfs to persist driver blacklist across reboots..."
+    $SUDO update-initramfs -u >/dev/null 2>&1 || true
+  fi
 
   ok "Kernel drivers blacklisted. Unplug/replug your RTL-SDR if connected."
   echo
@@ -979,7 +1366,7 @@ install_debian_packages() {
     export NEEDRESTART_MODE=a
   fi
 
-  TOTAL_STEPS=22
+  TOTAL_STEPS=28
   CURRENT_STEP=0
 
   progress "Updating APT package lists"
@@ -1021,12 +1408,18 @@ install_debian_packages() {
 
   apt_install_if_missing rtl-sdr
 
-  progress "RTL-SDR Blog drivers"
-  if cmd_exists rtl_test; then
-    ok "RTL-SDR drivers already installed"
+  progress "RTL-SDR Blog drivers (V4 support)"
+  if $IS_DRAGONOS; then
+    info "DragonOS: skipping RTL-SDR Blog driver install (pre-configured)."
   else
-    info "RTL-SDR drivers not found, installing RTL-SDR Blog drivers..."
-    install_rtlsdr_blog_drivers_debian
+    echo
+    info "RTL-SDR Blog drivers add V4 (R828D tuner) support and bias-tee improvements."
+    info "They are backward-compatible with all RTL-SDR devices."
+    if ask_yes_no "Install RTL-SDR Blog drivers? (recommended for V4 users, safe for all)" "y"; then
+      install_rtlsdr_blog_drivers_debian
+    else
+      warn "Skipping RTL-SDR Blog drivers. V4 devices may not work correctly."
+    fi
   fi
 
   progress "Installing multimon-ng"
@@ -1038,24 +1431,14 @@ install_debian_packages() {
   progress "SSTV decoder"
   ok "SSTV uses built-in pure Python decoder (no external tools needed)"
 
-  progress "Installing DSD (Digital Speech Decoder, optional)"
-  if ! cmd_exists dsd && ! cmd_exists dsd-fme; then
-    echo
-    info "DSD is used for DMR, P25, NXDN, and D-STAR digital voice decoding."
-    if ask_yes_no "Do you want to install DSD?"; then
-      install_dsd_from_source || warn "DSD build failed. DMR/P25 decoding will not be available."
-    else
-      warn "Skipping DSD installation. DMR/P25 decoding will not be available."
-    fi
-  else
-    ok "DSD already installed"
-  fi
-
   progress "Installing ffmpeg"
   apt_install ffmpeg
 
   progress "Installing rtl_433"
   apt_try_install_any rtl-433 rtl433 || warn "rtl-433 not available"
+
+  progress "Installing HackRF tools"
+  apt_install hackrf || warn "hackrf tools not available"
 
   progress "Installing rtlamr (optional)"
   # rtlamr is optional - used for utility meter monitoring
@@ -1113,12 +1496,21 @@ install_debian_packages() {
   $SUDO apt-get install -y python3-bleak >/dev/null 2>&1 || true
 
   progress "Installing dump1090"
+  # Remove any stale symlink left from a previous run where dump1090-mutability
+  # was later uninstalled — cmd_exists finds the broken symlink and skips the
+  # real install, leaving dump1090 seemingly present but non-functional.
+  local dump1090_path
+  dump1090_path="$(command -v dump1090 2>/dev/null || true)"
+  if [[ -n "$dump1090_path" ]] && [[ ! -x "$dump1090_path" ]]; then
+    info "Removing broken dump1090 symlink: $dump1090_path"
+    $SUDO rm -f "$dump1090_path"
+  fi
   if ! cmd_exists dump1090 && ! cmd_exists dump1090-mutability; then
     apt_try_install_any dump1090-fa dump1090-mutability dump1090 || true
   fi
   if ! cmd_exists dump1090; then
     if cmd_exists dump1090-mutability; then
-      $SUDO ln -s $(which dump1090-mutability) /usr/local/sbin/dump1090
+      $SUDO ln -s "$(which dump1090-mutability)" /usr/local/sbin/dump1090
     fi
   fi
   cmd_exists dump1090 || install_dump1090_from_source_debian
@@ -1129,11 +1521,45 @@ install_debian_packages() {
   fi
   cmd_exists acarsdec || install_acarsdec_from_source_debian
 
+  progress "Installing dumpvdl2"
+  if ! cmd_exists dumpvdl2; then
+    install_dumpvdl2_from_source_debian || warn "dumpvdl2 not available. VDL2 decoding will not be available."
+  else
+    ok "dumpvdl2 already installed"
+  fi
+
   progress "Installing AIS-catcher"
   if ! cmd_exists AIS-catcher && ! cmd_exists aiscatcher; then
     install_aiscatcher_from_source_debian
   else
     ok "AIS-catcher already installed"
+  fi
+
+  progress "Installing SatDump (optional)"
+  if ! cmd_exists satdump; then
+    echo
+    info "SatDump is used for weather satellite imagery (NOAA APT & Meteor LRPT)."
+    if ask_yes_no "Do you want to install SatDump?"; then
+      install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+    else
+      warn "Skipping SatDump installation. You can install it later if needed."
+    fi
+  else
+    ok "SatDump already installed"
+  fi
+
+  progress "Installing radiosonde_auto_rx (optional)"
+  if ! cmd_exists auto_rx.py && [ ! -f /opt/radiosonde_auto_rx/auto_rx/auto_rx.py ] \
+     || { [ -f /opt/radiosonde_auto_rx/auto_rx/auto_rx.py ] && [ ! -f /opt/radiosonde_auto_rx/auto_rx/dft_detect ]; }; then
+    echo
+    info "radiosonde_auto_rx is used for weather balloon (radiosonde) tracking."
+    if ask_yes_no "Do you want to install radiosonde_auto_rx?"; then
+      install_radiosonde_auto_rx || warn "radiosonde_auto_rx installation failed. Radiosonde tracking will not be available."
+    else
+      warn "Skipping radiosonde_auto_rx. You can install it later if needed."
+    fi
+  else
+    ok "radiosonde_auto_rx already installed"
   fi
 
   progress "Configuring udev rules"
@@ -1165,6 +1591,9 @@ final_summary_and_hard_fail() {
   echo "============================================"
   echo
   echo "To start INTERCEPT:"
+  echo "  sudo ./start.sh"
+  echo
+  echo "Or for quick local dev:"
   echo "  sudo -E venv/bin/python intercept.py"
   echo
   echo "Then open http://localhost:5050 in your browser"
@@ -1184,6 +1613,14 @@ final_summary_and_hard_fail() {
       fail "Exiting because required tools are missing."
       exit 1
     fi
+  fi
+
+  if [[ "${#missing_recommended[@]}" -gt 0 ]]; then
+    echo
+    warn "Missing RECOMMENDED tools (some features will not work):"
+    for t in "${missing_recommended[@]}"; do echo "  - $t"; done
+    echo
+    warn "Install these for full functionality"
   fi
 }
 
@@ -1231,6 +1668,19 @@ main() {
   fi
 
   install_python_deps
+
+  # Download leaflet-heat plugin (offline mode)
+  if [ ! -f "static/vendor/leaflet-heat/leaflet-heat.js" ]; then
+    info "Downloading leaflet-heat plugin..."
+    mkdir -p static/vendor/leaflet-heat
+    if curl -sL "https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" \
+        -o static/vendor/leaflet-heat/leaflet-heat.js; then
+      ok "leaflet-heat plugin downloaded"
+    else
+      warn "Failed to download leaflet-heat plugin. Heatmap will use CDN."
+    fi
+  fi
+
   final_summary_and_hard_fail
 }
 

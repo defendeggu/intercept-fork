@@ -1,0 +1,579 @@
+/* System Health Mode Styles — Enhanced Dashboard */
+
+.sys-dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Group headers span full width */
+.sys-group-header {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-cyan, #00d4ff);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+    padding-bottom: 6px;
+    margin-top: 8px;
+}
+
+.sys-group-header:first-child {
+    margin-top: 0;
+}
+
+/* Cards */
+.sys-card {
+    background: var(--bg-card, #1a1a2e);
+    border: 1px solid var(--border-color, #2a2a4a);
+    border-radius: 6px;
+    padding: 16px;
+}
+
+.sys-card-wide {
+    grid-column: span 2;
+}
+
+.sys-card-full {
+    grid-column: 1 / -1;
+}
+
+.sys-card-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim, #8888aa);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sys-card-body {
+    font-size: 12px;
+    color: var(--text-primary, #e0e0ff);
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.sys-card-detail {
+    font-size: 11px;
+    color: var(--text-dim, #8888aa);
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Metric Bars */
+.sys-metric-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.sys-metric-bar-label {
+    font-size: 10px;
+    color: var(--text-dim, #8888aa);
+    min-width: 40px;
+    text-transform: uppercase;
+}
+
+.sys-metric-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-primary, #0d0d1a);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sys-metric-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.sys-metric-bar-fill.ok {
+    background: var(--accent-green, #00ff88);
+}
+
+.sys-metric-bar-fill.warn {
+    background: var(--accent-yellow, #ffcc00);
+}
+
+.sys-metric-bar-fill.crit {
+    background: var(--accent-red, #ff3366);
+}
+
+.sys-metric-bar-value {
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 36px;
+    text-align: right;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.sys-metric-na {
+    color: var(--text-dim, #8888aa);
+    font-style: italic;
+    font-size: 11px;
+}
+
+/* SVG Arc Gauge */
+.sys-gauge-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.sys-gauge-arc {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    flex-shrink: 0;
+}
+
+.sys-gauge-arc svg {
+    width: 100%;
+    height: 100%;
+}
+
+.sys-gauge-arc .arc-bg {
+    fill: none;
+    stroke: var(--bg-primary, #0d0d1a);
+    stroke-width: 8;
+    stroke-linecap: round;
+}
+
+.sys-gauge-arc .arc-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;
+    filter: drop-shadow(0 0 4px currentColor);
+}
+
+.sys-gauge-arc .arc-fill.ok { stroke: var(--accent-green, #00ff88); }
+.sys-gauge-arc .arc-fill.warn { stroke: var(--accent-yellow, #ffcc00); }
+.sys-gauge-arc .arc-fill.crit { stroke: var(--accent-red, #ff3366); }
+
+.sys-gauge-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--text-primary, #e0e0ff);
+}
+
+.sys-gauge-details {
+    flex: 1;
+    font-size: 12px;
+}
+
+/* Per-core bars */
+.sys-core-bars {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 48px;
+    margin-top: 12px;
+}
+
+.sys-core-bar {
+    flex: 1;
+    background: var(--bg-primary, #0d0d1a);
+    border-radius: 3px;
+    position: relative;
+    min-width: 6px;
+    max-width: 32px;
+    height: 100%;
+}
+
+.sys-core-bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-radius: 2px;
+    transition: height 0.4s ease, background 0.3s ease;
+}
+
+/* Temperature sparkline */
+.sys-sparkline-wrap {
+    margin: 8px 0;
+}
+
+.sys-sparkline-wrap svg {
+    width: 100%;
+    height: 40px;
+}
+
+.sys-sparkline-line {
+    fill: none;
+    stroke: var(--accent-cyan, #00d4ff);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 2px rgba(0, 212, 255, 0.4));
+}
+
+.sys-sparkline-area {
+    fill: url(#sparkGradient);
+    opacity: 0.3;
+}
+
+.sys-temp-big {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--text-primary, #e0e0ff);
+    margin-bottom: 4px;
+}
+
+/* Network interface rows */
+.sys-net-iface {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.sys-net-iface:last-child {
+    border-bottom: none;
+}
+
+.sys-net-iface-name {
+    font-weight: 700;
+    color: var(--accent-cyan, #00d4ff);
+    font-size: 11px;
+}
+
+.sys-net-iface-ip {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 12px;
+    color: var(--text-primary, #e0e0ff);
+}
+
+.sys-net-iface-detail {
+    font-size: 10px;
+    color: var(--text-dim, #8888aa);
+}
+
+/* Bandwidth arrows */
+.sys-bandwidth {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px;
+}
+
+.sys-bw-up {
+    color: var(--accent-green, #00ff88);
+}
+
+.sys-bw-down {
+    color: var(--accent-cyan, #00d4ff);
+}
+
+/* Globe container — compact vertical layout */
+.sys-location-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.sys-globe-wrap {
+    width: 200px;
+    height: 200px;
+    flex-shrink: 0;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.sys-location-details {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* GPS status indicator */
+.sys-gps-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-dim, #8888aa);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sys-gps-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.sys-gps-dot.fix-3d {
+    background: var(--accent-green, #00ff88);
+    box-shadow: 0 0 4px rgba(0, 255, 136, 0.4);
+}
+
+.sys-gps-dot.fix-2d {
+    background: var(--accent-yellow, #ffcc00);
+    box-shadow: 0 0 4px rgba(255, 204, 0, 0.4);
+}
+
+.sys-gps-dot.no-fix {
+    background: var(--text-dim, #555);
+}
+
+.sys-location-coords {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 13px;
+    color: var(--text-primary, #e0e0ff);
+}
+
+.sys-location-source {
+    font-size: 10px;
+    color: var(--text-dim, #8888aa);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Weather overlay */
+.sys-weather {
+    margin-top: auto;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #2a2a4a);
+}
+
+.sys-weather-temp {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--text-primary, #e0e0ff);
+}
+
+.sys-weather-condition {
+    font-size: 12px;
+    color: var(--text-dim, #8888aa);
+    margin-top: 2px;
+}
+
+.sys-weather-detail {
+    font-size: 10px;
+    color: var(--text-dim, #8888aa);
+    margin-top: 2px;
+}
+
+/* Disk I/O indicators */
+.sys-disk-io {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px;
+}
+
+.sys-disk-io-read {
+    color: var(--accent-cyan, #00d4ff);
+}
+
+.sys-disk-io-write {
+    color: var(--accent-green, #00ff88);
+}
+
+/* Process grid — dot-matrix style */
+.sys-process-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px 12px;
+}
+
+.sys-process-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+}
+
+.sys-process-name {
+    font-size: 12px;
+}
+
+.sys-process-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sys-process-dot.running {
+    background: var(--accent-green, #00ff88);
+    box-shadow: 0 0 4px rgba(0, 255, 136, 0.4);
+}
+
+.sys-process-dot.stopped {
+    background: var(--text-dim, #555);
+}
+
+.sys-process-summary {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim, #8888aa);
+}
+
+/* SDR Devices */
+.sys-sdr-device {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.sys-sdr-device:last-child {
+    border-bottom: none;
+}
+
+.sys-rescan-btn {
+    font-size: 9px;
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid var(--border-color, #2a2a4a);
+    color: var(--accent-cyan, #00d4ff);
+    border-radius: 3px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sys-rescan-btn:hover {
+    background: var(--bg-primary, #0d0d1a);
+}
+
+/* System info — vertical layout to fill card */
+.sys-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim, #8888aa);
+}
+
+.sys-info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sys-info-item:last-child {
+    border-bottom: none;
+}
+
+.sys-info-item strong {
+    color: var(--text-primary, #e0e0ff);
+    font-weight: 600;
+}
+
+/* Battery indicator */
+.sys-battery-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+}
+
+/* Sidebar Quick Grid */
+.sys-quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.sys-quick-item {
+    padding: 6px 8px;
+    background: var(--bg-primary, #0d0d1a);
+    border: 1px solid var(--border-color, #2a2a4a);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.sys-quick-label {
+    display: block;
+    font-size: 9px;
+    color: var(--text-dim, #8888aa);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+}
+
+.sys-quick-value {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--text-primary, #e0e0ff);
+}
+
+/* Color-coded quick values */
+.sys-val-ok {
+    color: var(--accent-green, #00ff88) !important;
+}
+
+.sys-val-warn {
+    color: var(--accent-yellow, #ffcc00) !important;
+}
+
+.sys-val-crit {
+    color: var(--accent-red, #ff3366) !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sys-dashboard {
+        grid-template-columns: 1fr;
+        padding: 8px;
+        gap: 10px;
+    }
+
+    .sys-card-wide,
+    .sys-card-full {
+        grid-column: 1;
+    }
+
+    .sys-globe-wrap {
+        width: 100%;
+        height: 180px;
+    }
+
+    .sys-process-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1024px) and (min-width: 769px) {
+    .sys-dashboard {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sys-card-wide {
+        grid-column: span 2;
+    }
+
+    .sys-card-full {
+        grid-column: 1 / -1;
+    }
+}

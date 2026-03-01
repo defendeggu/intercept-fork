@@ -7,16 +7,150 @@ import os
 import sys
 
 # Application version
-VERSION = "2.14.0"
+VERSION = "2.23.0"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
     {
+        "version": "2.23.0",
+        "date": "February 2026",
+        "highlights": [
+            "Radiosonde weather balloon tracking mode with telemetry, map, and station distance",
+            "CW/Morse code decoder with Goertzel tone detection and OOK envelope mode",
+            "WeFax (Weather Fax) decoder with auto-scheduler and broadcast timeline",
+            "System Health monitoring mode with telemetry dashboard",
+            "HTTPS support, HackRF TSCM RF scan, ADS-B voice alerts",
+            "Production server (start.sh) with gunicorn + gevent for concurrent multi-client support",
+            "Multi-SDR support for WeFax, tool path overrides, native Homebrew detection",
+            "GPS mode upgraded to textured 3D globe",
+            "Destroy lifecycle added to all mode modules to prevent resource leaks",
+            "Dozens of bug fixes across ADS-B, APRS, SSE, Morse, waterfall, and more",
+        ]
+    },
+    {
+        "version": "2.22.3",
+        "date": "February 2026",
+        "highlights": [
+            "Waterfall control panel no longer shows as unstyled text on first visit",
+            "WebSDR globe renders correctly on first page load without requiring a refresh",
+            "Waterfall monitor audio no longer takes minutes to start — playback detection now waits for real audio data instead of just the WAV header",
+            "Waterfall monitor stop is now instant — audio pauses and UI updates immediately instead of waiting for backend cleanup",
+            "Stopping the waterfall no longer shows a stale 'WebSocket closed before ready' message",
+        ]
+    },
+    {
+        "version": "2.22.1",
+        "date": "February 2026",
+        "highlights": [
+            "Waterfall receiver overhaul: WebSocket I/Q streaming with server-side FFT, click-to-tune, and zoom controls",
+            "Voice alerts for configurable event notifications across modes",
+            "Signal fingerprinting mode for RF device identification and pattern analysis",
+            "SignalID integration via SigIDWiki API for automatic signal classification",
+            "PWA support: installable web app with service worker and manifest",
+            "Mode stop responsiveness improvements with faster timeout handling",
+            "Navigation performance instrumentation and smoother mode transitions",
+            "Pager, sensor, and SSTV real-time signal scope visualization",
+            "ADS-B MSG2 surface movement parsing for ground vehicle tracking",
+            "WebSDR major overhaul with improved receiver management and audio streaming",
+            "Documentation audit: fixed license, tool names, entry points, and SSTV decoder references",
+            "Help modal updated with ACARS and VDL2 mode descriptions",
+        ]
+    },
+    {
+        "version": "2.21.1",
+        "date": "February 2026",
+        "highlights": [
+            "BT Locate map first-load fix with render stabilization retries during initial mode open",
+            "BT Locate trail restore optimization for faster startup when historical GPS points exist",
+            "BT Locate mode-switch map invalidation timing fix to prevent delayed/blank map render",
+        ]
+    },
+    {
+        "version": "2.21.0",
+        "date": "February 2026",
+        "highlights": [
+            "Global map theme refresh with improved contrast and cross-dashboard consistency",
+            "Cross-app UX updates for accessibility, mode consistency, and render performance",
+            "Weather satellite reliability fixes for auto-scheduler and Mercator pass tracking",
+            "Bluetooth/WiFi runtime health fixes with BT Locate continuity and confidence improvements",
+            "ADS-B/VDL2 streaming reliability upgrades for multi-client SSE fanout and remote decoding",
+            "Analytics enhancements with operational insights and temporal pattern panels",
+        ]
+    },
+    {
+        "version": "2.20.0",
+        "date": "February 2026",
+        "highlights": [
+            "Space Weather mode: real-time solar and geomagnetic monitoring from NOAA SWPC, NASA SDO, and HamQSL",
+            "Kp index, solar wind, X-ray flux charts with Chart.js visualization",
+            "HF band conditions, D-RAP absorption maps, aurora forecast, and solar imagery",
+            "NOAA Space Weather Scales (G/S/R), flare probability, and active solar regions",
+            "No SDR hardware required — all data from public APIs with server-side caching",
+        ]
+    },
+    {
+        "version": "2.19.0",
+        "date": "February 2026",
+        "highlights": [
+            "VDL2 mode with modal message viewer, consolidated into ADS-B dashboard",
+            "ADS-B: trails enabled by default, radar modes removed, CSV export added",
+            "Bundled Roboto Condensed font for offline mode with SVG icon overhaul",
+            "Help modal updated with all modes and correct SVG icons",
+            "Setup script overhauled for reliability and macOS compatibility",
+            "GPS fix for preserving satellites across DOP-only SKY messages",
+            "Fix gpsd deadlock causing GPS connect to hang",
+        ]
+    },
+    {
+        "version": "2.18.0",
+        "date": "February 2026",
+        "highlights": [
+            "Bluetooth: service data inspector, appearance codes, MAC cluster tracking, and behavioral flags",
+            "Bluetooth: IRK badge display, distance estimation with confidence, and signal stability metrics",
+            "ACARS: SoapySDR device support for SDRplay, LimeSDR, Airspy, and other non-RTL backends",
+            "ADS-B: stale dump1090 process cleanup via PID file tracking",
+            "GPS: error state indicator and UI refinements",
+            "Proximity radar and signal card UI improvements",
+        ]
+    },
+    {
+        "version": "2.17.0",
+        "date": "February 2026",
+        "highlights": [
+            "BT Locate: SAR Bluetooth device location with GPS-tagged signal trail and proximity alerts",
+            "IRK auto-detection: extract Identity Resolving Keys from paired devices (macOS/Linux)",
+            "GPS mode: real-time position tracking with live map, speed, altitude, and satellite info",
+            "Bluetooth scanner lifecycle fix for bleak scan timeout tracking",
+        ]
+    },
+    {
+        "version": "2.16.0",
+        "date": "February 2026",
+        "highlights": [
+            "Sub-GHz analyzer with real-time RF capture and protocol decoding",
+            "Weather satellite auto-scheduler with polar plot and ground track map",
+            "SatDump support for local (non-Docker) installs via setup.sh",
+            "Shared waterfall UI across SDR modes",
+            "Listening post audio stuttering fix and SDR race condition fixes",
+            "Multi-arch Docker build support (amd64 + arm64)",
+        ]
+    },
+    {
+        "version": "2.15.0",
+        "date": "February 2026",
+        "highlights": [
+            "Real-time WebSocket waterfall with I/Q capture and server-side FFT",
+            "Cross-module frequency routing from Listening Post to decoders",
+            "Pure Python SSTV decoder replacing broken slowrx dependency",
+            "Real-time signal scope for pager, sensor, and SSTV modes",
+            "USB-level device probe to prevent cryptic rtl_fm crashes",
+            "SDR device lock-up fix from unreleased device registry on crash",
+        ]
+    },
+    {
         "version": "2.14.0",
         "date": "February 2026",
         "highlights": [
-            "DMR/P25/NXDN/D-STAR digital voice decoder with dsd-fme",
-            "DMR visual synthesizer with event-driven spring-physics bars",
             "HF SSTV general mode with predefined shortwave frequencies",
             "WebSDR integration for remote HF/shortwave listening",
             "Listening Post signal scanner and audio pipeline improvements",
@@ -162,6 +296,11 @@ PORT = _get_env_int('PORT', 5050)
 DEBUG = _get_env_bool('DEBUG', False)
 THREADED = _get_env_bool('THREADED', True)
 
+# HTTPS / SSL settings
+HTTPS = _get_env_bool('HTTPS', False)
+SSL_CERT = _get_env('SSL_CERT', '')
+SSL_KEY = _get_env('SSL_KEY', '')
+
 # Default RTL-SDR settings
 DEFAULT_GAIN = _get_env('DEFAULT_GAIN', '40')
 DEFAULT_DEVICE = _get_env('DEFAULT_DEVICE', '0')
@@ -198,20 +337,60 @@ ADSB_HISTORY_QUEUE_SIZE = _get_env_int('ADSB_HISTORY_QUEUE_SIZE', 50000)
 
 # Observer location settings
 SHARED_OBSERVER_LOCATION_ENABLED = _get_env_bool('SHARED_OBSERVER_LOCATION', True)
+DEFAULT_LATITUDE = _get_env_float('DEFAULT_LAT', 0.0)
+DEFAULT_LONGITUDE = _get_env_float('DEFAULT_LON', 0.0)
 
 # Satellite settings
 SATELLITE_UPDATE_INTERVAL = _get_env_int('SATELLITE_UPDATE_INTERVAL', 30)
 SATELLITE_TRAJECTORY_POINTS = _get_env_int('SATELLITE_TRAJECTORY_POINTS', 30)
 SATELLITE_ORBIT_MINUTES = _get_env_int('SATELLITE_ORBIT_MINUTES', 45)
 
+# Weather satellite settings
+WEATHER_SAT_DEFAULT_GAIN = _get_env_float('WEATHER_SAT_GAIN', 40.0)
+WEATHER_SAT_SAMPLE_RATE = _get_env_int('WEATHER_SAT_SAMPLE_RATE', 2400000)
+WEATHER_SAT_MIN_ELEVATION = _get_env_float('WEATHER_SAT_MIN_ELEVATION', 15.0)
+WEATHER_SAT_PREDICTION_HOURS = _get_env_int('WEATHER_SAT_PREDICTION_HOURS', 24)
+WEATHER_SAT_SCHEDULE_REFRESH_MINUTES = _get_env_int('WEATHER_SAT_SCHEDULE_REFRESH_MINUTES', 30)
+WEATHER_SAT_CAPTURE_BUFFER_SECONDS = _get_env_int('WEATHER_SAT_CAPTURE_BUFFER_SECONDS', 30)
+
+# WeFax (Weather Fax) settings
+WEFAX_DEFAULT_GAIN = _get_env_float('WEFAX_GAIN', 40.0)
+WEFAX_SAMPLE_RATE = _get_env_int('WEFAX_SAMPLE_RATE', 22050)
+WEFAX_DEFAULT_IOC = _get_env_int('WEFAX_IOC', 576)
+WEFAX_DEFAULT_LPM = _get_env_int('WEFAX_LPM', 120)
+WEFAX_SCHEDULE_REFRESH_MINUTES = _get_env_int('WEFAX_SCHEDULE_REFRESH_MINUTES', 30)
+WEFAX_CAPTURE_BUFFER_SECONDS = _get_env_int('WEFAX_CAPTURE_BUFFER_SECONDS', 30)
+
+# SubGHz transceiver settings (HackRF)
+SUBGHZ_DEFAULT_FREQUENCY = _get_env_float('SUBGHZ_FREQUENCY', 433.92)
+SUBGHZ_DEFAULT_SAMPLE_RATE = _get_env_int('SUBGHZ_SAMPLE_RATE', 2000000)
+SUBGHZ_DEFAULT_LNA_GAIN = _get_env_int('SUBGHZ_LNA_GAIN', 32)
+SUBGHZ_DEFAULT_VGA_GAIN = _get_env_int('SUBGHZ_VGA_GAIN', 20)
+SUBGHZ_DEFAULT_TX_GAIN = _get_env_int('SUBGHZ_TX_GAIN', 20)
+SUBGHZ_MAX_TX_DURATION = _get_env_int('SUBGHZ_MAX_TX_DURATION', 10)
+SUBGHZ_SWEEP_START_MHZ = _get_env_float('SUBGHZ_SWEEP_START', 300.0)
+SUBGHZ_SWEEP_END_MHZ = _get_env_float('SUBGHZ_SWEEP_END', 928.0)
+
+# Radiosonde settings
+RADIOSONDE_FREQ_MIN = _get_env_float('RADIOSONDE_FREQ_MIN', 400.0)
+RADIOSONDE_FREQ_MAX = _get_env_float('RADIOSONDE_FREQ_MAX', 406.0)
+RADIOSONDE_DEFAULT_GAIN = _get_env_float('RADIOSONDE_GAIN', 40.0)
+RADIOSONDE_UDP_PORT = _get_env_int('RADIOSONDE_UDP_PORT', 55673)
+
 # Update checking
 GITHUB_REPO = _get_env('GITHUB_REPO', 'smittix/intercept')
 UPDATE_CHECK_ENABLED = _get_env_bool('UPDATE_CHECK_ENABLED', True)
 UPDATE_CHECK_INTERVAL_HOURS = _get_env_int('UPDATE_CHECK_INTERVAL_HOURS', 6)
 
+# Alerting
+ALERT_WEBHOOK_URL = _get_env('ALERT_WEBHOOK_URL', '')
+ALERT_WEBHOOK_SECRET = _get_env('ALERT_WEBHOOK_SECRET', '')
+ALERT_WEBHOOK_TIMEOUT = _get_env_int('ALERT_WEBHOOK_TIMEOUT', 5)
+
 # Admin credentials
 ADMIN_USERNAME = _get_env('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = _get_env('ADMIN_PASSWORD', 'admin')
+
 
 def configure_logging() -> None:
     """Configure application logging."""

@@ -24,8 +24,12 @@ from .constants import (
     BLUETOOTHCTL_TIMEOUT,
     ADDRESS_TYPE_PUBLIC,
     ADDRESS_TYPE_RANDOM,
+    ADDRESS_TYPE_UUID,
     MANUFACTURER_NAMES,
 )
+
+# CoreBluetooth UUID pattern: 8-4-4-4-12 hex digits
+_CB_UUID_RE = re.compile(r'^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$')
 from .models import BTObservation
 
 logger = logging.getLogger(__name__)
@@ -132,7 +136,10 @@ class BleakScanner:
         """Convert bleak device to BTObservation."""
         # Determine address type from address format
         address_type = ADDRESS_TYPE_PUBLIC
-        if device.address and ':' in device.address:
+        if device.address and _CB_UUID_RE.match(device.address):
+            # macOS CoreBluetooth returns a platform UUID instead of a real MAC
+            address_type = ADDRESS_TYPE_UUID
+        elif device.address and ':' in device.address:
             # Check if first byte indicates random address
             first_byte = int(device.address.split(':')[0], 16)
             if (first_byte & 0xC0) == 0xC0:  # Random static

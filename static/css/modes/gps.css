@@ -1,0 +1,437 @@
+/* GPS Mode Styles */
+
+/* Sidebar info grid */
+.gps-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.gps-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 6px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+}
+
+.gps-info-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gps-info-value {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.gps-mono {
+    font-family: var(--font-mono);
+}
+
+/* Connection status */
+.gps-connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gps-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.gps-status-dot.connected {
+    background: #00ff88;
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
+}
+
+.gps-status-dot.waiting {
+    background: #ffaa00;
+    box-shadow: 0 0 6px rgba(255, 170, 0, 0.4);
+}
+
+.gps-status-dot.error {
+    background: #ff4444;
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.4);
+}
+
+.gps-status-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* Fix badge */
+.gps-fix-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.gps-fix-badge.no-fix {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.gps-fix-badge.fix-2d {
+    background: rgba(255, 170, 0, 0.2);
+    color: #ffaa00;
+    border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.gps-fix-badge.fix-3d {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+/* DOP quality indicators */
+.gps-dop-good { color: #00ff88; }
+.gps-dop-moderate { color: #ffaa00; }
+.gps-dop-poor { color: #ff4444; }
+
+/* ===== Visuals Panel ===== */
+
+.gps-visuals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Top row: sky view + position info */
+.gps-visuals-top {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+/* Sky View */
+.gps-skyview-panel {
+    flex: 1;
+    min-width: 320px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.gps-skyview-panel h4 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gps-skyview-canvas-wrap {
+    position: relative;
+    display: block;
+    width: min(100%, 430px);
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.gps-sky-globe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#gpsSkyCanvas {
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+#gpsSkyCanvas:active {
+    cursor: grabbing;
+}
+
+.gps-sky-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    pointer-events: none;
+    font-family: var(--font-mono);
+}
+
+.gps-skyview-canvas-wrap.gps-sky-fallback .gps-sky-globe {
+    display: none;
+}
+
+.gps-skyview-canvas-wrap.gps-sky-fallback #gpsSkyCanvas,
+.gps-skyview-canvas-wrap.gps-sky-fallback .gps-sky-overlay {
+    display: block;
+}
+
+.gps-globe-sat-icon {
+    --sat-size: 18px;
+    --sat-color: #8ea6bd;
+    width: var(--sat-size);
+    height: var(--sat-size);
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--sat-color);
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.22), rgba(7, 14, 23, 0.82) 72%);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 12px var(--sat-color);
+}
+
+.gps-globe-sat-icon img {
+    width: 76%;
+    height: 76%;
+    object-fit: contain;
+}
+
+.gps-globe-sat-icon.used {
+    opacity: 0.98;
+}
+
+.gps-globe-sat-icon.unused {
+    opacity: 0.72;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 6px var(--sat-color);
+}
+
+.gps-sky-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    letter-spacing: 0.2px;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
+}
+
+.gps-sky-label-cardinal {
+    font-weight: 700;
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+.gps-sky-label-sat {
+    font-weight: 600;
+}
+
+.gps-sky-label-sat.unused {
+    opacity: 0.75;
+}
+
+.gps-sky-hint {
+    margin-top: 8px;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Position info panel */
+.gps-position-panel {
+    flex: 1;
+    min-width: 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gps-position-panel h4 {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gps-pos-big {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    line-height: 1.3;
+}
+
+.gps-pos-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gps-pos-row:last-child {
+    border-bottom: none;
+}
+
+.gps-pos-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.gps-pos-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Signal Strength Bars */
+.gps-signal-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.gps-signal-panel h4 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gps-signal-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 140px;
+    padding: 0 4px;
+    overflow-x: auto;
+}
+
+.gps-signal-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 18px;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.gps-signal-bar {
+    width: 14px;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+    transition: height 0.3s ease;
+}
+
+.gps-signal-bar.unused {
+    opacity: 0.4;
+}
+
+.gps-signal-prn {
+    font-size: 8px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    writing-mode: horizontal-tb;
+}
+
+.gps-signal-snr {
+    font-size: 7px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+/* Constellation colors */
+.gps-const-gps { background-color: #00d4ff; }
+.gps-const-glonass { background-color: #00ff88; }
+.gps-const-galileo { background-color: #ff8800; }
+.gps-const-beidou { background-color: #ff4466; }
+.gps-const-sbas { background-color: #ffdd00; }
+.gps-const-qzss { background-color: #cc66ff; }
+
+/* Legend */
+.gps-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.gps-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--text-dim);
+}
+
+.gps-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Empty state */
+.gps-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+.gps-empty-state svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+}
+
+.gps-empty-state p {
+    font-size: 12px;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .gps-visuals-top {
+        flex-direction: column;
+    }
+
+    .gps-skyview-panel,
+    .gps-position-panel {
+        min-width: unset;
+    }
+
+    .gps-pos-big {
+        font-size: 16px;
+    }
+}

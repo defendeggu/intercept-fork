@@ -142,7 +142,7 @@ class DataStore:
 
 
 class CleanupManager:
-    """Manages periodic cleanup of multiple data stores."""
+    """Manages periodic cleanup of multiple data stores and database tables."""
 
     def __init__(self, interval: float = 60.0):
         """
@@ -152,9 +152,11 @@ class CleanupManager:
             interval: Cleanup interval in seconds
         """
         self.stores: list[DataStore] = []
+        self.db_cleanup_funcs: list[tuple[callable, int]] = []  # (func, interval_multiplier)
         self.interval = interval
         self._timer: threading.Timer | None = None
         self._running = False
+        self._cleanup_count = 0
         self._lock = threading.Lock()
 
     def register(self, store: DataStore) -> None:
@@ -168,6 +170,17 @@ class CleanupManager:
         with self._lock:
             if store in self.stores:
                 self.stores.remove(store)
+
+    def register_db_cleanup(self, func: callable, interval_multiplier: int = 60) -> None:
+        """
+        Register a database cleanup function.
+
+        Args:
+            func: Cleanup function to call (should return number of deleted rows)
+            interval_multiplier: How many cleanup cycles to wait between calls (default: 60 = 1 hour if interval is 60s)
+        """
+        with self._lock:
+            self.db_cleanup_funcs.append((func, interval_multiplier))
 
     def start(self) -> None:
         """Start the cleanup timer."""
@@ -194,17 +207,32 @@ class CleanupManager:
         self._timer.start()
 
     def _run_cleanup(self) -> None:
-        """Run cleanup on all registered stores."""
+        """Run cleanup on all registered stores and database tables."""
         total_cleaned = 0
 
+        # Cleanup in-memory data stores
         with self._lock:
             stores = list(self.stores)
+            db_funcs = list(self.db_cleanup_funcs)
+            self._cleanup_count += 1
+            current_count = self._cleanup_count
 
         for store in stores:
             try:
                 total_cleaned += store.cleanup()
             except Exception as e:
                 logger.error(f"Error cleaning up {store.name}: {e}")
+
+        # Cleanup database tables (less frequently)
+        for func, interval_multiplier in db_funcs:
+            if current_count % interval_multiplier == 0:
+                try:
+                    deleted = func()
+                    if deleted > 0:
+                        logger.info(f"Database cleanup: {func.__name__} removed {deleted} rows")
+                        total_cleaned += deleted
+                except Exception as e:
+                    logger.error(f"Error in database cleanup {func.__name__}: {e}")
 
         if total_cleaned > 0:
             logger.info(f"Cleanup complete: removed {total_cleaned} stale entries")

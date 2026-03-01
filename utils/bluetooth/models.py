@@ -18,6 +18,7 @@ from .constants import (
     RANGE_UNKNOWN,
     PROTOCOL_BLE,
     PROXIMITY_UNKNOWN,
+    get_appearance_name,
 )
 
 # Import tracker types (will be available after tracker_signatures module loads)
@@ -151,6 +152,7 @@ class BTDeviceAggregate:
     # Baseline tracking
     in_baseline: bool = False
     baseline_id: Optional[int] = None
+    seen_before: bool = False
 
     # Tracker detection fields
     is_tracker: bool = False
@@ -163,6 +165,10 @@ class BTDeviceAggregate:
     # Suspicious presence / following heuristics
     risk_score: float = 0.0  # 0.0 to 1.0
     risk_factors: list[str] = field(default_factory=list)
+
+    # IRK (Identity Resolving Key) from paired device database
+    irk_hex: Optional[str] = None  # 32-char hex if known
+    irk_source_name: Optional[str] = None  # Name from paired DB
 
     # Payload fingerprint (survives MAC randomization)
     payload_fingerprint_id: Optional[str] = None
@@ -277,6 +283,7 @@ class BTDeviceAggregate:
             # Baseline
             'in_baseline': self.in_baseline,
             'baseline_id': self.baseline_id,
+            'seen_before': self.seen_before,
 
             # Tracker detection
             'tracker': {
@@ -293,6 +300,11 @@ class BTDeviceAggregate:
                 'risk_score': round(self.risk_score, 2),
                 'risk_factors': self.risk_factors,
             },
+
+            # IRK
+            'has_irk': self.irk_hex is not None,
+            'irk_hex': self.irk_hex,
+            'irk_source_name': self.irk_source_name,
 
             # Fingerprint
             'fingerprint': {
@@ -317,23 +329,46 @@ class BTDeviceAggregate:
             'rssi_current': self.rssi_current,
             'rssi_median': round(self.rssi_median, 1) if self.rssi_median else None,
             'rssi_ema': round(self.rssi_ema, 1) if self.rssi_ema else None,
+            'rssi_min': self.rssi_min,
+            'rssi_max': self.rssi_max,
+            'rssi_variance': round(self.rssi_variance, 2) if self.rssi_variance else None,
             'range_band': self.range_band,
             'proximity_band': self.proximity_band,
             'estimated_distance_m': round(self.estimated_distance_m, 2) if self.estimated_distance_m else None,
             'distance_confidence': round(self.distance_confidence, 2),
             'is_randomized_mac': self.is_randomized_mac,
             'last_seen': self.last_seen.isoformat(),
+            'first_seen': self.first_seen.isoformat(),
             'age_seconds': self.age_seconds,
+            'duration_seconds': self.duration_seconds,
             'seen_count': self.seen_count,
+            'seen_rate': round(self.seen_rate, 2),
+            'tx_power': self.tx_power,
+            'manufacturer_id': self.manufacturer_id,
+            'appearance': self.appearance,
+            'appearance_name': get_appearance_name(self.appearance),
+            'is_connectable': self.is_connectable,
+            'service_uuids': self.service_uuids,
+            'service_data': {k: v.hex() for k, v in self.service_data.items()},
+            'manufacturer_bytes': self.manufacturer_bytes.hex() if self.manufacturer_bytes else None,
             'heuristic_flags': self.heuristic_flags,
+            'is_persistent': self.is_persistent,
+            'is_beacon_like': self.is_beacon_like,
+            'is_strong_stable': self.is_strong_stable,
             'in_baseline': self.in_baseline,
+            'seen_before': self.seen_before,
             # Tracker info for list view
             'is_tracker': self.is_tracker,
             'tracker_type': self.tracker_type,
             'tracker_name': self.tracker_name,
             'tracker_confidence': self.tracker_confidence,
             'tracker_confidence_score': round(self.tracker_confidence_score, 2),
+            'tracker_evidence': self.tracker_evidence,
             'risk_score': round(self.risk_score, 2),
+            'risk_factors': self.risk_factors,
+            'has_irk': self.irk_hex is not None,
+            'irk_hex': self.irk_hex,
+            'irk_source_name': self.irk_source_name,
             'fingerprint_id': self.payload_fingerprint_id,
         }
 

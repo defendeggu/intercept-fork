@@ -10,7 +10,7 @@
     {% if offline_settings and offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
 
     {# Core CSS (Design System) #}
@@ -133,7 +133,17 @@
             const currentTheme = html.getAttribute('data-theme') || 'dark';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
+            localStorage.setItem('intercept-theme', newTheme);
+
+            const btn = document.getElementById('themeToggle');
+            if (btn) btn.textContent = newTheme === 'light' ? '🌙' : '☀️';
+
+            // Persist to server
+            fetch('/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: newTheme })
+            }).catch(() => {});
         }
 
         // Apply saved theme

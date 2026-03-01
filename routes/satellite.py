@@ -16,6 +16,13 @@ from flask import Blueprint, jsonify, request, render_template, Response
 from config import SHARED_OBSERVER_LOCATION_ENABLED
 
 from data.satellites import TLE_SATELLITES
+from utils.database import (
+    get_tracked_satellites,
+    add_tracked_satellite,
+    bulk_add_tracked_satellites,
+    update_tracked_satellite,
+    remove_tracked_satellite,
+)
 from utils.logging import satellite_logger as logger
 from utils.validation import validate_latitude, validate_longitude, validate_hours, validate_elevation
 
@@ -29,6 +36,43 @@ ALLOWED_TLE_HOSTS = ['celestrak.org', 'celestrak.com', 'www.celestrak.org', 'www
 
 # Local TLE cache (can be updated via API)
 _tle_cache = dict(TLE_SATELLITES)
+
+
+def _load_db_satellites_into_cache():
+    """Load user-tracked satellites from DB into the TLE cache."""
+    global _tle_cache
+    try:
+        db_sats = get_tracked_satellites()
+        loaded = 0
+        for sat in db_sats:
+            if sat['tle_line1'] and sat['tle_line2']:
+                # Use a cache key derived from name (sanitised)
+                cache_key = sat['name'].replace(' ', '-').upper()
+                if cache_key not in _tle_cache:
+                    _tle_cache[cache_key] = (sat['name'], sat['tle_line1'], sat['tle_line2'])
+                    loaded += 1
+        if loaded:
+            logger.info(f"Loaded {loaded} user-tracked satellites into TLE cache")
+    except Exception as e:
+        logger.warning(f"Failed to load DB satellites into TLE cache: {e}")
+
+
+def init_tle_auto_refresh():
+    """Initialize TLE auto-refresh. Called by app.py after initialization."""
+    import threading
+
+    def _auto_refresh_tle():
+        try:
+            _load_db_satellites_into_cache()
+            updated = refresh_tle_data()
+            if updated:
+                logger.info(f"Auto-refreshed TLE data for: {', '.join(updated)}")
+        except Exception as e:
+            logger.warning(f"Auto TLE refresh failed: {e}")
+
+    # Start auto-refresh in background
+    threading.Timer(2.0, _auto_refresh_tle).start()
+    logger.info("TLE auto-refresh scheduled")
 
 
 def _fetch_iss_realtime(observer_lat: Optional[float] = None, observer_lon: Optional[float] = None) -> Optional[dict]:
@@ -122,9 +166,11 @@ def _fetch_iss_realtime(observer_lat: Optional[float] = None, observer_lon: Opti
 @satellite_bp.route('/dashboard')
 def satellite_dashboard():
     """Popout satellite tracking dashboard."""
+    embedded = request.args.get('embedded', 'false') == 'true'
     return render_template(
         'satellite_dashboard.html',
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+        embedded=embedded,
     )
 
 
@@ -153,15 +199,11 @@ def predict_passes():
 
     norad_to_name = {
         25544: 'ISS',
-        25338: 'NOAA-15',
-        28654: 'NOAA-18',
-        33591: 'NOAA-19',
-        43013: 'NOAA-20',
         40069: 'METEOR-M2',
         57166: 'METEOR-M2-3'
     }
 
-    sat_input = data.get('satellites', ['ISS', 'NOAA-15', 'NOAA-18', 'NOAA-19'])
+    sat_input = data.get('satellites', ['ISS', 'METEOR-M2', 'METEOR-M2-3'])
     satellites = []
     for sat in sat_input:
         if isinstance(sat, int) and sat in norad_to_name:
@@ -172,10 +214,6 @@ def predict_passes():
     passes = []
     colors = {
         'ISS': '#00ffff',
-        'NOAA-15': '#00ff00',
-        'NOAA-18': '#ff6600',
-        'NOAA-19': '#ff3366',
-        'NOAA-20': '#00ffaa',
         'METEOR-M2': '#9370DB',
         'METEOR-M2-3': '#ff00ff'
     }
@@ -312,10 +350,6 @@ def get_satellite_position():
 
     norad_to_name = {
         25544: 'ISS',
-        25338: 'NOAA-15',
-        28654: 'NOAA-18',
-        33591: 'NOAA-19',
-        43013: 'NOAA-20',
         40069: 'METEOR-M2',
         57166: 'METEOR-M2-3'
     }
@@ -481,7 +515,8 @@ def update_tle():
             'updated': updated
         })
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        logger.error(f"Error updating TLE data: {e}")
+        return jsonify({'status': 'error', 'message': 'TLE update failed'})
 
 
 @satellite_bp.route('/celestrak/<category>')
@@ -535,4 +570,104 @@ def fetch_celestrak(category):
         })
 
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        logger.error(f"Error fetching CelesTrak data: {e}")
+        return jsonify({'status': 'error', 'message': 'Failed to fetch satellite data'})
+
+
+# =============================================================================
+# Tracked Satellites CRUD
+# =============================================================================
+
+@satellite_bp.route('/tracked', methods=['GET'])
+def list_tracked_satellites():
+    """Return all tracked satellites from the database."""
+    enabled_only = request.args.get('enabled', '').lower() == 'true'
+    sats = get_tracked_satellites(enabled_only=enabled_only)
+    return jsonify({'status': 'success', 'satellites': sats})
+
+
+@satellite_bp.route('/tracked', methods=['POST'])
+def add_tracked_satellites_endpoint():
+    """Add one or more tracked satellites."""
+    global _tle_cache
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+
+    # Accept a single satellite dict or a list
+    sat_list = data if isinstance(data, list) else [data]
+
+    normalized: list[dict] = []
+    for sat in sat_list:
+        norad_id = str(sat.get('norad_id', sat.get('norad', '')))
+        name = sat.get('name', '')
+        if not norad_id or not name:
+            continue
+        tle1 = sat.get('tle_line1', sat.get('tle1'))
+        tle2 = sat.get('tle_line2', sat.get('tle2'))
+        enabled = sat.get('enabled', True)
+
+        normalized.append({
+            'norad_id': norad_id,
+            'name': name,
+            'tle_line1': tle1,
+            'tle_line2': tle2,
+            'enabled': bool(enabled),
+            'builtin': False,
+        })
+
+        # Also inject into TLE cache if we have TLE data
+        if tle1 and tle2:
+            cache_key = name.replace(' ', '-').upper()
+            _tle_cache[cache_key] = (name, tle1, tle2)
+
+    # Single inserts preserve previous behavior; list inserts use DB-level bulk path.
+    if len(normalized) == 1:
+        sat = normalized[0]
+        added = 1 if add_tracked_satellite(
+            sat['norad_id'],
+            sat['name'],
+            sat.get('tle_line1'),
+            sat.get('tle_line2'),
+            sat.get('enabled', True),
+            sat.get('builtin', False),
+        ) else 0
+    else:
+        added = bulk_add_tracked_satellites(normalized)
+
+    response_payload = {
+        'status': 'success',
+        'added': added,
+        'processed': len(normalized),
+    }
+
+    # Returning all tracked satellites for very large imports can stall the UI.
+    include_satellites = request.args.get('include_satellites', '').lower() == 'true'
+    if include_satellites or len(normalized) <= 32:
+        response_payload['satellites'] = get_tracked_satellites()
+
+    return jsonify(response_payload)
+
+
+@satellite_bp.route('/tracked/<norad_id>', methods=['PUT'])
+def update_tracked_satellite_endpoint(norad_id):
+    """Update the enabled state of a tracked satellite."""
+    data = request.json or {}
+    enabled = data.get('enabled')
+    if enabled is None:
+        return jsonify({'status': 'error', 'message': 'Missing enabled field'}), 400
+
+    ok = update_tracked_satellite(str(norad_id), bool(enabled))
+    if ok:
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error', 'message': 'Satellite not found'}), 404
+
+
+@satellite_bp.route('/tracked/<norad_id>', methods=['DELETE'])
+def delete_tracked_satellite_endpoint(norad_id):
+    """Remove a tracked satellite by NORAD ID."""
+    ok, msg = remove_tracked_satellite(str(norad_id))
+    if ok:
+        return jsonify({'status': 'success', 'message': msg})
+    status_code = 403 if 'builtin' in msg.lower() else 404
+    return jsonify({'status': 'error', 'message': msg}), status_code

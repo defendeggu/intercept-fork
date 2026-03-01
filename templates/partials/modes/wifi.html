@@ -1,7 +1,8 @@
 <!-- WiFi MODE -->
                 <div id="wifiMode" class="mode-content">
                     <!-- Scan Mode Tabs -->
-                    <div class="section" style="padding: 8px;">
+                    <div class="section">
+                        <h3>Signal Source</h3>
                         <div class="wifi-scan-mode-tabs" style="display: flex; gap: 4px;">
                             <button id="wifiScanModeQuick" class="wifi-mode-tab active" style="flex: 1; padding: 8px; font-size: 11px; background: var(--accent-green); color: #000; border: none; border-radius: 4px; cursor: pointer;">
                                 Quick Scan
@@ -69,7 +70,22 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Channel (empty = hop)</label>
+                            <label>Channel Preset</label>
+                            <select id="wifiChannelPreset">
+                                <option value="">Auto hop (all)</option>
+                                <option value="2.4-common">2.4 GHz Common (1,6,11)</option>
+                                <option value="2.4-all">2.4 GHz All (1-13)</option>
+                                <option value="5-low">5 GHz Low (36-48)</option>
+                                <option value="5-mid">5 GHz Mid/DFS (52-64)</option>
+                                <option value="5-high">5 GHz High (149-165)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Channel List (overrides preset)</label>
+                            <input type="text" id="wifiChannelList" placeholder="e.g., 1,6,11 or 36,40,44,48">
+                        </div>
+                        <div class="form-group">
+                            <label>Channel (single)</label>
                             <input type="text" id="wifiChannel" placeholder="e.g., 6 or 36">
                         </div>
                     </div>
@@ -153,29 +169,8 @@
                         </div>
                     </div>
 
-                    <!-- v2 Scan Buttons -->
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button class="run-btn" id="wifiQuickScanBtn" onclick="WiFiMode.startQuickScan()" style="flex: 1;">
-                            Quick Scan
-                        </button>
-                        <button class="run-btn" id="wifiDeepScanBtn" onclick="WiFiMode.startDeepScan()" style="flex: 1; background: var(--accent-orange);">
-                            Deep Scan
-                        </button>
-                    </div>
-                    <button class="stop-btn" id="wifiStopScanBtn" onclick="WiFiMode.stopScan()" style="display: none; width: 100%;">
-                        Stop Scanning
-                    </button>
-
-                    <!-- Legacy Scan Buttons (hidden, for backwards compatibility) -->
-                    <button class="run-btn" id="startWifiBtn" onclick="startWifiScan()" style="display: none;">
-                        Start Scanning (Legacy)
-                    </button>
-                    <button class="stop-btn" id="stopWifiBtn" onclick="stopWifiScan()" style="display: none;">
-                        Stop Scanning (Legacy)
-                    </button>
-
                     <!-- Export Section -->
-                    <div class="section" style="margin-top: 10px;">
+                    <div class="section">
                         <h3>Export</h3>
                         <div style="display: flex; gap: 8px;">
                             <button class="preset-btn" onclick="WiFiMode.exportData('csv')" style="flex: 1;">
@@ -185,5 +180,28 @@
                                 Export JSON
                             </button>
                         </div>
+                    </div>
+
+                    <div class="mode-actions-bottom">
+                        <!-- v2 Scan Buttons -->
+                        <div style="display: flex; gap: 8px;">
+                            <button class="run-btn" id="wifiQuickScanBtn" onclick="WiFiMode.startQuickScan()" style="flex: 1;">
+                                Quick Scan
+                            </button>
+                            <button class="run-btn" id="wifiDeepScanBtn" onclick="WiFiMode.startDeepScan()" style="flex: 1; background: var(--accent-orange);">
+                                Deep Scan
+                            </button>
+                        </div>
+                        <button class="stop-btn" id="wifiStopScanBtn" onclick="WiFiMode.stopScan()" style="display: none; width: 100%;">
+                            Stop Scanning
+                        </button>
+
+                        <!-- Legacy Scan Buttons (hidden, for backwards compatibility) -->
+                        <button class="run-btn" id="startWifiBtn" onclick="startWifiScan()" style="display: none;">
+                            Start Scanning (Legacy)
+                        </button>
+                        <button class="stop-btn" id="stopWifiBtn" onclick="stopWifiScan()" style="display: none;">
+                            Stop Scanning (Legacy)
+                        </button>
                     </div>
                 </div>

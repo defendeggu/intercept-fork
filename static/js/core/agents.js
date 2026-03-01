@@ -423,7 +423,7 @@ async function syncAgentModeStates(agentId) {
                 });
 
                 // Also check modes that might need to be marked as stopped
-                const allModes = ['sensor', 'pager', 'adsb', 'wifi', 'bluetooth', 'ais', 'dsc', 'acars', 'aprs', 'rtlamr', 'tscm', 'satellite', 'listening_post'];
+                const allModes = ['sensor', 'pager', 'adsb', 'wifi', 'bluetooth', 'ais', 'dsc', 'acars', 'vdl2', 'aprs', 'rtlamr', 'tscm', 'satellite', 'listening_post'];
                 allModes.forEach(mode => {
                     if (!agentRunningModes.includes(mode)) {
                         syncModeUI(mode, false, agentId);
@@ -485,7 +485,7 @@ async function syncLocalModeStates() {
  */
 function showAgentModeWarnings(runningModes, modesDetail = {}) {
     // SDR modes that can't run simultaneously on same device
-    const sdrModes = ['sensor', 'pager', 'adsb', 'ais', 'acars', 'aprs', 'rtlamr', 'listening_post', 'tscm', 'dsc'];
+    const sdrModes = ['sensor', 'pager', 'adsb', 'ais', 'acars', 'vdl2', 'aprs', 'rtlamr', 'listening_post', 'tscm', 'dsc'];
     const runningSdrModes = runningModes.filter(m => sdrModes.includes(m));
 
     let warning = document.getElementById('agentModeWarning');
@@ -621,7 +621,7 @@ function checkAgentModeConflict(modeToStart, deviceToUse = null) {
         return false;
     }
 
-    const sdrModes = ['sensor', 'pager', 'adsb', 'ais', 'acars', 'aprs', 'rtlamr', 'listening_post', 'tscm', 'dsc'];
+    const sdrModes = ['sensor', 'pager', 'adsb', 'ais', 'acars', 'vdl2', 'aprs', 'rtlamr', 'listening_post', 'tscm', 'dsc'];
 
     // If we're trying to start an SDR mode
     if (sdrModes.includes(modeToStart)) {
@@ -704,6 +704,7 @@ function syncModeUI(mode, isRunning, agentId = null) {
         'wifi': 'setWiFiRunning',
         'bluetooth': 'setBluetoothRunning',
         'acars': 'setAcarsRunning',
+        'vdl2': 'setVdl2Running',
         'listening_post': 'setListeningPostRunning'
     };
 

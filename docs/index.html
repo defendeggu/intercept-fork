@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <canvas id="bg-canvas"></canvas>
     <nav class="navbar">
         <div class="nav-container">
             <a href="#" class="nav-logo">iNTERCEPT</a>
@@ -35,7 +36,7 @@
             </div>
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-value">15+</span>
+                    <span class="stat-value">30+</span>
                     <span class="stat-label">Modes</span>
                 </div>
                 <div class="stat">
@@ -58,97 +59,169 @@
             <h2>Capabilities</h2>
             <p class="section-subtitle">Everything you need for signal intelligence in one interface</p>
 
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">📟</div>
-                    <h3>Pager Decoding</h3>
-                    <p>Decode POCSAG and FLEX pager messages using rtl_fm and multimon-ng. Monitor emergency services and legacy paging systems.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">✈️</div>
-                    <h3>Aircraft Tracking</h3>
-                    <p>Real-time ADS-B tracking with interactive maps, aircraft photos, emergency squawk detection, and range visualization.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📡</div>
-                    <h3>433MHz Sensors</h3>
-                    <p>Decode 200+ protocols including weather stations, TPMS, smart home devices, and IoT sensors via rtl_433.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📻</div>
-                    <h3>Listening Post</h3>
-                    <p>Frequency scanner with real-time audio monitoring, fine-tuning controls, and customizable frequency presets.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🛰️</div>
-                    <h3>Satellite Tracking</h3>
-                    <p>Track satellites with TLE data, sky plots, ground track visualization, and pass predictions for your location.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📶</div>
-                    <h3>WiFi Scanning</h3>
-                    <p>Monitor mode reconnaissance via aircrack-ng. Network discovery, client tracking, and handshake capture.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔵</div>
-                    <h3>Bluetooth Scanning</h3>
-                    <p>Device discovery with tracker detection for AirTags, Tile, Samsung SmartTag, and other Bluetooth devices.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🛡️</div>
-                    <h3>TSCM</h3>
-                    <p>Counter-surveillance with baseline recording, threat detection, device correlation, and risk scoring.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Meter Reading</h3>
-                    <p>Intercept smart utility meters via rtl_amr. Monitor electricity, gas, and water meter transmissions.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🚢</div>
-                    <h3>Vessel Tracking</h3>
-                    <p>Real-time AIS ship tracking via AIS-catcher. Monitor maritime traffic with vessel details, course, speed, and destination.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔢</div>
-                    <h3>Spy Stations</h3>
-                    <p>Number stations and diplomatic HF network database. Frequencies, schedules, and background info from priyom.org.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🌐</div>
-                    <h3>Remote Agents</h3>
-                    <p>Distributed signal intelligence with remote sensor nodes. Deploy agents across multiple locations and aggregate data to a central controller.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📴</div>
-                    <h3>Offline Mode</h3>
-                    <p>Run without internet using bundled assets. Choose from multiple map tile providers or use your own local tile server.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📡</div>
-                    <h3>Meshtastic</h3>
-                    <p>LoRa mesh network integration. Connect to Meshtastic devices for decentralized, long-range communication monitoring.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🖼️</div>
-                    <h3>ISS SSTV</h3>
-                    <p>Receive Slow Scan Television from the ISS. Real-time tracking globe, pass predictions, and image decoding.</p>
-                </div>
+            <div class="carousel-filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="signals">Signals</button>
+                <button class="filter-btn" data-filter="tracking">Tracking</button>
+                <button class="filter-btn" data-filter="space">Space</button>
+                <button class="filter-btn" data-filter="wireless">Wireless</button>
+                <button class="filter-btn" data-filter="intel">Intel</button>
+                <button class="filter-btn" data-filter="platform">Platform</button>
             </div>
+
+            <div class="carousel-wrapper">
+                <button class="carousel-arrow carousel-arrow-left" aria-label="Scroll left">&#8249;</button>
+                <div class="carousel-track">
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="6" y1="9" x2="6" y2="15"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="11" x2="18" y2="11"/><line x1="14" y1="13" x2="18" y2="13"/></svg></div>
+                        <h3>Pager Decoding</h3>
+                        <p>Decode POCSAG and FLEX pager messages using rtl_fm and multimon-ng. Monitor emergency services and legacy paging systems.</p>
+                    </div>
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><circle cx="12" cy="12" r="4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg></div>
+                        <h3>433MHz Sensors</h3>
+                        <p>Decode 200+ protocols including weather stations, TPMS, smart home devices, and IoT sensors via rtl_433.</p>
+                    </div>
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 6 18 3-9h4"/></svg></div>
+                        <h3>Sub-GHz Analyzer</h3>
+                        <p>HackRF-based signal capture and protocol decoding for 300-928 MHz ISM bands with spectrum analysis and replay.</p>
+                    </div>
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.5a6.5 6.5 0 1 1 0-13"/><path d="M17 12h5"/><path d="M12 7V2"/><circle cx="12" cy="12" r="2"/><path d="M8.5 8.5L5 5"/></svg></div>
+                        <h3>Listening Post</h3>
+                        <p>Frequency scanner with real-time audio monitoring, fine-tuning controls, and customizable frequency presets.</p>
+                    </div>
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h2"/><path d="M8 12h1"/><path d="M11 12h2"/><path d="M15 12h1"/><path d="M18 12h2"/><circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/><path d="M4 8h16"/><path d="M4 16h16"/></svg></div>
+                        <h3>CW/Morse Decoder</h3>
+                        <p>Morse code decoding with custom Goertzel tone detection for CW and OOK/AM envelope detection for ISM band signals.</p>
+                    </div>
+                    <div class="feature-card" data-category="intel">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+                        <h3>WebSDR</h3>
+                        <p>Remote HF/shortwave listening via the KiwiSDR network. Access receivers worldwide with real-time audio streaming.</p>
+                    </div>
+                    <div class="feature-card" data-category="intel">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h2v2H8z"/><path d="M14 8h2v2h-2z"/><path d="M8 14h2v2H8z"/><path d="M14 14h2v2h-2z"/><path d="M11 8h2v2h-2z"/><path d="M11 11h2v2h-2z"/></svg></div>
+                        <h3>Spy Stations</h3>
+                        <p>Number stations and diplomatic HF network database. Frequencies, schedules, and background info from priyom.org.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                        <h3>APRS</h3>
+                        <p>Amateur packet radio position reports and telemetry via direwolf. Track amateur radio operators on an interactive map.</p>
+                    </div>
+                    <div class="feature-card" data-category="signals">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                        <h3>Utility Meters</h3>
+                        <p>Smart meter monitoring via rtlamr. Receive electric, gas, and water meter broadcasts in real time.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></div>
+                        <h3>Aircraft Tracking</h3>
+                        <p>Real-time ADS-B tracking with interactive maps, aircraft photos, emergency squawk detection, and range visualization.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/><path d="M7 16h8"/></svg></div>
+                        <h3>ACARS</h3>
+                        <p>Aircraft datalink messages via acarsdec. Decode operational, weather, and position reports from commercial flights.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17"/><path d="M3.5 15h17"/></svg></div>
+                        <h3>VDL2</h3>
+                        <p>VHF Data Link Mode 2 aircraft datalink decoding via dumpvdl2. Real-time ACARS-over-AVLC message capture with signal analysis.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20l4-4h3l4-7 2 4h2l5-9"/><path d="M22 20H2"/><path d="M6 16v4"/></svg></div>
+                        <h3>Vessel Tracking</h3>
+                        <p>Real-time AIS ship tracking via AIS-catcher. Monitor maritime traffic with vessel details, course, speed, and destination.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="M5 5l2 2"/><path d="M17 17l2 2"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="M5 19l2-2"/><path d="M17 7l2-2"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(45 12 12)"/></svg></div>
+                        <h3>Satellite Tracking</h3>
+                        <p>Track satellites with TLE data, sky plots, ground track visualization, and pass predictions for your location.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="4"/><path d="M16 12a4 4 0 0 0-4-4"/></svg></div>
+                        <h3>Weather Satellites</h3>
+                        <p>NOAA APT and Meteor LRPT image decoding via SatDump with auto-scheduler, polar plot, and ground track map.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+                        <h3>ISS SSTV</h3>
+                        <p>Receive Slow Scan Television from the ISS. Real-time tracking globe, pass predictions, and image decoding.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg></div>
+                        <h3>HF SSTV</h3>
+                        <p>Terrestrial SSTV on shortwave frequencies. Decode amateur radio image transmissions across HF, VHF, and UHF bands.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/><path d="M3 9h18"/><path d="M6 3v18"/><path d="M18 3v18"/><path d="M9 6h6"/></svg></div>
+                        <h3>WeFax</h3>
+                        <p>HF weather fax decoder with broadcast timeline, auto-scheduler, and image gallery for marine weather charts.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/><path d="M12 8l4 4-4 4"/></svg></div>
+                        <h3>GPS Tracking</h3>
+                        <p>Real-time GPS position tracking with live map, speed, heading, altitude, satellite info, and track recording.</p>
+                    </div>
+                    <div class="feature-card" data-category="tracking">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M12 22v-6"/><circle cx="12" cy="12" r="4"/><path d="M8 12H2"/><path d="M22 12h-6"/><path d="M12 8a20 20 0 0 1 0 8"/><path d="M7 4l2 3"/><path d="M17 20l-2-3"/></svg></div>
+                        <h3>Radiosonde</h3>
+                        <p>Weather balloon tracking on 400-406 MHz via radiosonde_auto_rx. Real-time telemetry, trajectory map, and station distance.</p>
+                    </div>
+                    <div class="feature-card" data-category="space">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
+                        <h3>Space Weather</h3>
+                        <p>Real-time solar and geomagnetic monitoring. Kp index, HF band conditions, solar imagery, D-RAP maps, and aurora forecasts from NOAA SWPC.</p>
+                    </div>
+                    <div class="feature-card" data-category="wireless">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg></div>
+                        <h3>WiFi Scanning</h3>
+                        <p>Monitor mode reconnaissance via aircrack-ng. Network discovery, client tracking, and handshake capture.</p>
+                    </div>
+                    <div class="feature-card" data-category="wireless">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="6"/><path d="M12 16v5"/><path d="M8 21h8"/><path d="M9.5 7.5L12 10l2.5-2.5"/></svg></div>
+                        <h3>Bluetooth Scanning</h3>
+                        <p>Device discovery with tracker detection for AirTags, Tile, Samsung SmartTag, and other Bluetooth devices.</p>
+                    </div>
+                    <div class="feature-card" data-category="wireless">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="4 2"/><circle cx="12" cy="12" r="11" stroke-dasharray="2 3"/><line x1="12" y1="1" x2="12" y2="3"/></svg></div>
+                        <h3>BT Locate</h3>
+                        <p>SAR Bluetooth device location with GPS-tagged signal trail mapping, IRK-based RPA resolution, and proximity audio alerts.</p>
+                    </div>
+                    <div class="feature-card" data-category="intel">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/><path d="M12 2v3"/><path d="M4.93 4.93l2.12 2.12"/><path d="M20 12h-3"/></svg></div>
+                        <h3>TSCM</h3>
+                        <p>Counter-surveillance with baseline recording, threat detection, device correlation, and risk scoring.</p>
+                    </div>
+                    <div class="feature-card" data-category="wireless">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+                        <h3>Meshtastic</h3>
+                        <p>LoRa mesh network integration. Connect to Meshtastic devices for decentralized, long-range communication monitoring.</p>
+                    </div>
+                    <div class="feature-card" data-category="platform">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/><path d="M5 10h2"/><path d="M17 10h2"/></svg></div>
+                        <h3>Remote Agents</h3>
+                        <p>Distributed signal intelligence with remote sensor nodes. Deploy agents across multiple locations and aggregate data to a central controller.</p>
+                    </div>
+                    <div class="feature-card" data-category="platform">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15"/><path d="M6.16 6.16a9 9 0 0 0-2.57 8.84"/><path d="M12 2v4"/><path d="M2 12h4"/><line x1="2" y1="2" x2="22" y2="22"/><circle cx="12" cy="12" r="3"/></svg></div>
+                        <h3>Offline Mode</h3>
+                        <p>Run without internet using bundled assets. Choose from multiple map tile providers or use your own local tile server.</p>
+                    </div>
+                    <div class="feature-card" data-category="platform">
+                        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                        <h3>System Health</h3>
+                        <p>Real-time telemetry dashboard with process monitoring, system metrics, and SDR device status overview.</p>
+                    </div>
+                </div>
+                <button class="carousel-arrow carousel-arrow-right" aria-label="Scroll right">&#8250;</button>
+            </div>
+
+            <div class="carousel-indicators" id="carousel-indicators"></div>
         </div>
     </section>
 
@@ -194,6 +267,50 @@
                     <img src="images/ais.png" alt="AIS Vessel Tracking">
                     <span class="screenshot-label">AIS Vessel Tracking</span>
                 </div>
+                <div class="screenshot-item">
+                    <img src="images/bt-locate.png" alt="BT Locate SAR Tracker">
+                    <span class="screenshot-label">BT Locate — SAR Tracker</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/spy-stations.png" alt="Spy Stations Database">
+                    <span class="screenshot-label">Spy Stations</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/gps.png" alt="GPS Receiver">
+                    <span class="screenshot-label">GPS Receiver</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/websdr.png" alt="WebSDR Remote Listening">
+                    <span class="screenshot-label">WebSDR</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/aprs.png" alt="APRS Tracker">
+                    <span class="screenshot-label">APRS Tracker</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/vdl2.png" alt="VDL2 Aircraft Datalink">
+                    <span class="screenshot-label">VDL2 Aircraft Datalink</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/weather-satellite.png" alt="Weather Satellite Decoder">
+                    <span class="screenshot-label">Weather Satellite</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/space-weather-1.png" alt="Space Weather Dashboard">
+                    <span class="screenshot-label">Space Weather</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/space-weather-2.png" alt="Space Weather Solar Imagery">
+                    <span class="screenshot-label">Space Weather — Solar &amp; Aurora</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/satellite-tracker.png" alt="Satellite Tracker">
+                    <span class="screenshot-label">Satellite Tracker</span>
+                </div>
+                <div class="screenshot-item">
+                    <img src="images/iss-sstv.png" alt="ISS SSTV Decoder">
+                    <span class="screenshot-label">ISS SSTV</span>
+                </div>
             </div>
         </div>
     </section>
@@ -214,7 +331,7 @@
                         <pre><code>git clone https://github.com/smittix/intercept.git
 cd intercept
 ./setup.sh
-sudo -E venv/bin/python intercept.py</code></pre>
+sudo ./start.sh</code></pre>
                     </div>
                     <p class="install-note">Requires Python 3.9+ and RTL-SDR drivers</p>
                 </div>
@@ -224,7 +341,7 @@ sudo -E venv/bin/python intercept.py</code></pre>
                     <div class="code-block">
                         <pre><code>git clone https://github.com/smittix/intercept.git
 cd intercept
-docker compose up -d</code></pre>
+docker compose --profile basic up -d --build</code></pre>
                     </div>
                     <p class="install-note">Requires privileged mode for USB SDR access</p>
                 </div>
@@ -278,6 +395,36 @@ docker compose up -d</code></pre>
         </div>
     </section>
 
+    <section class="support">
+        <div class="container">
+            <h2>Support & Contact</h2>
+            <p class="section-subtitle">Help keep iNTERCEPT alive or get in touch</p>
+
+            <div class="support-grid">
+                <a href="https://www.buymeacoffee.com/smittix" target="_blank" class="support-card support-coffee">
+                    <div class="support-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg></div>
+                    <h3>Buy Me a Coffee</h3>
+                    <p>Support development with a one-time donation</p>
+                </a>
+                <a href="#" id="email-card" class="support-card" onclick="return false;">
+                    <div class="support-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4L12 13 2 4"/></svg></div>
+                    <h3>Email</h3>
+                    <p id="email-text">Click to reveal</p>
+                </a>
+                <a href="https://discord.gg/EyeksEJmWE" target="_blank" class="support-card">
+                    <div class="support-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+                    <h3>Discord</h3>
+                    <p>Join the community for help and discussion</p>
+                </a>
+                <a href="https://github.com/smittix/intercept/issues" target="_blank" class="support-card">
+                    <div class="support-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+                    <h3>Report an Issue</h3>
+                    <p>Bug reports and feature requests on GitHub</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -288,12 +435,14 @@ docker compose up -d</code></pre>
                 <div class="footer-links">
                     <a href="https://github.com/smittix/intercept" target="_blank">GitHub</a>
                     <a href="https://discord.gg/EyeksEJmWE" target="_blank">Discord</a>
+                    <a href="#" id="footer-email">Email</a>
+                    <a href="https://www.buymeacoffee.com/smittix" target="_blank">Donate</a>
                     <a href="https://github.com/smittix/intercept/blob/main/docs/USAGE.md">Documentation</a>
                     <a href="https://github.com/smittix/intercept/blob/main/docs/DISTRIBUTED_AGENTS.md">Remote Agents</a>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>Created by <a href="https://github.com/smittix" target="_blank">smittix</a> · MIT License</p>
+                <p>Created by <a href="https://github.com/smittix" target="_blank">smittix</a> · Apache 2.0 License</p>
                 <p class="disclaimer">For educational and authorized testing purposes only.</p>
             </div>
         </div>
@@ -336,6 +485,334 @@ docker compose up -d</code></pre>
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeLightbox();
         });
+
+        // Carousel functionality
+        (function() {
+            const track = document.querySelector('.carousel-track');
+            const cards = Array.from(track.querySelectorAll('.feature-card'));
+            const leftArrow = document.querySelector('.carousel-arrow-left');
+            const rightArrow = document.querySelector('.carousel-arrow-right');
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            const indicatorContainer = document.getElementById('carousel-indicators');
+
+            const SCROLL_AMOUNT = 300;
+
+            function updateArrows() {
+                leftArrow.disabled = track.scrollLeft <= 0;
+                rightArrow.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 2;
+            }
+
+            function buildIndicators() {
+                const visible = cards.filter(c => !c.classList.contains('hidden'));
+                const totalWidth = visible.length * 300;
+                const pages = Math.max(1, Math.ceil(totalWidth / track.clientWidth));
+                indicatorContainer.innerHTML = '';
+                for (let i = 0; i < pages; i++) {
+                    const dot = document.createElement('button');
+                    dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+                    dot.addEventListener('click', () => {
+                        track.scrollTo({ left: (track.scrollWidth / pages) * i, behavior: 'smooth' });
+                    });
+                    indicatorContainer.appendChild(dot);
+                }
+            }
+
+            function updateIndicators() {
+                const dots = indicatorContainer.querySelectorAll('.carousel-dot');
+                if (!dots.length) return;
+                const ratio = track.scrollLeft / Math.max(1, track.scrollWidth - track.clientWidth);
+                const idx = Math.round(ratio * (dots.length - 1));
+                dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+            }
+
+            leftArrow.addEventListener('click', () => {
+                track.scrollBy({ left: -SCROLL_AMOUNT, behavior: 'smooth' });
+            });
+
+            rightArrow.addEventListener('click', () => {
+                track.scrollBy({ left: SCROLL_AMOUNT, behavior: 'smooth' });
+            });
+
+            track.addEventListener('scroll', () => {
+                updateArrows();
+                updateIndicators();
+            });
+
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const filter = btn.dataset.filter;
+
+                    cards.forEach(card => {
+                        if (filter === 'all' || card.dataset.category === filter) {
+                            card.classList.remove('hidden');
+                        } else {
+                            card.classList.add('hidden');
+                        }
+                    });
+
+                    track.scrollTo({ left: 0 });
+                    buildIndicators();
+                    updateArrows();
+                });
+            });
+
+            buildIndicators();
+            updateArrows();
+            window.addEventListener('resize', () => { buildIndicators(); updateArrows(); });
+        })();
+
+        // Obfuscated email - assembled at runtime to defeat scrapers
+        (function() {
+            const p = ['smittix', 'outlook', 'com'];
+            const addr = p[0] + '@' + p[1] + '.' + p[2];
+            const card = document.getElementById('email-card');
+            const text = document.getElementById('email-text');
+            const footerLink = document.getElementById('footer-email');
+            let revealed = false;
+
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!revealed) {
+                    text.textContent = addr;
+                    revealed = true;
+                } else {
+                    window.location.href = 'mail' + 'to:' + addr;
+                }
+            });
+
+            footerLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = 'mail' + 'to:' + addr;
+            });
+        })();
+    </script>
+
+    <script>
+    // Animated satellite & signal background
+    (function() {
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let w, h, dpr;
+        let orbits = [];
+        let pulses = [];
+        let particles = [];
+        let mouse = { x: -1000, y: -1000 };
+
+        function resize() {
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            w = window.innerWidth;
+            h = document.documentElement.scrollHeight;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        // Orbital paths with satellites
+        function createOrbits() {
+            orbits = [];
+            const count = Math.max(4, Math.floor(w / 300));
+            for (let i = 0; i < count; i++) {
+                const cx = Math.random() * w;
+                const cy = Math.random() * h;
+                const rx = 120 + Math.random() * 280;
+                const ry = 40 + Math.random() * 100;
+                const tilt = (Math.random() - 0.5) * 1.2;
+                const speed = (0.0002 + Math.random() * 0.0004) * (Math.random() > 0.5 ? 1 : -1);
+                const sats = [];
+                const satCount = 1 + Math.floor(Math.random() * 2);
+                for (let j = 0; j < satCount; j++) {
+                    sats.push({ angle: Math.random() * Math.PI * 2, pulseTimer: 0 });
+                }
+                orbits.push({ cx, cy, rx, ry, tilt, speed, sats });
+            }
+        }
+
+        // Floating signal particles (tiny dots drifting upward)
+        function createParticles() {
+            particles = [];
+            const count = Math.max(30, Math.floor((w * h) / 25000));
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    vy: -(0.08 + Math.random() * 0.15),
+                    vx: (Math.random() - 0.5) * 0.1,
+                    size: 0.5 + Math.random() * 1.2,
+                    alpha: 0.1 + Math.random() * 0.25,
+                    flicker: Math.random() * Math.PI * 2,
+                });
+            }
+        }
+
+        function spawnPulse(x, y) {
+            pulses.push({ x, y, r: 2, maxR: 50 + Math.random() * 40, alpha: 0.35 });
+        }
+
+        function drawOrbitPath(orbit) {
+            ctx.save();
+            ctx.translate(orbit.cx, orbit.cy);
+            ctx.rotate(orbit.tilt);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, orbit.rx, orbit.ry, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 212, 170, 0.04)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawSatellite(orbit, sat, dt) {
+            sat.angle += orbit.speed * dt;
+            const cos = Math.cos(orbit.tilt);
+            const sin = Math.sin(orbit.tilt);
+            const ex = orbit.rx * Math.cos(sat.angle);
+            const ey = orbit.ry * Math.sin(sat.angle);
+            const sx = orbit.cx + ex * cos - ey * sin;
+            const sy = orbit.cy + ex * sin + ey * cos;
+
+            // Satellite dot
+            ctx.beginPath();
+            ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 212, 170, 0.7)';
+            ctx.fill();
+
+            // Faint glow
+            ctx.beginPath();
+            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 6);
+            g.addColorStop(0, 'rgba(0, 212, 170, 0.15)');
+            g.addColorStop(1, 'rgba(0, 212, 170, 0)');
+            ctx.fillStyle = g;
+            ctx.fill();
+
+            // Periodic signal pulse
+            sat.pulseTimer += dt;
+            if (sat.pulseTimer > 3000 + Math.random() * 500) {
+                sat.pulseTimer = 0;
+                spawnPulse(sx, sy);
+            }
+        }
+
+        function drawPulses(dt) {
+            for (let i = pulses.length - 1; i >= 0; i--) {
+                const p = pulses[i];
+                p.r += dt * 0.025;
+                p.alpha = 0.35 * (1 - p.r / p.maxR);
+                if (p.r >= p.maxR) { pulses.splice(i, 1); continue; }
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(0, 212, 170, ${p.alpha})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Second ring
+                if (p.r > 12) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r * 0.6, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(0, 136, 255, ${p.alpha * 0.5})`;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawParticles(dt, time) {
+            for (const p of particles) {
+                p.y += p.vy * dt * 0.06;
+                p.x += p.vx * dt * 0.06;
+                p.flicker += dt * 0.002;
+
+                if (p.y < -10) { p.y = h + 10; p.x = Math.random() * w; }
+                if (p.x < -10) p.x = w + 10;
+                if (p.x > w + 10) p.x = -10;
+
+                const flick = p.alpha * (0.6 + 0.4 * Math.sin(p.flicker));
+
+                // Mouse interaction - subtle brighten
+                const dx = p.x - mouse.x;
+                const dy = p.y - mouse.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const boost = dist < 150 ? 0.3 * (1 - dist / 150) : 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 212, 170, ${Math.min(flick + boost, 0.6)})`;
+                ctx.fill();
+            }
+        }
+
+        // Faint grid lines (signal grid)
+        function drawGrid(time) {
+            ctx.strokeStyle = 'rgba(0, 212, 170, 0.015)';
+            ctx.lineWidth = 1;
+            const spacing = 120;
+            const offset = (time * 0.005) % spacing;
+
+            for (let x = -spacing + offset; x < w + spacing; x += spacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            for (let y = -spacing + offset * 0.7; y < h + spacing; y += spacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+        }
+
+        let last = 0;
+        function animate(now) {
+            const dt = last ? Math.min(now - last, 50) : 16;
+            last = now;
+
+            ctx.clearRect(0, 0, w, h);
+            drawGrid(now);
+
+            for (const orbit of orbits) {
+                drawOrbitPath(orbit);
+                for (const sat of orbit.sats) {
+                    drawSatellite(orbit, sat, dt);
+                }
+            }
+
+            drawPulses(dt);
+            drawParticles(dt, now);
+
+            requestAnimationFrame(animate);
+        }
+
+        // Track mouse for particle interaction
+        document.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY + window.scrollY;
+        });
+
+        // Resize handling
+        let resizeTimer;
+        function handleResize() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                resize();
+                createOrbits();
+                createParticles();
+            }, 200);
+        }
+
+        // Keep canvas height synced with document
+        const ro = new ResizeObserver(() => { handleResize(); });
+        ro.observe(document.documentElement);
+        window.addEventListener('resize', handleResize);
+
+        resize();
+        createOrbits();
+        createParticles();
+        requestAnimationFrame(animate);
+    })();
     </script>
 </body>
 </html>

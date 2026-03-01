@@ -1,33 +1,44 @@
 # INTERCEPT - Signal Intelligence Platform
 # Docker Compose configuration for easy deployment
 #
-# Basic usage:
-#   docker compose up -d
+# Uses gunicorn + gevent production server via start.sh (handles concurrent SSE/WebSocket)
+#
+# Basic usage (build locally):
+#   docker compose --profile basic up -d --build
+#
+# Basic usage (pre-built image from registry):
+#   INTERCEPT_IMAGE=ghcr.io/user/intercept:latest docker compose --profile basic up -d
 #
 # With ADS-B history (Postgres):
 #   docker compose --profile history up -d
 
 services:
   intercept:
+    # When INTERCEPT_IMAGE is set, use that pre-built image; otherwise build locally
+    image: ${INTERCEPT_IMAGE:-intercept:latest}
     build: .
     container_name: intercept
     ports:
       - "5050:5050"
+      # Uncomment for HTTPS support (set INTERCEPT_HTTPS=true below)
+      # - "5443:5443"
     # Privileged mode required for USB SDR device access
-    # Alternatively, use device mapping (see below)
     privileged: true
-    # USB device mapping (alternative to privileged mode)
-    # devices:
-    #   - /dev/bus/usb:/dev/bus/usb
-    # volumes:
-      # Persist data directory
-      # - ./data:/app/data
+    # USB device mapping for all USB devices
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      # Persist decoded images and database across container rebuilds
+      - ./data:/app/data
       # Optional: mount logs directory
       # - ./logs:/app/logs
     environment:
       - INTERCEPT_HOST=0.0.0.0
       - INTERCEPT_PORT=5050
       - INTERCEPT_LOG_LEVEL=INFO
+      # HTTPS support (auto-generates self-signed cert)
+      # - INTERCEPT_HTTPS=true
+      # - INTERCEPT_PORT=5443
       # ADS-B history is disabled by default
       # To enable, use: docker compose --profile history up -d
       # - INTERCEPT_ADSB_HISTORY_ENABLED=true
@@ -40,6 +51,9 @@ services:
       - INTERCEPT_ADSB_AUTO_START=${INTERCEPT_ADSB_AUTO_START:-false}
       # Shared observer location across modules
       - INTERCEPT_SHARED_OBSERVER_LOCATION=${INTERCEPT_SHARED_OBSERVER_LOCATION:-true}
+      # Default observer coordinates (set to your location to skip the GPS prompt)
+      # - INTERCEPT_DEFAULT_LAT=${INTERCEPT_DEFAULT_LAT:-0}
+      # - INTERCEPT_DEFAULT_LON=${INTERCEPT_DEFAULT_LON:-0}
     # Network mode for WiFi scanning (requires host network)
     # network_mode: host
     restart: unless-stopped
@@ -53,19 +67,32 @@ services:
   # ADS-B history with Postgres persistence
   # Enable with: docker compose --profile history up -d
   intercept-history:
+    # Same image/build fallback pattern as above
+    image: ${INTERCEPT_IMAGE:-intercept:latest}
     build: .
-    container_name: intercept
+    container_name: intercept-history
     profiles:
       - history
     depends_on:
       - adsb_db
     ports:
       - "5050:5050"
+      # Uncomment for HTTPS support (set INTERCEPT_HTTPS=true below)
+      # - "5443:5443"
+    # Privileged mode required for USB SDR device access
     privileged: true
+    # USB device mapping for all USB devices
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      - ./data:/app/data
     environment:
       - INTERCEPT_HOST=0.0.0.0
       - INTERCEPT_PORT=5050
       - INTERCEPT_LOG_LEVEL=INFO
+      # HTTPS support (auto-generates self-signed cert)
+      # - INTERCEPT_HTTPS=true
+      # - INTERCEPT_PORT=5443
       - INTERCEPT_ADSB_HISTORY_ENABLED=true
       - INTERCEPT_ADSB_DB_HOST=adsb_db
       - INTERCEPT_ADSB_DB_PORT=5432
@@ -76,6 +103,9 @@ services:
       - INTERCEPT_ADSB_AUTO_START=${INTERCEPT_ADSB_AUTO_START:-false}
       # Shared observer location across modules
       - INTERCEPT_SHARED_OBSERVER_LOCATION=${INTERCEPT_SHARED_OBSERVER_LOCATION:-true}
+      # Default observer coordinates (set to your location to skip the GPS prompt)
+      # - INTERCEPT_DEFAULT_LAT=${INTERCEPT_DEFAULT_LAT:-0}
+      # - INTERCEPT_DEFAULT_LON=${INTERCEPT_DEFAULT_LON:-0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:5050/health"]
@@ -94,7 +124,8 @@ services:
       - POSTGRES_USER=intercept
       - POSTGRES_PASSWORD=intercept
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      # Default local path (override with PGDATA_PATH for external storage)
+      - ${PGDATA_PATH:-./pgdata}:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U intercept -d intercept_adsb"]

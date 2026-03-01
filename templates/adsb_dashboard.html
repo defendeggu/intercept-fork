@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% if offline_settings.tile_provider in ['cartodb_dark', 'cartodb_dark_cyan'] %}map-cyber-enabled{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <!-- Leaflet.js - Conditional CDN/Local loading -->
     {% if offline_settings.assets_source == 'local' %}
@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/adsb_dashboard.css') }}">
     <script>
@@ -54,8 +54,10 @@
         </div>
     </header>
 
+    {% if not embedded %}
     {% set active_mode = 'adsb' %}
     {% include 'partials/nav.html' with context %}
+    {% endif %}
 
     <!-- Slim Statistics Bar -->
     <div class="stats-strip">
@@ -92,8 +94,12 @@
                 <span class="strip-value" id="stripAcars">0</span>
                 <span class="strip-label">ACARS</span>
             </div>
+            <div class="strip-stat">
+                <span class="strip-value" id="stripVdl2">0</span>
+                <span class="strip-label">VDL2</span>
+            </div>
             <div class="strip-stat source-stat" title="Data source (Local or Agent name)">
-                <span class="strip-value" id="stripSource" style="font-size: 10px;">Local</span>
+                <span class="strip-value" id="stripSource">Local</span>
                 <span class="strip-label">SOURCE</span>
             </div>
             <div class="strip-stat signal-stat" title="Signal quality (messages/errors)">
@@ -106,17 +112,25 @@
             </div>
             <div class="strip-divider"></div>
             <button type="button" class="strip-btn" onclick="showSquawkInfo(null)" title="Squawk Code Reference">
-                📟 Squawk
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>
+                Squawk
             </button>
             <button type="button" class="strip-btn" onclick="lookupSelectedFlight()" title="Lookup selected aircraft on FlightAware" id="flightLookupBtn" disabled>
-                🔗 Lookup
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                Lookup
             </button>
             <button type="button" class="strip-btn primary" onclick="generateReport()" title="Generate Session Report">
-                📊 Report
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Report
             </button>
             <a class="strip-btn" href="/adsb/history" title="Open History Reporting">
-                📚 History
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                History
             </a>
+            <button type="button" class="strip-btn" onclick="toggleAntennaGuide()" title="1090 MHz Antenna Guide">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 L12 2 L22 12"/><line x1="12" y1="2" x2="12" y2="22"/><path d="M4.93 4.93 L12 12"/><path d="M19.07 4.93 L12 12"/></svg>
+                Antenna
+            </button>
             <div class="strip-divider"></div>
             <div class="strip-status">
                 <div class="status-dot inactive" id="trackingDot"></div>
@@ -127,6 +141,8 @@
     </div>
 
     <main class="dashboard">
+        <!-- Left Sidebars (ACARS + VDL2) -->
+        <div class="left-sidebars">
         <!-- ACARS Panel (left of map) - Collapsible -->
         <div class="acars-sidebar" id="acarsSidebar">
             <div class="acars-sidebar-content" id="acarsSidebarContent">
@@ -176,26 +192,71 @@
             </button>
         </div>
 
+        <!-- VDL2 Panel (left of map, after ACARS) - Collapsible -->
+        <div class="vdl2-sidebar" id="vdl2Sidebar">
+            <div class="vdl2-sidebar-content" id="vdl2SidebarContent">
+                <div class="panel vdl2-panel">
+                    <div class="panel-header">
+                        <span>VDL2 MESSAGES</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="vdl2Count" style="font-size: 10px; color: var(--accent-cyan);">0</span>
+                            <button onclick="exportVdl2Csv()" title="Export VDL2 to CSV" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-family: var(--font-mono);">CSV</button>
+                            <div class="panel-indicator" id="vdl2PanelIndicator"></div>
+                        </div>
+                    </div>
+                    <div id="vdl2PanelContent">
+                        <div class="vdl2-info" style="font-size: 9px; color: var(--text-muted); padding: 5px 8px; border-bottom: 1px solid var(--border-color);">
+                            <span style="color: var(--accent-yellow);">&#9888;</span> Requires separate SDR (VHF ~137 MHz)
+                        </div>
+                        <div class="vdl2-controls" style="padding: 8px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                                <select id="vdl2DeviceSelect" style="flex: 1; font-size: 10px;">
+                                    <option value="0">SDR 0</option>
+                                    <option value="1">SDR 1</option>
+                                </select>
+                                <select id="vdl2RegionDashSelect" onchange="updateVdl2FreqCheckboxes()" style="flex: 1; font-size: 10px;">
+                                    <option value="na">N. America</option>
+                                    <option value="eu">Europe</option>
+                                    <option value="ap">Asia-Pac</option>
+                                </select>
+                            </div>
+                            <div id="vdl2FreqSelector" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; font-size: 9px;">
+                                <!-- Frequency checkboxes populated by JS -->
+                            </div>
+                            <button class="vdl2-btn" id="vdl2ToggleBtn" onclick="toggleVdl2()" style="width: 100%;">
+                                &#9654; START VDL2
+                            </button>
+                        </div>
+                        <div class="vdl2-messages" id="vdl2Messages">
+                            <div class="no-aircraft" style="padding: 20px; text-align: center;">
+                                <div style="font-size: 10px; color: var(--text-muted);">No VDL2 messages</div>
+                                <div style="font-size: 9px; color: var(--text-dim); margin-top: 5px;">Start VDL2 to receive digital datalink messages</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="vdl2-collapse-btn" id="vdl2CollapseBtn" onclick="toggleVdl2Sidebar()" title="Toggle VDL2 Panel">
+                <span id="vdl2CollapseIcon">&#9664;</span>
+                <span class="vdl2-collapse-label">VDL2</span>
+            </button>
+        </div>
+        </div><!-- /left-sidebars -->
+
         <!-- Main Display (Map or Radar Scope) -->
         <div class="main-display">
             <div class="display-container">
                 <div id="radarMap">
-                    <canvas id="radarOverlayCanvas"></canvas>
                 </div>
-                <div id="radarScope">
-                    <canvas id="radarCanvas"></canvas>
+                <div id="mapCrosshairOverlay" class="map-crosshair-overlay" aria-hidden="true">
+                    <div class="map-crosshair-line map-crosshair-vertical"></div>
+                    <div class="map-crosshair-line map-crosshair-horizontal"></div>
                 </div>
             </div>
         </div>
 
         <!-- Sidebar -->
         <div class="sidebar">
-            <!-- View Toggle -->
-            <div class="view-toggle">
-                <button class="view-btn active" id="mapViewBtn" onclick="setView('map')">MAP</button>
-                <button class="view-btn" id="radarViewBtn" onclick="setView('radar')">RADAR</button>
-            </div>
-
             <!-- Selected Aircraft -->
             <div class="panel selected-aircraft">
                 <div class="panel-header">
@@ -231,9 +292,8 @@
             <div class="control-group">
                 <span class="control-group-label">DISPLAY</span>
                 <div class="control-group-items">
-                    <label title="Show aircraft trails"><input type="checkbox" id="showTrails" onchange="toggleTrails()"> Trails</label>
+                    <label title="Show aircraft trails"><input type="checkbox" id="showTrails" checked onchange="toggleTrails()"> Trails</label>
                     <label title="Show range rings"><input type="checkbox" id="showRangeRings" checked onchange="drawRangeRings()"> Rings</label>
-                    <label title="Radar sweep overlay"><input type="checkbox" id="radarOverlay" onchange="toggleRadarOverlay()"> Radar</label>
                     <label title="Audio alerts for military/emergency"><input type="checkbox" id="alertToggle" checked onchange="toggleAlerts()"> Alerts</label>
                     <label title="Sound when new aircraft detected"><input type="checkbox" id="detectionSoundToggle" onchange="toggleDetectionSound()"> Ping</label>
                     <select id="aircraftFilter" onchange="applyFilter()" title="Filter aircraft">
@@ -359,24 +419,31 @@
         let agentPollTimer = null;  // Polling fallback for agent mode
         let isTracking = false;
         let currentFilter = 'all';
+        // ICAO -> { emergency: bool, watchlist: bool, military: bool }
         let alertedAircraft = {};
         let alertsEnabled = true;
         let detectionSoundEnabled = localStorage.getItem('adsb_detectionSound') !== 'false';  // Default on
         let soundedAircraft = {};  // Track aircraft we've played detection sound for
-        let currentView = 'map';  // 'map' or 'radar'
-
+        const MAP_CROSSHAIR_DURATION_MS = 1500;
+        const PANEL_SELECTION_BASE_ZOOM = 10;
+        const PANEL_SELECTION_MAX_ZOOM = 12;
+        const PANEL_SELECTION_ZOOM_INCREMENT = 1.4;
+        const PANEL_SELECTION_STAGE1_DURATION_SEC = 1.05;
+        const PANEL_SELECTION_STAGE2_DURATION_SEC = 1.15;
+        const PANEL_SELECTION_STAGE_GAP_MS = 180;
+        let mapCrosshairResetTimer = null;
+        let panelSelectionFallbackTimer = null;
+        let panelSelectionStageTimer = null;
+        let mapCrosshairRequestId = 0;
         // Watchlist - persisted to localStorage
         let watchlist = JSON.parse(localStorage.getItem('adsb_watchlist') || '[]');
 
         // Aircraft trails
         let aircraftTrails = {};  // ICAO -> [{lat, lon, alt, time}, ...]
         let trailLines = {};      // ICAO -> L.polyline (array of segments)
-        let showTrails = false;
+        let showTrails = true;
         const MAX_TRAIL_POINTS = 100;
 
-        // Radar scope
-        let radarScope = null;
-        let radarAnimationId = null;
         let maxRange = 200;  // nautical miles
 
         // Statistics
@@ -550,7 +617,7 @@
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    if (parsed.lat && parsed.lon) return parsed;
+                    if (parsed.lat !== undefined && parsed.lat !== null && parsed.lon !== undefined && parsed.lon !== null) return parsed;
                 } catch (e) {}
             }
             return { lat: 51.5074, lon: -0.1278 };
@@ -602,24 +669,64 @@
             }
         }
 
+        function speakAircraftAlert(kind, icao, ac, detail) {
+            if (typeof VoiceAlerts === 'undefined' || typeof VoiceAlerts.speak !== 'function') return;
+
+            const cfg = (typeof VoiceAlerts.getConfig === 'function')
+                ? VoiceAlerts.getConfig()
+                : { streams: {} };
+            const streams = cfg && cfg.streams ? cfg.streams : {};
+            const callsign = (ac && ac.callsign ? String(ac.callsign).trim() : '') || icao;
+
+            if (kind === 'emergency') {
+                if (streams.squawks === false) return;
+                const squawk = detail && detail.squawk ? ` squawk ${detail.squawk}.` : '.';
+                const meaning = detail && detail.name ? ` ${detail.name}.` : '';
+                VoiceAlerts.speak(`Aircraft emergency: ${callsign}.${squawk}${meaning}`, VoiceAlerts.PRIORITY.HIGH);
+                return;
+            }
+
+            if (kind === 'military') {
+                if (streams.adsb_military === false) return;
+                const country = detail && detail.country ? ` ${detail.country}.` : '';
+                VoiceAlerts.speak(`Military aircraft detected: ${callsign}.${country}`, VoiceAlerts.PRIORITY.HIGH);
+            }
+        }
+
         function checkAndAlertAircraft(icao, ac) {
-            if (alertedAircraft[icao]) return;
+            if (!alertedAircraft[icao]) {
+                alertedAircraft[icao] = { emergency: false, watchlist: false, military: false };
+            }
+
+            const alertState = alertedAircraft[icao];
             const militaryInfo = isMilitaryAircraft(icao, ac.callsign);
             const squawkInfo = checkSquawkCode(ac);
             const onWatchlist = isOnWatchlist(ac);
 
             if (squawkInfo && squawkInfo.type === 'emergency') {
-                alertedAircraft[icao] = 'emergency';
-                playAlertSound('emergency');
-                showAlertBanner(`EMERGENCY: ${squawkInfo.name} - ${ac.callsign || icao}`, '#ff0000');
-            } else if (onWatchlist) {
-                alertedAircraft[icao] = 'watchlist';
+                if (!alertState.emergency) {
+                    alertState.emergency = true;
+                    playAlertSound('emergency');
+                    showAlertBanner(`EMERGENCY: ${squawkInfo.name} - ${ac.callsign || icao}`, '#ff0000');
+                    speakAircraftAlert('emergency', icao, ac, {
+                        squawk: ac.squawk,
+                        name: squawkInfo.name,
+                    });
+                }
+                return;
+            }
+
+            if (onWatchlist && !alertState.watchlist) {
+                alertState.watchlist = true;
                 playAlertSound('military');  // Use military sound for watchlist
                 showAlertBanner(`WATCHLIST: ${ac.callsign || ac.registration || icao} detected!`, '#00d4ff');
-            } else if (militaryInfo.military) {
-                alertedAircraft[icao] = 'military';
+            } else if (militaryInfo.military && !alertState.military) {
+                alertState.military = true;
                 playAlertSound('military');
                 showAlertBanner(`MILITARY: ${ac.callsign || icao}${militaryInfo.country ? ' (' + militaryInfo.country + ')' : ''}`, '#556b2f');
+                speakAircraftAlert('military', icao, ac, {
+                    country: militaryInfo.country || null,
+                });
             }
         }
 
@@ -936,7 +1043,7 @@
             }
 
             // Distance calculation
-            if (ac.lat && ac.lon) {
+            if (ac.lat !== undefined && ac.lat !== null && ac.lon !== undefined && ac.lon !== null) {
                 const distance = calculateDistanceNm(
                     observerLocation.lat, observerLocation.lon,
                     ac.lat, ac.lon
@@ -988,7 +1095,7 @@
                     fastest = ac.speed;
                     fastestIcao = icao;
                 }
-                if (ac.lat && ac.lon) {
+                if (ac.lat !== undefined && ac.lat !== null && ac.lon !== undefined && ac.lon !== null) {
                     const dist = calculateDistanceNm(
                         observerLocation.lat, observerLocation.lon,
                         ac.lat, ac.lon
@@ -1296,21 +1403,41 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             }
             trailLines[icao] = [];
 
-            // Create gradient segments
+            // Group consecutive same-altitude-color points into single polylines.
+            // This reduces layer count from O(trail length) to O(color band changes),
+            // which is typically 1-2 polylines per aircraft instead of up to 99.
             const now = Date.now();
-            for (let i = 1; i < trail.length; i++) {
-                const p1 = trail[i-1];
-                const p2 = trail[i];
-                const age = (now - p2.time) / 1000;  // seconds
-                const opacity = Math.max(0.2, 1 - (age / 120));  // Fade over 2 minutes
+            let runColor = getAltitudeColor(trail[0].alt);
+            let runPoints = [[trail[0].lat, trail[0].lon]];
+            let runEndTime = trail[0].time;
 
-                const color = getAltitudeColor(p2.alt);
-                const line = L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
-                    color: color,
-                    weight: 2,
-                    opacity: opacity
-                }).addTo(radarMap);
-                trailLines[icao].push(line);
+            for (let i = 1; i < trail.length; i++) {
+                const p = trail[i];
+                const color = getAltitudeColor(p.alt);
+
+                if (color !== runColor) {
+                    // Flush the current color run as one polyline
+                    if (runPoints.length >= 2) {
+                        const opacity = Math.max(0.2, 1 - ((now - runEndTime) / 1000 / 120));
+                        trailLines[icao].push(
+                            L.polyline(runPoints, { color: runColor, weight: 2, opacity }).addTo(radarMap)
+                        );
+                    }
+                    // Start a new run, sharing the junction point for visual continuity
+                    runColor = color;
+                    runPoints = [[trail[i-1].lat, trail[i-1].lon], [p.lat, p.lon]];
+                } else {
+                    runPoints.push([p.lat, p.lon]);
+                }
+                runEndTime = p.time;
+            }
+
+            // Flush the final run
+            if (runPoints.length >= 2) {
+                const opacity = Math.max(0.2, 1 - ((now - runEndTime) / 1000 / 120));
+                trailLines[icao].push(
+                    L.polyline(runPoints, { color: runColor, weight: 2, opacity }).addTo(radarMap)
+                );
             }
         }
 
@@ -1320,444 +1447,6 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 delete trailLines[icao];
             }
             delete aircraftTrails[icao];
-        }
-
-        // ============================================
-        // RADAR SCOPE (PPI)
-        // ============================================
-        class RadarScope {
-            constructor(canvasId) {
-                this.canvas = document.getElementById(canvasId);
-                this.ctx = this.canvas.getContext('2d');
-                this.sweepAngle = 0;
-                this.blips = [];  // Aircraft blips with afterglow
-                this.resize();
-                window.addEventListener('resize', () => this.resize());
-            }
-
-            resize() {
-                const container = this.canvas.parentElement;
-                const size = Math.min(container.clientWidth, container.clientHeight) - 40;
-                this.canvas.width = size;
-                this.canvas.height = size;
-                this.centerX = size / 2;
-                this.centerY = size / 2;
-                this.radius = (size / 2) - 30;
-            }
-
-            draw() {
-                const ctx = this.ctx;
-                const w = this.canvas.width;
-                const h = this.canvas.height;
-
-                // Clear
-                ctx.fillStyle = '#1a1a2e';
-                ctx.fillRect(0, 0, w, h);
-
-                // Draw range rings
-                this.drawRangeRings();
-
-                // Draw compass rose
-                this.drawCompassRose();
-
-                // Draw aircraft blips
-                this.drawBlips();
-
-                // Draw sweep line
-                this.drawSweep();
-
-                // Draw center point (observer)
-                ctx.beginPath();
-                ctx.arc(this.centerX, this.centerY, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffff00';
-                ctx.fill();
-            }
-
-            drawRangeRings() {
-                const ctx = this.ctx;
-                const rings = [0.25, 0.5, 0.75, 1.0];
-
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-                ctx.lineWidth = 1;
-
-                rings.forEach((ratio, i) => {
-                    const r = this.radius * ratio;
-                    ctx.beginPath();
-                    ctx.arc(this.centerX, this.centerY, r, 0, Math.PI * 2);
-                    ctx.stroke();
-
-                    // Range label
-                    const rangeNm = Math.round(maxRange * ratio);
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                    ctx.font = '10px Space Mono';
-                    ctx.fillText(`${rangeNm}`, this.centerX + r + 5, this.centerY + 4);
-                });
-            }
-
-            drawCompassRose() {
-                const ctx = this.ctx;
-                const directions = [
-                    { angle: 0, label: 'N' },
-                    { angle: 90, label: 'E' },
-                    { angle: 180, label: 'S' },
-                    { angle: 270, label: 'W' }
-                ];
-
-                ctx.fillStyle = '#00ffff';
-                ctx.font = 'bold 12px Orbitron';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-
-                directions.forEach(d => {
-                    const rad = (d.angle - 90) * Math.PI / 180;
-                    const x = this.centerX + (this.radius + 15) * Math.cos(rad);
-                    const y = this.centerY + (this.radius + 15) * Math.sin(rad);
-                    ctx.fillText(d.label, x, y);
-                });
-
-                // Draw tick marks every 30 degrees
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-                ctx.lineWidth = 1;
-                for (let angle = 0; angle < 360; angle += 30) {
-                    const rad = (angle - 90) * Math.PI / 180;
-                    const inner = this.radius - 5;
-                    const outer = this.radius + 2;
-                    ctx.beginPath();
-                    ctx.moveTo(
-                        this.centerX + inner * Math.cos(rad),
-                        this.centerY + inner * Math.sin(rad)
-                    );
-                    ctx.lineTo(
-                        this.centerX + outer * Math.cos(rad),
-                        this.centerY + outer * Math.sin(rad)
-                    );
-                    ctx.stroke();
-                }
-            }
-
-            drawSweep() {
-                const ctx = this.ctx;
-                const rad = (this.sweepAngle - 90) * Math.PI / 180;
-
-                // Sweep line with gradient
-                const gradient = ctx.createLinearGradient(
-                    this.centerX, this.centerY,
-                    this.centerX + this.radius * Math.cos(rad),
-                    this.centerY + this.radius * Math.sin(rad)
-                );
-                gradient.addColorStop(0, 'rgba(0, 255, 255, 0.8)');
-                gradient.addColorStop(1, 'rgba(0, 255, 255, 0.1)');
-
-                ctx.beginPath();
-                ctx.moveTo(this.centerX, this.centerY);
-                ctx.lineTo(
-                    this.centerX + this.radius * Math.cos(rad),
-                    this.centerY + this.radius * Math.sin(rad)
-                );
-                ctx.strokeStyle = gradient;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Sweep arc (afterglow)
-                const startAngle = (this.sweepAngle - 90 - 30) * Math.PI / 180;
-                const endAngle = (this.sweepAngle - 90) * Math.PI / 180;
-                const arcGradient = ctx.createConicGradient(startAngle, this.centerX, this.centerY);
-                arcGradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-                arcGradient.addColorStop(1, 'rgba(0, 255, 255, 0.15)');
-
-                ctx.beginPath();
-                ctx.moveTo(this.centerX, this.centerY);
-                ctx.arc(this.centerX, this.centerY, this.radius, startAngle, endAngle);
-                ctx.closePath();
-                ctx.fillStyle = arcGradient;
-                ctx.fill();
-
-                // Update sweep angle
-                this.sweepAngle = (this.sweepAngle + 2) % 360;
-            }
-
-            drawBlips() {
-                const ctx = this.ctx;
-                const now = Date.now();
-
-                // Update blips from aircraft data
-                this.blips = [];
-                Object.entries(aircraft).forEach(([icao, ac]) => {
-                    if (!ac.lat || !ac.lon) return;
-                    if (!passesFilter(icao, ac)) return;
-
-                    const distance = calculateDistanceNm(
-                        observerLocation.lat, observerLocation.lon,
-                        ac.lat, ac.lon
-                    );
-
-                    if (distance > maxRange) return;
-
-                    const bearing = calculateBearing(
-                        observerLocation.lat, observerLocation.lon,
-                        ac.lat, ac.lon
-                    );
-
-                    const ratio = distance / maxRange;
-                    const rad = (bearing - 90) * Math.PI / 180;
-                    const x = this.centerX + (this.radius * ratio) * Math.cos(rad);
-                    const y = this.centerY + (this.radius * ratio) * Math.sin(rad);
-
-                    this.blips.push({
-                        x, y,
-                        icao,
-                        callsign: ac.callsign,
-                        altitude: ac.altitude,
-                        selected: icao === selectedIcao
-                    });
-                });
-
-                // Draw blips
-                this.blips.forEach(blip => {
-                    // Blip glow
-                    const gradient = ctx.createRadialGradient(blip.x, blip.y, 0, blip.x, blip.y, 12);
-                    gradient.addColorStop(0, blip.selected ? 'rgba(255, 255, 0, 0.8)' : 'rgba(0, 255, 255, 0.8)');
-                    gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(blip.x - 12, blip.y - 12, 24, 24);
-
-                    // Blip dot
-                    ctx.beginPath();
-                    ctx.arc(blip.x, blip.y, blip.selected ? 5 : 3, 0, Math.PI * 2);
-                    ctx.fillStyle = blip.selected ? '#ffff00' : '#00ffff';
-                    ctx.fill();
-
-                    // Label
-                    if (blip.callsign || blip.selected) {
-                        ctx.fillStyle = '#00ffff';
-                        ctx.font = '9px Space Mono';
-                        ctx.textAlign = 'left';
-                        ctx.fillText(blip.callsign || blip.icao, blip.x + 8, blip.y - 5);
-                        if (blip.altitude) {
-                            ctx.fillText(`${Math.round(blip.altitude/100)}`, blip.x + 8, blip.y + 7);
-                        }
-                    }
-                });
-            }
-
-            handleClick(event) {
-                const rect = this.canvas.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-
-                // Find clicked blip
-                for (const blip of this.blips) {
-                    const dx = x - blip.x;
-                    const dy = y - blip.y;
-                    if (dx * dx + dy * dy < 100) {  // 10px radius
-                        selectAircraft(blip.icao);
-                        return;
-                    }
-                }
-            }
-        }
-
-        function startRadarAnimation() {
-            if (radarAnimationId) return;
-            function animate() {
-                if (currentView === 'radar' && radarScope) {
-                    radarScope.draw();
-                }
-                radarAnimationId = requestAnimationFrame(animate);
-            }
-            animate();
-        }
-
-        function stopRadarAnimation() {
-            if (radarAnimationId) {
-                cancelAnimationFrame(radarAnimationId);
-                radarAnimationId = null;
-            }
-        }
-
-        // ============================================
-        // RADAR OVERLAY ON MAP
-        // ============================================
-        let radarOverlayEnabled = false;
-        let radarOverlayAnimationId = null;
-        let radarOverlaySweepAngle = 0;
-
-        function toggleRadarOverlay() {
-            radarOverlayEnabled = document.getElementById('radarOverlay').checked;
-            const canvas = document.getElementById('radarOverlayCanvas');
-
-            if (radarOverlayEnabled) {
-                canvas.classList.add('active');
-                startRadarOverlayAnimation();
-            } else {
-                canvas.classList.remove('active');
-                stopRadarOverlayAnimation();
-            }
-        }
-
-        function startRadarOverlayAnimation() {
-            if (radarOverlayAnimationId) return;
-
-            const canvas = document.getElementById('radarOverlayCanvas');
-            const ctx = canvas.getContext('2d');
-
-            function animate() {
-                if (radarOverlayEnabled && currentView === 'map') {
-                    drawRadarOverlay(canvas, ctx);
-                }
-                radarOverlayAnimationId = requestAnimationFrame(animate);
-            }
-            animate();
-        }
-
-        function stopRadarOverlayAnimation() {
-            if (radarOverlayAnimationId) {
-                cancelAnimationFrame(radarOverlayAnimationId);
-                radarOverlayAnimationId = null;
-            }
-        }
-
-        function drawRadarOverlay(canvas, ctx) {
-            const container = canvas.parentElement;
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-
-            // Resize canvas if needed
-            if (canvas.width !== w || canvas.height !== h) {
-                canvas.width = w;
-                canvas.height = h;
-            }
-
-            const centerX = w / 2;
-            const centerY = h / 2;
-            const radius = Math.min(w, h) / 2 - 20;
-
-            // Clear with transparency
-            ctx.clearRect(0, 0, w, h);
-
-            // Draw range rings
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
-            ctx.lineWidth = 1;
-            const rings = [0.25, 0.5, 0.75, 1.0];
-            rings.forEach((ratio, i) => {
-                const r = radius * ratio;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Range label
-                const rangeNm = Math.round(maxRange * ratio);
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
-                ctx.font = '10px Space Mono';
-                ctx.fillText(`${rangeNm}nm`, centerX + r + 5, centerY);
-            });
-
-            // Draw compass directions
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-            ctx.font = 'bold 14px Orbitron';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            const directions = [
-                { angle: 0, label: 'N', x: centerX, y: centerY - radius - 12 },
-                { angle: 90, label: 'E', x: centerX + radius + 12, y: centerY },
-                { angle: 180, label: 'S', x: centerX, y: centerY + radius + 12 },
-                { angle: 270, label: 'W', x: centerX - radius - 12, y: centerY }
-            ];
-            directions.forEach(d => ctx.fillText(d.label, d.x, d.y));
-
-            // Draw tick marks every 30 degrees
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-            for (let angle = 0; angle < 360; angle += 30) {
-                const rad = (angle - 90) * Math.PI / 180;
-                const inner = radius - 8;
-                const outer = radius + 3;
-                ctx.beginPath();
-                ctx.moveTo(centerX + inner * Math.cos(rad), centerY + inner * Math.sin(rad));
-                ctx.lineTo(centerX + outer * Math.cos(rad), centerY + outer * Math.sin(rad));
-                ctx.stroke();
-            }
-
-            // Draw sweep line
-            const sweepRad = (radarOverlaySweepAngle - 90) * Math.PI / 180;
-            const gradient = ctx.createLinearGradient(
-                centerX, centerY,
-                centerX + radius * Math.cos(sweepRad),
-                centerY + radius * Math.sin(sweepRad)
-            );
-            gradient.addColorStop(0, 'rgba(0, 255, 255, 0.6)');
-            gradient.addColorStop(1, 'rgba(0, 255, 255, 0.1)');
-
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(
-                centerX + radius * Math.cos(sweepRad),
-                centerY + radius * Math.sin(sweepRad)
-            );
-            ctx.strokeStyle = gradient;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Draw sweep arc (afterglow)
-            const startAngle = (radarOverlaySweepAngle - 90 - 40) * Math.PI / 180;
-            const endAngle = (radarOverlaySweepAngle - 90) * Math.PI / 180;
-
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-            ctx.closePath();
-
-            const arcGradient = ctx.createConicGradient(startAngle, centerX, centerY);
-            arcGradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-            arcGradient.addColorStop(1, 'rgba(0, 255, 255, 0.1)');
-            ctx.fillStyle = arcGradient;
-            ctx.fill();
-
-            // Draw center point
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Update sweep angle
-            radarOverlaySweepAngle = (radarOverlaySweepAngle + 1.5) % 360;
-        }
-
-        // ============================================
-        // VIEW TOGGLE
-        // ============================================
-        function setView(view) {
-            currentView = view;
-            const mapEl = document.getElementById('radarMap');
-            const scopeEl = document.getElementById('radarScope');
-            const mapBtn = document.getElementById('mapViewBtn');
-            const radarBtn = document.getElementById('radarViewBtn');
-
-            if (view === 'map') {
-                mapEl.style.display = 'block';
-                scopeEl.classList.remove('active');
-                mapBtn.classList.add('active');
-                radarBtn.classList.remove('active');
-                stopRadarAnimation();
-                // Invalidate map size after showing
-                setTimeout(() => radarMap && radarMap.invalidateSize(), 100);
-            } else {
-                mapEl.style.display = 'none';
-                scopeEl.classList.add('active');
-                mapBtn.classList.remove('active');
-                radarBtn.classList.add('active');
-                if (!radarScope) {
-                    radarScope = new RadarScope('radarCanvas');
-                    document.getElementById('radarCanvas').addEventListener('click', (e) => radarScope.handleClick(e));
-                }
-                radarScope.resize();
-                startRadarAnimation();
-            }
         }
 
         function updateRange() {
@@ -1786,19 +1475,19 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 const meters = nm * 1852;
                 const circle = L.circle([observerLocation.lat, observerLocation.lon], {
                     radius: meters,
-                    color: '#00ff88',
+                    color: '#4a9eff',
                     fillColor: 'transparent',
                     fillOpacity: 0,
                     weight: 1,
-                    opacity: 0.4,
-                    dashArray: '5, 5'
+                    opacity: 0.3,
+                    dashArray: '4 4'
                 });
 
                 const labelLat = observerLocation.lat + (nm * 0.0166);
                 const label = L.marker([labelLat, observerLocation.lon], {
                     icon: L.divIcon({
                         className: 'range-label',
-                        html: `<span style="color: #00ff88; font-size: 10px; background: rgba(0,0,0,0.7); padding: 1px 4px; border-radius: 2px;">${Math.round(nm)} nm</span>`,
+                        html: `<span style="color: #4a9eff; font-size: 10px; background: rgba(0,0,0,0.7); padding: 1px 4px; border-radius: 2px;">${Math.round(nm)} nm</span>`,
                         iconSize: [40, 12],
                         iconAnchor: [20, 6]
                     })
@@ -1924,7 +1613,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             gpsEventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'position' && data.latitude && data.longitude) {
+                    if (data.type === 'position' && data.latitude !== undefined && data.latitude !== null && data.longitude !== undefined && data.longitude !== null) {
                         updateLocationFromGps(data);
                     }
                 } catch (e) {
@@ -1996,7 +1685,7 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             Object.keys(markerState).forEach(icao => delete markerState[icao]);
             pendingMarkerUpdates.clear();
             Object.keys(aircraft).forEach(icao => {
-                if (aircraft[icao].lat && aircraft[icao].lon) {
+                if (aircraft[icao].lat !== undefined && aircraft[icao].lat !== null && aircraft[icao].lon !== undefined && aircraft[icao].lon !== null) {
                     pendingMarkerUpdates.add(icao);
                 }
             });
@@ -2063,31 +1752,37 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                     airbandSelect.innerHTML = '';
 
                     if (devices.length === 0) {
-                        adsbSelect.innerHTML = '<option value="0">No SDR found</option>';
-                        airbandSelect.innerHTML = '<option value="0">No SDR found</option>';
+                        adsbSelect.innerHTML = '<option value="rtlsdr:0">No SDR found</option>';
+                        airbandSelect.innerHTML = '<option value="rtlsdr:0">No SDR found</option>';
                         airbandSelect.disabled = true;
                     } else {
                         devices.forEach((dev, i) => {
                             const idx = dev.index !== undefined ? dev.index : i;
+                            const sdrType = dev.sdr_type || 'rtlsdr';
+                            const compositeVal = `${sdrType}:${idx}`;
                             const displayName = `SDR ${idx}: ${dev.name}`;
 
                             // Add to ADS-B selector
                             const adsbOpt = document.createElement('option');
-                            adsbOpt.value = idx;
+                            adsbOpt.value = compositeVal;
+                            adsbOpt.dataset.sdrType = sdrType;
+                            adsbOpt.dataset.index = idx;
                             adsbOpt.textContent = displayName;
                             adsbSelect.appendChild(adsbOpt);
 
                             // Add to Airband selector
                             const airbandOpt = document.createElement('option');
-                            airbandOpt.value = idx;
+                            airbandOpt.value = compositeVal;
+                            airbandOpt.dataset.sdrType = sdrType;
+                            airbandOpt.dataset.index = idx;
                             airbandOpt.textContent = displayName;
                             airbandSelect.appendChild(airbandOpt);
                         });
 
                         // Default: ADS-B uses first device, Airband uses second (if available)
-                        adsbSelect.value = devices[0].index !== undefined ? devices[0].index : 0;
+                        adsbSelect.value = adsbSelect.options[0]?.value || 'rtlsdr:0';
                         if (devices.length > 1) {
-                            airbandSelect.value = devices[1].index !== undefined ? devices[1].index : 1;
+                            airbandSelect.value = airbandSelect.options[1]?.value || airbandSelect.options[0]?.value || 'rtlsdr:0';
                         }
 
                         // Show warning if only one device
@@ -2098,8 +1793,8 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                     }
                 })
                 .catch(() => {
-                    document.getElementById('adsbDeviceSelect').innerHTML = '<option value="0">Error</option>';
-                    document.getElementById('airbandDeviceSelect').innerHTML = '<option value="0">Error</option>';
+                    document.getElementById('adsbDeviceSelect').innerHTML = '<option value="rtlsdr:0">Error</option>';
+                    document.getElementById('airbandDeviceSelect').innerHTML = '<option value="rtlsdr:0">Error</option>';
                 });
         }
 
@@ -2455,7 +2150,6 @@ sudo make install</code>
                 // Check for remote dump1090 config (only for local mode)
                 const remoteConfig = !useAgent ? getRemoteDump1090Config() : null;
                 if (remoteConfig === false) return;
-
                 // Check for agent SDR conflicts
                 if (useAgent && typeof checkAgentModeConflict === 'function') {
                     if (!checkAgentModeConflict('adsb')) {
@@ -2463,18 +2157,20 @@ sudo make install</code>
                     }
                 }
 
-                // Get selected ADS-B device
-                const adsbDevice = parseInt(document.getElementById('adsbDeviceSelect').value) || 0;
+                // Get selected ADS-B device (composite value "sdr_type:index")
+                const adsbSelectVal = document.getElementById('adsbDeviceSelect').value || 'rtlsdr:0';
+                const [adsbSdrType, adsbDeviceIdx] = adsbSelectVal.includes(':') ? adsbSelectVal.split(':') : ['rtlsdr', adsbSelectVal];
+                const adsbDevice = parseInt(adsbDeviceIdx) || 0;
 
                 const requestBody = {
                     device: adsbDevice,
+                    sdr_type: adsbSdrType,
                     bias_t: getBiasTEnabled()
                 };
                 if (remoteConfig) {
                     requestBody.remote_sbs_host = remoteConfig.host;
                     requestBody.remote_sbs_port = remoteConfig.port;
                 }
-
                 try {
                     // Route through agent proxy if using remote agent
                     const url = useAgent
@@ -2527,21 +2223,44 @@ sudo make install</code>
                 }
             } else {
                 try {
-                    // Route stop through agent proxy if using remote agent
-                    const url = useAgent
-                        ? `/controller/agents/${adsbCurrentAgent}/adsb/stop`
+                    // Route stop through the source that actually started tracking.
+                    const stopSource = adsbTrackingSource || (useAgent ? adsbCurrentAgent : 'local');
+                    const stopViaAgent = stopSource !== null && stopSource !== undefined && stopSource !== 'local';
+                    const url = stopViaAgent
+                        ? `/controller/agents/${stopSource}/adsb/stop`
                         : '/adsb/stop';
-                    await fetch(url, {
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({})
+                        body: JSON.stringify({ source: 'adsb_dashboard' })
                     });
+                    const text = await response.text();
+                    let data = {};
+                    if (text) {
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            throw new Error(`Invalid response: ${text}`);
+                        }
+                    }
+                    const result = stopViaAgent && data.result ? data.result : data;
+                    const stopped = response.ok && (
+                        result.status === 'stopped' ||
+                        result.status === 'success' ||
+                        data.status === 'success'
+                    );
+                    if (!stopped) {
+                        throw new Error(result.message || data.message || `HTTP ${response.status}`);
+                    }
 
                     // Update agent running modes tracking
-                    if (useAgent && typeof agentRunningModes !== 'undefined') {
+                    if (stopViaAgent && typeof agentRunningModes !== 'undefined') {
                         agentRunningModes = agentRunningModes.filter(m => m !== 'adsb');
                     }
-                } catch (err) {}
+                } catch (err) {
+                    alert('Failed to stop ADS-B: ' + err.message);
+                    return;
+                }
 
                 stopEventStream();
                 isTracking = false;
@@ -2596,11 +2315,13 @@ sudo make install</code>
                     }
 
                     const sessionDevice = session.device_index;
+                    const sessionSdrType = session.sdr_type || 'rtlsdr';
                     if (sessionDevice !== null && sessionDevice !== undefined) {
                         adsbActiveDevice = sessionDevice;
                         const adsbSelect = document.getElementById('adsbDeviceSelect');
                         if (adsbSelect) {
-                            adsbSelect.value = sessionDevice;
+                            // Use composite value to select the correct device+type
+                            adsbSelect.value = `${sessionSdrType}:${sessionDevice}`;
                         }
                     }
 
@@ -2694,16 +2415,17 @@ sudo make install</code>
         function startEventStream() {
             if (eventSource) eventSource.close();
 
-            const useAgent = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
+            const activeSource = (isTracking && adsbTrackingSource) ? adsbTrackingSource : adsbCurrentAgent;
+            const useAgent = typeof activeSource !== 'undefined' && activeSource !== null && activeSource !== 'local';
             const streamUrl = useAgent ? '/controller/stream/all' : '/adsb/stream';
 
-            console.log(`[ADS-B] startEventStream called - adsbCurrentAgent=${adsbCurrentAgent}, useAgent=${useAgent}, streamUrl=${streamUrl}`);
+            console.log(`[ADS-B] startEventStream called - activeSource=${activeSource}, useAgent=${useAgent}, streamUrl=${streamUrl}`);
             eventSource = new EventSource(streamUrl);
 
             // Get agent name for filtering multi-agent stream
             let targetAgentName = null;
             if (useAgent && typeof agents !== 'undefined') {
-                const agent = agents.find(a => a.id == adsbCurrentAgent);
+                const agent = agents.find(a => a.id == activeSource);
                 targetAgentName = agent ? agent.name : null;
             }
 
@@ -2927,7 +2649,7 @@ sudo make install</code>
             updateStatistics(icao, aircraft[icao]);
 
             // Record trail point
-            if (data.lat && data.lon) {
+            if (data.lat !== undefined && data.lat !== null && data.lon !== undefined && data.lon !== null) {
                 recordTrailPoint(icao, data.lat, data.lon, data.altitude);
                 if (showTrails) {
                     updateTrailLine(icao);
@@ -2942,7 +2664,7 @@ sudo make install</code>
 
         function updateMarkerImmediate(icao) {
             const ac = aircraft[icao];
-            if (!ac || !ac.lat || !ac.lon) return;
+            if (!ac || ac.lat === undefined || ac.lat === null || ac.lon === undefined || ac.lon === null) return;
 
             if (!passesFilter(icao, ac)) {
                 if (markers[icao]) {
@@ -2979,7 +2701,7 @@ sudo make install</code>
             } else {
                 markers[icao] = L.marker([ac.lat, ac.lon], { icon: createMarkerIcon(rotation, color, iconType, isSelected) })
                     .addTo(radarMap)
-                    .on('click', () => selectAircraft(icao));
+                    .on('click', () => selectAircraft(icao, 'map'));
                 markers[icao].bindTooltip(`${callsign}<br>${alt}`, {
                     permanent: false, direction: 'top', className: 'aircraft-tooltip'
                 });
@@ -3083,7 +2805,7 @@ sudo make install</code>
                     const div = document.createElement('div');
                     div.className = `aircraft-item ${selectedIcao === ac.icao ? 'selected' : ''} ${isOnWatchlist(ac) ? 'watched' : ''}`;
                     div.setAttribute('data-icao', ac.icao);
-                    div.onclick = () => selectAircraft(ac.icao);
+                    div.onclick = () => selectAircraft(ac.icao, 'panel');
                     div.innerHTML = buildAircraftItemHTML(ac);
                     fragment.appendChild(div);
                 });
@@ -3153,9 +2875,139 @@ sudo make install</code>
             `;
         }
 
-        function selectAircraft(icao) {
+        function triggerMapCrosshairAnimation(lat, lon, durationMs = MAP_CROSSHAIR_DURATION_MS, lockToMapCenter = false) {
+            if (!radarMap) return;
+            const overlay = document.getElementById('mapCrosshairOverlay');
+            if (!overlay) return;
+
+            const size = radarMap.getSize();
+            let targetX;
+            let targetY;
+
+            if (lockToMapCenter) {
+                targetX = size.x / 2;
+                targetY = size.y / 2;
+            } else {
+                const point = radarMap.latLngToContainerPoint([lat, lon]);
+                targetX = Math.max(0, Math.min(size.x, point.x));
+                targetY = Math.max(0, Math.min(size.y, point.y));
+            }
+
+            const startX = size.x + 8;
+            const startY = size.y + 8;
+
+            overlay.style.setProperty('--crosshair-x-start', `${startX}px`);
+            overlay.style.setProperty('--crosshair-y-start', `${startY}px`);
+            overlay.style.setProperty('--crosshair-x-end', `${targetX}px`);
+            overlay.style.setProperty('--crosshair-y-end', `${targetY}px`);
+            overlay.style.setProperty('--crosshair-duration', `${durationMs}ms`);
+            overlay.classList.remove('active');
+            void overlay.offsetWidth;
+            overlay.classList.add('active');
+
+            if (mapCrosshairResetTimer) {
+                clearTimeout(mapCrosshairResetTimer);
+            }
+            mapCrosshairResetTimer = setTimeout(() => {
+                overlay.classList.remove('active');
+                mapCrosshairResetTimer = null;
+            }, durationMs + 100);
+        }
+
+        function getPanelSelectionFinalZoom() {
+            if (!radarMap) return PANEL_SELECTION_BASE_ZOOM;
+            const currentZoom = radarMap.getZoom();
+            const maxZoom = typeof radarMap.getMaxZoom === 'function' ? radarMap.getMaxZoom() : PANEL_SELECTION_MAX_ZOOM;
+            return Math.min(
+                PANEL_SELECTION_MAX_ZOOM,
+                maxZoom,
+                Math.max(PANEL_SELECTION_BASE_ZOOM, currentZoom + PANEL_SELECTION_ZOOM_INCREMENT)
+            );
+        }
+
+        function getPanelSelectionIntermediateZoom(finalZoom) {
+            if (!radarMap) return finalZoom;
+            const currentZoom = radarMap.getZoom();
+            if (finalZoom - currentZoom < 0.8) {
+                return finalZoom;
+            }
+            const midpointZoom = currentZoom + ((finalZoom - currentZoom) * 0.55);
+            return Math.min(finalZoom - 0.45, midpointZoom);
+        }
+
+        function runPanelSelectionAnimation(lat, lon, requestId) {
+            if (!radarMap) return;
+
+            const finalZoom = getPanelSelectionFinalZoom();
+            const intermediateZoom = getPanelSelectionIntermediateZoom(finalZoom);
+            const sequenceDurationMs = Math.round(
+                ((PANEL_SELECTION_STAGE1_DURATION_SEC + PANEL_SELECTION_STAGE2_DURATION_SEC) * 1000) +
+                PANEL_SELECTION_STAGE_GAP_MS + 260
+            );
+            const startSecondStage = () => {
+                if (requestId !== mapCrosshairRequestId) return;
+                radarMap.flyTo([lat, lon], finalZoom, {
+                    animate: true,
+                    duration: PANEL_SELECTION_STAGE2_DURATION_SEC,
+                    easeLinearity: 0.2
+                });
+            };
+
+            triggerMapCrosshairAnimation(
+                lat,
+                lon,
+                Math.max(MAP_CROSSHAIR_DURATION_MS, sequenceDurationMs),
+                true
+            );
+
+            if (intermediateZoom >= finalZoom - 0.1) {
+                radarMap.flyTo([lat, lon], finalZoom, {
+                    animate: true,
+                    duration: PANEL_SELECTION_STAGE2_DURATION_SEC,
+                    easeLinearity: 0.2
+                });
+                return;
+            }
+
+            let stage1Handled = false;
+            const finishStage1 = () => {
+                if (stage1Handled || requestId !== mapCrosshairRequestId) return;
+                stage1Handled = true;
+                if (panelSelectionFallbackTimer) {
+                    clearTimeout(panelSelectionFallbackTimer);
+                    panelSelectionFallbackTimer = null;
+                }
+                panelSelectionStageTimer = setTimeout(() => {
+                    panelSelectionStageTimer = null;
+                    startSecondStage();
+                }, PANEL_SELECTION_STAGE_GAP_MS);
+            };
+
+            radarMap.once('moveend', finishStage1);
+            panelSelectionFallbackTimer = setTimeout(
+                finishStage1,
+                Math.round(PANEL_SELECTION_STAGE1_DURATION_SEC * 1000) + 160
+            );
+
+            radarMap.flyTo([lat, lon], intermediateZoom, {
+                animate: true,
+                duration: PANEL_SELECTION_STAGE1_DURATION_SEC,
+                easeLinearity: 0.2
+            });
+        }
+
+        function selectAircraft(icao, source = 'map') {
             const prevSelected = selectedIcao;
             selectedIcao = icao;
+            mapCrosshairRequestId += 1;
+            if (panelSelectionFallbackTimer) {
+                clearTimeout(panelSelectionFallbackTimer);
+                panelSelectionFallbackTimer = null;
+            }
+            if (panelSelectionStageTimer) {
+                clearTimeout(panelSelectionStageTimer);
+                panelSelectionStageTimer = null;
+            }
 
             // Update marker icons for both previous and new selection
             [prevSelected, icao].forEach(targetIcao => {
@@ -3179,8 +3031,16 @@ sudo make install</code>
             updateFlightLookupBtn();
 
             const ac = aircraft[icao];
-            if (ac && ac.lat && ac.lon && currentView === 'map') {
-                radarMap.setView([ac.lat, ac.lon], 10);
+            if (ac && ac.lat !== undefined && ac.lat !== null && ac.lon !== undefined && ac.lon !== null) {
+                const targetLat = ac.lat;
+                const targetLon = ac.lon;
+
+                if (source === 'panel' && radarMap) {
+                    runPanelSelectionAnimation(targetLat, targetLon, mapCrosshairRequestId);
+                    return;
+                }
+
+                radarMap.setView([targetLat, targetLon], 10);
             }
         }
 
@@ -3450,7 +3310,7 @@ sudo make install</code>
 
         function initAirband() {
             // Check if audio tools are available
-            fetch('/listening/tools')
+            fetch('/receiver/tools')
                 .then(r => r.json())
                 .then(data => {
                     const missingTools = [];
@@ -3600,7 +3460,7 @@ sudo make install</code>
 
             try {
                 // Start audio on backend
-                const response = await fetch('/listening/audio/start', {
+                const response = await fetch('/receiver/audio/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3637,7 +3497,7 @@ sudo make install</code>
                 audioPlayer.load();
 
                 // Connect to stream
-                const streamUrl = `/listening/audio/stream?t=${Date.now()}`;
+                const streamUrl = `/receiver/audio/stream?t=${Date.now()}`;
                 console.log('[AIRBAND] Connecting to stream:', streamUrl);
                 audioPlayer.src = streamUrl;
 
@@ -3681,7 +3541,7 @@ sudo make install</code>
             audioPlayer.pause();
             audioPlayer.src = '';
 
-            fetch('/listening/audio/stop', { method: 'POST' })
+            fetch('/receiver/audio/stop', { method: 'POST' })
                 .then(r => r.json())
                 .then(() => {
                     isAirbandPlaying = false;
@@ -3721,9 +3581,9 @@ sudo make install</code>
         let acarsCurrentAgent = null;
         let acarsPollTimer = null;
         let acarsMessageCount = 0;
-        let acarsSidebarCollapsed = localStorage.getItem('acarsSidebarCollapsed') === 'true';
+        let acarsSidebarCollapsed = localStorage.getItem('acarsSidebarCollapsed') !== 'false';
         let acarsFrequencies = {
-            'na': ['129.125', '130.025', '130.450', '131.550'],
+            'na': ['131.725', '131.825'],
             'eu': ['131.525', '131.725', '131.550'],
             'ap': ['131.550', '131.450']
         };
@@ -3733,6 +3593,14 @@ sudo make install</code>
             acarsSidebarCollapsed = !acarsSidebarCollapsed;
             sidebar.classList.toggle('collapsed', acarsSidebarCollapsed);
             localStorage.setItem('acarsSidebarCollapsed', acarsSidebarCollapsed);
+            // Collapse VDL2 when expanding ACARS
+            if (!acarsSidebarCollapsed && !vdl2SidebarCollapsed) {
+                const vdl2 = document.getElementById('vdl2Sidebar');
+                vdl2SidebarCollapsed = true;
+                vdl2.classList.add('collapsed');
+                localStorage.setItem('vdl2SidebarCollapsed', vdl2SidebarCollapsed);
+            }
+            setTimeout(() => { if (typeof radarMap !== 'undefined' && radarMap) radarMap.invalidateSize(); }, 350);
         }
 
         // Initialize ACARS sidebar state and frequency checkboxes
@@ -3742,6 +3610,22 @@ sudo make install</code>
                 sidebar.classList.add('collapsed');
             }
             updateAcarsFreqCheckboxes();
+
+            // Check if ACARS is already running (e.g. after page reload)
+            fetch('/acars/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.running) {
+                        isAcarsRunning = true;
+                        acarsMessageCount = data.message_count || 0;
+                        document.getElementById('acarsCount').textContent = acarsMessageCount;
+                        document.getElementById('acarsToggleBtn').textContent = '■ STOP ACARS';
+                        document.getElementById('acarsToggleBtn').classList.add('active');
+                        document.getElementById('acarsPanelIndicator').classList.add('active');
+                        startAcarsStream(false);
+                    }
+                })
+                .catch(() => {});
         });
 
         function updateAcarsFreqCheckboxes() {
@@ -3789,7 +3673,10 @@ sudo make install</code>
         }
 
         function startAcars() {
-            const device = document.getElementById('acarsDeviceSelect').value;
+            const acarsSelect = document.getElementById('acarsDeviceSelect');
+            const compositeVal = acarsSelect.value || 'rtlsdr:0';
+            const [sdr_type, deviceIdx] = compositeVal.includes(':') ? compositeVal.split(':') : ['rtlsdr', compositeVal];
+            const device = deviceIdx;
             const frequencies = getAcarsRegionFreqs();
 
             // Check if using agent mode
@@ -3815,7 +3702,7 @@ sudo make install</code>
             fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device, frequencies, gain: '40' })
+                body: JSON.stringify({ device, frequencies, gain: '40', sdr_type })
             })
             .then(r => r.json())
             .then(data => {
@@ -3923,6 +3810,11 @@ sudo make install</code>
 
             acarsEventSource.onerror = function() {
                 console.error('ACARS stream error');
+                setTimeout(() => {
+                    if (isAcarsRunning) {
+                        startAcarsStream(acarsCurrentAgent !== null);
+                    }
+                }, 2000);
             };
 
             // Start polling fallback for agent mode
@@ -4016,20 +3908,566 @@ sudo make install</code>
                     const select = document.getElementById('acarsDeviceSelect');
                     select.innerHTML = '';
                     if (devices.length === 0) {
-                        select.innerHTML = '<option value="0">No SDR detected</option>';
+                        select.innerHTML = '<option value="rtlsdr:0">No SDR detected</option>';
                     } else {
                         devices.forEach((d, i) => {
                             const opt = document.createElement('option');
-                            opt.value = d.index || i;
-                            opt.textContent = `SDR ${d.index || i}: ${d.name || d.type || 'SDR'}`;
+                            const sdrType = d.sdr_type || 'rtlsdr';
+                            const idx = d.index !== undefined ? d.index : i;
+                            opt.value = `${sdrType}:${idx}`;
+                            opt.dataset.sdrType = sdrType;
+                            opt.dataset.index = idx;
+                            opt.textContent = `SDR ${idx}: ${d.name || d.type || 'SDR'}`;
                             select.appendChild(opt);
                         });
                         // Default to device 1 if available (device 0 likely used for ADS-B)
                         if (devices.length > 1) {
-                            select.value = '1';
+                            select.value = select.options[1]?.value || select.options[0]?.value;
                         }
                     }
                 });
+        });
+
+        // ============================================
+        // VDL2 DATALINK PANEL
+        // ============================================
+        let vdl2EventSource = null;
+        let isVdl2Running = false;
+        let vdl2CurrentAgent = null;
+        let vdl2PollTimer = null;
+        let vdl2MessageCount = 0;
+        let vdl2CollectedData = [];
+        let vdl2SidebarCollapsed = localStorage.getItem('vdl2SidebarCollapsed') !== 'false';
+        let vdl2Frequencies = {
+            'na': ['136975000', '136100000', '136650000', '136700000', '136800000'],
+            'eu': ['136975000', '136675000', '136725000', '136775000', '136825000'],
+            'ap': ['136975000', '136900000']
+        };
+        let vdl2FreqLabels = {
+            '136975000': '136.975', '136100000': '136.100', '136650000': '136.650',
+            '136700000': '136.700', '136800000': '136.800', '136675000': '136.675',
+            '136725000': '136.725', '136775000': '136.775', '136825000': '136.825',
+            '136900000': '136.900'
+        };
+
+        function toggleVdl2Sidebar() {
+            const sidebar = document.getElementById('vdl2Sidebar');
+            vdl2SidebarCollapsed = !vdl2SidebarCollapsed;
+            sidebar.classList.toggle('collapsed', vdl2SidebarCollapsed);
+            localStorage.setItem('vdl2SidebarCollapsed', vdl2SidebarCollapsed);
+            // Collapse ACARS when expanding VDL2
+            if (!vdl2SidebarCollapsed && !acarsSidebarCollapsed) {
+                const acars = document.getElementById('acarsSidebar');
+                acarsSidebarCollapsed = true;
+                acars.classList.add('collapsed');
+                localStorage.setItem('acarsSidebarCollapsed', acarsSidebarCollapsed);
+            }
+            setTimeout(() => { if (typeof radarMap !== 'undefined' && radarMap) radarMap.invalidateSize(); }, 350);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('vdl2Sidebar');
+            if (sidebar && vdl2SidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+            }
+            updateVdl2FreqCheckboxes();
+        });
+
+        function updateVdl2FreqCheckboxes() {
+            const region = document.getElementById('vdl2RegionDashSelect').value;
+            const freqs = vdl2Frequencies[region] || vdl2Frequencies['na'];
+            const container = document.getElementById('vdl2FreqSelector');
+
+            const previouslyChecked = new Set();
+            container.querySelectorAll('input:checked').forEach(cb => previouslyChecked.add(cb.value));
+
+            container.innerHTML = freqs.map(freq => {
+                const checked = previouslyChecked.size === 0 || previouslyChecked.has(freq) ? 'checked' : '';
+                const label = vdl2FreqLabels[freq] || freq;
+                return `
+                    <label style="display: flex; align-items: center; gap: 3px; padding: 2px 6px; background: var(--bg-secondary); border-radius: 3px; cursor: pointer;">
+                        <input type="checkbox" class="vdl2-freq-cb" value="${freq}" ${checked} style="margin: 0; cursor: pointer;">
+                        <span>${label}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function getVdl2RegionFreqs() {
+            const checkboxes = document.querySelectorAll('.vdl2-freq-cb:checked');
+            const selectedFreqs = Array.from(checkboxes).map(cb => cb.value);
+            if (selectedFreqs.length === 0) {
+                const region = document.getElementById('vdl2RegionDashSelect').value;
+                return vdl2Frequencies[region] || vdl2Frequencies['na'];
+            }
+            return selectedFreqs;
+        }
+
+        function toggleVdl2() {
+            if (isVdl2Running) {
+                stopVdl2();
+            } else {
+                startVdl2();
+            }
+        }
+
+        function startVdl2() {
+            const vdl2Select = document.getElementById('vdl2DeviceSelect');
+            const compositeVal = vdl2Select.value || 'rtlsdr:0';
+            const [sdr_type, deviceIdx] = compositeVal.includes(':') ? compositeVal.split(':') : ['rtlsdr', compositeVal];
+            const device = deviceIdx;
+            const frequencies = getVdl2RegionFreqs();
+
+            // Check if using agent mode
+            const isAgentMode = typeof adsbCurrentAgent !== 'undefined' && adsbCurrentAgent !== 'local';
+            vdl2CurrentAgent = isAgentMode ? adsbCurrentAgent : null;
+
+            // Warn if using same device as ADS-B (only for local mode)
+            if (!isAgentMode && isTracking && device === '0') {
+                const useAnyway = confirm(
+                    'Warning: ADS-B tracking may be using SDR device 0.\n\n' +
+                    'VDL2 uses VHF frequencies (~137 MHz) while ADS-B uses 1090 MHz.\n' +
+                    'You need TWO separate SDR devices to receive both simultaneously.\n\n' +
+                    'Click OK to start VDL2 on device ' + device + ' anyway.'
+                );
+                if (!useAnyway) return;
+            }
+
+            // Determine endpoint based on agent mode
+            const endpoint = isAgentMode
+                ? `/controller/agents/${adsbCurrentAgent}/vdl2/start`
+                : '/vdl2/start';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device, frequencies, gain: '40', sdr_type })
+            })
+            .then(r => r.json())
+            .then(data => {
+                // Handle controller proxy response format
+                const vdl2Result = isAgentMode && data.result ? data.result : data;
+
+                if (vdl2Result.status === 'started' || vdl2Result.status === 'success') {
+                    isVdl2Running = true;
+                    vdl2MessageCount = 0;
+                    vdl2CollectedData = [];
+                    document.getElementById('vdl2ToggleBtn').innerHTML = '&#9632; STOP VDL2';
+                    document.getElementById('vdl2ToggleBtn').classList.add('active');
+                    document.getElementById('vdl2PanelIndicator').classList.add('active');
+                    startVdl2Stream(isAgentMode);
+                } else {
+                    alert('VDL2 Error: ' + (vdl2Result.message || vdl2Result.error || 'Failed to start'));
+                }
+            })
+            .catch(err => alert('VDL2 Error: ' + err));
+        }
+
+        async function stopVdl2() {
+            const sourceAgentId = vdl2CurrentAgent;
+            const isAgentMode = sourceAgentId !== null && sourceAgentId !== undefined;
+            const endpoint = isAgentMode
+                ? `/controller/agents/${sourceAgentId}/vdl2/stop`
+                : '/vdl2/stop';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'adsb_dashboard' })
+                });
+                const text = await response.text();
+                let data = {};
+                if (text) {
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        throw new Error(`Invalid response: ${text}`);
+                    }
+                }
+
+                const result = isAgentMode && data.result ? data.result : data;
+                const stopped = response.ok && (
+                    result.status === 'stopped' ||
+                    result.status === 'success' ||
+                    data.status === 'success'
+                );
+                if (!stopped) {
+                    throw new Error(result.message || data.message || `HTTP ${response.status}`);
+                }
+
+                isVdl2Running = false;
+                vdl2CurrentAgent = null;
+                document.getElementById('vdl2ToggleBtn').innerHTML = '&#9654; START VDL2';
+                document.getElementById('vdl2ToggleBtn').classList.remove('active');
+                document.getElementById('vdl2PanelIndicator').classList.remove('active');
+                if (vdl2EventSource) {
+                    vdl2EventSource.close();
+                    vdl2EventSource = null;
+                }
+                // Clear polling timer
+                if (vdl2PollTimer) {
+                    clearInterval(vdl2PollTimer);
+                    vdl2PollTimer = null;
+                }
+            } catch (err) {
+                alert('Failed to stop VDL2: ' + err.message);
+            }
+        }
+
+        // Sync VDL2 UI state (called by syncModeUI in agents.js)
+        function setVdl2Running(running, agentId = null) {
+            isVdl2Running = running;
+            const btn = document.getElementById('vdl2ToggleBtn');
+            const indicator = document.getElementById('vdl2PanelIndicator');
+
+            if (running) {
+                vdl2CurrentAgent = agentId;
+                btn.innerHTML = '&#9632; STOP VDL2';
+                btn.classList.add('active');
+                if (indicator) indicator.classList.add('active');
+                if (!vdl2EventSource && !vdl2PollTimer) {
+                    startVdl2Stream(agentId !== null);
+                }
+            } else {
+                vdl2CurrentAgent = null;
+                btn.innerHTML = '&#9654; START VDL2';
+                btn.classList.remove('active');
+                if (indicator) indicator.classList.remove('active');
+            }
+        }
+        // Expose to global scope for syncModeUI
+        window.setVdl2Running = setVdl2Running;
+
+        function startVdl2Stream(isAgentMode = false) {
+            if (vdl2EventSource) vdl2EventSource.close();
+
+            // For remote agent mode, stream directly from the selected agent via controller proxy.
+            // This does not depend on push ingestion being enabled.
+            const streamUrl = isAgentMode && vdl2CurrentAgent !== null
+                ? `/controller/agents/${vdl2CurrentAgent}/vdl2/stream`
+                : '/vdl2/stream';
+            vdl2EventSource = new EventSource(streamUrl);
+
+            vdl2EventSource.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                let message = null;
+
+                // Backward compatibility: handle wrapped multi-agent payloads if encountered.
+                if (data.scan_type === 'vdl2' && data.payload && data.payload.type === 'vdl2') {
+                    message = data.payload;
+                    if (isAgentMode) {
+                        message.agent_name = data.agent_name || message.agent_name || 'Remote Agent';
+                    }
+                } else if (data.type === 'vdl2') {
+                    message = data;
+                    if (isAgentMode && !message.agent_name) {
+                        message.agent_name = 'Remote Agent';
+                    }
+                }
+
+                if (message) {
+                    vdl2MessageCount++;
+                    if (typeof stats !== 'undefined') stats.vdl2Messages = (stats.vdl2Messages || 0) + 1;
+                    document.getElementById('vdl2Count').textContent = vdl2MessageCount;
+                    document.getElementById('stripVdl2').textContent = vdl2MessageCount;
+                    addVdl2Message(message);
+                }
+            };
+
+            vdl2EventSource.onerror = function() {
+                console.error('VDL2 stream error');
+                setTimeout(() => {
+                    if (isVdl2Running) {
+                        startVdl2Stream(vdl2CurrentAgent !== null);
+                    }
+                }, 2000);
+            };
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Unwrap dumpvdl2 JSON: data may have fields at top level or nested under data.vdl2
+        function unwrapVdl2(data) {
+            if (data.vdl2 && typeof data.vdl2 === 'object') return data.vdl2;
+            return data;
+        }
+
+        function showVdl2Modal(data, timeStr) {
+            // Remove any existing modal
+            const existing = document.querySelector('.vdl2-modal-overlay');
+            if (existing) existing.remove();
+
+            const inner = unwrapVdl2(data);
+            const avlc = inner.avlc || {};
+            const src = avlc.src || {};
+            const dst = avlc.dst || {};
+            const acars = avlc.acars || {};
+            const xid = avlc.xid || {};
+            const flight = acars.flight || '';
+            const freq = inner.freq ? (inner.freq / 1000000).toFixed(3) + ' MHz' : '';
+            const title = flight || src.addr || 'VDL2 Message';
+
+            // Build section helper
+            function buildSection(titleText, fields) {
+                if (!fields.length) return '';
+                return `<div class="vdl2-modal-section">
+                    <div class="vdl2-modal-section-title">${titleText}</div>
+                    <div class="vdl2-modal-grid">${fields.map(([l, v]) =>
+                        `<div class="vdl2-modal-field"><span class="vdl2-modal-field-label">${escapeHtml(l)}</span><span class="vdl2-modal-field-value">${escapeHtml(String(v))}</span></div>`
+                    ).join('')}</div>
+                </div>`;
+            }
+
+            // Radio / signal fields
+            const radioFields = [];
+            if (freq) radioFields.push(['Frequency', freq]);
+            if (inner.sig_level != null) radioFields.push(['Signal', inner.sig_level.toFixed(1) + ' dB']);
+            if (inner.noise_level != null) radioFields.push(['Noise', inner.noise_level.toFixed(1) + ' dB']);
+            if (inner.sig_level != null && inner.noise_level != null) radioFields.push(['SNR', (inner.sig_level - inner.noise_level).toFixed(1) + ' dB']);
+            if (inner.freq_skew != null) radioFields.push(['Freq Skew', inner.freq_skew.toFixed(2) + ' Hz']);
+            if (inner.burst_len_octets != null) radioFields.push(['Burst Length', inner.burst_len_octets + ' octets']);
+            if (inner.octets_corrected_by_fec != null) radioFields.push(['FEC Corrections', String(inner.octets_corrected_by_fec)]);
+            if (inner.hdr_bits_fixed != null) radioFields.push(['Header Bits Fixed', String(inner.hdr_bits_fixed)]);
+            if (inner.idx != null) radioFields.push(['SDR Index', String(inner.idx)]);
+            if (inner.station) radioFields.push(['Station', String(inner.station)]);
+            if (data.agent_name) radioFields.push(['Agent', data.agent_name]);
+            const radioHtml = buildSection('Radio', radioFields);
+
+            // Timestamp from dumpvdl2
+            let tsStr = '';
+            if (inner.t) {
+                const d = new Date(inner.t.sec * 1000);
+                tsStr = d.toISOString().replace('T', ' ').replace('Z', '') + ' UTC';
+            }
+
+            // AVLC frame fields
+            const frameFields = [];
+            if (src.addr) frameFields.push(['Source', String(src.addr) + (src.type ? ' (' + src.type + ')' : '')]);
+            if (dst.addr) frameFields.push(['Destination', String(dst.addr) + (dst.type ? ' (' + dst.type + ')' : '')]);
+            if (avlc.cr) frameFields.push(['Cmd/Response', avlc.cr]);
+            if (avlc.frame_type) frameFields.push(['Frame Type', avlc.frame_type]);
+            if (avlc.rseq != null) frameFields.push(['R-Seq', String(avlc.rseq)]);
+            if (avlc.sseq != null) frameFields.push(['S-Seq', String(avlc.sseq)]);
+            if (avlc.poll != null) frameFields.push(['Poll/Final', avlc.poll ? 'Yes' : 'No']);
+            const frameHtml = buildSection('AVLC Frame', frameFields);
+
+            // ACARS fields
+            const acarsFields = [];
+            if (acars.reg) acarsFields.push(['Registration', acars.reg]);
+            if (acars.flight) acarsFields.push(['Flight', acars.flight]);
+            if (acars.mode) acarsFields.push(['Mode', acars.mode]);
+            if (acars.label) acarsFields.push(['Label', acars.label]);
+            if (acars.sublabel) acarsFields.push(['Sublabel', acars.sublabel]);
+            if (acars.blk_id) acarsFields.push(['Block ID', acars.blk_id]);
+            if (acars.ack) acarsFields.push(['ACK', acars.ack === '!' ? 'NAK' : acars.ack]);
+            if (acars.msg_num) acarsFields.push(['Msg Number', acars.msg_num]);
+            if (acars.msg_num_seq) acarsFields.push(['Msg Seq', acars.msg_num_seq]);
+            if (acars.more != null) acarsFields.push(['More Follows', acars.more ? 'Yes' : 'No']);
+            const acarsHtml = buildSection('ACARS', acarsFields);
+
+            // XID fields
+            const xidFields = [];
+            if (xid.type_descr) xidFields.push(['Type', xid.type_descr]);
+            if (xid.vdl_params) {
+                const params = xid.vdl_params;
+                if (params.ac_location) {
+                    const loc = params.ac_location;
+                    if (loc.lat != null) xidFields.push(['Latitude', loc.lat.toFixed(4)]);
+                    if (loc.lon != null) xidFields.push(['Longitude', loc.lon.toFixed(4)]);
+                    if (loc.alt != null) xidFields.push(['Altitude', loc.alt + ' ft']);
+                }
+                if (params.dst_airport) xidFields.push(['Destination', params.dst_airport]);
+                if (params.modulation_support) xidFields.push(['Modulation', params.modulation_support]);
+            }
+            const xidHtml = buildSection('XID', xidFields);
+
+            // Message body
+            const msgText = acars.msg_text || '';
+            let bodyHtml = '';
+            if (msgText) {
+                bodyHtml = `<div class="vdl2-modal-section">
+                    <div class="vdl2-modal-section-title">Message</div>
+                    <div class="vdl2-modal-msg-body">${escapeHtml(msgText)}</div>
+                </div>`;
+            }
+
+            // Raw JSON
+            const rawJson = JSON.stringify(data, null, 2);
+            const rawId = 'vdl2modal_raw_' + Date.now();
+            const rawHtml = `<div class="vdl2-modal-section">
+                <span class="vdl2-modal-raw-toggle" id="${rawId}_toggle">&#9656; Show raw JSON</span>
+                <div class="vdl2-modal-raw-json" id="${rawId}">${escapeHtml(rawJson)}</div>
+            </div>`;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'vdl2-modal-overlay';
+            overlay.innerHTML = `
+                <div class="vdl2-modal">
+                    <div class="vdl2-modal-header">
+                        <div>
+                            <div class="vdl2-modal-title">${escapeHtml(title)}</div>
+                            <div class="vdl2-modal-time">${escapeHtml(tsStr || timeStr)}${freq ? ' · ' + escapeHtml(freq) : ''}</div>
+                        </div>
+                        <button class="vdl2-modal-close" title="Close">&times;</button>
+                    </div>
+                    <div class="vdl2-modal-body">
+                        ${radioHtml}
+                        ${frameHtml}
+                        ${acarsHtml}
+                        ${xidHtml}
+                        ${bodyHtml}
+                        ${rawHtml}
+                    </div>
+                </div>
+            `;
+
+            // Close handlers
+            overlay.querySelector('.vdl2-modal-close').addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+            // Raw JSON toggle
+            const rawToggle = overlay.querySelector(`#${rawId}_toggle`);
+            const rawEl = overlay.querySelector(`#${rawId}`);
+            rawToggle.addEventListener('click', () => {
+                const show = rawEl.style.display !== 'block';
+                rawEl.style.display = show ? 'block' : 'none';
+                rawToggle.innerHTML = show ? '&#9662; Hide raw JSON' : '&#9656; Show raw JSON';
+            });
+
+            // Escape key
+            const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+            document.addEventListener('keydown', onKey);
+
+            document.body.appendChild(overlay);
+        }
+
+        function addVdl2Message(data) {
+            const container = document.getElementById('vdl2Messages');
+
+            const placeholder = container.querySelector('.no-aircraft');
+            if (placeholder) placeholder.remove();
+
+            const msg = document.createElement('div');
+            msg.className = 'vdl2-message-item';
+
+            const inner = unwrapVdl2(data);
+            const avlc = inner.avlc || {};
+            const src = avlc.src?.addr || '';
+            const acars = avlc.acars || {};
+            const flight = acars.flight || '';
+            const msgText = acars.msg_text || '';
+            const time = new Date().toLocaleTimeString();
+            const freq = inner.freq ? (inner.freq / 1000000).toFixed(3) : '';
+
+            // Store for CSV export
+            vdl2CollectedData.push({
+                timestamp: new Date().toISOString(),
+                frequency: freq ? freq + ' MHz' : '',
+                source: avlc.src?.addr || '',
+                source_type: avlc.src?.type || '',
+                destination: avlc.dst?.addr || '',
+                destination_type: avlc.dst?.type || '',
+                frame_type: avlc.frame_type || '',
+                flight: flight,
+                registration: acars.reg || '',
+                label: acars.label || '',
+                sublabel: acars.sublabel || '',
+                block_id: acars.blk_id || '',
+                msg_number: acars.msg_num || '',
+                message: msgText.replace(/\n/g, ' '),
+                signal_level: inner.sig_level != null ? inner.sig_level.toFixed(1) : '',
+                noise_level: inner.noise_level != null ? inner.noise_level.toFixed(1) : '',
+                agent: data.agent_name || ''
+            });
+            const label = flight || src || (avlc.frame_type || 'VDL2');
+
+            msg.innerHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span style="color: var(--accent-cyan); font-weight: bold;">${escapeHtml(label)}</span>
+                    <span style="color: var(--text-muted);">${time}</span>
+                </div>
+                <div style="color: var(--text-dim); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    ${freq ? freq + ' MHz' : ''}${freq && acars.label ? ' · ' : ''}${acars.label ? 'Label: ' + escapeHtml(acars.label) : ''}${msgText ? ' · ' + escapeHtml(msgText.substring(0, 50)) + (msgText.length > 50 ? '…' : '') : ''}
+                </div>
+            `;
+
+            msg.addEventListener('click', () => showVdl2Modal(data, time));
+
+            container.insertBefore(msg, container.firstChild);
+
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function exportVdl2Csv() {
+            if (vdl2CollectedData.length === 0) {
+                alert('No VDL2 messages to export.');
+                return;
+            }
+            const headers = Object.keys(vdl2CollectedData[0]);
+            const csvRows = [headers.join(',')];
+            for (const row of vdl2CollectedData) {
+                csvRows.push(headers.map(h => {
+                    const val = String(row[h] || '');
+                    return '"' + val.replace(/"/g, '""') + '"';
+                }).join(','));
+            }
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vdl2_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Populate VDL2 device selector and check running status
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/devices')
+                .then(r => r.json())
+                .then(devices => {
+                    const select = document.getElementById('vdl2DeviceSelect');
+                    select.innerHTML = '';
+                    if (devices.length === 0) {
+                        select.innerHTML = '<option value="rtlsdr:0">No SDR detected</option>';
+                    } else {
+                        devices.forEach((d, i) => {
+                            const opt = document.createElement('option');
+                            const sdrType = d.sdr_type || 'rtlsdr';
+                            const idx = d.index !== undefined ? d.index : i;
+                            opt.value = `${sdrType}:${idx}`;
+                            opt.dataset.sdrType = sdrType;
+                            opt.dataset.index = idx;
+                            opt.textContent = `SDR ${idx}: ${d.name || d.type || 'SDR'}`;
+                            select.appendChild(opt);
+                        });
+                        if (devices.length > 1) {
+                            select.value = select.options[1]?.value || select.options[0]?.value;
+                        }
+                    }
+                });
+
+            // Check if VDL2 is already running (e.g. after page reload)
+            fetch('/vdl2/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.running) {
+                        isVdl2Running = true;
+                        vdl2MessageCount = data.message_count || 0;
+                        document.getElementById('vdl2Count').textContent = vdl2MessageCount;
+                        document.getElementById('vdl2ToggleBtn').innerHTML = '&#9632; STOP VDL2';
+                        document.getElementById('vdl2ToggleBtn').classList.add('active');
+                        document.getElementById('vdl2PanelIndicator').classList.add('active');
+                        startVdl2Stream(false);
+                    }
+                })
+                .catch(() => {});
         });
 
         // ============================================
@@ -4091,6 +4529,18 @@ sudo make install</code>
         document.getElementById('squawkModal')?.addEventListener('click', (e) => {
             if (e.target.id === 'squawkModal') closeSquawkModal();
         });
+
+        // ============================================
+        // ANTENNA GUIDE
+        // ============================================
+        function toggleAntennaGuide() {
+            const modal = document.getElementById('antennaGuideModal');
+            modal.classList.toggle('active');
+        }
+
+        document.getElementById('antennaGuideModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'antennaGuideModal') toggleAntennaGuide();
+        });
     </script>
 
     <!-- Squawk Code Reference Modal -->
@@ -4140,6 +4590,72 @@ sudo make install</code>
             <div class="watchlist-footer">
                 <span class="watchlist-count"><span id="watchlistCount">0</span> entries</span>
                 <span class="watchlist-hint">Alerts trigger when watched aircraft appear</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Antenna Guide Modal -->
+    <div id="antennaGuideModal" class="antenna-guide-modal">
+        <div class="antenna-guide-modal-content">
+            <div class="antenna-guide-modal-header">
+                <span>ANTENNA GUIDE &mdash; 1090 MHz ADS-B</span>
+                <button class="antenna-guide-modal-close" onclick="toggleAntennaGuide()">&times;</button>
+            </div>
+            <div class="antenna-guide-modal-body">
+                <p style="margin-bottom: 10px; color: var(--accent-cyan, #00d4ff); font-weight: 600; font-size: 12px;">
+                    1090 MHz &mdash; stock SDR antenna can work but is not ideal
+                </p>
+
+                <div class="antenna-section">
+                    <strong style="color: var(--accent-cyan, #00d4ff);">Stock Telescopic Antenna</strong>
+                    <ul>
+                        <li><strong>1090 MHz:</strong> Collapse to ~6.9 cm (quarter-wave). It works for nearby aircraft</li>
+                        <li><strong>Range:</strong> Expect ~50 NM (90 km) indoors, ~100 NM outdoors</li>
+                    </ul>
+                </div>
+
+                <div class="antenna-section recommended">
+                    <strong style="color: #00ff88;">Recommended: 1090 MHz Collinear (~$10-20 DIY)</strong>
+                    <ul>
+                        <li><strong>Design:</strong> 8 coaxial collinear elements from RG-6 coax cable</li>
+                        <li><strong>Element length:</strong> ~6.9 cm segments soldered alternating center/shield</li>
+                        <li><strong>Gain:</strong> ~5&ndash;7 dBi omnidirectional, ideal for 360&deg; coverage</li>
+                        <li><strong>Range:</strong> 150&ndash;250+ NM depending on height and LOS</li>
+                    </ul>
+                </div>
+
+                <div class="antenna-section">
+                    <strong style="color: var(--accent-cyan, #00d4ff);">Commercial Options</strong>
+                    <ul>
+                        <li><strong>FlightAware antenna:</strong> ~$35, 1090 MHz tuned, 66cm fiberglass whip</li>
+                        <li><strong>ADSBexchange whip:</strong> ~$40, similar performance</li>
+                        <li><strong>Jetvision A3:</strong> ~$50, high-gain 1090 MHz collinear</li>
+                    </ul>
+                </div>
+
+                <div class="antenna-section">
+                    <strong style="color: var(--accent-cyan, #00d4ff);">Placement &amp; LNA</strong>
+                    <ul>
+                        <li><strong>Location:</strong> OUTDOORS, as high as possible. Roof or mast mount</li>
+                        <li><strong>Height:</strong> Every 3m higher adds ~10 NM range (line-of-sight)</li>
+                        <li><strong>LNA:</strong> 1090 MHz filtered LNA at antenna feed (e.g. Uputronics, ~$30)</li>
+                        <li><strong>Filter:</strong> A 1090 MHz bandpass filter removes cell/FM interference</li>
+                        <li><strong>Coax:</strong> Keep short. At 1090 MHz, RG-58 loses ~10 dB per 10m</li>
+                        <li><strong>Bias-T:</strong> Enable Bias-T in controls above if LNA is powered via coax</li>
+                    </ul>
+                </div>
+
+                <div class="antenna-section">
+                    <strong style="color: var(--accent-cyan, #00d4ff);">Quick Reference</strong>
+                    <table class="antenna-ref-table">
+                        <tr><td>ADS-B frequency</td><td>1090 MHz</td></tr>
+                        <tr><td>Quarter-wave length</td><td>6.9 cm</td></tr>
+                        <tr><td>Modulation</td><td>PPM (pulse)</td></tr>
+                        <tr><td>Polarization</td><td>Vertical</td></tr>
+                        <tr><td>Bandwidth</td><td>~2 MHz</td></tr>
+                        <tr><td>Typical range (outdoor)</td><td>100&ndash;250 NM</td></tr>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -4289,6 +4805,108 @@ sudo make install</code>
         .watchlist-btn:hover {
             background: var(--accent-cyan, #00d4ff);
             color: #000;
+        }
+
+        /* Antenna Guide Modal */
+        .antenna-guide-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .antenna-guide-modal.active {
+            display: flex;
+        }
+        .antenna-guide-modal-content {
+            background: var(--bg-secondary, #1a1a1a);
+            border: 1px solid var(--border-color, #333);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 480px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .antenna-guide-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-tertiary, #252525);
+            border-bottom: 1px solid var(--border-color, #333);
+            font-weight: 600;
+            font-size: 12px;
+            letter-spacing: 0.1em;
+            color: var(--accent-cyan, #00d4ff);
+        }
+        .antenna-guide-modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #888);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .antenna-guide-modal-close:hover {
+            color: #fff;
+        }
+        .antenna-guide-modal-body {
+            padding: 16px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: var(--text-secondary, #999);
+            line-height: 1.5;
+        }
+        .antenna-section {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color, #333);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        .antenna-section strong {
+            font-size: 11px;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .antenna-section ul {
+            margin: 4px 0 0 14px;
+            padding: 0;
+            font-size: 10px;
+        }
+        .antenna-section ul li {
+            margin-bottom: 2px;
+        }
+        .antenna-section ul li strong {
+            display: inline;
+            color: var(--text-primary, #fff);
+            font-size: 10px;
+        }
+        .antenna-ref-table {
+            width: 100%;
+            margin-top: 6px;
+            font-size: 10px;
+            border-collapse: collapse;
+        }
+        .antenna-ref-table tr {
+            border-bottom: 1px solid var(--border-color, #333);
+        }
+        .antenna-ref-table td {
+            padding: 3px 4px;
+        }
+        .antenna-ref-table td:first-child {
+            color: var(--text-dim, #666);
+        }
+        .antenna-ref-table td:last-child {
+            color: var(--text-primary, #fff);
+            text-align: right;
         }
 
         /* Watchlist Modal */
@@ -4530,7 +5148,13 @@ sudo make install</code>
     <!-- Help Modal -->
     {% include 'partials/help-modal.html' %}
 
-    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/voice-alerts.js') }}?v={{ version }}&r=adsbvoice1"></script>
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}?v={{ version }}&r=maptheme17"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof VoiceAlerts !== 'undefined') VoiceAlerts.init();
+        });
+    </script>
 
     <!-- Agent Manager -->
     <script src="{{ url_for('static', filename='js/core/agents.js') }}"></script>
@@ -4662,24 +5286,27 @@ sudo make install</code>
 
             if (running) {
                 isTracking = true;
+                const normalizedSource = source === null || source === undefined
+                    ? (adsbTrackingSource || 'local')
+                    : source;
 
                 // If source is an agent ID (not 'local' and not null), update adsbCurrentAgent
                 // This ensures startEventStream uses the correct routing
-                if (source && source !== 'local') {
-                    adsbCurrentAgent = source;
+                if (normalizedSource !== 'local') {
+                    adsbCurrentAgent = normalizedSource;
                     // Also update the dropdown to match
                     const agentSelect = document.getElementById('agentSelect');
                     if (agentSelect) {
-                        agentSelect.value = source;
+                        agentSelect.value = normalizedSource;
                     }
                     // Update global agent state too
                     if (typeof currentAgent !== 'undefined') {
-                        currentAgent = source;
+                        currentAgent = normalizedSource;
                     }
-                    console.log(`[ADS-B] Updated adsbCurrentAgent to ${source}`);
+                    console.log(`[ADS-B] Updated adsbCurrentAgent to ${normalizedSource}`);
                 }
 
-                adsbTrackingSource = source || adsbCurrentAgent;  // Track which source is active
+                adsbTrackingSource = normalizedSource;  // Track which source is active
 
                 // Update button
                 if (btn) {
@@ -4699,9 +5326,9 @@ sudo make install</code>
                 if (agentSelect) agentSelect.disabled = true;
 
                 // Start data stream for the active source
-                const isAgentSource = adsbCurrentAgent !== 'local';
+                const isAgentSource = normalizedSource !== 'local';
                 if (isAgentSource) {
-                    console.log(`[ADS-B] Starting data stream from agent ${adsbCurrentAgent}`);
+                    console.log(`[ADS-B] Starting data stream from agent ${normalizedSource}`);
                     startEventStream();
                     drawRangeRings();
                     startSessionTimer();
@@ -4772,7 +5399,7 @@ sudo make install</code>
                         const gps = typeof data.agent.gps_coords === 'string'
                             ? JSON.parse(data.agent.gps_coords)
                             : data.agent.gps_coords;
-                        if (gps.lat && gps.lon) {
+                        if (gps.lat !== undefined && gps.lat !== null && gps.lon !== undefined && gps.lon !== null) {
                             document.getElementById('obsLat').value = gps.lat.toFixed(4);
                             document.getElementById('obsLon').value = gps.lon.toFixed(4);
                             updateObserverLoc();
@@ -4795,12 +5422,16 @@ sudo make install</code>
                 select.innerHTML = '';
 
                 if (devices.length === 0) {
-                    select.innerHTML = '<option value="0">No SDR found</option>';
+                    select.innerHTML = '<option value="rtlsdr:0">No SDR found</option>';
                 } else {
                     devices.forEach(device => {
                         const opt = document.createElement('option');
-                        opt.value = device.index;
-                        opt.textContent = `SDR ${device.index}: ${device.name || device.type || 'SDR'}`;
+                        const sdrType = device.sdr_type || 'rtlsdr';
+                        const idx = device.index !== undefined ? device.index : 0;
+                        opt.value = `${sdrType}:${idx}`;
+                        opt.dataset.sdrType = sdrType;
+                        opt.dataset.index = idx;
+                        opt.textContent = `SDR ${idx}: ${device.name || device.type || 'SDR'}`;
                         select.appendChild(opt);
                     });
                 }

@@ -4,19 +4,24 @@ from __future__ import annotations
 
 import queue
 import time
-from typing import Generator
+from collections.abc import Generator
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify
 
-from utils.logging import get_logger
-from utils.sse import format_sse
 from utils.gps import (
-    get_gps_reader,
-    start_gpsd,
-    stop_gps,
-    get_current_position,
     GPSPosition,
+    GPSSkyData,
+    detect_gps_devices,
+    get_current_position,
+    get_gps_reader,
+    is_gpsd_running,
+    start_gpsd,
+    start_gpsd_daemon,
+    stop_gps,
+    stop_gpsd_daemon,
 )
+from utils.logging import get_logger
+from utils.sse import sse_stream_fanout
 
 logger = get_logger('intercept.gps')
 
@@ -29,12 +34,24 @@ _gps_queue: queue.Queue = queue.Queue(maxsize=100)
 def _position_callback(position: GPSPosition) -> None:
     """Callback to queue position updates for SSE stream."""
     try:
-        _gps_queue.put_nowait(position.to_dict())
+        _gps_queue.put_nowait({'type': 'position', **position.to_dict()})
     except queue.Full:
         # Discard oldest if queue is full
         try:
             _gps_queue.get_nowait()
-            _gps_queue.put_nowait(position.to_dict())
+            _gps_queue.put_nowait({'type': 'position', **position.to_dict()})
+        except queue.Empty:
+            pass
+
+
+def _sky_callback(sky: GPSSkyData) -> None:
+    """Callback to queue sky data updates for SSE stream."""
+    try:
+        _gps_queue.put_nowait({'type': 'sky', **sky.to_dict()})
+    except queue.Full:
+        try:
+            _gps_queue.get_nowait()
+            _gps_queue.put_nowait({'type': 'sky', **sky.to_dict()})
         except queue.Empty:
             pass
 
@@ -45,36 +62,47 @@ def auto_connect_gps():
     Automatically connect to gpsd if available.
 
     Called on page load to seamlessly enable GPS if gpsd is running.
+    If gpsd is not running, attempts to detect GPS devices and start gpsd.
     Returns current status if already connected.
     """
-    import socket
-
     # Check if already running
     reader = get_gps_reader()
     if reader and reader.is_running:
+        # Ensure stream callbacks are attached for this process.
+        reader.add_callback(_position_callback)
+        reader.add_sky_callback(_sky_callback)
         position = reader.position
+        sky = reader.sky
         return jsonify({
             'status': 'connected',
             'source': 'gpsd',
             'has_fix': position is not None,
-            'position': position.to_dict() if position else None
+            'position': position.to_dict() if position else None,
+            'sky': sky.to_dict() if sky else None,
         })
 
-    # Try to connect to gpsd on localhost:2947
     host = 'localhost'
     port = 2947
 
-    # First check if gpsd is reachable
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1.0)
-        sock.connect((host, port))
-        sock.close()
-    except Exception:
-        return jsonify({
-            'status': 'unavailable',
-            'message': 'gpsd not running'
-        })
+    # If gpsd isn't running, try to detect a device and start it
+    if not is_gpsd_running(host, port):
+        devices = detect_gps_devices()
+        if not devices:
+            return jsonify({
+                'status': 'unavailable',
+                'message': 'No GPS device detected'
+            })
+
+        # Try to start gpsd with the first detected device
+        device_path = devices[0]['path']
+        success, msg = start_gpsd_daemon(device_path, host, port)
+        if not success:
+            return jsonify({
+                'status': 'unavailable',
+                'message': msg,
+                'devices': devices,
+            })
+        logger.info(f"Auto-started gpsd on {device_path}")
 
     # Clear the queue
     while not _gps_queue.empty():
@@ -84,14 +112,17 @@ def auto_connect_gps():
             break
 
     # Start the gpsd client
-    success = start_gpsd(host, port, callback=_position_callback)
+    success = start_gpsd(host, port,
+                         callback=_position_callback,
+                         sky_callback=_sky_callback)
 
     if success:
         return jsonify({
             'status': 'connected',
             'source': 'gpsd',
             'has_fix': False,
-            'position': None
+            'position': None,
+            'sky': None,
         })
     else:
         return jsonify({
@@ -100,14 +131,26 @@ def auto_connect_gps():
         })
 
 
+@gps_bp.route('/devices')
+def list_gps_devices():
+    """List detected GPS serial devices."""
+    devices = detect_gps_devices()
+    return jsonify({
+        'devices': devices,
+        'gpsd_running': is_gpsd_running(),
+    })
+
+
 @gps_bp.route('/stop', methods=['POST'])
 def stop_gps_reader():
-    """Stop GPS client."""
+    """Stop GPS client and gpsd daemon if we started it."""
     reader = get_gps_reader()
     if reader:
         reader.remove_callback(_position_callback)
+        reader.remove_sky_callback(_sky_callback)
 
     stop_gps()
+    stop_gpsd_daemon()
 
     return jsonify({'status': 'stopped'})
 
@@ -122,15 +165,18 @@ def get_gps_status():
             'running': False,
             'device': None,
             'position': None,
+            'sky': None,
             'error': None,
             'message': 'GPS client not started'
         })
 
     position = reader.position
+    sky = reader.sky
     return jsonify({
         'running': reader.is_running,
         'device': reader.device_path,
         'position': position.to_dict() if position else None,
+        'sky': sky.to_dict() if sky else None,
         'last_update': reader.last_update.isoformat() if reader.last_update else None,
         'error': reader.error,
         'message': 'Waiting for GPS fix - ensure GPS has clear view of sky' if reader.is_running and not position else None
@@ -161,25 +207,43 @@ def get_position():
             })
 
 
+@gps_bp.route('/satellites')
+def get_satellites():
+    """Get current satellite sky view data."""
+    reader = get_gps_reader()
+
+    if not reader or not reader.is_running:
+        return jsonify({
+            'status': 'waiting',
+            'running': False,
+            'message': 'GPS client not running'
+        })
+
+    sky = reader.sky
+    if sky:
+        return jsonify({
+            'status': 'ok',
+            'sky': sky.to_dict()
+        })
+    else:
+        return jsonify({
+            'status': 'waiting',
+            'message': 'Waiting for satellite data'
+        })
+
+
 @gps_bp.route('/stream')
 def stream_gps():
-    """SSE stream of GPS position updates."""
-    def generate() -> Generator[str, None, None]:
-        last_keepalive = time.time()
-        keepalive_interval = 30.0
-
-        while True:
-            try:
-                position = _gps_queue.get(timeout=1)
-                last_keepalive = time.time()
-                yield format_sse({'type': 'position', **position})
-            except queue.Empty:
-                now = time.time()
-                if now - last_keepalive >= keepalive_interval:
-                    yield format_sse({'type': 'keepalive'})
-                    last_keepalive = now
-
-    response = Response(generate(), mimetype='text/event-stream')
+    """SSE stream of GPS position and sky updates."""
+    response = Response(
+        sse_stream_fanout(
+            source_queue=_gps_queue,
+            channel_key='gps',
+            timeout=1.0,
+            keepalive_interval=30.0,
+        ),
+        mimetype='text/event-stream',
+    )
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'

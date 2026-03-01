@@ -196,6 +196,28 @@
     margin-left: 6px;
     font-size: 10px;
 }
+.tracker-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(255, 51, 102, 0.2);
+    color: #ff3366;
+    border: 1px solid rgba(255, 51, 102, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.client-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(74, 158, 255, 0.2);
+    color: #4a9eff;
+    border: 1px solid rgba(74, 158, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
 .known-badge {
     margin-left: 6px;
     font-size: 9px;

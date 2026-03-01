@@ -24,7 +24,9 @@ from .constants import (
 )
 from .dbus_scanner import DBusScanner
 from .fallback_scanner import FallbackScanner
+from .ubertooth_scanner import UbertoothScanner
 from .heuristics import HeuristicsEngine
+from .irk_extractor import get_paired_irks
 from .models import BTDeviceAggregate, BTObservation, ScanStatus, SystemCapabilities
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,7 @@ class BluetoothScanner:
         # Scanner backends
         self._dbus_scanner: Optional[DBusScanner] = None
         self._fallback_scanner: Optional[FallbackScanner] = None
+        self._ubertooth_scanner: Optional[UbertoothScanner] = None
         self._active_backend: Optional[str] = None
 
         # Event queue for SSE streaming
@@ -66,7 +69,7 @@ class BluetoothScanner:
         self._scan_timer: Optional[threading.Timer] = None
 
         # Callbacks
-        self._on_device_updated: Optional[Callable[[BTDeviceAggregate], None]] = None
+        self._on_device_updated_callbacks: list[Callable[[BTDeviceAggregate], None]] = []
 
         # Capability check result
         self._capabilities: Optional[SystemCapabilities] = None
@@ -113,6 +116,8 @@ class BluetoothScanner:
 
             if mode == 'dbus':
                 started, backend_used = self._start_dbus(adapter, transport, rssi_threshold)
+            elif mode == 'ubertooth':
+                started, backend_used = self._start_ubertooth()
 
             # Fallback: try non-DBus methods if DBus failed or wasn't requested
             if not started and (original_mode == 'auto' or mode in ('bleak', 'hcitool', 'bluetoothctl')):
@@ -168,6 +173,18 @@ class BluetoothScanner:
             logger.warning(f"DBus scanner failed: {e}")
         return False, None
 
+    def _start_ubertooth(self) -> tuple[bool, Optional[str]]:
+        """Start Ubertooth One scanner."""
+        try:
+            self._ubertooth_scanner = UbertoothScanner(
+                on_observation=self._handle_observation,
+            )
+            if self._ubertooth_scanner.start():
+                return True, 'ubertooth'
+        except Exception as e:
+            logger.warning(f"Ubertooth scanner failed: {e}")
+        return False, None
+
     def _start_fallback(self, adapter: str, preferred: str) -> tuple[bool, Optional[str]]:
         """Start fallback scanner."""
         try:
@@ -204,6 +221,10 @@ class BluetoothScanner:
                 self._fallback_scanner.stop()
                 self._fallback_scanner = None
 
+            if self._ubertooth_scanner:
+                self._ubertooth_scanner.stop()
+                self._ubertooth_scanner = None
+
             # Update status
             self._status.is_scanning = False
             self._active_backend = None
@@ -216,6 +237,47 @@ class BluetoothScanner:
 
             logger.info("Bluetooth scan stopped")
 
+    def _match_irk(self, device: BTDeviceAggregate) -> None:
+        """Check if a device address resolves against any paired IRK."""
+        if device.irk_hex is not None:
+            return  # Already matched
+
+        address = device.address
+        if not address or len(address.replace(':', '').replace('-', '')) not in (12, 32):
+            return
+
+        # Only attempt RPA resolution on 6-byte addresses
+        addr_clean = address.replace(':', '').replace('-', '')
+        if len(addr_clean) != 12:
+            return
+
+        try:
+            paired = get_paired_irks()
+        except Exception:
+            return
+
+        if not paired:
+            return
+
+        try:
+            from utils.bt_locate import resolve_rpa
+        except ImportError:
+            return
+
+        for entry in paired:
+            irk_hex = entry.get('irk_hex', '')
+            if not irk_hex or len(irk_hex) != 32:
+                continue
+            try:
+                irk = bytes.fromhex(irk_hex)
+                if resolve_rpa(irk, address):
+                    device.irk_hex = irk_hex
+                    device.irk_source_name = entry.get('name')
+                    logger.debug(f"IRK match for {address}: {entry.get('name', 'unnamed')}")
+                    return
+            except Exception:
+                continue
+
     def _handle_observation(self, observation: BTObservation) -> None:
         """Handle incoming observation from scanner backend."""
         try:
@@ -225,20 +287,35 @@ class BluetoothScanner:
             # Evaluate heuristics
             self._heuristics.evaluate(device)
 
+            # Check for IRK match
+            self._match_irk(device)
+
             # Update device count
             with self._lock:
                 self._status.devices_found = self._aggregator.device_count
+
+            # Build summary with MAC cluster count
+            summary = device.to_summary_dict()
+            if device.payload_fingerprint_id:
+                summary['mac_cluster_count'] = self._aggregator.get_fingerprint_mac_count(
+                    device.payload_fingerprint_id
+                )
+            else:
+                summary['mac_cluster_count'] = 0
 
             # Queue event
             self._queue_event({
                 'type': 'device',
                 'action': 'update',
-                'device': device.to_summary_dict(),
+                'device': summary,
             })
 
-            # Callback
-            if self._on_device_updated:
-                self._on_device_updated(device)
+            # Callbacks
+            for cb in self._on_device_updated_callbacks:
+                try:
+                    cb(device)
+                except Exception as cb_err:
+                    logger.error(f"Device callback error: {cb_err}")
 
         except Exception as e:
             logger.error(f"Error handling observation: {e}")
@@ -368,13 +445,40 @@ class BluetoothScanner:
         return self._capabilities
 
     def set_on_device_updated(self, callback: Callable[[BTDeviceAggregate], None]) -> None:
-        """Set callback for device updates."""
-        self._on_device_updated = callback
+        """Set callback for device updates (legacy, adds to callback list)."""
+        self.add_device_callback(callback)
+
+    def add_device_callback(self, callback: Callable[[BTDeviceAggregate], None]) -> None:
+        """Add a callback for device updates."""
+        if callback not in self._on_device_updated_callbacks:
+            self._on_device_updated_callbacks.append(callback)
+
+    def remove_device_callback(self, callback: Callable[[BTDeviceAggregate], None]) -> None:
+        """Remove a device update callback."""
+        if callback in self._on_device_updated_callbacks:
+            self._on_device_updated_callbacks.remove(callback)
 
     @property
     def is_scanning(self) -> bool:
-        """Check if scanning is active."""
-        return self._status.is_scanning
+        """Check if scanning is active.
+
+        Cross-checks the backend scanner state, since bleak scans can
+        expire silently without calling stop_scan().
+        """
+        if not self._status.is_scanning:
+            return False
+
+        # Detect backends that finished on their own (e.g. bleak timeout)
+        backend_alive = (
+            (self._dbus_scanner and self._dbus_scanner.is_scanning)
+            or (self._fallback_scanner and self._fallback_scanner.is_scanning)
+            or (self._ubertooth_scanner and self._ubertooth_scanner.is_scanning)
+        )
+        if not backend_alive:
+            self._status.is_scanning = False
+            return False
+
+        return True
 
     @property
     def device_count(self) -> int:

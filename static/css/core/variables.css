@@ -16,6 +16,11 @@
     --bg-card: #121a25;
     --bg-elevated: #1b2734;
     --bg-overlay: rgba(8, 13, 20, 0.75);
+    --surface-glass: rgba(16, 25, 37, 0.82);
+    --surface-panel-gradient: linear-gradient(160deg, rgba(20, 32, 47, 0.94) 0%, rgba(11, 18, 27, 0.96) 100%);
+    --ambient-top-left: rgba(74, 163, 255, 0.14);
+    --ambient-top-right: rgba(56, 193, 128, 0.09);
+    --ambient-bottom: rgba(214, 168, 94, 0.06);
 
     /* Background aliases for components */
     --bg-dark: var(--bg-primary);
@@ -78,8 +83,8 @@
     /* ============================================
        TYPOGRAPHY
        ============================================ */
-    --font-sans: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
-    --font-mono: 'IBM Plex Mono', 'Space Mono', ui-monospace, 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --font-sans: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
     /* Font sizes */
     --text-xs: 10px;
@@ -158,6 +163,11 @@
     --bg-card: #ffffff;
     --bg-elevated: #f1f4f9;
     --bg-overlay: rgba(244, 247, 251, 0.92);
+    --surface-glass: rgba(255, 255, 255, 0.84);
+    --surface-panel-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 251, 0.97) 100%);
+    --ambient-top-left: rgba(31, 95, 168, 0.1);
+    --ambient-top-right: rgba(31, 138, 87, 0.06);
+    --ambient-bottom: rgba(181, 134, 58, 0.05);
 
     /* Background aliases for components */
     --bg-dark: var(--bg-primary);

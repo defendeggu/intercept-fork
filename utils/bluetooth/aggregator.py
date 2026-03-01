@@ -606,6 +606,12 @@ class DeviceAggregator:
 
         return result
 
+    def get_fingerprint_mac_count(self, fingerprint_id: str) -> int:
+        """Return how many distinct device_ids share a fingerprint."""
+        with self._lock:
+            device_ids = self._fingerprint_to_devices.get(fingerprint_id)
+            return len(device_ids) if device_ids else 0
+
     def prune_ring_buffer(self) -> int:
         """Prune old observations from ring buffer."""
         return self._ring_buffer.prune_old()

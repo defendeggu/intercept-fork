@@ -2,6 +2,163 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.23.0] - 2026-02-27
+
+### Added
+- **Radiosonde Weather Balloon Tracking** - 400-406 MHz reception via radiosonde_auto_rx with telemetry, map, and station distance tracking
+- **CW/Morse Code Decoder** - Custom Goertzel tone detection with OOK/AM envelope detection mode for ISM bands
+- **WeFax (Weather Fax) Decoder** - HF weather fax reception with auto-scheduler, broadcast timeline, and image gallery
+- **System Health Monitoring** - Telemetry dashboard with process monitoring and system metrics
+- **HTTPS Support** - TLS via `INTERCEPT_HTTPS` configuration
+- **ADS-B Voice Alerts** - Text-to-speech notifications for military and emergency aircraft detections
+- **HackRF TSCM RF Scan** - HackRF support added to TSCM counter-surveillance RF sweep
+- **Multi-SDR WeFax** - Multiple SDR hardware support for WeFax decoder
+- **Tool Path Overrides** - `INTERCEPT_*_PATH` environment variables for custom tool locations
+- **Homebrew Tool Detection** - Native path detection for Apple Silicon Homebrew installations
+- **Production Server** - `start.sh` with gunicorn + gevent for concurrent SSE/WebSocket handling — eliminates multi-client page load delays
+
+### Changed
+- Morse decoder rebuilt with custom Goertzel decoder, replacing multimon-ng dependency
+- GPS mode upgraded to textured 3D globe visualization
+- Destroy lifecycle added to all mode modules to prevent resource leaks
+- Docker container now uses gunicorn + gevent by default via `start.sh`
+
+### Fixed
+- ADS-B device release leak and startup performance regression
+- ADS-B probe incorrectly treating "No devices found" as success
+- USB claim race condition after SDR probe
+- SDR device registry collision when multiple SDR types present
+- APRS 15-minute startup delay caused by pipe buffering
+- APRS map centering at [0,0] when GPS unavailable
+- DSC decoder ITU-R M.493 compliance issues
+- Weather satellite 0dB SNR — increased sample rate for Meteor LRPT
+- SSE fanout backlog causing delayed updates across all modes
+- SSE reconnect packet loss during client reconnection
+- Waterfall monitor tuning race conditions
+- Mode FOUC (flash of unstyled content) on initial navigation
+- Various Morse decoder stability and lifecycle fixes
+
+---
+
+## [2.22.3] - 2026-02-23
+
+### Fixed
+- Waterfall control panel rendered as unstyled text for up to 20 seconds on first visit — CSS is now loaded eagerly with the rest of the page assets
+- WebSDR globe failed to render on first page load — initialization now waits for a layout frame before mounting the WebGL renderer, ensuring the container has non-zero dimensions
+- Waterfall monitor audio took minutes to start — `_waitForPlayback` now only reports success on actual audio playback (`playing`/`timeupdate`), not from the WAV header alone (`loadeddata`/`canplay`)
+- Waterfall monitor could not be stopped — `stopMonitor()` now pauses audio and updates the UI immediately instead of waiting for the backend stop request (which blocked for 1+ seconds during SDR process cleanup)
+- Stopping the waterfall no longer shows a stale "WebSocket closed before ready" message — the `onclose` handler now detects intentional closes
+
+---
+
+## [2.22.1] - 2026-02-23
+
+### Fixed
+- PWA install prompt not appearing — manifest now includes required PNG icons (192×192, 512×512)
+- Apple touch icon updated to PNG for iOS Safari compatibility
+- Service worker cache bumped to bust stale cached assets
+
+---
+
+## [2.22.0] - 2026-02-23
+
+### Added
+- **Waterfall Receiver Overhaul** - WebSocket-based I/Q streaming with server-side FFT, click-to-tune, zoom controls, and auto-scaling
+- **Voice Alerts** - Configurable text-to-speech event notifications across modes
+- **Signal Fingerprinting** - RF device identification and pattern analysis mode
+- **SignalID** - Automatic signal classification via SigIDWiki API integration
+- **PWA Support** - Installable web app with service worker caching and manifest
+- **Real-time Signal Scope** - Live signal visualization for pager, sensor, and SSTV modes
+- **ADS-B MSG2 Surface Parsing** - Ground vehicle movement tracking from MSG2 frames
+- **Cheat Sheets** - Quick reference overlays for keyboard shortcuts and mode controls
+- App icon (SVG) for PWA and browser tab
+
+### Changed
+- **WebSDR overhaul** - Improved receiver management, audio streaming, and UI
+- **Mode stop responsiveness** - Faster timeout handling and improved WiFi/Bluetooth scanner shutdown
+- **Mode transitions** - Smoother navigation with performance instrumentation
+- **BT Locate** - Refactored JS engine with improved trail management and signal smoothing
+- **Listening Post** - Refactored with cross-module frequency routing
+- **SSTV decoder** - State machine improvements and partial image streaming
+- Analytics mode removed; per-mode analytics panels integrated into existing dashboards
+
+### Fixed
+- ADS-B SSE multi-client fanout stability and update flush timing
+- WiFi scanner robustness and monitor mode teardown reliability
+- Agent client reliability improvements for remote sensor nodes
+- SSTV VIS detector state reporting in signal monitor diagnostics
+
+### Documentation
+- Complete documentation audit across README, FEATURES, USAGE, help modal, and GitHub Pages
+- Fixed license badge (MIT → Apache 2.0) to match actual LICENSE file
+- Fixed tool name `rtl_amr` → `rtlamr` throughout all docs
+- Fixed incorrect entry point examples (`python app.py` → `sudo -E venv/bin/python intercept.py`)
+- Removed duplicate AIS Vessel Tracking section from FEATURES.md
+- Updated SSTV requirements: pure Python decoder, no external `slowrx` needed
+- Added ACARS and VDL2 mode descriptions to in-app help modal
+- GitHub Pages site: corrected Docker command, license, and tool name references
+
+---
+
+## [2.21.1] - 2026-02-20
+
+### Fixed
+- BT Locate map first-load rendering race that could cause blank/late map initialization
+- BT Locate mode switch timing so Leaflet invalidation runs after panel visibility settles
+- BT Locate trail restore startup latency by batching historical GPS point rendering
+
+---
+
+## [2.21.0] - 2026-02-20
+
+### Added
+- Analytics panels for operational insights and temporal pattern analysis
+
+### Changed
+- Global map theme refresh with improved contrast and cross-dashboard consistency
+- Cross-app UX refinements for accessibility, mode consistency, and render performance
+- BT Locate enhancements including improved continuity, smoothing, and confidence reporting
+
+### Fixed
+- Weather satellite auto-scheduler and Mercator tracking reliability issues
+- Bluetooth/WiFi runtime health issues affecting scanner continuity
+- ADS-B SSE multi-client fanout stability and remote VDL2 streaming reliability
+
+---
+
+## [2.15.0] - 2026-02-09
+
+### Added
+- **Real-time WebSocket Waterfall** - I/Q capture with server-side FFT
+  - Click-to-tune, zoom controls, and auto-scaling quantization
+  - Shared waterfall UI across SDR modes with function bar controls
+  - WebSocket frame serialization and connection reuse
+- **Cross-Module Frequency Routing** - Tune from Listening Post directly to decoders
+- **Pure Python SSTV Decoder** - Replaces broken slowrx C dependency
+  - Real-time decode progress with partial image streaming
+  - VIS detector state in signal monitor diagnostics
+  - Image gallery with delete and download functionality
+- **Real-time Signal Scope** - Live signal visualization for pager, sensor, and SSTV modes
+- **SSTV Image Gallery** - Delete and download decoded images
+- **USB Device Probe** - Detect broken SDR devices before rtl_fm crashes
+
+### Fixed
+- DMR dsd-fme protocol flags, device label, and tuning controls
+- DMR frontend/backend state desync causing 409 on start
+- Digital voice decoder producing no output due to wrong dsd-fme flags
+- SDR device lock-up from unreleased device registry on process crash
+- APRS crash on large station count and station list overflow
+- Settings modal overflowing viewport on smaller screens
+- Waterfall crash on zoom by reusing WebSocket and adding USB release retry
+- PD120 SSTV decode hang and false leader tone detection
+- WebSocket waterfall blocked by login redirect
+- TSCM sweep KeyError on RiskLevel.NEEDS_REVIEW
+
+### Removed
+- GSM Spy functionality removed for legal compliance
+
+---
+
 ## [2.14.0] - 2026-02-06
 
 ### Added

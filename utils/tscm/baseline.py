@@ -30,6 +30,7 @@ class BaselineRecorder:
         self.recording = False
         self.current_baseline_id: int | None = None
         self.wifi_networks: dict[str, dict] = {}  # BSSID -> network info
+        self.wifi_clients: dict[str, dict] = {}  # MAC -> client info
         self.bt_devices: dict[str, dict] = {}  # MAC -> device info
         self.rf_frequencies: dict[float, dict] = {}  # Frequency -> signal info
 
@@ -52,6 +53,7 @@ class BaselineRecorder:
         """
         self.recording = True
         self.wifi_networks = {}
+        self.wifi_clients = {}
         self.bt_devices = {}
         self.rf_frequencies = {}
 
@@ -79,6 +81,7 @@ class BaselineRecorder:
 
         # Convert to lists for storage
         wifi_list = list(self.wifi_networks.values())
+        wifi_client_list = list(self.wifi_clients.values())
         bt_list = list(self.bt_devices.values())
         rf_list = list(self.rf_frequencies.values())
 
@@ -86,6 +89,7 @@ class BaselineRecorder:
         update_tscm_baseline(
             self.current_baseline_id,
             wifi_networks=wifi_list,
+            wifi_clients=wifi_client_list,
             bt_devices=bt_list,
             rf_frequencies=rf_list
         )
@@ -93,6 +97,7 @@ class BaselineRecorder:
         summary = {
             'baseline_id': self.current_baseline_id,
             'wifi_count': len(wifi_list),
+            'wifi_client_count': len(wifi_client_list),
             'bt_count': len(bt_list),
             'rf_count': len(rf_list),
         }
@@ -160,6 +165,33 @@ class BaselineRecorder:
                 'last_seen': datetime.now().isoformat(),
             }
 
+    def add_wifi_client(self, client: dict) -> None:
+        """Add a WiFi client to the current baseline."""
+        if not self.recording:
+            return
+
+        mac = client.get('mac', client.get('address', '')).upper()
+        if not mac:
+            return
+
+        if mac in self.wifi_clients:
+            self.wifi_clients[mac].update({
+                'last_seen': datetime.now().isoformat(),
+                'rssi': client.get('rssi', self.wifi_clients[mac].get('rssi')),
+                'associated_bssid': client.get('associated_bssid', self.wifi_clients[mac].get('associated_bssid')),
+            })
+        else:
+            self.wifi_clients[mac] = {
+                'mac': mac,
+                'vendor': client.get('vendor', ''),
+                'rssi': client.get('rssi'),
+                'associated_bssid': client.get('associated_bssid'),
+                'probed_ssids': client.get('probed_ssids', []),
+                'probe_count': client.get('probe_count', len(client.get('probed_ssids', []))),
+                'first_seen': datetime.now().isoformat(),
+                'last_seen': datetime.now().isoformat(),
+            }
+
     def add_rf_signal(self, signal: dict) -> None:
         """Add an RF signal to the current baseline."""
         if not self.recording:
@@ -197,6 +229,7 @@ class BaselineRecorder:
             'recording': self.recording,
             'baseline_id': self.current_baseline_id,
             'wifi_count': len(self.wifi_networks),
+            'wifi_client_count': len(self.wifi_clients),
             'bt_count': len(self.bt_devices),
             'rf_count': len(self.rf_frequencies),
         }
@@ -223,6 +256,11 @@ class BaselineComparator:
         self.baseline_bt = {
             d.get('mac', d.get('address', '')).upper(): d
             for d in baseline.get('bt_devices', [])
+            if d.get('mac') or d.get('address')
+        }
+        self.baseline_wifi_clients = {
+            d.get('mac', d.get('address', '')).upper(): d
+            for d in baseline.get('wifi_clients', [])
             if d.get('mac') or d.get('address')
         }
         self.baseline_rf = {
@@ -300,6 +338,37 @@ class BaselineComparator:
             'matching_count': len(matching_devices),
         }
 
+    def compare_wifi_clients(self, current_devices: list[dict]) -> dict:
+        """Compare current WiFi clients against baseline."""
+        current_macs = {
+            d.get('mac', d.get('address', '')).upper(): d
+            for d in current_devices
+            if d.get('mac') or d.get('address')
+        }
+
+        new_devices = []
+        missing_devices = []
+        matching_devices = []
+
+        for mac, device in current_macs.items():
+            if mac not in self.baseline_wifi_clients:
+                new_devices.append(device)
+            else:
+                matching_devices.append(device)
+
+        for mac, device in self.baseline_wifi_clients.items():
+            if mac not in current_macs:
+                missing_devices.append(device)
+
+        return {
+            'new': new_devices,
+            'missing': missing_devices,
+            'matching': matching_devices,
+            'new_count': len(new_devices),
+            'missing_count': len(missing_devices),
+            'matching_count': len(matching_devices),
+        }
+
     def compare_rf(self, current_signals: list[dict]) -> dict:
         """Compare current RF signals against baseline."""
         current_freqs = {
@@ -334,6 +403,7 @@ class BaselineComparator:
     def compare_all(
         self,
         wifi_devices: list[dict] | None = None,
+        wifi_clients: list[dict] | None = None,
         bt_devices: list[dict] | None = None,
         rf_signals: list[dict] | None = None
     ) -> dict:
@@ -345,6 +415,7 @@ class BaselineComparator:
         """
         results = {
             'wifi': None,
+            'wifi_clients': None,
             'bluetooth': None,
             'rf': None,
             'total_new': 0,
@@ -355,6 +426,11 @@ class BaselineComparator:
             results['wifi'] = self.compare_wifi(wifi_devices)
             results['total_new'] += results['wifi']['new_count']
             results['total_missing'] += results['wifi']['missing_count']
+
+        if wifi_clients is not None:
+            results['wifi_clients'] = self.compare_wifi_clients(wifi_clients)
+            results['total_new'] += results['wifi_clients']['new_count']
+            results['total_missing'] += results['wifi_clients']['missing_count']
 
         if bt_devices is not None:
             results['bluetooth'] = self.compare_bluetooth(bt_devices)
@@ -371,6 +447,7 @@ class BaselineComparator:
 
 def get_comparison_for_active_baseline(
     wifi_devices: list[dict] | None = None,
+    wifi_clients: list[dict] | None = None,
     bt_devices: list[dict] | None = None,
     rf_signals: list[dict] | None = None
 ) -> dict | None:
@@ -385,4 +462,4 @@ def get_comparison_for_active_baseline(
         return None
 
     comparator = BaselineComparator(baseline)
-    return comparator.compare_all(wifi_devices, bt_devices, rf_signals)
+    return comparator.compare_all(wifi_devices, wifi_clients, bt_devices, rf_signals)

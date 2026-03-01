@@ -1,0 +1,72 @@
+<!-- BT LOCATE MODE -->
+<div id="btLocateMode" class="mode-content">
+    <div class="section">
+        <h3>BT Locate</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            SAR Bluetooth device location &mdash; GPS-tagged signal trail mapping with proximity alerts for locating missing persons' devices.
+        </p>
+    </div>
+
+    <!-- Target Lock -->
+    <div class="section">
+        <h3>Target</h3>
+        <div id="btLocateHandoffCard" style="display: none; background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); border-radius: 6px; padding: 8px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 10px; color: var(--accent-green); text-transform: uppercase; font-weight: 600;">Handed off from BT</span>
+                <button onclick="BtLocate.clearHandoff()" style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 10px;">&times;</button>
+            </div>
+            <div id="btLocateHandoffName" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 4px;"></div>
+            <div id="btLocateHandoffMeta" style="font-size: 10px; color: var(--text-dim); font-family: var(--font-mono);"></div>
+        </div>
+
+        <label class="input-label">MAC Address</label>
+        <input type="text" id="btLocateMac" class="text-input" placeholder="AA:BB:CC:DD:EE:FF" style="font-family: var(--font-mono); font-size: 11px;">
+
+        <label class="input-label" style="margin-top: 6px;">Name Pattern</label>
+        <input type="text" id="btLocateNamePattern" class="text-input" placeholder="iPhone, Galaxy, etc.">
+
+        <label class="input-label" style="margin-top: 6px;">IRK (hex, optional)</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+            <input type="text" id="btLocateIrk" class="text-input" placeholder="32 hex chars for RPA resolution" style="font-family: var(--font-mono); font-size: 10px; flex: 1;">
+            <button class="btl-detect-irk-btn" id="btLocateDetectIrkBtn" onclick="BtLocate.fetchPairedIrks()" title="Detect IRKs from paired devices">Detect</button>
+        </div>
+        <div id="btLocateIrkPicker" class="btl-irk-picker" style="display: none;">
+            <div id="btLocateIrkPickerStatus" class="btl-irk-picker-status"></div>
+            <div id="btLocateIrkPickerList" class="btl-irk-picker-list"></div>
+        </div>
+    </div>
+
+    <!-- Environment Preset -->
+    <div class="section">
+        <h3>Environment</h3>
+        <div class="btl-env-grid">
+            <button class="btl-env-btn" data-env="FREE_SPACE" onclick="BtLocate.setEnvironment('FREE_SPACE')">
+                <span class="btl-env-icon">&#127968;</span>
+                <span class="btl-env-label">Open Field</span>
+                <span class="btl-env-n">n=2.0</span>
+            </button>
+            <button class="btl-env-btn active" data-env="OUTDOOR" onclick="BtLocate.setEnvironment('OUTDOOR')">
+                <span class="btl-env-icon">&#127795;</span>
+                <span class="btl-env-label">Outdoor</span>
+                <span class="btl-env-n">n=2.2</span>
+            </button>
+            <button class="btl-env-btn" data-env="INDOOR" onclick="BtLocate.setEnvironment('INDOOR')">
+                <span class="btl-env-icon">&#127970;</span>
+                <span class="btl-env-label">Indoor</span>
+                <span class="btl-env-n">n=3.0</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="section">
+        <div style="display: flex; gap: 6px;">
+            <button class="run-btn" id="btLocateStartBtn" onclick="BtLocate.start()">Start Locate</button>
+            <button class="stop-btn" id="btLocateStopBtn" onclick="BtLocate.stop()" style="display: none;">Stop</button>
+        </div>
+        <div id="btLocateScanStatus" style="display: none; margin-top: 6px; font-size: 10px; color: var(--text-dim);">
+            <span id="btLocateScanDot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; margin-right: 4px; vertical-align: middle;"></span>
+            <span id="btLocateScanText">BT scanner active</span>
+        </div>
+    </div>
+</div>

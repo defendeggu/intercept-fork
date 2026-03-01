@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% if offline_settings.tile_provider in ['cartodb_dark', 'cartodb_dark_cyan'] %}map-cyber-enabled{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,19 +7,19 @@
     {% if offline_settings.fonts_source == 'local' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
     {% else %}
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/agents.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-nav.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}?v={{ version }}&r=maptheme17">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/help-modal.css') }}">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --font-sans: 'Space Mono', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            --font-mono: 'Space Mono', 'Fira Code', 'Consolas', monospace;
+            --font-sans: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --font-mono: 'Roboto Condensed', 'Arial Narrow', Roboto, 'Helvetica Neue', Arial, sans-serif;
             --bg-primary: #0a0c10;
             --bg-secondary: #0f1218;
             --bg-tertiary: #151a23;
@@ -787,7 +787,7 @@
 
             entry.rssiByAgent.forEach((info, agentName) => {
                 const gps = agentGPS.get(agentName);
-                if (gps && gps.lat && gps.lon) {
+                if (gps && gps.lat !== undefined && gps.lat !== null && gps.lon !== undefined && gps.lon !== null) {
                     observations.push({
                         agent_name: agentName,
                         agent_lat: gps.lat,
@@ -1073,7 +1073,7 @@
                                 const coords = agent.gps_coords;
                                 const lat = coords.lat || coords.latitude;
                                 const lon = coords.lon || coords.longitude;
-                                if (lat && lon) {
+                                if (lat !== undefined && lat !== null && lon !== undefined && lon !== null) {
                                     agentGPS.set(agent.name, { lat, lon });
                                     addLogEntry('gps', `Agent "${agent.name}" GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
                                 }
@@ -1117,7 +1117,7 @@
     <!-- Help Modal -->
     {% include 'partials/help-modal.html' %}
 
-    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core/settings-manager.js') }}?v={{ version }}&r=maptheme17"></script>
     <script src="{{ url_for('static', filename='js/core/global-nav.js') }}"></script>
 </body>
 </html>
