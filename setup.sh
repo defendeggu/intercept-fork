@@ -323,7 +323,7 @@ install_python_deps() {
   #  and cause pip to roll back pure-Python packages like flask)
   info "Installing core packages..."
   $PIP install --quiet "flask>=3.0.0" "flask-limiter>=2.5.4" "requests>=2.28.0" \
-    "Werkzeug>=3.1.5" "pyserial>=3.5" "flask-sock" "websocket-client>=1.6.0" 2>/dev/null || true
+    "Werkzeug>=3.1.5" "pyserial>=3.5" 2>/dev/null || true
 
   # Verify critical packages
   $PY -c "import flask; import requests; from flask_limiter import Limiter" 2>/dev/null || {
@@ -335,9 +335,9 @@ install_python_deps() {
 
   # Install optional packages individually (some may fail on newer Python)
   info "Installing optional packages..."
-  for pkg in "numpy>=1.24.0" "scipy>=1.10.0" "Pillow>=9.0.0" "skyfield>=1.45" \
-             "bleak>=0.21.0" "psycopg2-binary>=2.9.9" "meshtastic>=2.0.0" \
-             "scapy>=2.4.5" "qrcode[pil]>=7.4" "cryptography>=41.0.0" \
+  for pkg in "flask-sock" "websocket-client>=1.6.0" "numpy>=1.24.0" "scipy>=1.10.0" \
+             "Pillow>=9.0.0" "skyfield>=1.45" "bleak>=0.21.0" "psycopg2-binary>=2.9.9" \
+             "meshtastic>=2.0.0" "scapy>=2.4.5" "qrcode[pil]>=7.4" "cryptography>=41.0.0" \
              "gunicorn>=21.2.0" "gevent>=23.9.0" "psutil>=5.9.0"; do
     pkg_name="${pkg%%>=*}"
     if ! $PIP install "$pkg" 2>/dev/null; then
