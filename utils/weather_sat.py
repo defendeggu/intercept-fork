@@ -356,6 +356,8 @@ class WeatherSatDecoder:
         gain: float = 40.0,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         bias_t: bool = False,
+        rtl_tcp_host: str | None = None,
+        rtl_tcp_port: int = 1234,
     ) -> tuple[bool, str | None]:
         """Start weather satellite capture and decode.
 
@@ -365,6 +367,8 @@ class WeatherSatDecoder:
             gain: SDR gain in dB
             sample_rate: Sample rate in Hz
             bias_t: Enable bias-T power for LNA
+            rtl_tcp_host: Remote rtl_tcp server hostname/IP (None for local SDR)
+            rtl_tcp_port: Remote rtl_tcp server port (default 1234)
 
         Returns:
             Tuple of (success, error_message). error_message is None on success.
@@ -382,7 +386,8 @@ class WeatherSatDecoder:
 
         # Resolve device ID BEFORE lock — this runs rtl_test which can
         # take up to 5s and has no side effects on instance state.
-        source_id = self._resolve_device_id(device_index)
+        # Skip for remote rtl_tcp connections.
+        source_id = None if rtl_tcp_host else self._resolve_device_id(device_index)
 
         with self._lock:
             if self._running:
@@ -407,7 +412,8 @@ class WeatherSatDecoder:
 
             try:
                 self._running = True
-                self._start_satdump(sat_info, device_index, gain, sample_rate, bias_t, source_id)
+                self._start_satdump(sat_info, device_index, gain, sample_rate, bias_t, source_id,
+                                    rtl_tcp_host=rtl_tcp_host, rtl_tcp_port=rtl_tcp_port)
 
                 logger.info(
                     f"Weather satellite capture started: {satellite} "
@@ -444,6 +450,8 @@ class WeatherSatDecoder:
         sample_rate: int,
         bias_t: bool,
         source_id: str | None = None,
+        rtl_tcp_host: str | None = None,
+        rtl_tcp_port: int = 1234,
     ) -> None:
         """Start SatDump live capture and decode."""
         # Create timestamped output directory for this capture
@@ -454,25 +462,41 @@ class WeatherSatDecoder:
 
         freq_hz = int(sat_info['frequency'] * 1_000_000)
 
-        # Use pre-resolved source_id, or fall back to resolving now
-        if source_id is None:
-            source_id = self._resolve_device_id(device_index)
+        if rtl_tcp_host:
+            # Remote SDR via rtl_tcp
+            cmd = [
+                'satdump', 'live',
+                sat_info['pipeline'],
+                str(self._capture_output_dir),
+                '--source', 'rtltcp',
+                '--ip_address', rtl_tcp_host,
+                '--port', str(rtl_tcp_port),
+                '--samplerate', str(sample_rate),
+                '--frequency', str(freq_hz),
+                '--gain', str(int(gain)),
+            ]
+            logger.info(f"Using remote SDR: rtl_tcp://{rtl_tcp_host}:{rtl_tcp_port}")
+        else:
+            # Local RTL-SDR device
+            # Use pre-resolved source_id, or fall back to resolving now
+            if source_id is None:
+                source_id = self._resolve_device_id(device_index)
 
-        cmd = [
-            'satdump', 'live',
-            sat_info['pipeline'],
-            str(self._capture_output_dir),
-            '--source', 'rtlsdr',
-            '--samplerate', str(sample_rate),
-            '--frequency', str(freq_hz),
-            '--gain', str(int(gain)),
-        ]
+            cmd = [
+                'satdump', 'live',
+                sat_info['pipeline'],
+                str(self._capture_output_dir),
+                '--source', 'rtlsdr',
+                '--samplerate', str(sample_rate),
+                '--frequency', str(freq_hz),
+                '--gain', str(int(gain)),
+            ]
 
-        # Only pass --source_id if we have a real serial number.
-        # When _resolve_device_id returns None (no serial found),
-        # omit the flag so SatDump uses the first available device.
-        if source_id is not None:
-            cmd.extend(['--source_id', source_id])
+            # Only pass --source_id if we have a real serial number.
+            # When _resolve_device_id returns None (no serial found),
+            # omit the flag so SatDump uses the first available device.
+            if source_id is not None:
+                cmd.extend(['--source_id', source_id])
 
         if bias_t:
             cmd.append('--bias')

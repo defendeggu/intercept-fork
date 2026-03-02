@@ -138,6 +138,68 @@ class TestWeatherSatDecoder:
 
     @patch('subprocess.Popen')
     @patch('pty.openpty')
+    @patch('utils.weather_sat.register_process')
+    def test_start_rtl_tcp_uses_rtltcp_source(self, mock_register, mock_pty, mock_popen):
+        """start() with rtl_tcp should use --source rtltcp instead of rtlsdr."""
+        with patch('shutil.which', return_value='/usr/bin/satdump'):
+            mock_pty.return_value = (10, 11)
+            mock_process = MagicMock()
+            mock_process.poll.return_value = None
+            mock_popen.return_value = mock_process
+
+            decoder = WeatherSatDecoder()
+            callback = MagicMock()
+            decoder.set_callback(callback)
+
+            success, error_msg = decoder.start(
+                satellite='NOAA-18',
+                device_index=0,
+                gain=40.0,
+                rtl_tcp_host='192.168.1.100',
+                rtl_tcp_port=1234,
+            )
+
+            assert success is True
+            assert error_msg is None
+
+            mock_popen.assert_called_once()
+            cmd = mock_popen.call_args[0][0]
+            assert '--source' in cmd
+            source_idx = cmd.index('--source')
+            assert cmd[source_idx + 1] == 'rtltcp'
+            assert '--ip_address' in cmd
+            assert '192.168.1.100' in cmd
+            assert '--port' in cmd
+            assert '1234' in cmd
+            # Should NOT have --source_id for remote
+            assert '--source_id' not in cmd
+
+    @patch('subprocess.Popen')
+    @patch('pty.openpty')
+    @patch('utils.weather_sat.register_process')
+    def test_start_rtl_tcp_skips_device_resolve(self, mock_register, mock_pty, mock_popen):
+        """start() with rtl_tcp should skip _resolve_device_id."""
+        with patch('shutil.which', return_value='/usr/bin/satdump'), \
+             patch('utils.weather_sat.WeatherSatDecoder._resolve_device_id') as mock_resolve:
+            mock_pty.return_value = (10, 11)
+            mock_process = MagicMock()
+            mock_process.poll.return_value = None
+            mock_popen.return_value = mock_process
+
+            decoder = WeatherSatDecoder()
+
+            success, _ = decoder.start(
+                satellite='NOAA-18',
+                device_index=0,
+                gain=40.0,
+                rtl_tcp_host='10.0.0.1',
+            )
+
+            assert success is True
+            mock_resolve.assert_not_called()
+
+    @patch('subprocess.Popen')
+    @patch('pty.openpty')
     def test_start_already_running(self, mock_pty, mock_popen):
         """start() should return True when already running."""
         with patch('shutil.which', return_value='/usr/bin/satdump'), \

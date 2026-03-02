@@ -91,7 +91,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     libzmq3-dev \
     libpulse-dev \
-    libfftw3-dev \
+    libfftw3-bin \
     liblapack-dev \
     libglib2.0-dev \
     libxml2-dev \

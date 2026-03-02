@@ -13,8 +13,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Generator
 
-from flask import Blueprint, jsonify, request, Response, render_template
-from flask import make_response
+from flask import Blueprint, Response, jsonify, make_response, render_template, request
 
 # psycopg2 is optional - only needed for PostgreSQL history persistence
 try:
@@ -28,39 +27,38 @@ except ImportError:
 
 import app as app_module
 from config import (
+    ADSB_AUTO_START,
     ADSB_DB_HOST,
     ADSB_DB_NAME,
     ADSB_DB_PASSWORD,
     ADSB_DB_PORT,
     ADSB_DB_USER,
-    ADSB_AUTO_START,
     ADSB_HISTORY_ENABLED,
     SHARED_OBSERVER_LOCATION_ENABLED,
 )
-from utils.logging import adsb_logger as logger
-from utils.process import write_dump1090_pid, clear_dump1090_pid, cleanup_stale_dump1090
-from utils.validation import (
-    validate_device_index, validate_gain,
-    validate_rtl_tcp_host, validate_rtl_tcp_port
-)
-from utils.sse import format_sse
-from utils.event_pipeline import process_event
-from utils.sdr import SDRFactory, SDRType
+from utils import aircraft_db
+from utils.acars_translator import translate_message
+from utils.adsb_history import _ensure_adsb_schema, adsb_history_writer, adsb_snapshot_writer
 from utils.constants import (
     ADSB_SBS_PORT,
     ADSB_TERMINATE_TIMEOUT,
-    PROCESS_TERMINATE_TIMEOUT,
-    SBS_SOCKET_TIMEOUT,
-    SBS_RECONNECT_DELAY,
-    SOCKET_BUFFER_SIZE,
-    SSE_KEEPALIVE_INTERVAL,
-    SSE_QUEUE_TIMEOUT,
-    SOCKET_CONNECT_TIMEOUT,
     ADSB_UPDATE_INTERVAL,
     DUMP1090_START_WAIT,
+    PROCESS_TERMINATE_TIMEOUT,
+    SBS_RECONNECT_DELAY,
+    SBS_SOCKET_TIMEOUT,
+    SOCKET_BUFFER_SIZE,
+    SOCKET_CONNECT_TIMEOUT,
+    SSE_KEEPALIVE_INTERVAL,
+    SSE_QUEUE_TIMEOUT,
 )
-from utils import aircraft_db
-from utils.adsb_history import adsb_history_writer, adsb_snapshot_writer, _ensure_adsb_schema
+from utils.event_pipeline import process_event
+from utils.flight_correlator import get_flight_correlator
+from utils.logging import adsb_logger as logger
+from utils.process import cleanup_stale_dump1090, clear_dump1090_pid, write_dump1090_pid
+from utils.sdr import SDRFactory, SDRType
+from utils.sse import format_sse
+from utils.validation import validate_device_index, validate_gain, validate_rtl_tcp_host, validate_rtl_tcp_port
 
 adsb_bp = Blueprint('adsb', __name__, url_prefix='/adsb')
 
@@ -1245,7 +1243,21 @@ def get_aircraft_messages(icao: str):
 
     aircraft = app_module.adsb_aircraft.get(icao.upper())
     callsign = aircraft.get('callsign') if aircraft else None
+    registration = aircraft.get('registration') if aircraft else None
 
-    from utils.flight_correlator import get_flight_correlator
-    messages = get_flight_correlator().get_messages_for_aircraft(icao=icao.upper(), callsign=callsign)
+    messages = get_flight_correlator().get_messages_for_aircraft(
+        icao=icao.upper(), callsign=callsign, registration=registration
+    )
+
+    # Backfill translation on messages missing label_description
+    try:
+        for msg in messages.get('acars', []):
+            if not msg.get('label_description'):
+                translation = translate_message(msg)
+                msg['label_description'] = translation['label_description']
+                msg['message_type'] = translation['message_type']
+                msg['parsed'] = translation['parsed']
+    except Exception:
+        pass
+
     return jsonify({'status': 'success', 'icao': icao.upper(), **messages})

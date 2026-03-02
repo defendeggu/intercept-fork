@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from collections import deque
 
+from utils.airline_codes import expand_search_terms, translate_flight
+
 
 class FlightCorrelator:
     """Correlate ACARS and VDL2 messages with ADS-B aircraft."""
@@ -26,7 +28,10 @@ class FlightCorrelator:
         })
 
     def get_messages_for_aircraft(
-        self, icao: str | None = None, callsign: str | None = None
+        self,
+        icao: str | None = None,
+        callsign: str | None = None,
+        registration: str | None = None,
     ) -> dict[str, list[dict]]:
         """Match ACARS/VDL2 messages by callsign, flight, or registration fields."""
         if not icao and not callsign:
@@ -37,6 +42,11 @@ class FlightCorrelator:
             search_terms.add(callsign.strip().upper())
         if icao:
             search_terms.add(icao.strip().upper())
+        if registration:
+            search_terms.add(registration.strip().upper())
+
+        # Expand with IATA↔ICAO airline code translations
+        search_terms = expand_search_terms(search_terms)
 
         acars = []
         for msg in self._acars_messages:
@@ -55,14 +65,36 @@ class FlightCorrelator:
         """Check if any identifying field in msg matches the search terms."""
         for field in ('flight', 'tail', 'reg', 'callsign', 'icao', 'addr'):
             val = msg.get(field)
-            if val and str(val).strip().upper() in terms:
+            if not val:
+                continue
+            upper_val = str(val).strip().upper()
+            if upper_val in terms:
                 return True
+            # Also try translating the message field value
+            for translated in translate_flight(upper_val):
+                if translated in terms:
+                    return True
         return False
 
     @staticmethod
     def _clean_msg(msg: dict) -> dict:
         """Return message without internal correlation fields."""
         return {k: v for k, v in msg.items() if not k.startswith('_corr_')}
+
+    def get_recent_messages(self, msg_type: str = 'acars', limit: int = 50) -> list[dict]:
+        """Return the most recent messages (newest first)."""
+        source = self._acars_messages if msg_type == 'acars' else self._vdl2_messages
+        msgs = [self._clean_msg(m) for m in source]
+        msgs.reverse()
+        return msgs[:limit]
+
+    def clear_acars(self) -> None:
+        """Clear all stored ACARS messages."""
+        self._acars_messages.clear()
+
+    def clear_vdl2(self) -> None:
+        """Clear all stored VDL2 messages."""
+        self._vdl2_messages.clear()
 
     @property
     def acars_count(self) -> int:

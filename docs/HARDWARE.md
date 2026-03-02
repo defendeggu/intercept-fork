@@ -94,6 +94,126 @@ sudo modprobe -r dvb_usb_rtl28xxu
 
 ---
 
+## Multiple RTL-SDR Dongles
+
+If you're running two (or more) RTL-SDR dongles on the same machine, they ship with the same default serial number so Linux can't tell them apart reliably. Follow these steps to give each a unique identity.
+
+### Step 1: Blacklist the DVB-T driver
+
+Already covered above, but make sure this is done first — the kernel's DVB driver will grab the dongles before librtlsdr can:
+
+```bash
+echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl.conf
+sudo modprobe -r dvb_usb_rtl28xxu
+```
+
+### Step 2: Burn unique serial numbers
+
+Each dongle has an EEPROM that stores a serial number. By default they're all `00000001`. You need to give each one a unique serial.
+
+**Plug in only the first dongle**, then:
+
+```bash
+rtl_eeprom -d 0 -s 00000001
+```
+
+**Unplug it, plug in the second dongle**, then:
+
+```bash
+rtl_eeprom -d 0 -s 00000002
+```
+
+> Pick any 8-digit hex serials you like. The `-d 0` means "device index 0" (the only one plugged in).
+
+Unplug and replug both dongles after writing.
+
+### Step 3: Verify
+
+With both plugged in:
+
+```bash
+rtl_test -t
+```
+
+You should see:
+
+```
+0:  Realtek, RTL2838UHIDIR, SN: 00000001
+1:  Realtek, RTL2838UHIDIR, SN: 00000002
+```
+
+**Tip:** If you don't know which physical dongle has which serial, unplug one and run `rtl_test -t` — the one still detected is the one still plugged in.
+
+### Step 4: Udev rules with stable symlinks
+
+Create rules that give each dongle a persistent name based on its serial:
+
+```bash
+sudo bash -c 'cat > /etc/udev/rules.d/20-rtlsdr.rules << EOF
+# RTL-SDR dongles - permissions and stable symlinks by serial
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2838", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2832", MODE="0666"
+
+# Symlinks by serial — change names/serials to match your hardware
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTRS{serial}=="00000001", SYMLINK+="sdr-dongle1"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTRS{serial}=="00000002", SYMLINK+="sdr-dongle2"
+EOF'
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+After replugging, you'll have `/dev/sdr-dongle1` and `/dev/sdr-dongle2`.
+
+### Step 5: USB power (Raspberry Pi)
+
+Two dongles can draw more current than the Pi allows by default:
+
+```bash
+# In /boot/firmware/config.txt, add:
+usb_max_current_enable=1
+```
+
+Disable USB autosuspend so dongles don't get powered off:
+
+```bash
+# In /etc/default/grub or kernel cmdline, add:
+usbcore.autosuspend=-1
+```
+
+Or via udev:
+
+```bash
+echo 'ACTION=="add", SUBSYSTEM=="usb", ATTR{power/autosuspend}="-1"' | \
+  sudo tee /etc/udev/rules.d/50-usb-autosuspend.rules
+```
+
+### Step 6: Docker access
+
+Your `docker-compose.yml` needs privileged mode and USB passthrough:
+
+```yaml
+services:
+  intercept:
+    privileged: true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+```
+
+INTERCEPT auto-detects both dongles inside the container via `rtl_test -t` and addresses them by device index (`-d 0`, `-d 1`).
+
+### Quick reference
+
+| Step | What | Why |
+|------|------|-----|
+| Blacklist DVB | `/etc/modprobe.d/blacklist-rtl.conf` | Kernel won't steal the dongles |
+| Burn serials | `rtl_eeprom -d 0 -s <serial>` | Unique identity per dongle |
+| Udev rules | `/etc/udev/rules.d/20-rtlsdr.rules` | Permissions + stable `/dev/sdr-*` names |
+| USB power | `config.txt` + autosuspend off | Enough current for two dongles on a Pi |
+| Docker | `privileged: true` + USB volume | Container sees both dongles |
+
+---
+
 ## Verify Installation
 
 ### Check dependencies

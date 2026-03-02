@@ -33,6 +33,7 @@ services:
       # Optional: mount logs directory
       # - ./logs:/app/logs
     environment:
+      - TZ=${TZ:-UTC}
       - INTERCEPT_HOST=0.0.0.0
       - INTERCEPT_PORT=5050
       - INTERCEPT_LOG_LEVEL=INFO
@@ -87,6 +88,7 @@ services:
     volumes:
       - ./data:/app/data
     environment:
+      - TZ=${TZ:-UTC}
       - INTERCEPT_HOST=0.0.0.0
       - INTERCEPT_PORT=5050
       - INTERCEPT_LOG_LEVEL=INFO
@@ -120,6 +122,7 @@ services:
     profiles:
       - history
     environment:
+      - TZ=${TZ:-UTC}
       - POSTGRES_DB=intercept_adsb
       - POSTGRES_USER=intercept
       - POSTGRES_PASSWORD=intercept

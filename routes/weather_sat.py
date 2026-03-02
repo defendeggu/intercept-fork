@@ -12,7 +12,7 @@ from flask import Blueprint, jsonify, request, Response, send_file
 
 from utils.logging import get_logger
 from utils.sse import sse_stream
-from utils.validation import validate_device_index, validate_gain, validate_latitude, validate_longitude, validate_elevation
+from utils.validation import validate_device_index, validate_gain, validate_latitude, validate_longitude, validate_elevation, validate_rtl_tcp_host, validate_rtl_tcp_port
 from utils.weather_sat import (
     get_weather_sat_decoder,
     is_weather_sat_available,
@@ -158,18 +158,30 @@ def start_capture():
 
     bias_t = bool(data.get('bias_t', False))
 
-    # Claim SDR device
-    try:
-        import app as app_module
-        error = app_module.claim_sdr_device(device_index, 'weather_sat')
-        if error:
-            return jsonify({
-                'status': 'error',
-                'error_type': 'DEVICE_BUSY',
-                'message': error,
-            }), 409
-    except ImportError:
-        pass
+    # Check for rtl_tcp (remote SDR) connection
+    rtl_tcp_host = data.get('rtl_tcp_host')
+    rtl_tcp_port = data.get('rtl_tcp_port', 1234)
+
+    if rtl_tcp_host:
+        try:
+            rtl_tcp_host = validate_rtl_tcp_host(rtl_tcp_host)
+            rtl_tcp_port = validate_rtl_tcp_port(rtl_tcp_port)
+        except ValueError as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+
+    # Claim SDR device (skip for remote rtl_tcp)
+    if not rtl_tcp_host:
+        try:
+            import app as app_module
+            error = app_module.claim_sdr_device(device_index, 'weather_sat')
+            if error:
+                return jsonify({
+                    'status': 'error',
+                    'error_type': 'DEVICE_BUSY',
+                    'message': error,
+                }), 409
+        except ImportError:
+            pass
 
     # Clear queue
     while not _weather_sat_queue.empty():
@@ -182,7 +194,8 @@ def start_capture():
     decoder.set_callback(_progress_callback)
 
     def _release_device():
-        _release_weather_sat_device(device_index)
+        if not rtl_tcp_host:
+            _release_weather_sat_device(device_index)
 
     decoder.set_on_complete(_release_device)
 
@@ -192,6 +205,8 @@ def start_capture():
         gain=gain,
         sample_rate=DEFAULT_SAMPLE_RATE,
         bias_t=bias_t,
+        rtl_tcp_host=rtl_tcp_host,
+        rtl_tcp_port=rtl_tcp_port,
     )
 
     if success:

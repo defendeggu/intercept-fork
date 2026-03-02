@@ -226,6 +226,68 @@ class TestWeatherSatRoutes:
             assert data['error_type'] == 'DEVICE_BUSY'
             assert 'Device busy' in data['message']
 
+    def test_start_capture_rtl_tcp_success(self, client):
+        """POST /weather-sat/start with rtl_tcp remote SDR."""
+        with patch('routes.weather_sat.is_weather_sat_available', return_value=True), \
+             patch('routes.weather_sat.get_weather_sat_decoder') as mock_get, \
+             patch('app.claim_sdr_device') as mock_claim:
+
+            mock_decoder = MagicMock()
+            mock_decoder.is_running = False
+            mock_decoder.start.return_value = (True, None)
+            mock_get.return_value = mock_decoder
+
+            payload = {
+                'satellite': 'NOAA-18',
+                'device': 0,
+                'gain': 40.0,
+                'rtl_tcp_host': '192.168.1.100',
+                'rtl_tcp_port': 1234,
+            }
+
+            response = client.post(
+                '/weather-sat/start',
+                data=json.dumps(payload),
+                content_type='application/json'
+            )
+
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data['status'] == 'started'
+
+            # Device claim should NOT be called for remote SDR
+            mock_claim.assert_not_called()
+
+            # Verify rtl_tcp params passed to decoder
+            mock_decoder.start.assert_called_once()
+            call_kwargs = mock_decoder.start.call_args
+            assert call_kwargs[1]['rtl_tcp_host'] == '192.168.1.100'
+            assert call_kwargs[1]['rtl_tcp_port'] == 1234
+
+    def test_start_capture_rtl_tcp_invalid_host(self, client):
+        """POST /weather-sat/start with invalid rtl_tcp host."""
+        with patch('routes.weather_sat.is_weather_sat_available', return_value=True), \
+             patch('routes.weather_sat.get_weather_sat_decoder') as mock_get:
+
+            mock_decoder = MagicMock()
+            mock_decoder.is_running = False
+            mock_get.return_value = mock_decoder
+
+            payload = {
+                'satellite': 'NOAA-18',
+                'rtl_tcp_host': 'not a valid host!@#',
+            }
+
+            response = client.post(
+                '/weather-sat/start',
+                data=json.dumps(payload),
+                content_type='application/json'
+            )
+
+            assert response.status_code == 400
+            data = response.get_json()
+            assert data['status'] == 'error'
+
     def test_start_capture_start_failure(self, client):
         """POST /weather-sat/start when decoder.start() fails."""
         with patch('routes.weather_sat.is_weather_sat_available', return_value=True), \

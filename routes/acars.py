@@ -13,30 +13,35 @@ import subprocess
 import threading
 import time
 from datetime import datetime
-from typing import Generator
+from typing import Any, Generator
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify, request
 
 import app as app_module
-from utils.logging import sensor_logger as logger
-from utils.validation import validate_device_index, validate_gain, validate_ppm
-from utils.sdr import SDRFactory, SDRType
-from utils.sse import sse_stream_fanout
-from utils.event_pipeline import process_event
+from utils.acars_translator import translate_message
 from utils.constants import (
+    PROCESS_START_WAIT,
     PROCESS_TERMINATE_TIMEOUT,
     SSE_KEEPALIVE_INTERVAL,
     SSE_QUEUE_TIMEOUT,
-    PROCESS_START_WAIT,
 )
+from utils.event_pipeline import process_event
+from utils.flight_correlator import get_flight_correlator
+from utils.logging import sensor_logger as logger
 from utils.process import register_process, unregister_process
+from utils.sdr import SDRFactory, SDRType
+from utils.sse import sse_stream_fanout
+from utils.validation import validate_device_index, validate_gain, validate_ppm
 
 acars_bp = Blueprint('acars', __name__, url_prefix='/acars')
 
-# Default VHF ACARS frequencies (MHz) - common worldwide
+# Default VHF ACARS frequencies (MHz) - North America primary
 DEFAULT_ACARS_FREQUENCIES = [
-    '131.725',  # North America
-    '131.825',  # North America
+    '131.550',  # Primary worldwide / North America
+    '130.025',  # North America secondary
+    '129.125',  # North America tertiary
+    '131.725',  # North America (major US carriers)
+    '131.825',  # North America (major US carriers)
 ]
 
 # Message counter for statistics
@@ -121,6 +126,15 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
                 data['type'] = 'acars'
                 data['timestamp'] = datetime.utcnow().isoformat() + 'Z'
 
+                # Enrich with translated label and parsed fields
+                try:
+                    translation = translate_message(data)
+                    data['label_description'] = translation['label_description']
+                    data['message_type'] = translation['message_type']
+                    data['parsed'] = translation['parsed']
+                except Exception:
+                    pass
+
                 # Update stats
                 acars_message_count += 1
                 acars_last_message_time = time.time()
@@ -129,7 +143,6 @@ def stream_acars_output(process: subprocess.Popen, is_text_mode: bool = False) -
 
                 # Feed flight correlator
                 try:
-                    from utils.flight_correlator import get_flight_correlator
                     get_flight_correlator().add_acars_message(data)
                 except Exception:
                     pass
@@ -439,13 +452,32 @@ def stream_acars() -> Response:
     return response
 
 
+@acars_bp.route('/messages')
+def get_acars_messages() -> Response:
+    """Get recent ACARS messages from correlator (for history reload)."""
+    limit = request.args.get('limit', 50, type=int)
+    limit = max(1, min(limit, 200))
+    msgs = get_flight_correlator().get_recent_messages('acars', limit)
+    return jsonify(msgs)
+
+
+@acars_bp.route('/clear', methods=['POST'])
+def clear_acars_messages() -> Response:
+    """Clear stored ACARS messages and reset counter."""
+    global acars_message_count, acars_last_message_time
+    get_flight_correlator().clear_acars()
+    acars_message_count = 0
+    acars_last_message_time = None
+    return jsonify({'status': 'cleared'})
+
+
 @acars_bp.route('/frequencies')
 def get_frequencies() -> Response:
     """Get default ACARS frequencies."""
     return jsonify({
         'default': DEFAULT_ACARS_FREQUENCIES,
         'regions': {
-            'north_america': ['131.725', '131.825'],
+            'north_america': ['131.550', '130.025', '129.125', '131.725', '131.825'],
             'europe': ['131.525', '131.725', '131.550'],
             'asia_pacific': ['131.550', '131.450'],
         }

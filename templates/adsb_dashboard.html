@@ -173,9 +173,14 @@
                             <div id="acarsFreqSelector" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; font-size: 9px;">
                                 <!-- Frequency checkboxes populated by JS -->
                             </div>
-                            <button class="acars-btn" id="acarsToggleBtn" onclick="toggleAcars()" style="width: 100%;">
-                                ▶ START ACARS
-                            </button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="acars-btn" id="acarsToggleBtn" onclick="toggleAcars()" style="flex: 1;">
+                                    ▶ START ACARS
+                                </button>
+                                <button class="acars-btn" id="acarsClearBtn" onclick="clearAcarsMessages()" title="Clear messages" style="padding: 4px 8px; font-size: 9px; opacity: 0.7;">
+                                    CLEAR
+                                </button>
+                            </div>
                         </div>
                         <div class="acars-messages" id="acarsMessages">
                             <div class="no-aircraft" style="padding: 20px; text-align: center;">
@@ -223,9 +228,14 @@
                             <div id="vdl2FreqSelector" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; font-size: 9px;">
                                 <!-- Frequency checkboxes populated by JS -->
                             </div>
-                            <button class="vdl2-btn" id="vdl2ToggleBtn" onclick="toggleVdl2()" style="width: 100%;">
-                                &#9654; START VDL2
-                            </button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="vdl2-btn" id="vdl2ToggleBtn" onclick="toggleVdl2()" style="flex: 1;">
+                                    &#9654; START VDL2
+                                </button>
+                                <button class="vdl2-btn" id="vdl2ClearBtn" onclick="clearVdl2Messages()" title="Clear messages" style="padding: 4px 8px; font-size: 9px; opacity: 0.7;">
+                                    CLEAR
+                                </button>
+                            </div>
                         </div>
                         <div class="vdl2-messages" id="vdl2Messages">
                             <div class="no-aircraft" style="padding: 20px; text-align: center;">
@@ -2841,6 +2851,9 @@ sudo make install</code>
             // Agent badge if aircraft came from remote agent
             const agentBadge = ac._agent ?
                 `<span class="agent-badge">${ac._agent}</span>` : '';
+            // ACARS indicator if this aircraft has datalink messages
+            const acarsIndicator = (typeof acarsAircraftIcaos !== 'undefined' && acarsAircraftIcaos.has(ac.icao)) ?
+                `<span style="background:var(--accent-cyan);color:#000;padding:1px 4px;border-radius:2px;font-size:7px;font-weight:700;margin-left:4px;" title="Has ACARS messages">DLK</span>` : '';
             // Vertical rate indicator: arrow up (climbing), arrow down (descending), or dash (level)
             let vsIndicator = '-';
             let vsColor = '';
@@ -2851,8 +2864,8 @@ sudo make install</code>
 
             return `
                 <div class="aircraft-header">
-                    <span class="aircraft-callsign">${callsign}${badge}${agentBadge}</span>
-                    <span class="aircraft-icao">${typeCode ? typeCode + ' • ' : ''}${ac.icao}</span>
+                    <span class="aircraft-callsign">${escapeHtml(callsign)}${badge}${acarsIndicator}${agentBadge}</span>
+                    <span class="aircraft-icao">${typeCode ? escapeHtml(typeCode) + ' • ' : ''}${escapeHtml(ac.icao)}</span>
                 </div>
                 <div class="aircraft-details">
                     <div class="aircraft-detail">
@@ -3029,6 +3042,7 @@ sudo make install</code>
             renderAircraftList();
             showAircraftDetails(icao);
             updateFlightLookupBtn();
+            highlightSidebarMessages(icao);
 
             const ac = aircraft[icao];
             if (ac && ac.lat !== undefined && ac.lat !== null && ac.lon !== undefined && ac.lon !== null) {
@@ -3042,6 +3056,24 @@ sudo make install</code>
 
                 radarMap.setView([targetLat, targetLon], 10);
             }
+        }
+
+        function highlightSidebarMessages(icao) {
+            // Highlight ACARS/VDL2 sidebar messages matching the selected aircraft
+            const containers = ['acarsMessages', 'vdl2Messages'];
+            containers.forEach(containerId => {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                for (const item of container.children) {
+                    if (item.dataset.icao === icao) {
+                        item.style.borderLeft = '3px solid var(--accent-cyan)';
+                        item.style.background = 'rgba(0, 212, 255, 0.08)';
+                    } else {
+                        item.style.borderLeft = '';
+                        item.style.background = '';
+                    }
+                }
+            });
         }
 
         function showAircraftDetails(icao) {
@@ -3122,12 +3154,139 @@ sudo make install</code>
                         <div class="telemetry-label">Range</div>
                         <div class="telemetry-value">${ac.lat ? calculateDistanceNm(observerLocation.lat, observerLocation.lon, ac.lat, ac.lon).toFixed(1) + ' nm' : 'N/A'}</div>
                     </div>
+                </div>
+                <div id="aircraftAcarsSection" style="margin-top:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:600;color:var(--accent-cyan);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;border-top:1px solid var(--border-color);padding-top:8px;">
+                        <span>Datalink Messages</span>
+                        <button onclick="clearAircraftMessages()" title="Clear datalink messages" style="background:none;border:1px solid var(--border-color);color:var(--text-muted);cursor:pointer;font-size:9px;padding:1px 5px;border-radius:3px;font-family:var(--font-mono);line-height:1;">&#10005;</button>
+                    </div>
+                    <div id="aircraftAcarsMessages" style="font-size:10px;color:var(--text-dim);transition:opacity 0.15s ease;">Loading...</div>
                 </div>`;
 
             // Fetch aircraft photo if registration is available
             if (registration) {
                 fetchAircraftPhoto(registration);
             }
+
+            // Fetch ACARS messages for this aircraft
+            fetchAircraftMessages(icao);
+        }
+
+        // ACARS message refresh timer for selected aircraft
+        let acarsMessageTimer = null;
+
+        function fetchAircraftMessages(icao) {
+            // Clear previous timer
+            if (acarsMessageTimer) {
+                clearInterval(acarsMessageTimer);
+                acarsMessageTimer = null;
+            }
+
+            function doFetch() {
+                fetch('/adsb/aircraft/' + icao + '/messages')
+                    .then(r => r.json())
+                    .then(data => {
+                        const container = document.getElementById('aircraftAcarsMessages');
+                        if (!container) return;
+                        const msgs = (data.acars || []).concat(data.vdl2 || []);
+                        let newHtml;
+                        if (msgs.length === 0) {
+                            newHtml = '<span style="color:var(--text-muted);font-style:italic;">No messages yet</span>';
+                        } else {
+                            msgs.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+                            newHtml = msgs.slice(0, 20).map(renderAcarsCard).join('');
+                        }
+                        // Only update DOM if content actually changed
+                        if (container.innerHTML !== newHtml) {
+                            container.style.opacity = '0.7';
+                            setTimeout(() => {
+                                container.innerHTML = newHtml;
+                                container.style.opacity = '1';
+                            }, 150);
+                        }
+                    })
+                    .catch(() => { /* keep existing content on error */ });
+            }
+
+            doFetch();
+            acarsMessageTimer = setInterval(doFetch, 10000);
+        }
+
+        function getAcarsTypeBadge(type) {
+            const colors = {
+                position: '#00ff88',
+                engine_data: '#ff9500',
+                weather: '#00d4ff',
+                ats: '#ffdd00',
+                cpdlc: '#b388ff',
+                oooi: '#4fc3f7',
+                squawk: '#ff6b6b',
+                link_test: '#666',
+                handshake: '#555',
+                other: '#888',
+            };
+            const labels = {
+                position: 'POS',
+                engine_data: 'ENG',
+                weather: 'WX',
+                ats: 'ATS',
+                cpdlc: 'CPDLC',
+                oooi: 'OOOI',
+                squawk: 'SQK',
+                link_test: 'LINK',
+                handshake: 'HSHK',
+                other: 'MSG',
+            };
+            const color = colors[type] || '#888';
+            const lbl = labels[type] || 'MSG';
+            return '<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;color:#000;background:' + color + ';">' + lbl + '</span>';
+        }
+
+        // TODO: Similar to renderAcarsMainCard in partials/modes/acars.html — consider unifying
+        function renderAcarsCard(msg) {
+            const type = msg.message_type || 'other';
+            const badge = getAcarsTypeBadge(type);
+            const desc = escapeHtml(msg.label_description || ('Label ' + (msg.label || '?')));
+            const text = msg.text || msg.msg || '';
+            const truncText = escapeHtml(text.length > 120 ? text.substring(0, 120) + '...' : text);
+            const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+            const flight = escapeHtml(msg.flight || '');
+
+            let parsedHtml = '';
+            if (msg.parsed) {
+                const p = msg.parsed;
+                if (type === 'position' && p.lat !== undefined) {
+                    parsedHtml = '<div style="color:var(--accent-green);margin-top:2px;">' +
+                        p.lat.toFixed(4) + ', ' + p.lon.toFixed(4) +
+                        (p.flight_level ? ' • ' + escapeHtml(String(p.flight_level)) : '') +
+                        (p.destination ? ' → ' + escapeHtml(String(p.destination)) : '') + '</div>';
+                } else if (type === 'engine_data') {
+                    const parts = [];
+                    Object.keys(p).forEach(k => {
+                        parts.push(escapeHtml(k) + ': ' + escapeHtml(String(p[k].value)));
+                    });
+                    if (parts.length) {
+                        parsedHtml = '<div style="color:var(--accent-orange,#ff9500);margin-top:2px;">' + parts.slice(0, 4).join(' | ') + '</div>';
+                    }
+                } else if (type === 'oooi' && p.origin) {
+                    parsedHtml = '<div style="color:var(--accent-cyan);margin-top:2px;">' +
+                        escapeHtml(String(p.origin)) + ' → ' + escapeHtml(String(p.destination)) +
+                        (p.out ? ' | OUT ' + escapeHtml(String(p.out)) : '') +
+                        (p.off ? ' OFF ' + escapeHtml(String(p.off)) : '') +
+                        (p.on ? ' ON ' + escapeHtml(String(p.on)) : '') +
+                        (p['in'] ? ' IN ' + escapeHtml(String(p['in'])) : '') + '</div>';
+                }
+            }
+
+            return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
+                '<span>' + badge + ' <span style="color:var(--text-primary);">' + desc + '</span></span>' +
+                '<span style="color:var(--text-muted);font-size:9px;">' + time + '</span></div>' +
+                (flight ? '<div style="color:var(--accent-cyan);font-size:9px;">' + flight + '</div>' : '') +
+                parsedHtml +
+                (truncText && type !== 'link_test' && type !== 'handshake' ?
+                    '<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:9px;margin-top:2px;word-break:break-all;">' + truncText + '</div>' : '') +
+                '</div>';
         }
 
         // Cache for aircraft photos to avoid repeated API calls
@@ -3188,12 +3347,15 @@ sudo make install</code>
                     cleanupTrail(icao);
                     delete aircraft[icao];
                     delete alertedAircraft[icao];
+                    if (typeof acarsAircraftIcaos !== 'undefined') acarsAircraftIcaos.delete(icao);
                     needsUpdate = true;
 
                     if (selectedIcao === icao) {
                         selectedIcao = null;
                         showAircraftDetails(null);
                         updateFlightLookupBtn();
+                        highlightSidebarMessages(null);
+                        clearAircraftMessages();
                     }
                 }
             });
@@ -3583,7 +3745,7 @@ sudo make install</code>
         let acarsMessageCount = 0;
         let acarsSidebarCollapsed = localStorage.getItem('acarsSidebarCollapsed') !== 'false';
         let acarsFrequencies = {
-            'na': ['131.725', '131.825'],
+            'na': ['131.550', '130.025', '129.125'],
             'eu': ['131.525', '131.725', '131.550'],
             'ap': ['131.550', '131.450']
         };
@@ -3623,6 +3785,17 @@ sudo make install</code>
                         document.getElementById('acarsToggleBtn').classList.add('active');
                         document.getElementById('acarsPanelIndicator').classList.add('active');
                         startAcarsStream(false);
+                        // Reload message history from backend
+                        fetch('/acars/messages?limit=50')
+                            .then(r => r.json())
+                            .then(msgs => {
+                                if (!msgs || !msgs.length) return;
+                                // Add oldest first so newest ends up on top
+                                for (let i = msgs.length - 1; i >= 0; i--) {
+                                    addAcarsMessage(msgs[i]);
+                                }
+                            })
+                            .catch(() => {});
                     }
                 })
                 .catch(() => {});
@@ -3639,8 +3812,8 @@ sudo make install</code>
                 previouslyChecked.add(cb.value);
             });
 
-            container.innerHTML = freqs.map(freq => {
-                // Check by default if it was previously checked or if this is initial load
+            container.innerHTML = freqs.map((freq, i) => {
+                // On initial load, check all frequencies; otherwise preserve state
                 const checked = previouslyChecked.size === 0 || previouslyChecked.has(freq) ? 'checked' : '';
                 return `
                     <label style="display: flex; align-items: center; gap: 3px; padding: 2px 6px; background: var(--bg-secondary); border-radius: 3px; cursor: pointer;">
@@ -3684,9 +3857,9 @@ sudo make install</code>
             acarsCurrentAgent = isAgentMode ? adsbCurrentAgent : null;
 
             // Warn if using same device as ADS-B (only for local mode)
-            if (!isAgentMode && isTracking && device === '0') {
+            if (!isAgentMode && isTracking && adsbActiveDevice !== null && device === String(adsbActiveDevice)) {
                 const useAnyway = confirm(
-                    'Warning: ADS-B tracking may be using SDR device 0.\n\n' +
+                    `Warning: ADS-B tracking is using SDR device ${adsbActiveDevice}.\n\n` +
                     'ACARS uses VHF frequencies (129-131 MHz) while ADS-B uses 1090 MHz.\n' +
                     'You need TWO separate SDR devices to receive both simultaneously.\n\n' +
                     'Click OK to start ACARS on device ' + device + ' anyway.'
@@ -3865,6 +4038,63 @@ sudo make install</code>
             }, pollInterval);
         }
 
+        // Track which aircraft have ACARS messages (by ICAO)
+        const acarsAircraftIcaos = new Set();
+
+        // IATA (2-letter) → ICAO (3-letter) airline code mapping
+        // NOTE: Duplicated from utils/airline_codes.py — keep both in sync
+        const IATA_TO_ICAO = {
+            'AA':'AAL','DL':'DAL','UA':'UAL','WN':'SWA','B6':'JBU','AS':'ASA',
+            'NK':'NKS','F9':'FFT','G4':'AAY','HA':'HAL','SY':'SCX','WS':'WJA',
+            'AC':'ACA','WG':'WGN','TS':'TSC','PD':'POE','MX':'MXA','QX':'QXE',
+            'OH':'COM','OO':'SKW','YX':'RPA','9E':'FLG','PT':'SWQ','MQ':'ENY',
+            'YV':'ASH','AX':'LOF','ZW':'AWI','G7':'GJS','EV':'ASQ',
+            'AM':'AMX','VB':'VIV','4O':'AIJ','Y4':'VOI',
+            '5X':'UPS','FX':'FDX',
+            'BA':'BAW','LH':'DLH','AF':'AFR','KL':'KLM','IB':'IBE','AZ':'ITY',
+            'SK':'SAS','AY':'FIN','OS':'AUA','LX':'SWR','SN':'BEL','TP':'TAP',
+            'EI':'EIN','U2':'EZY','FR':'RYR','W6':'WZZ','VY':'VLG','PC':'PGT',
+            'TK':'THY','LO':'LOT','BT':'BTI','DY':'NAX','VS':'VIR','EW':'EWG',
+            'SQ':'SIA','CX':'CPA','QF':'QFA','JL':'JAL','NH':'ANA','KE':'KAL',
+            'OZ':'AAR','CI':'CAL','BR':'EVA','CZ':'CSN','MU':'CES','CA':'CCA',
+            'AI':'AIC','GA':'GIA','TG':'THA','MH':'MAS','PR':'PAL','VN':'HVN',
+            'NZ':'ANZ','3K':'JSA','JQ':'JST','AK':'AXM','TR':'TGW','5J':'CEB',
+            'EK':'UAE','QR':'QTR','EY':'ETD','GF':'GFA','SV':'SVA',
+            'ET':'ETH','MS':'MSR','SA':'SAA','RJ':'RJA','WY':'OMA',
+            'LA':'LAN','G3':'GLO','AD':'AZU','AV':'AVA','CM':'CMP','AR':'ARG'
+        };
+        const ICAO_TO_IATA = Object.fromEntries(Object.entries(IATA_TO_ICAO).map(([k,v]) => [v,k]));
+
+        function translateFlight(flight) {
+            if (!flight) return [];
+            const m = flight.match(/^([A-Z0-9]{2,3})(\d+[A-Z]?)$/);
+            if (!m) return [];
+            const [, prefix, num] = m;
+            const results = [];
+            if (IATA_TO_ICAO[prefix]) results.push(IATA_TO_ICAO[prefix] + num);
+            if (ICAO_TO_IATA[prefix]) results.push(ICAO_TO_IATA[prefix] + num);
+            return results;
+        }
+
+        function findAircraftIcaoByFlight(flight) {
+            if (!flight || flight === 'UNKNOWN') return null;
+            const upper = flight.trim().toUpperCase();
+            // Build candidate list: original + translated variants
+            const candidates = [upper, ...translateFlight(upper)];
+            for (const candidate of candidates) {
+                for (const [icao, ac] of Object.entries(aircraft)) {
+                    const cs = (ac.callsign || '').trim().toUpperCase();
+                    if (cs === candidate) return icao;
+                    // Also match by registration (tail number)
+                    const reg = (ac.registration || '').trim().toUpperCase();
+                    if (reg && reg === candidate) return icao;
+                }
+                // Also check ICAO hex directly
+                if (aircraft[candidate]) return candidate;
+            }
+            return null;
+        }
+
         function addAcarsMessage(data) {
             const container = document.getElementById('acarsMessages');
 
@@ -3874,22 +4104,51 @@ sudo make install</code>
 
             const msg = document.createElement('div');
             msg.className = 'acars-message-item';
-            msg.style.cssText = 'padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 10px;';
 
             const flight = data.flight || 'UNKNOWN';
             const reg = data.reg || '';
             const label = data.label || '';
+            const labelDesc = data.label_description || '';
+            const msgType = data.message_type || 'other';
             const text = data.text || data.msg || '';
             const time = new Date().toLocaleTimeString();
 
+            // Escape user-controlled strings for safe innerHTML insertion
+            const eFlight = escapeHtml(flight);
+            const eReg = escapeHtml(reg);
+            const eLabelDesc = escapeHtml(labelDesc || (label ? 'Label: ' + label : ''));
+            const eText = escapeHtml(text.length > 80 ? text.substring(0, 80) + '...' : text);
+
+            // Try to find matching tracked aircraft
+            const matchedIcao = findAircraftIcaoByFlight(flight) ||
+                                findAircraftIcaoByFlight(data.tail) ||
+                                findAircraftIcaoByFlight(data.reg) ||
+                                (data.icao && aircraft[data.icao.toUpperCase()] ? data.icao.toUpperCase() : null);
+
+            if (matchedIcao) acarsAircraftIcaos.add(matchedIcao);
+
+            // Tag message with matched ICAO for cross-highlighting
+            if (matchedIcao) msg.dataset.icao = matchedIcao;
+
+            // Make clickable if we have a matching aircraft
+            msg.style.cssText = 'padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 10px;' +
+                (matchedIcao ? ' cursor: pointer;' : '');
+            if (matchedIcao) {
+                msg.onclick = () => selectAircraft(matchedIcao);
+                msg.title = 'Click to locate ' + flight + ' on map';
+            }
+
+            const typeBadge = typeof getAcarsTypeBadge === 'function' ? getAcarsTypeBadge(msgType) : '';
+            const linkIcon = matchedIcao ? '<span style="color:var(--accent-green);font-size:9px;margin-left:3px;" title="Tracked on map">&#9992;</span>' : '';
+
             msg.innerHTML = `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                    <span style="color: var(--accent-cyan); font-weight: bold;">${flight}</span>
+                    <span style="color: var(--accent-cyan); font-weight: bold;">${eFlight}${linkIcon}</span>
                     <span style="color: var(--text-muted);">${time}</span>
                 </div>
-                ${reg ? `<div style="color: var(--text-muted); font-size: 9px;">Reg: ${reg}</div>` : ''}
-                ${label ? `<div style="color: var(--accent-green);">Label: ${label}</div>` : ''}
-                ${text ? `<div style="color: var(--text-primary); margin-top: 3px; word-break: break-word;">${text}</div>` : ''}
+                ${reg ? `<div style="color: var(--text-muted); font-size: 9px;">Reg: ${eReg}</div>` : ''}
+                <div style="margin-top: 2px;">${typeBadge} <span style="color: var(--text-primary);">${eLabelDesc}</span></div>
+                ${text && msgType !== 'link_test' && msgType !== 'handshake' ? `<div style="color: var(--text-dim); margin-top: 3px; word-break: break-word; font-size: 9px;">${eText}</div>` : ''}
             `;
 
             container.insertBefore(msg, container.firstChild);
@@ -3897,6 +4156,33 @@ sudo make install</code>
             // Keep max 50 messages
             while (container.children.length > 50) {
                 container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearAcarsMessages() {
+            fetch('/acars/clear', { method: 'POST' }).catch(() => {});
+            const container = document.getElementById('acarsMessages');
+            container.innerHTML = '<div class="no-aircraft" style="padding: 20px; text-align: center;"><div style="font-size: 10px; color: var(--text-muted);">No ACARS messages</div><div style="font-size: 9px; color: var(--text-dim); margin-top: 5px;">Start ACARS to receive aircraft datalink messages</div></div>';
+            acarsMessageCount = 0;
+            document.getElementById('acarsCount').textContent = '0';
+        }
+
+        function clearVdl2Messages() {
+            fetch('/vdl2/clear', { method: 'POST' }).catch(() => {});
+            const container = document.getElementById('vdl2Messages');
+            container.innerHTML = '<div class="no-aircraft" style="padding: 20px; text-align: center;"><div style="font-size: 10px; color: var(--text-muted);">No VDL2 messages</div><div style="font-size: 9px; color: var(--text-dim); margin-top: 5px;">Start VDL2 to receive digital datalink messages</div></div>';
+            vdl2MessageCount = 0;
+            document.getElementById('vdl2Count').textContent = '0';
+        }
+
+        function clearAircraftMessages() {
+            const container = document.getElementById('aircraftAcarsMessages');
+            if (container) {
+                container.innerHTML = '<span style="color:var(--text-muted);font-style:italic;">No messages yet</span>';
+            }
+            if (acarsMessageTimer) {
+                clearInterval(acarsMessageTimer);
+                acarsMessageTimer = null;
             }
         }
 
@@ -3920,10 +4206,6 @@ sudo make install</code>
                             opt.textContent = `SDR ${idx}: ${d.name || d.type || 'SDR'}`;
                             select.appendChild(opt);
                         });
-                        // Default to device 1 if available (device 0 likely used for ADS-B)
-                        if (devices.length > 1) {
-                            select.value = select.options[1]?.value || select.options[0]?.value;
-                        }
                     }
                 });
         });
@@ -4023,9 +4305,9 @@ sudo make install</code>
             vdl2CurrentAgent = isAgentMode ? adsbCurrentAgent : null;
 
             // Warn if using same device as ADS-B (only for local mode)
-            if (!isAgentMode && isTracking && device === '0') {
+            if (!isAgentMode && isTracking && adsbActiveDevice !== null && device === String(adsbActiveDevice)) {
                 const useAnyway = confirm(
-                    'Warning: ADS-B tracking may be using SDR device 0.\n\n' +
+                    `Warning: ADS-B tracking is using SDR device ${adsbActiveDevice}.\n\n` +
                     'VDL2 uses VHF frequencies (~137 MHz) while ADS-B uses 1090 MHz.\n' +
                     'You need TWO separate SDR devices to receive both simultaneously.\n\n' +
                     'Click OK to start VDL2 on device ' + device + ' anyway.'
@@ -4261,13 +4543,14 @@ sudo make install</code>
             if (acars.reg) acarsFields.push(['Registration', acars.reg]);
             if (acars.flight) acarsFields.push(['Flight', acars.flight]);
             if (acars.mode) acarsFields.push(['Mode', acars.mode]);
-            if (acars.label) acarsFields.push(['Label', acars.label]);
+            if (acars.label) acarsFields.push(['Label', acars.label + (acars.label_description ? ' — ' + acars.label_description : '')]);
             if (acars.sublabel) acarsFields.push(['Sublabel', acars.sublabel]);
             if (acars.blk_id) acarsFields.push(['Block ID', acars.blk_id]);
             if (acars.ack) acarsFields.push(['ACK', acars.ack === '!' ? 'NAK' : acars.ack]);
             if (acars.msg_num) acarsFields.push(['Msg Number', acars.msg_num]);
             if (acars.msg_num_seq) acarsFields.push(['Msg Seq', acars.msg_num_seq]);
             if (acars.more != null) acarsFields.push(['More Follows', acars.more ? 'Yes' : 'No']);
+            if (acars.message_type && acars.message_type !== 'other') acarsFields.push(['Message Type', acars.message_type.replace(/_/g, ' ')]);
             const acarsHtml = buildSection('ACARS', acarsFields);
 
             // XID fields
@@ -4386,17 +4669,42 @@ sudo make install</code>
             });
             const label = flight || src || (avlc.frame_type || 'VDL2');
 
+            // Try to find matching tracked aircraft (same logic as ACARS)
+            const matchedIcao = findAircraftIcaoByFlight(flight) ||
+                                findAircraftIcaoByFlight(acars.reg) ||
+                                (src && aircraft[src.toUpperCase()] ? src.toUpperCase() : null);
+
+            if (matchedIcao) {
+                acarsAircraftIcaos.add(matchedIcao);
+                msg.dataset.icao = matchedIcao;
+            }
+
+            msg.style.cssText = 'padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 10px;' +
+                (matchedIcao ? ' cursor: pointer;' : '');
+            const linkIcon = matchedIcao ? '<span style="color:var(--accent-green);font-size:9px;margin-left:3px;" title="Tracked on map">&#9992;</span>' : '';
+
+            const acarsLabelDesc = acars.label_description || '';
+            const acarsMsgType = acars.message_type || 'other';
+            const vdl2TypeBadge = typeof getAcarsTypeBadge === 'function' && acars.label ? getAcarsTypeBadge(acarsMsgType) : '';
+
             msg.innerHTML = `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                    <span style="color: var(--accent-cyan); font-weight: bold;">${escapeHtml(label)}</span>
+                    <span style="color: var(--accent-cyan); font-weight: bold;">${escapeHtml(label)}${linkIcon}</span>
                     <span style="color: var(--text-muted);">${time}</span>
                 </div>
+                ${acarsLabelDesc ? `<div style="margin-top: 2px;">${vdl2TypeBadge} <span style="color: var(--text-primary);">${escapeHtml(acarsLabelDesc)}</span></div>` : ''}
                 <div style="color: var(--text-dim); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     ${freq ? freq + ' MHz' : ''}${freq && acars.label ? ' · ' : ''}${acars.label ? 'Label: ' + escapeHtml(acars.label) : ''}${msgText ? ' · ' + escapeHtml(msgText.substring(0, 50)) + (msgText.length > 50 ? '…' : '') : ''}
                 </div>
             `;
 
-            msg.addEventListener('click', () => showVdl2Modal(data, time));
+            if (matchedIcao) {
+                msg.addEventListener('click', () => selectAircraft(matchedIcao));
+                msg.addEventListener('dblclick', () => showVdl2Modal(data, time));
+                msg.title = 'Click to locate on map, double-click for details';
+            } else {
+                msg.addEventListener('click', () => showVdl2Modal(data, time));
+            }
 
             container.insertBefore(msg, container.firstChild);
 
@@ -4447,9 +4755,6 @@ sudo make install</code>
                             opt.textContent = `SDR ${idx}: ${d.name || d.type || 'SDR'}`;
                             select.appendChild(opt);
                         });
-                        if (devices.length > 1) {
-                            select.value = select.options[1]?.value || select.options[0]?.value;
-                        }
                     }
                 });
 
@@ -4465,6 +4770,16 @@ sudo make install</code>
                         document.getElementById('vdl2ToggleBtn').classList.add('active');
                         document.getElementById('vdl2PanelIndicator').classList.add('active');
                         startVdl2Stream(false);
+                        // Reload message history from backend
+                        fetch('/vdl2/messages?limit=50')
+                            .then(r => r.json())
+                            .then(msgs => {
+                                if (!msgs || !msgs.length) return;
+                                for (let i = msgs.length - 1; i >= 0; i--) {
+                                    addVdl2Message(msgs[i]);
+                                }
+                            })
+                            .catch(() => {});
                     }
                 })
                 .catch(() => {});
@@ -5416,8 +5731,9 @@ sudo make install</code>
             const adsbSelect = document.getElementById('adsbDeviceSelect');
             const airbandSelect = document.getElementById('airbandDeviceSelect');
             const acarsSelect = document.getElementById('acarsDeviceSelect');
+            const vdl2Select = document.getElementById('vdl2DeviceSelect');
 
-            [adsbSelect, airbandSelect, acarsSelect].forEach(select => {
+            [adsbSelect, airbandSelect, acarsSelect, vdl2Select].forEach(select => {
                 if (!select) return;
                 select.innerHTML = '';
 
@@ -5436,6 +5752,7 @@ sudo make install</code>
                     });
                 }
             });
+
         }
 
         // Hook into page init
