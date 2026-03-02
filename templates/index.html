@@ -4459,14 +4459,18 @@
                     rtlDeviceSection._origParent = rtlDeviceSection.parentNode;
                     rtlDeviceSection._origNext = rtlDeviceSection.nextElementSibling;
                 }
-                // For morse/radiosonde modes, move SDR device section inside the panel after the title
+                // For morse/radiosonde/meteor modes, move SDR device section inside the panel after the title
                 const morsePanel = document.getElementById('morseMode');
                 const radiosondePanel = document.getElementById('radiosondeMode');
+                const meteorPanel = document.getElementById('meteorMode');
                 if (mode === 'morse' && morsePanel) {
                     const firstSection = morsePanel.querySelector('.section');
                     if (firstSection) firstSection.after(rtlDeviceSection);
                 } else if (mode === 'radiosonde' && radiosondePanel) {
                     const firstSection = radiosondePanel.querySelector('.section');
+                    if (firstSection) firstSection.after(rtlDeviceSection);
+                } else if (mode === 'meteor' && meteorPanel) {
+                    const firstSection = meteorPanel.querySelector('.section');
                     if (firstSection) firstSection.after(rtlDeviceSection);
                 } else if (rtlDeviceSection._origParent && rtlDeviceSection.parentNode !== rtlDeviceSection._origParent) {
                     // Restore to original sidebar position when leaving morse mode

@@ -3,6 +3,7 @@
  *
  * WebSocket for binary waterfall frames, SSE for detection events/stats.
  * Renders spectrum, waterfall, timeline, and an event table.
+ * Enhanced with starfield, meteor streak animations, particle bursts, and signal meter.
  */
 const MeteorScatter = (function () {
     'use strict';
@@ -17,6 +18,7 @@ const MeteorScatter = (function () {
     let _specCanvas = null, _specCtx = null;
     let _wfCanvas = null, _wfCtx = null;
     let _tlCanvas = null, _tlCtx = null;
+    let _starCanvas = null, _starCtx = null;
 
     // Data
     let _events = [];
@@ -31,6 +33,15 @@ const MeteorScatter = (function () {
 
     // Colour LUT (turbo palette)
     const _lut = _buildTurboLUT();
+
+    // Starfield state
+    let _stars = [];
+    let _meteors = [];
+    let _starAnimId = null;
+
+    // Signal meter state
+    let _peakSignal = 0;
+    let _peakDecay = 0;
 
     // ── Public API ──
 
@@ -47,11 +58,22 @@ const MeteorScatter = (function () {
         _resizeCanvases();
         window.addEventListener('resize', _resizeCanvases);
 
-        // Wire up start/stop buttons
+        // Wire up headline bar start/stop buttons
         const startBtn = document.getElementById('meteorStartBtn');
         const stopBtn = document.getElementById('meteorStopBtn');
         if (startBtn) startBtn.addEventListener('click', start);
         if (stopBtn) stopBtn.addEventListener('click', stop);
+
+        // Wire up sidebar start/stop buttons
+        const sidebarStart = document.getElementById('meteorSidebarStartBtn');
+        const sidebarStop = document.getElementById('meteorSidebarStopBtn');
+        if (sidebarStart) sidebarStart.addEventListener('click', start);
+        if (sidebarStop) sidebarStop.addEventListener('click', stop);
+
+        // Init starfield canvas
+        _initStarfield();
+        // Init signal meter
+        _initSignalMeter();
 
         _renderEmptyState();
     }
@@ -60,6 +82,7 @@ const MeteorScatter = (function () {
         _active = false;
         stop();
         window.removeEventListener('resize', _resizeCanvases);
+        _destroyStarfield();
         _specCanvas = _wfCanvas = _tlCanvas = null;
         _specCtx = _wfCtx = _tlCtx = null;
     }
@@ -199,7 +222,7 @@ const MeteorScatter = (function () {
                     if (_events.length > 500) _events.length = 500;
                     _renderEvents();
                     _addToTimeline(data.event);
-                    _flashPing();
+                    _onDetection(data.event);
                 } else if (data.type === 'stats') {
                     _stats = data;
                     _renderStats();
@@ -238,6 +261,7 @@ const MeteorScatter = (function () {
 
         _drawSpectrum(frame.bins);
         _scrollWaterfall(frame.bins);
+        _updateSignalMeter(frame.bins);
     }
 
     function _onJsonMessage(msg) {
@@ -270,6 +294,7 @@ const MeteorScatter = (function () {
             c.width = Math.round(rect.width * dpr);
             c.height = Math.round(rect.height * dpr);
         });
+        _resizeStarfield();
     }
 
     function _drawSpectrum(bins) {
@@ -410,6 +435,274 @@ const MeteorScatter = (function () {
         _drawTimeline();
     }
 
+    // ── Detection Handler (visual effects) ──
+
+    function _onDetection(event) {
+        const snr = event.snr_db || 6;
+
+        // 1. Enhanced ping flash (border pulse + stats glow)
+        _flashPing(snr);
+
+        // 2. Meteor streak on starfield
+        _spawnMeteorStreak(snr);
+
+        // 3. Particle burst near spectrum area
+        _spawnParticleBurst(snr);
+
+        // 4. Bounce the total pings counter
+        _bouncePingCounter();
+    }
+
+    // ── Starfield + Meteor Streaks ──
+
+    function _initStarfield() {
+        const wfWrap = document.querySelector('.ms-waterfall-wrap');
+        if (!wfWrap) return;
+
+        _starCanvas = document.createElement('canvas');
+        _starCanvas.className = 'ms-starfield-canvas';
+        wfWrap.insertBefore(_starCanvas, wfWrap.firstChild);
+        _starCtx = _starCanvas.getContext('2d');
+
+        _resizeStarfield();
+        _generateStars();
+        _starAnimLoop();
+    }
+
+    function _destroyStarfield() {
+        if (_starAnimId) {
+            cancelAnimationFrame(_starAnimId);
+            _starAnimId = null;
+        }
+        if (_starCanvas && _starCanvas.parentNode) {
+            _starCanvas.parentNode.removeChild(_starCanvas);
+        }
+        _starCanvas = null;
+        _starCtx = null;
+        _stars = [];
+        _meteors = [];
+    }
+
+    function _resizeStarfield() {
+        if (!_starCanvas || !_starCanvas.parentElement) return;
+        const rect = _starCanvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        _starCanvas.width = Math.round(rect.width * dpr);
+        _starCanvas.height = Math.round(rect.height * dpr);
+        _generateStars();
+    }
+
+    function _generateStars() {
+        if (!_starCanvas) return;
+        _stars = [];
+        const count = Math.floor((_starCanvas.width * _starCanvas.height) / 3000);
+        for (let i = 0; i < count; i++) {
+            _stars.push({
+                x: Math.random() * _starCanvas.width,
+                y: Math.random() * _starCanvas.height,
+                r: Math.random() * 1.2 + 0.3,
+                a: Math.random() * 0.6 + 0.2,
+                twinkleSpeed: Math.random() * 0.02 + 0.005,
+                twinklePhase: Math.random() * Math.PI * 2,
+            });
+        }
+    }
+
+    function _starAnimLoop() {
+        if (!_active || !_starCtx || !_starCanvas) return;
+        const ctx = _starCtx;
+        const w = _starCanvas.width;
+        const h = _starCanvas.height;
+        const now = performance.now() * 0.001;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw twinkling stars
+        for (const s of _stars) {
+            const alpha = s.a + Math.sin(now * s.twinkleSpeed * 60 + s.twinklePhase) * 0.15;
+            ctx.fillStyle = 'rgba(200, 220, 255, ' + Math.max(0.05, Math.min(1, alpha)) + ')';
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw and update meteor streaks
+        for (let i = _meteors.length - 1; i >= 0; i--) {
+            const m = _meteors[i];
+            const elapsed = now - m.startTime;
+            const progress = elapsed / m.duration;
+            if (progress > 1) {
+                _meteors.splice(i, 1);
+                continue;
+            }
+
+            const headX = m.x0 + (m.x1 - m.x0) * Math.min(progress * 1.2, 1);
+            const headY = m.y0 + (m.y1 - m.y0) * Math.min(progress * 1.2, 1);
+            const tailProgress = Math.max(0, progress - 0.2) / 0.8;
+            const tailX = m.x0 + (m.x1 - m.x0) * Math.min(tailProgress * 1.2, 1);
+            const tailY = m.y0 + (m.y1 - m.y0) * Math.min(tailProgress * 1.2, 1);
+
+            // Fade out near end
+            const fadeAlpha = progress > 0.7 ? 1 - (progress - 0.7) / 0.3 : 1;
+            const alpha = m.brightness * fadeAlpha;
+
+            // Meteor trail gradient
+            const grad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+            grad.addColorStop(0, 'rgba(107, 255, 184, 0)');
+            grad.addColorStop(0.5, 'rgba(107, 255, 184, ' + (alpha * 0.4) + ')');
+            grad.addColorStop(1, 'rgba(200, 255, 230, ' + alpha + ')');
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = m.width;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(headX, headY);
+            ctx.stroke();
+
+            // Bright head glow
+            if (progress < 0.85) {
+                const glowR = m.width * 3;
+                const glowGrad = ctx.createRadialGradient(headX, headY, 0, headX, headY, glowR);
+                glowGrad.addColorStop(0, 'rgba(220, 255, 240, ' + (alpha * 0.8) + ')');
+                glowGrad.addColorStop(1, 'rgba(107, 255, 184, 0)');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(headX, headY, glowR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        _starAnimId = requestAnimationFrame(_starAnimLoop);
+    }
+
+    function _spawnMeteorStreak(snr) {
+        if (!_starCanvas) return;
+        const w = _starCanvas.width;
+        const h = _starCanvas.height;
+
+        // Brightness and size proportional to SNR
+        const norm = Math.min(1, Math.max(0, (snr - 3) / 27)); // 3-30 dB range
+        const brightness = 0.4 + norm * 0.6;
+        const streakWidth = 1 + norm * 3;
+        const duration = 0.4 + norm * 0.8; // 0.4s to 1.2s
+
+        // Random start near top edge, streak diagonally
+        const angle = (Math.random() * 0.6 + 0.3) * Math.PI; // roughly top-to-bottom-left
+        const length = 80 + norm * 200;
+        const x0 = Math.random() * w;
+        const y0 = Math.random() * h * 0.3;
+        const x1 = x0 + Math.cos(angle) * length;
+        const y1 = y0 + Math.sin(angle) * length;
+
+        _meteors.push({
+            x0: x0, y0: y0,
+            x1: x1, y1: y1,
+            brightness: brightness,
+            width: streakWidth,
+            duration: duration,
+            startTime: performance.now() * 0.001,
+        });
+    }
+
+    // ── Particle Burst ──
+
+    function _spawnParticleBurst(snr) {
+        const specWrap = document.querySelector('.ms-spectrum-wrap');
+        if (!specWrap) return;
+
+        const norm = Math.min(1, Math.max(0, (snr - 3) / 27));
+        const count = Math.floor(4 + norm * 8);
+        const rect = specWrap.getBoundingClientRect();
+
+        for (let i = 0; i < count; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'ms-particle';
+
+            // Position near center-bottom of spectrum
+            const px = rect.width * (0.3 + Math.random() * 0.4);
+            const py = rect.height * 0.7;
+            particle.style.left = px + 'px';
+            particle.style.top = py + 'px';
+
+            // Random direction
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 20 + Math.random() * 40 * (0.5 + norm);
+            particle.style.setProperty('--dx', (Math.cos(angle) * dist) + 'px');
+            particle.style.setProperty('--dy', (Math.sin(angle) * dist) + 'px');
+
+            // Size based on SNR
+            const size = 2 + Math.random() * 2 * (0.5 + norm);
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+
+            specWrap.appendChild(particle);
+            // Clean up after animation
+            particle.addEventListener('animationend', function () {
+                if (particle.parentNode) particle.parentNode.removeChild(particle);
+            });
+        }
+    }
+
+    // ── Signal Meter ──
+
+    function _initSignalMeter() {
+        const headlineRight = document.querySelector('.ms-headline-right');
+        if (!headlineRight || document.getElementById('meteorSignalMeter')) return;
+
+        const meter = document.createElement('div');
+        meter.id = 'meteorSignalMeter';
+        meter.className = 'ms-signal-meter';
+        meter.innerHTML =
+            '<span class="ms-signal-meter-label">SIG</span>' +
+            '<div class="ms-signal-meter-bars">' +
+                '<div class="ms-signal-bar" data-idx="0"></div>' +
+                '<div class="ms-signal-bar" data-idx="1"></div>' +
+                '<div class="ms-signal-bar" data-idx="2"></div>' +
+                '<div class="ms-signal-bar" data-idx="3"></div>' +
+                '<div class="ms-signal-bar" data-idx="4"></div>' +
+                '<div class="ms-signal-bar" data-idx="5"></div>' +
+                '<div class="ms-signal-bar" data-idx="6"></div>' +
+                '<div class="ms-signal-bar" data-idx="7"></div>' +
+            '</div>';
+        // Insert before the state tag
+        headlineRight.insertBefore(meter, headlineRight.firstChild);
+    }
+
+    function _updateSignalMeter(bins) {
+        if (!bins || bins.length === 0) return;
+
+        // Find peak value
+        let peak = 0;
+        for (let i = 0; i < bins.length; i++) {
+            if (bins[i] > peak) peak = bins[i];
+        }
+
+        // Smooth peak with decay
+        if (peak > _peakSignal) {
+            _peakSignal = peak;
+        } else {
+            _peakSignal = _peakSignal * 0.92 + peak * 0.08;
+        }
+        // Separate slow-decay hold for the peak indicator
+        if (peak > _peakDecay) {
+            _peakDecay = peak;
+        } else {
+            _peakDecay = Math.max(peak, _peakDecay - 1.5);
+        }
+
+        const normalized = _peakSignal / 255;
+        const bars = document.querySelectorAll('.ms-signal-bar');
+        const count = bars.length;
+        for (let i = 0; i < count; i++) {
+            const threshold = (i + 1) / count;
+            const active = normalized >= threshold;
+            const isPeak = Math.abs((_peakDecay / 255) - threshold) < (1 / count);
+            bars[i].classList.toggle('active', active);
+            bars[i].classList.toggle('peak', isPeak && !active);
+        }
+    }
+
     // ── UI Rendering ──
 
     function _renderStats() {
@@ -469,14 +762,38 @@ const MeteorScatter = (function () {
             statusChip.textContent = _running ? 'RUNNING' : 'IDLE';
             statusChip.className = 'ms-headline-tag' + (_running ? '' : ' idle');
         }
+
+        // Sidebar buttons: show/hide like other modes
+        const sidebarStart = document.getElementById('meteorSidebarStartBtn');
+        const sidebarStop = document.getElementById('meteorSidebarStopBtn');
+        if (sidebarStart) sidebarStart.style.display = _running ? 'none' : '';
+        if (sidebarStop) sidebarStop.style.display = _running ? '' : 'none';
     }
 
-    function _flashPing() {
+    function _flashPing(snr) {
         const container = document.getElementById('meteorVisuals');
         if (!container) return;
+
+        // Enhanced border pulse
         container.classList.remove('ms-ping-flash');
-        void container.offsetWidth; // force reflow
+        void container.offsetWidth;
         container.classList.add('ms-ping-flash');
+
+        // Stats strip glow
+        const strip = container.querySelector('.ms-stats-strip');
+        if (strip) {
+            strip.classList.remove('ms-stats-glow');
+            void strip.offsetWidth;
+            strip.classList.add('ms-stats-glow');
+        }
+    }
+
+    function _bouncePingCounter() {
+        const el = document.getElementById('meteorStatPingsTotal');
+        if (!el) return;
+        el.classList.remove('ms-counter-bounce');
+        void el.offsetWidth;
+        el.classList.add('ms-counter-bounce');
     }
 
     function _renderEmptyState() {

@@ -85,6 +85,7 @@
     background: var(--ms-surface);
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     flex-shrink: 0;
+    transition: box-shadow 0.3s ease;
 }
 
 .ms-stat-cell {
@@ -124,6 +125,7 @@
     flex-shrink: 0;
     background: rgba(0, 0, 0, 0.3);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: hidden;
 }
 
 .ms-spectrum-wrap canvas {
@@ -144,6 +146,18 @@
     width: 100%;
     height: 100%;
     display: block;
+}
+
+/* Starfield canvas behind the waterfall */
+.ms-starfield-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.6;
 }
 
 .ms-timeline-wrap {
@@ -272,7 +286,7 @@
     color: #ffd782;
 }
 
-/* ── Ping Highlight Animation ── */
+/* ── Ping Highlight Animation (Enhanced) ── */
 
 @keyframes ms-pulse {
     0%, 100% { opacity: 1; }
@@ -281,15 +295,130 @@
 
 @keyframes ms-ping-flash {
     0% {
-        box-shadow: inset 0 0 20px rgba(107, 255, 184, 0.3);
+        box-shadow: inset 0 0 30px rgba(107, 255, 184, 0.4),
+                    0 0 15px rgba(107, 255, 184, 0.2);
+        border-color: rgba(107, 255, 184, 0.6);
+    }
+    50% {
+        box-shadow: inset 0 0 10px rgba(107, 255, 184, 0.15),
+                    0 0 5px rgba(107, 255, 184, 0.08);
+        border-color: rgba(107, 255, 184, 0.35);
+    }
+    100% {
+        box-shadow: inset 0 0 0 rgba(107, 255, 184, 0),
+                    0 0 0 rgba(107, 255, 184, 0);
+        border-color: var(--ms-border);
+    }
+}
+
+.ms-ping-flash {
+    animation: ms-ping-flash 0.7s ease-out;
+}
+
+/* Stats strip glow on detection */
+@keyframes ms-stats-glow {
+    0% {
+        box-shadow: inset 0 0 20px rgba(107, 255, 184, 0.15);
     }
     100% {
         box-shadow: inset 0 0 0 rgba(107, 255, 184, 0);
     }
 }
 
-.ms-ping-flash {
-    animation: ms-ping-flash 0.5s ease-out;
+.ms-stats-glow {
+    animation: ms-stats-glow 0.6s ease-out;
+}
+
+/* Ping counter bounce */
+@keyframes ms-counter-bounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.35); color: #fff; }
+    60% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+.ms-counter-bounce {
+    animation: ms-counter-bounce 0.4s ease-out;
+    display: inline-block;
+}
+
+/* ── Particle Burst ── */
+
+@keyframes ms-particle-burst {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--dx, 30px), var(--dy, -30px)) scale(0.3);
+    }
+}
+
+.ms-particle {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--ms-accent);
+    box-shadow: 0 0 4px var(--ms-accent), 0 0 8px rgba(107, 255, 184, 0.3);
+    pointer-events: none;
+    z-index: 5;
+    animation: ms-particle-burst 0.5s ease-out forwards;
+}
+
+/* ── Signal Meter ── */
+
+.ms-signal-meter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ms-signal-meter-label {
+    font-size: 8px;
+    color: var(--text-dim, #667);
+    font-family: var(--font-mono, monospace);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ms-signal-meter-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 16px;
+}
+
+.ms-signal-bar {
+    width: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 1px;
+    transition: background 0.1s ease, height 0.1s ease;
+}
+
+.ms-signal-bar[data-idx="0"] { height: 4px; }
+.ms-signal-bar[data-idx="1"] { height: 6px; }
+.ms-signal-bar[data-idx="2"] { height: 7px; }
+.ms-signal-bar[data-idx="3"] { height: 9px; }
+.ms-signal-bar[data-idx="4"] { height: 10px; }
+.ms-signal-bar[data-idx="5"] { height: 12px; }
+.ms-signal-bar[data-idx="6"] { height: 14px; }
+.ms-signal-bar[data-idx="7"] { height: 16px; }
+
+.ms-signal-bar.active {
+    background: var(--ms-accent);
+    box-shadow: 0 0 3px rgba(107, 255, 184, 0.4);
+}
+
+.ms-signal-bar.active[data-idx="5"],
+.ms-signal-bar.active[data-idx="6"],
+.ms-signal-bar.active[data-idx="7"] {
+    background: #ffd700;
+    box-shadow: 0 0 3px rgba(255, 215, 0, 0.4);
+}
+
+.ms-signal-bar.peak {
+    background: rgba(255, 100, 100, 0.7);
+    box-shadow: 0 0 3px rgba(255, 100, 100, 0.3);
 }
 
 /* ── Empty State ── */
