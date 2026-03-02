@@ -66,6 +66,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/function-strip.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/ux-platform.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/signal-waveform.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/waterfall.css') }}?v={{ version }}&r=wfdeck19">
     <script>
@@ -3245,6 +3246,7 @@
     <script src="{{ url_for('static', filename='js/components/device-card.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/proximity-radar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/timeline-heatmap.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/signal-waveform.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/bluetooth.js') }}?v={{ version }}&r=btlocate1"></script>
     <!-- WiFi v2 components -->
     <script src="{{ url_for('static', filename='js/components/channel-chart.js') }}"></script>
@@ -4457,6 +4459,7 @@
             } else if (mode === 'morse') {
                 MorseMode.init();
             } else if (mode === 'radiosonde') {
+                initRadiosondeWaveform();
                 initRadiosondeMap();
                 setTimeout(() => {
                     if (radiosondeMap) radiosondeMap.invalidateSize();
