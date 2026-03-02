@@ -129,10 +129,20 @@ if "$PYTHON" -c "import gevent" 2>/dev/null; then
     HAS_GEVENT=1
 fi
 
+# ── Resolve LAN address for display ──────────────────────────────────────────
+if [[ "$HOST" == "0.0.0.0" ]]; then
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    LAN_IP="${LAN_IP:-localhost}"
+else
+    LAN_IP="$HOST"
+fi
+PROTO="http"
+[[ "$HTTPS" -eq 1 ]] && PROTO="https"
+
 # ── Start the server ─────────────────────────────────────────────────────────
 if [[ "$HAS_GUNICORN" -eq 1 && "$HAS_GEVENT" -eq 1 ]]; then
     echo "[INTERCEPT] Starting production server (gunicorn + gevent)..."
-    echo "[INTERCEPT] Listening on ${HOST}:${PORT}"
+    echo "[INTERCEPT] Listening on ${PROTO}://${LAN_IP}:${PORT}"
 
     GUNICORN_ARGS=(
         -c "$SCRIPT_DIR/gunicorn.conf.py"
