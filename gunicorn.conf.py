@@ -1,6 +1,21 @@
 """Gunicorn configuration for INTERCEPT."""
 
 
+def post_fork(server, worker):
+    """Apply gevent monkey-patching immediately after fork.
+
+    Gunicorn's built-in gevent worker is supposed to handle this, but on
+    some platforms (notably Raspberry Pi / ARM) the worker deadlocks during
+    its own init_process() before it gets to patch.  Doing it here — right
+    after fork, before any worker initialisation — avoids the race.
+    """
+    try:
+        from gevent import monkey
+        monkey.patch_all(subprocess=False)
+    except Exception:
+        pass
+
+
 def post_worker_init(worker):
     """Suppress noisy SystemExit tracebacks during gevent worker shutdown.
 
