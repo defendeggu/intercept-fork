@@ -262,7 +262,7 @@
 
 .toggle-switch input:checked + .toggle-slider:before {
     transform: translateX(20px);
-    background-color: white;
+    background-color: var(--text-inverse);
 }
 
 .toggle-switch input:focus + .toggle-slider {
@@ -430,7 +430,7 @@
     background: linear-gradient(135deg, var(--accent-amber, #d4a853) 0%, var(--accent-orange, #f59e0b) 100%);
     border: none;
     border-radius: 6px;
-    color: #000;
+    color: var(--text-inverse);
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;

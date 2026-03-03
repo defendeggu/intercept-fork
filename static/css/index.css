@@ -1780,7 +1780,7 @@ header h1 .tagline {
     padding: 12px;
     background: var(--accent-green);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
     font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 600;
@@ -1809,7 +1809,7 @@ header h1 .tagline {
 .run-btn.active,
 .stop-btn {
     background: var(--accent-red);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .stop-btn {
@@ -1818,7 +1818,7 @@ header h1 .tagline {
     padding: 12px;
     background: var(--accent-red);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
     font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 600;
@@ -2637,7 +2637,7 @@ header h1 .tagline {
 }
 
 .aircraft-popup .value {
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .leaflet-popup-content-wrapper {
@@ -3632,7 +3632,7 @@ header h1 .tagline {
 
 .wifi-filter-btn.active {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan);
 }
 
@@ -3875,7 +3875,7 @@ header h1 .tagline {
 
 .channel-band-tab.active {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan);
 }
 
@@ -4550,7 +4550,7 @@ header h1 .tagline {
 .bt-detail-btn:hover {
     background: var(--accent-cyan);
     border-color: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .bt-detail-btn.active {
@@ -4573,7 +4573,7 @@ header h1 .tagline {
 }
 
 .bt-inspector-toggle:hover {
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .bt-inspector-arrow {
@@ -4839,7 +4839,7 @@ header h1 .tagline {
 .bt-filter-btn.active {
     background: var(--accent-purple);
     border-color: var(--accent-purple);
-    color: white;
+    color: var(--text-inverse);
 }
 
 .bt-tracker-item {
@@ -5397,7 +5397,7 @@ header h1 .tagline {
 .bt-modal-btn-primary {
     background: var(--accent-cyan, #00d4ff);
     border: none;
-    color: #000;
+    color: var(--text-inverse);
     font-weight: 600;
 }
 
@@ -5528,7 +5528,7 @@ header h1 .tagline {
 
 .channel-label {
     font-size: 8px;
-    color: #fff;
+    color: var(--text-primary);
     margin-top: 3px;
 }
 
@@ -5755,7 +5755,7 @@ body::before {
 
 .disclaimer-modal .accept-btn {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border: none;
     padding: 12px 40px;
     font-family: var(--font-sans);
@@ -5846,7 +5846,7 @@ body::before {
 /* WPS Indicator */
 .wps-enabled {
     background: #ff6600;
-    color: #000;
+    color: var(--text-inverse);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 9px;
@@ -5855,7 +5855,7 @@ body::before {
 /* Rogue AP Indicator */
 .rogue-indicator {
     background: linear-gradient(90deg, #ff0000, #cc0000);
-    color: #fff;
+    color: var(--text-inverse);
     padding: 4px 8px;
     margin: -10px -10px 8px -10px;
     font-size: 10px;
@@ -5874,7 +5874,7 @@ body::before {
 /* PMKID Capture */
 .pmkid-btn {
     background: linear-gradient(135deg, #9933ff, #6600cc);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .pmkid-btn:hover {
@@ -5889,7 +5889,7 @@ body::before {
 
 .findmy-badge {
     background: linear-gradient(135deg, #007aff, #5856d6);
-    color: #fff;
+    color: var(--text-inverse);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 10px;
@@ -5966,7 +5966,7 @@ body::before {
     left: 50%;
     transform: translateX(-50%);
     background: #ff0000;
-    color: #fff;
+    color: var(--text-inverse);
     padding: 15px 30px;
     border-radius: 8px;
     font-weight: bold;
@@ -6014,7 +6014,7 @@ body::before {
 
 .military-badge {
     background: #556b2f;
-    color: #fff;
+    color: var(--text-inverse);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 9px;
@@ -6029,7 +6029,7 @@ body::before {
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    color: #000;
+    color: var(--text-inverse);
     border: 2px solid var(--accent-cyan);
 }
 
@@ -6715,7 +6715,7 @@ body::before {
 .radio-action-btn.scan {
     background: var(--accent-green);
     border-color: var(--accent-green);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .radio-action-btn.scan:hover {
@@ -6735,7 +6735,7 @@ body::before {
 .radio-action-btn.pause {
     background: var(--accent-orange);
     border-color: var(--accent-orange);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .radio-action-btn.pause:disabled {
@@ -6961,7 +6961,7 @@ body::before {
 .radio-action-btn.listen {
     background: var(--accent-green);
     border-color: var(--accent-green);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .radio-action-btn.scan:hover:not(:disabled),

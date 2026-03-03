@@ -303,7 +303,7 @@
 
 .mesh-strip-btn.disconnect {
     background: var(--accent-red, #ff3366);
-    color: white;
+    color: var(--text-inverse);
 }
 
 .mesh-strip-btn.disconnect:hover {
@@ -478,7 +478,7 @@
         0 2px 8px rgba(0, 0, 0, 0.6),
         0 0 20px 8px rgba(0, 255, 255, 0.7),  /* Strong outer glow */
         inset 0 0 8px rgba(255, 255, 255, 0.3);  /* Inner highlight */
-    color: #000;
+    color: var(--text-inverse);
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: bold;
@@ -1088,7 +1088,7 @@
     border-radius: 4px;
     padding: 10px 14px;
     cursor: pointer;
-    color: #000;
+    color: var(--text-inverse);
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
@@ -1231,7 +1231,7 @@
     background: var(--accent-cyan);
     border: none;
     border-radius: 4px;
-    color: #000;
+    color: var(--text-inverse);
     font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
@@ -1413,7 +1413,7 @@
 .mesh-position-btn:hover,
 .mesh-telemetry-btn:hover {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan);
 }
 
@@ -1435,7 +1435,7 @@
 
 .mesh-qr-btn:hover {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan);
 }
 

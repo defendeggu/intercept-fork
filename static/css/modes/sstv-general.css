@@ -105,7 +105,7 @@
 
 .sstv-general-strip-btn.stop {
     background: var(--accent-red, #ff3366);
-    color: white;
+    color: var(--text-inverse);
 }
 
 .sstv-general-strip-btn.stop:hover {

@@ -132,7 +132,7 @@
 .aprs-strip .strip-btn.primary {
     background: linear-gradient(135deg, var(--accent-green) 0%, #10b981 100%);
     border: none;
-    color: #000;
+    color: var(--text-inverse);
 }
 .aprs-strip .strip-btn.primary:hover:not(:disabled) {
     filter: brightness(1.1);
@@ -140,7 +140,7 @@
 .aprs-strip .strip-btn.stop {
     background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
 }
 .aprs-strip .strip-btn.stop:hover:not(:disabled) {
     filter: brightness(1.1);

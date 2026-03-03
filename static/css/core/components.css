@@ -75,7 +75,7 @@
 
 .btn-danger {
     background: var(--accent-red);
-    color: white;
+    color: var(--text-inverse);
     border-color: var(--accent-red);
 }
 
@@ -86,7 +86,7 @@
 
 .btn-success {
     background: var(--accent-green);
-    color: white;
+    color: var(--text-inverse);
     border-color: var(--accent-green);
 }
 

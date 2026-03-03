@@ -136,7 +136,7 @@
 
 .activity-timeline-btn.active {
     background: var(--timeline-accent);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--timeline-accent);
 }
 

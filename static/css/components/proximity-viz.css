@@ -52,19 +52,19 @@
 
 .bt-radar-filter-btn:hover {
     background: var(--bg-hover, #333) !important;
-    color: #fff !important;
+    color: var(--text-primary) !important;
 }
 
 .bt-radar-filter-btn.active {
-    background: #00d4ff !important;
-    color: #000 !important;
-    border-color: #00d4ff !important;
+    background: var(--accent-cyan) !important;
+    color: var(--text-inverse) !important;
+    border-color: var(--accent-cyan) !important;
 }
 
 #btRadarPauseBtn.active {
-    background: #f97316 !important;
-    color: #000 !important;
-    border-color: #f97316 !important;
+    background: var(--accent-orange) !important;
+    color: var(--text-inverse) !important;
+    border-color: var(--accent-orange) !important;
 }
 
 /* ============================================
@@ -120,9 +120,9 @@
 }
 
 .heatmap-btn.active {
-    background: #f97316;
-    color: #000;
-    border-color: #f97316;
+    background: var(--accent-orange);
+    color: var(--text-inverse);
+    border-color: var(--accent-orange);
 }
 
 .timeline-heatmap-content {
@@ -141,7 +141,7 @@
 }
 
 .heatmap-error {
-    color: #ef4444;
+    color: var(--accent-red);
 }
 
 .heatmap-grid {

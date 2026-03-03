@@ -323,7 +323,7 @@
 }
 
 .setup-btn.primary {
-    color: #fff;
+    color: var(--text-inverse);
     background: var(--accent-cyan, #4aa3ff);
     border-color: var(--accent-cyan, #4aa3ff);
 }

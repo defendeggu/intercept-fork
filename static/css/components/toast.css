@@ -122,7 +122,7 @@
 
 .update-toast-btn-primary {
     background: var(--accent-green, #22c55e);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .update-toast-btn-primary:hover {
@@ -561,7 +561,7 @@
 
 .update-modal-btn-primary {
     background: var(--accent-green, #22c55e);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .update-modal-btn-primary:hover:not(:disabled) {

@@ -394,7 +394,7 @@ body {
 .strip-btn.primary {
     background: linear-gradient(135deg, var(--accent-cyan) 0%, #2b6fb8 100%);
     border: none;
-    color: white;
+    color: var(--text-inverse);
 }
 
 /* Main dashboard grid - Mobile first */
@@ -812,7 +812,7 @@ body {
     padding: 6px 16px;
     border: none;
     background: var(--accent-green);
-    color: #fff;
+    color: var(--text-inverse);
     font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
@@ -830,7 +830,7 @@ body {
 
 .start-btn.active {
     background: var(--accent-red);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .start-btn.active:hover {
@@ -1282,7 +1282,7 @@ body {
 .dsc-distress-alert button {
     background: var(--accent-red);
     border: none;
-    color: white;
+    color: var(--text-inverse);
     padding: 10px 24px;
     font-family: var(--font-mono);
     font-size: 12px;
@@ -1313,7 +1313,7 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    color: white;
+    color: var(--text-inverse);
     border: 2px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
