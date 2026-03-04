@@ -2,12 +2,13 @@ const RunState = (function() {
     'use strict';
 
     const REFRESH_MS = 5000;
-    const CHIP_MODES = ['pager', 'sensor', 'wifi', 'bluetooth', 'adsb', 'ais', 'acars', 'vdl2', 'aprs', 'dsc', 'subghz'];
+    const CHIP_MODES = ['pager', 'sensor', 'wifi', 'bluetooth', 'adsb', 'ais', 'acars', 'vdl2', 'aprs', 'dsc', 'subghz', 'radiosonde', 'morse', 'rtlamr', 'meshtastic', 'sstv', 'weathersat', 'wefax', 'sstv_general', 'tscm', 'gps', 'bt_locate', 'meteor'];
     const MODE_ALIASES = {
         bt: 'bluetooth',
-        bt_locate: 'bluetooth',
         btlocate: 'bluetooth',
         aircraft: 'adsb',
+        sonde: 'radiosonde',
+        weather_sat: 'weathersat',
     };
 
     const modeLabels = {
@@ -22,6 +23,18 @@ const RunState = (function() {
         aprs: 'APRS',
         dsc: 'DSC',
         subghz: 'SubGHz',
+        radiosonde: 'Sonde',
+        morse: 'Morse',
+        rtlamr: 'Meter',
+        meshtastic: 'Mesh',
+        sstv: 'SSTV',
+        weathersat: 'WxSat',
+        wefax: 'WeFax',
+        sstv_general: 'HF SSTV',
+        tscm: 'TSCM',
+        gps: 'GPS',
+        bt_locate: 'BT Loc',
+        meteor: 'Meteor',
     };
 
     let refreshTimer = null;
@@ -181,6 +194,17 @@ const RunState = (function() {
         if (normalized.includes('aprs')) return 'aprs';
         if (normalized.includes('dsc')) return 'dsc';
         if (normalized.includes('subghz')) return 'subghz';
+        if (normalized.includes('radiosonde') || normalized.includes('sonde')) return 'radiosonde';
+        if (normalized.includes('morse')) return 'morse';
+        if (normalized.includes('meter') || normalized.includes('rtlamr')) return 'rtlamr';
+        if (normalized.includes('meshtastic') || normalized.includes('mesh')) return 'meshtastic';
+        if (normalized.includes('hf sstv') || normalized.includes('sstv general')) return 'sstv_general';
+        if (normalized.includes('sstv')) return 'sstv';
+        if (normalized.includes('weather') && normalized.includes('sat')) return 'weathersat';
+        if (normalized.includes('wefax') || normalized.includes('weather fax')) return 'wefax';
+        if (normalized.includes('tscm')) return 'tscm';
+        if (normalized.includes('gps')) return 'gps';
+        if (normalized.includes('bt loc')) return 'bt_locate';
         if (normalized.includes('433')) return 'sensor';
         return 'pager';
     }
@@ -196,9 +220,7 @@ const RunState = (function() {
         processes.bluetooth = Boolean(
             processes.bluetooth ||
             processes.bt ||
-            processes.bt_scan ||
-            processes.btlocate ||
-            processes.bt_locate
+            processes.bt_scan
         );
         processes.wifi = Boolean(
             processes.wifi ||

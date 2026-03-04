@@ -258,6 +258,7 @@ const WeatherSat = (function() {
                 device,
                 gain,
                 bias_t: biasT,
+                sdr_type: typeof getSelectedSDRType === 'function' ? getSelectedSDRType() : 'rtlsdr',
             };
 
             // Add rtl_tcp params if using remote SDR

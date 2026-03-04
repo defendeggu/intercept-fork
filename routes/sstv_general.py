@@ -30,6 +30,7 @@ _sstv_general_queue: queue.Queue = queue.Queue(maxsize=100)
 
 # Track which device is being used
 _sstv_general_active_device: int | None = None
+_sstv_general_active_sdr_type: str = 'rtlsdr'
 
 # Predefined SSTV frequencies
 SSTV_FREQUENCIES = [
@@ -119,6 +120,14 @@ def start_decoder():
             break
 
     data = request.get_json(silent=True) or {}
+    sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
+    if sdr_type_str != 'rtlsdr':
+        return jsonify({
+            'status': 'error',
+            'message': f'{sdr_type_str.replace("_", " ").title()} is not yet supported for this mode. Please use an RTL-SDR device.'
+        }), 400
+
     frequency = data.get('frequency')
     modulation = data.get('modulation')
     device_index = data.get('device', 0)
@@ -155,9 +164,9 @@ def start_decoder():
         }), 400
 
     # Claim SDR device
-    global _sstv_general_active_device
+    global _sstv_general_active_device, _sstv_general_active_sdr_type
     device_int = int(device_index)
-    error = app_module.claim_sdr_device(device_int, 'sstv_general')
+    error = app_module.claim_sdr_device(device_int, 'sstv_general', sdr_type_str)
     if error:
         return jsonify({
             'status': 'error',
@@ -175,6 +184,7 @@ def start_decoder():
 
     if success:
         _sstv_general_active_device = device_int
+        _sstv_general_active_sdr_type = sdr_type_str
         return jsonify({
             'status': 'started',
             'frequency': frequency,
@@ -182,7 +192,7 @@ def start_decoder():
             'device': device_index,
         })
     else:
-        app_module.release_sdr_device(device_int)
+        app_module.release_sdr_device(device_int, sdr_type_str)
         return jsonify({
             'status': 'error',
             'message': 'Failed to start decoder',
@@ -192,12 +202,12 @@ def start_decoder():
 @sstv_general_bp.route('/stop', methods=['POST'])
 def stop_decoder():
     """Stop general SSTV decoder."""
-    global _sstv_general_active_device
+    global _sstv_general_active_device, _sstv_general_active_sdr_type
     decoder = get_general_sstv_decoder()
     decoder.stop()
 
     if _sstv_general_active_device is not None:
-        app_module.release_sdr_device(_sstv_general_active_device)
+        app_module.release_sdr_device(_sstv_general_active_device, _sstv_general_active_sdr_type)
         _sstv_general_active_device = None
 
     return jsonify({'status': 'stopped'})

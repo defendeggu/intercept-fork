@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .base import CommandBuilder, SDRCapabilities, SDRDevice, SDRType
-from .detection import detect_all_devices, probe_rtlsdr_device
+from .detection import detect_all_devices, invalidate_device_cache, probe_rtlsdr_device
 from .rtlsdr import RTLSDRCommandBuilder
 from .limesdr import LimeSDRCommandBuilder
 from .hackrf import HackRFCommandBuilder
@@ -231,4 +231,5 @@ __all__ = [
     'get_capabilities_for_type',
     # Device probing
     'probe_rtlsdr_device',
+    'invalidate_device_cache',
 ]

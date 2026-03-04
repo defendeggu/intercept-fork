@@ -366,9 +366,11 @@ def start_acars() -> Response:
             stderr = ''
             if process.stderr:
                 stderr = process.stderr.read().decode('utf-8', errors='replace')
-            error_msg = f'acarsdec failed to start'
             if stderr:
-                error_msg += f': {stderr[:200]}'
+                logger.error(f"acarsdec stderr:\n{stderr}")
+            error_msg = 'acarsdec failed to start'
+            if stderr:
+                error_msg += f': {stderr[:500]}'
             logger.error(error_msg)
             return jsonify({'status': 'error', 'message': error_msg}), 500
 

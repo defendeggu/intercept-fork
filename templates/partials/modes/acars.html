@@ -254,7 +254,9 @@
 
         acarsMainEventSource.onerror = function() {
             setTimeout(() => {
-                if (document.getElementById('stopAcarsBtn').style.display === 'block') {
+                const panel = document.getElementById('acarsMode');
+                if (panel && panel.classList.contains('active') &&
+                    document.getElementById('stopAcarsBtn').style.display === 'block') {
                     startAcarsMainSSE();
                 }
             }, 2000);

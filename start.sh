@@ -78,6 +78,28 @@ done
 export INTERCEPT_HOST="$HOST"
 export INTERCEPT_PORT="$PORT"
 
+# ── Fix ownership of user data dirs when run via sudo ────────────────────────
+# When invoked via sudo the server process runs as root, so every file it
+# creates (configs, logs, database) ends up owned by root.  On the *next*
+# startup we fix that retroactively, and we also pre-create known runtime
+# directories so they get correct ownership from the start.
+if [[ "$(id -u)" -eq 0 && -n "${SUDO_USER:-}" ]]; then
+    # Pre-create directories that routes may need at runtime
+    mkdir -p "$SCRIPT_DIR/instance" \
+             "$SCRIPT_DIR/data/radiosonde/logs" \
+             "$SCRIPT_DIR/data/weather_sat"
+
+    for dir in instance data certs; do
+        if [[ -d "$SCRIPT_DIR/$dir" ]]; then
+            chown -R "$SUDO_USER" "$SCRIPT_DIR/$dir"
+        fi
+    done
+
+    # Export real user identity so Python can chown runtime-created files
+    export INTERCEPT_SUDO_UID="$(id -u "$SUDO_USER")"
+    export INTERCEPT_SUDO_GID="$(id -g "$SUDO_USER")"
+fi
+
 # ── Dependency check (delegate to intercept.py) ─────────────────────────────
 if [[ "$CHECK_DEPS" -eq 1 ]]; then
     exec "$PYTHON" intercept.py --check-deps
@@ -120,10 +142,20 @@ if "$PYTHON" -c "import gevent" 2>/dev/null; then
     HAS_GEVENT=1
 fi
 
+# ── Resolve LAN address for display ──────────────────────────────────────────
+if [[ "$HOST" == "0.0.0.0" ]]; then
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    LAN_IP="${LAN_IP:-localhost}"
+else
+    LAN_IP="$HOST"
+fi
+PROTO="http"
+[[ "$HTTPS" -eq 1 ]] && PROTO="https"
+
 # ── Start the server ─────────────────────────────────────────────────────────
 if [[ "$HAS_GUNICORN" -eq 1 && "$HAS_GEVENT" -eq 1 ]]; then
     echo "[INTERCEPT] Starting production server (gunicorn + gevent)..."
-    echo "[INTERCEPT] Listening on ${HOST}:${PORT}"
+    echo "[INTERCEPT] Listening on ${PROTO}://${LAN_IP}:${PORT}"
 
     GUNICORN_ARGS=(
         -c "$SCRIPT_DIR/gunicorn.conf.py"

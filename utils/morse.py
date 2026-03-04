@@ -254,6 +254,10 @@ class MorseDecoder:
         self._current_symbol = ''
         self._pending_buffer: list[int] = []
 
+        # Dropout tolerance: bridge brief signal dropouts mid-element (~40ms).
+        self._dropout_blocks: float = 0.0
+        self._dropout_tolerance: float = 2.0
+
         # Output / diagnostics.
         self._last_level = 0.0
         self._last_noise_ref = 0.0
@@ -581,6 +585,7 @@ class MorseDecoder:
             if tone_detected and not self._tone_on:
                 # Tone edge up.
                 self._tone_on = True
+                self._dropout_blocks = 0.0
                 silence_count = self._silence_blocks
                 self._silence_blocks = 0.0
                 self._tone_blocks = 0.0
@@ -615,11 +620,17 @@ class MorseDecoder:
                         self._record_dit_candidate(silence_count)
 
             elif (not tone_detected) and self._tone_on:
-                # Tone edge down.
+                # Possible tone dropout — tolerate brief gaps before confirming edge-down.
+                self._dropout_blocks += 1.0
+                if self._dropout_blocks <= self._dropout_tolerance:
+                    continue
+
+                # Confirmed tone edge down — dropout was genuine silence, not a glitch.
                 self._tone_on = False
                 tone_count = max(1.0, self._tone_blocks)
+                self._silence_blocks = self._dropout_blocks
                 self._tone_blocks = 0.0
-                self._silence_blocks = 0.0
+                self._dropout_blocks = 0.0
 
                 element = ''
                 if tone_count >= self._dah_threshold:
@@ -641,7 +652,9 @@ class MorseDecoder:
                         self._record_dit_candidate(tone_count / 3.0)
 
             elif tone_detected and self._tone_on:
-                self._tone_blocks += 1.0
+                # Recover any dropout blocks — tone resumed, so they were part of the element.
+                self._tone_blocks += self._dropout_blocks + 1.0
+                self._dropout_blocks = 0.0
 
             elif (not tone_detected) and (not self._tone_on):
                 self._silence_blocks += 1.0
@@ -668,8 +681,8 @@ class MorseDecoder:
                 snr_mult = max(1.15, self.threshold_multiplier * 0.5)
                 snr_on = snr_mult * (1.0 + self._hysteresis)
                 snr_off = snr_mult * (1.0 - self._hysteresis)
-                scope_event['snr'] = round(self._last_level / max(self._noise_floor, 1e-6), 2)
-                scope_event['noise_ref'] = round(self._noise_floor, 4)
+                scope_event['snr'] = round(self._last_level / max(self._last_noise_ref, 1e-6), 2)
+                scope_event['noise_ref'] = round(self._last_noise_ref, 4)
                 scope_event['snr_on'] = round(snr_on, 2)
                 scope_event['snr_off'] = round(snr_off, 2)
             events.append(scope_event)
@@ -680,8 +693,8 @@ class MorseDecoder:
         """Flush pending symbols at end-of-stream."""
         events: list[dict[str, Any]] = []
 
-        if self._tone_on and self._tone_blocks >= self._dit_min:
-            tone_count = self._tone_blocks
+        if self._tone_on and (self._tone_blocks + self._dropout_blocks) >= self._dit_min:
+            tone_count = self._tone_blocks + self._dropout_blocks
             element = '-' if tone_count >= self._dah_threshold else '.'
             self._current_symbol += element
             events.append({
@@ -699,6 +712,7 @@ class MorseDecoder:
         self._tone_on = False
         self._tone_blocks = 0.0
         self._silence_blocks = 0.0
+        self._dropout_blocks = 0.0
         return events
 
 

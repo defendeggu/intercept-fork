@@ -23,6 +23,16 @@ _hackrf_cache: list[SDRDevice] = []
 _hackrf_cache_ts: float = 0.0
 _HACKRF_CACHE_TTL_SECONDS = 3.0
 
+# Cache all-device detection results.  Multiple endpoints call
+# detect_all_devices() on the same page load (e.g. /devices and /adsb/tools
+# both trigger it from DOMContentLoaded).  On a Pi the subprocess calls
+# (rtl_test, SoapySDRUtil, hackrf_info) each take seconds and block the
+# single gevent worker, serialising every other request behind them.
+# A short TTL cache avoids duplicate subprocess storms.
+_all_devices_cache: list[SDRDevice] = []
+_all_devices_cache_ts: float = 0.0
+_ALL_DEVICES_CACHE_TTL_SECONDS = 5.0
+
 
 def _hackrf_probe_blocked() -> bool:
     """Return True when probing HackRF would interfere with an active stream."""
@@ -483,7 +493,7 @@ def probe_rtlsdr_device(device_index: int) -> str | None:
             )
             return (
                 f'SDR device {device_index} is not available — '
-                f'check that the RTL-SDR is connected and not in use by another process.'
+                f'check that the SDR device is connected and not in use by another process.'
             )
 
     except Exception as e:
@@ -492,12 +502,26 @@ def probe_rtlsdr_device(device_index: int) -> str | None:
     return None
 
 
-def detect_all_devices() -> list[SDRDevice]:
+def detect_all_devices(force: bool = False) -> list[SDRDevice]:
     """
     Detect all connected SDR devices across all supported hardware types.
 
+    Results are cached for a few seconds so that multiple callers hitting
+    this within the same page-load cycle (e.g. /devices + /adsb/tools) do
+    not each spawn a full set of blocking subprocess probes.
+
+    Args:
+        force: Bypass the cache and re-probe hardware.
+
     Returns a unified list of SDRDevice objects sorted by type and index.
     """
+    global _all_devices_cache, _all_devices_cache_ts
+
+    now = time.time()
+    if not force and _all_devices_cache_ts and (now - _all_devices_cache_ts) < _ALL_DEVICES_CACHE_TTL_SECONDS:
+        logger.debug("Returning cached device list (%d device(s))", len(_all_devices_cache))
+        return list(_all_devices_cache)
+
     devices: list[SDRDevice] = []
     skip_in_soapy: set[SDRType] = set()
 
@@ -524,6 +548,16 @@ def detect_all_devices() -> list[SDRDevice]:
     for d in devices:
         logger.debug(f"  {d.sdr_type.value}:{d.index} - {d.name} (serial: {d.serial})")
 
+    # Update cache
+    _all_devices_cache = list(devices)
+    _all_devices_cache_ts = time.time()
+
     return devices
 
+
+def invalidate_device_cache() -> None:
+    """Clear the all-devices cache so the next call re-probes hardware."""
+    global _all_devices_cache, _all_devices_cache_ts
+    _all_devices_cache = []
+    _all_devices_cache_ts = 0.0
 

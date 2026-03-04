@@ -164,7 +164,9 @@
 
         aisEventSource.onerror = function() {
             setTimeout(() => {
-                if (document.getElementById('stopAisBtn').style.display === 'block') {
+                const panel = document.getElementById('aisMode');
+                if (panel && panel.classList.contains('active') &&
+                    document.getElementById('stopAisBtn').style.display === 'block') {
                     startAisSSE();
                 }
             }, 2000);

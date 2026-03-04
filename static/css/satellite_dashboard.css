@@ -666,7 +666,7 @@ body {
 
 .btn.primary {
     background: var(--accent-green);
-    color: #fff;
+    color: var(--text-inverse);
     margin-left: auto;
 }
 

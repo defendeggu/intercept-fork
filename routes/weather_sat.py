@@ -136,6 +136,13 @@ def start_capture():
         })
 
     data = request.get_json(silent=True) or {}
+    sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
+    if sdr_type_str != 'rtlsdr':
+        return jsonify({
+            'status': 'error',
+            'message': f'{sdr_type_str.replace("_", " ").title()} is not yet supported for this mode. Please use an RTL-SDR device.'
+        }), 400
 
     # Validate satellite
     satellite = data.get('satellite')
@@ -173,7 +180,7 @@ def start_capture():
     if not rtl_tcp_host:
         try:
             import app as app_module
-            error = app_module.claim_sdr_device(device_index, 'weather_sat')
+            error = app_module.claim_sdr_device(device_index, 'weather_sat', sdr_type_str)
             if error:
                 return jsonify({
                     'status': 'error',

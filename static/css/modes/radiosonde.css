@@ -139,6 +139,87 @@
     border-radius: 2px;
 }
 
+/* Stats strip above map */
+.radiosonde-strip {
+    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+.radiosonde-strip-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: max-content;
+}
+.radiosonde-strip .strip-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 10px;
+    background: rgba(0, 229, 255, 0.05);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    border-radius: 4px;
+    min-width: 55px;
+}
+.radiosonde-strip .strip-stat:hover {
+    background: rgba(0, 229, 255, 0.1);
+    border-color: rgba(0, 229, 255, 0.3);
+}
+.radiosonde-strip .strip-value {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    line-height: 1.2;
+}
+.radiosonde-strip .strip-label {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 1px;
+}
+.radiosonde-strip .strip-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+.radiosonde-strip .strip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.radiosonde-strip .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.radiosonde-strip .status-dot.tracking {
+    background: var(--accent-green);
+    animation: radiosonde-strip-pulse 1.5s ease-in-out infinite;
+}
+@keyframes radiosonde-strip-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px 2px currentColor; }
+    50% { opacity: 0.6; box-shadow: none; }
+}
+.radiosonde-strip .strip-waveform {
+    display: flex;
+    align-items: center;
+}
+
 /* Responsive: stack cards on narrow screens */
 @media (max-width: 600px) {
     .radiosonde-card {

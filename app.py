@@ -208,6 +208,11 @@ morse_process = None
 morse_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 morse_lock = threading.Lock()
 
+# Meteor scatter detection
+meteor_process = None
+meteor_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+meteor_lock = threading.Lock()
+
 # Deauth Attack Detection
 deauth_detector = None
 deauth_detector_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -696,6 +701,29 @@ def _get_subghz_active() -> bool:
         return False
 
 
+def _get_singleton_running(module_path: str, getter_name: str, attr: str) -> bool:
+    """Safely check if a singleton-based mode is running without creating instances."""
+    try:
+        import importlib
+        mod = importlib.import_module(module_path)
+        getter = getattr(mod, getter_name)
+        instance = getter()
+        if instance is None:
+            return False
+        return bool(getattr(instance, attr, False))
+    except Exception:
+        return False
+
+
+def _get_tscm_active() -> bool:
+    """Check if a TSCM sweep is running."""
+    try:
+        from routes.tscm import _sweep_running
+        return bool(_sweep_running)
+    except Exception:
+        return False
+
+
 def _get_bluetooth_health() -> tuple[bool, int]:
     """Return Bluetooth active state and best-effort device count."""
     legacy_running = bt_process is not None and (bt_process.poll() is None if bt_process else False)
@@ -774,6 +802,15 @@ def health_check() -> Response:
             'radiosonde': radiosonde_process is not None and (radiosonde_process.poll() is None if radiosonde_process else False),
             'morse': morse_process is not None and (morse_process.poll() is None if morse_process else False),
             'subghz': _get_subghz_active(),
+            'rtlamr': rtlamr_process is not None and (rtlamr_process.poll() is None if rtlamr_process else False),
+            'meshtastic': _get_singleton_running('utils.meshtastic', 'get_meshtastic_client', 'is_running'),
+            'sstv': _get_singleton_running('utils.sstv', 'get_sstv_decoder', 'is_running'),
+            'weathersat': _get_singleton_running('utils.weather_sat', 'get_weather_sat_decoder', 'is_running'),
+            'wefax': _get_singleton_running('utils.wefax', 'get_wefax_decoder', 'is_running'),
+            'sstv_general': _get_singleton_running('utils.sstv', 'get_general_sstv_decoder', 'is_running'),
+            'tscm': _get_tscm_active(),
+            'gps': _get_singleton_running('utils.gps', 'get_gps_reader', 'is_running'),
+            'bt_locate': _get_singleton_running('utils.bt_locate', 'get_locate_session', 'is_active'),
         },
         'data': {
             'aircraft_count': len(adsb_aircraft),
@@ -975,6 +1012,13 @@ def _init_app() -> None:
     try:
         from routes.waterfall_websocket import init_waterfall_websocket
         init_waterfall_websocket(app)
+    except ImportError:
+        pass
+
+    # Initialize WebSocket for meteor scatter monitoring
+    try:
+        from routes.meteor_websocket import init_meteor_websocket
+        init_meteor_websocket(app)
     except ImportError:
         pass
 

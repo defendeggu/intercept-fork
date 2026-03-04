@@ -1,0 +1,141 @@
+<!-- METEOR SCATTER MODE -->
+<div id="meteorMode" class="mode-content">
+    <div class="section">
+        <h3>Meteor Scatter Monitor</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+            Monitor VHF beacon reflections from meteor ionization trails.
+            Detects transient pings on continuous beacons like GRAVES (143.050 MHz).
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Frequency</h3>
+        <div class="form-group">
+            <label>Center Frequency (MHz)</label>
+            <input type="number" id="meteorFrequency" value="143.050" step="0.001" min="24" max="1766">
+        </div>
+        <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <button class="preset-btn" onclick="document.getElementById('meteorFrequency').value='143.050'" style="flex: 1;">
+                GRAVES 143.050
+            </button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Capture Settings</h3>
+        <div class="form-group">
+            <label>Gain (0 = auto)</label>
+            <input type="number" id="meteorGain" value="0" step="0.1" min="0" max="50">
+        </div>
+        <div class="form-group">
+            <label>Sample Rate</label>
+            <select id="meteorSampleRate">
+                <option value="250000">250 kHz</option>
+                <option value="1024000" selected>1024 kHz</option>
+                <option value="2048000">2048 kHz</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>FFT Size</label>
+            <select id="meteorFFTSize">
+                <option value="256">256</option>
+                <option value="512">512</option>
+                <option value="1024" selected>1024</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Frame Rate (FPS)</label>
+            <input type="number" id="meteorFPS" value="20" step="1" min="5" max="30">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Detection</h3>
+        <div class="form-group">
+            <label>SNR Threshold (dB): <span id="meteorSNRValue">6</span></label>
+            <input type="range" id="meteorSNRThreshold" value="6" min="3" max="30" step="0.5"
+                   oninput="document.getElementById('meteorSNRValue').textContent=this.value">
+        </div>
+        <div class="form-group">
+            <label>Min Duration (ms): <span id="meteorMinDurValue">50</span></label>
+            <input type="range" id="meteorMinDuration" value="50" min="20" max="500" step="10"
+                   oninput="document.getElementById('meteorMinDurValue').textContent=this.value">
+        </div>
+        <div class="form-group">
+            <label>Cooldown (ms): <span id="meteorCooldownValue">200</span></label>
+            <input type="range" id="meteorCooldown" value="200" min="100" max="2000" step="50"
+                   oninput="document.getElementById('meteorCooldownValue').textContent=this.value">
+        </div>
+        <div class="form-group">
+            <label>Freq Drift Tolerance (Hz): <span id="meteorDriftValue">500</span></label>
+            <input type="range" id="meteorFreqDrift" value="500" min="100" max="5000" step="100"
+                   oninput="document.getElementById('meteorDriftValue').textContent=this.value">
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Export</h3>
+        <div style="display: flex; gap: 6px;">
+            <button class="preset-btn" onclick="MeteorScatter.exportCSV()" style="flex: 1;">CSV</button>
+            <button class="preset-btn" onclick="MeteorScatter.exportJSON()" style="flex: 1;">JSON</button>
+            <button class="preset-btn" onclick="MeteorScatter.clearEvents()" style="flex: 1; color: var(--accent-red, #ff6b6b);">Clear</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>About Meteor Scatter</h3>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim);">
+            Meteor scatter communications exploit the brief ionization trails left by
+            meteors entering the atmosphere. These trails reflect VHF radio signals,
+            creating detectable "pings" lasting milliseconds to seconds.
+        </p>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+            The GRAVES radar in France (143.050 MHz) is a primary target &mdash; its continuous
+            beacon produces clear reflections off meteor trails visible across Europe.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Antenna Guide</h3>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.5;">
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">VHF Yagi (Best)</strong>
+                <ul style="margin: 6px 0 0 14px; padding: 0;">
+                    <li><strong style="color: var(--text-primary);">Frequency:</strong> 143 MHz (2m band)</li>
+                    <li><strong style="color: var(--text-primary);">Direction:</strong> South (from Europe, toward GRAVES)</li>
+                    <li><strong style="color: var(--text-primary);">Elevation:</strong> ~45&deg; above horizon</li>
+                    <li><strong style="color: var(--text-primary);">Polarization:</strong> Horizontal</li>
+                </ul>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px;">
+                <strong style="color: var(--accent-cyan); font-size: 12px;">Quick Reference</strong>
+                <table style="width: 100%; margin-top: 6px; font-size: 10px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">GRAVES frequency</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">143.050 MHz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Quarter-wave length</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">~52 cm</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Peak meteor showers</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">Perseids (Aug), Geminids (Dec)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 3px 4px; color: var(--text-dim);">Typical ping duration</td>
+                        <td style="padding: 3px 4px; color: var(--text-primary); text-align: right;">50 ms &ndash; 10 s</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <button class="run-btn" id="meteorSidebarStartBtn" onclick="MeteorScatter.start()">
+        Start Monitoring
+    </button>
+    <button class="stop-btn" id="meteorSidebarStopBtn" onclick="MeteorScatter.stop()" style="display: none;">
+        Stop Monitoring
+    </button>
+</div>

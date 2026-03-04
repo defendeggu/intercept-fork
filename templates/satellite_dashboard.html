@@ -362,6 +362,33 @@
             return false;
         }
 
+        let positionPollingInterval = null;
+
+        function startPositionPolling() {
+            if (!positionPollingInterval) {
+                updateRealTimePositions();
+                positionPollingInterval = setInterval(updateRealTimePositions, 5000);
+            }
+        }
+
+        function stopPositionPolling() {
+            if (positionPollingInterval) {
+                clearInterval(positionPollingInterval);
+                positionPollingInterval = null;
+            }
+        }
+
+        // Listen for visibility messages from parent page (embedded mode)
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'satellite-visibility') {
+                if (event.data.visible) {
+                    startPositionPolling();
+                } else {
+                    stopPositionPolling();
+                }
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             loadDashboardSatellites();
             setupEmbeddedMode();
@@ -370,7 +397,11 @@
             updateClock();
             setInterval(updateClock, 1000);
             setInterval(updateCountdown, 1000);
-            setInterval(updateRealTimePositions, 5000);
+            // In standalone mode, start polling immediately.
+            // In embedded mode, wait for parent to signal visibility.
+            if (!isEmbedded) {
+                startPositionPolling();
+            }
             loadAgents();
             if (!usedShared) {
                 getLocation();

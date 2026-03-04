@@ -414,7 +414,7 @@ body {
 .acars-sidebar .acars-btn {
     background: var(--accent-green);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
     padding: 6px 10px;
     font-size: 10px;
     font-weight: 600;
@@ -575,7 +575,7 @@ body {
 .vdl2-sidebar .vdl2-btn {
     background: var(--accent-green);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
     padding: 6px 10px;
     font-size: 10px;
     font-weight: 600;
@@ -1347,7 +1347,7 @@ body {
     padding: 6px 16px;
     border: none;
     background: var(--accent-green);
-    color: #fff;
+    color: var(--text-inverse);
     font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
@@ -1365,7 +1365,7 @@ body {
 
 .start-btn.active {
     background: var(--accent-red);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .start-btn.active:hover {
@@ -1497,7 +1497,7 @@ body {
     padding: 6px 12px;
     background: var(--accent-green);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
     border-radius: 4px;
     cursor: pointer;
     font-size: 11px;
@@ -1518,7 +1518,7 @@ body {
 
 .airband-btn.active {
     background: var(--accent-red);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .airband-btn.active:hover {
@@ -1912,7 +1912,7 @@ body {
 .strip-report-btn {
     background: linear-gradient(135deg, var(--accent-cyan) 0%, #2b6fb8 100%);
     border: none;
-    color: white;
+    color: var(--text-inverse);
     padding: 8px 12px;
     border-radius: 4px;
     font-size: 10px;
@@ -2224,7 +2224,7 @@ body {
 .strip-btn.primary {
     background: linear-gradient(135deg, var(--accent-cyan) 0%, #2b6fb8 100%);
     border: none;
-    color: white;
+    color: var(--text-inverse);
 }
 
 .strip-btn.primary:hover {

@@ -34,6 +34,16 @@ def unregister_process(process: subprocess.Popen) -> None:
             _spawned_processes.remove(process)
 
 
+def close_process_pipes(process: subprocess.Popen) -> None:
+    """Close stdin/stdout/stderr pipes on a subprocess to free file descriptors."""
+    for pipe in (process.stdin, process.stdout, process.stderr):
+        if pipe:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+
 def cleanup_all_processes() -> None:
     """Clean up all registered processes on exit."""
     logger.info("Cleaning up all spawned processes...")
@@ -47,6 +57,7 @@ def cleanup_all_processes() -> None:
                     process.kill()
                 except Exception as e:
                     logger.warning(f"Error cleaning up process: {e}")
+            close_process_pipes(process)
         _spawned_processes.clear()
 
 
@@ -66,12 +77,14 @@ def safe_terminate(process: subprocess.Popen | None, timeout: float = 2.0) -> bo
 
     if process.poll() is not None:
         # Already dead
+        close_process_pipes(process)
         unregister_process(process)
         return False
 
     try:
         process.terminate()
         process.wait(timeout=timeout)
+        close_process_pipes(process)
         unregister_process(process)
         return True
     except subprocess.TimeoutExpired:
@@ -80,10 +93,12 @@ def safe_terminate(process: subprocess.Popen | None, timeout: float = 2.0) -> bo
             process.wait(timeout=3)
         except subprocess.TimeoutExpired:
             pass
+        close_process_pipes(process)
         unregister_process(process)
         return True
     except Exception as e:
         logger.warning(f"Error terminating process: {e}")
+        close_process_pipes(process)
         return False
 
 

@@ -51,10 +51,10 @@
 }
 
 .sw-header-value.accent-cyan { color: var(--accent-cyan); }
-.sw-header-value.accent-green { color: #00ff88; }
-.sw-header-value.accent-yellow { color: #ffcc00; }
-.sw-header-value.accent-orange { color: #ff8800; }
-.sw-header-value.accent-red { color: #ff3366; }
+.sw-header-value.accent-green { color: var(--neon-green); }
+.sw-header-value.accent-yellow { color: var(--neon-yellow); }
+.sw-header-value.accent-orange { color: var(--neon-orange); }
+.sw-header-value.accent-red { color: var(--neon-red); }
 
 /* Refresh controls in strip */
 .sw-strip-controls {
@@ -126,12 +126,15 @@
 }
 
 /* Scale severity colors */
-.sw-scale-0 { color: #00ff88; border-color: #00ff8833; }
+.sw-scale-0 { color: var(--neon-green); border-color: #00ff8833; }
 .sw-scale-1 { color: #88ff00; border-color: #88ff0033; }
-.sw-scale-2 { color: #ffcc00; border-color: #ffcc0033; }
-.sw-scale-3 { color: #ff8800; border-color: #ff880033; }
+.sw-scale-2 { color: var(--neon-yellow); border-color: #ffcc0033; }
+.sw-scale-3 { color: var(--neon-orange); border-color: #ff880033; }
 .sw-scale-4 { color: #ff4400; border-color: #ff440033; }
-.sw-scale-5 { color: #ff0044; border-color: #ff004433; }
+.sw-scale-5 { color: var(--neon-red); border-color: #ff004433; }
+
+[data-theme="light"] .sw-scale-1 { color: #5a8a00; }
+[data-theme="light"] .sw-scale-4 { color: #cc3300; }
 
 /* HF Band conditions grid */
 .sw-band-panel {
@@ -180,9 +183,9 @@
     font-weight: 600;
 }
 
-.sw-band-good { color: #00ff88; background: #00ff8815; }
-.sw-band-fair { color: #ffcc00; background: #ffcc0015; }
-.sw-band-poor { color: #ff3366; background: #ff336615; }
+.sw-band-good { color: var(--neon-green); background: #00ff8815; }
+.sw-band-fair { color: var(--neon-yellow); background: #ffcc0015; }
+.sw-band-poor { color: var(--neon-red); background: #ff336615; }
 
 /* 2-column dashboard grid */
 .sw-dashboard-grid {

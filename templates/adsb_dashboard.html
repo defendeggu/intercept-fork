@@ -2172,6 +2172,58 @@ sudo make install</code>
                 const [adsbSdrType, adsbDeviceIdx] = adsbSelectVal.includes(':') ? adsbSelectVal.split(':') : ['rtlsdr', adsbSelectVal];
                 const adsbDevice = parseInt(adsbDeviceIdx) || 0;
 
+                // Pre-flight: check if another mode is using this device and auto-stop it
+                if (!useAgent) {
+                    try {
+                        const devResp = await fetch('/devices/status');
+                        if (devResp.ok) {
+                            const devices = await devResp.json();
+                            const target = devices.find(d => d.sdr_type === adsbSdrType && d.index === adsbDevice);
+                            if (target && target.in_use && target.used_by && target.used_by !== 'adsb') {
+                                const stopEndpoints = {
+                                    pager: '/stop',
+                                    sensor: '/stop_sensor',
+                                    morse: '/morse/stop',
+                                    adsb: '/adsb/stop',
+                                    acars: '/acars/stop',
+                                    vdl2: '/vdl2/stop',
+                                    ais: '/ais/stop',
+                                    dsc: '/dsc/stop',
+                                    weathersat: '/weather-sat/stop',
+                                    sstv: '/sstv/stop',
+                                    radiosonde: '/radiosonde/stop',
+                                    rtlamr: '/rtlamr/stop_rtlamr',
+                                    aprs: '/aprs/stop',
+                                    tscm: '/tscm/sweep/stop',
+                                    wefax: '/wefax/stop',
+                                    sstv_general: '/sstv-general/stop',
+                                };
+                                const mode = target.used_by;
+                                const stopUrl = stopEndpoints[mode];
+                                if (stopUrl) {
+                                    console.log(`Device ${adsbSdrType}:${adsbDevice} in use by ${mode}, stopping...`);
+                                    btn.textContent = `Stopping ${mode}...`;
+                                    btn.disabled = true;
+                                    try {
+                                        await fetch(stopUrl, { method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ source: 'adsb_conflict' })
+                                        });
+                                    } catch (e) {
+                                        console.warn(`Failed to stop ${mode}:`, e);
+                                    }
+                                    // Wait for USB device to be released
+                                    await new Promise(resolve => setTimeout(resolve, 1500));
+                                    btn.textContent = 'Starting...';
+                                    btn.disabled = false;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Device conflict check failed:', e);
+                    }
+                }
+
                 const requestBody = {
                     device: adsbDevice,
                     sdr_type: adsbSdrType,
@@ -3600,8 +3652,8 @@ sudo make install</code>
 
         async function startAirband() {
             const frequency = getAirbandFrequency();
-            const device = parseInt(document.getElementById('airbandDeviceSelect').value);
-            const squelch = parseInt(document.getElementById('airbandSquelch').value);
+            const device = parseInt(document.getElementById('airbandDeviceSelect').value) || 0;
+            const squelch = parseInt(document.getElementById('airbandSquelch').value) || 0;
 
             console.log('[AIRBAND] Starting with device:', device, 'freq:', frequency, 'squelch:', squelch);
 

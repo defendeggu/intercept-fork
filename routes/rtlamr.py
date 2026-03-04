@@ -29,6 +29,7 @@ rtl_tcp_lock = threading.Lock()
 
 # Track which device is being used
 rtlamr_active_device: int | None = None
+rtlamr_active_sdr_type: str = 'rtlsdr'
 
 
 def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
@@ -62,7 +63,7 @@ def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
     except Exception as e:
         app_module.rtlamr_queue.put({'type': 'error', 'text': str(e)})
     finally:
-        global rtl_tcp_process, rtlamr_active_device
+        global rtl_tcp_process, rtlamr_active_device, rtlamr_active_sdr_type
         # Ensure rtlamr process is terminated
         try:
             process.terminate()
@@ -91,19 +92,26 @@ def stream_rtlamr_output(process: subprocess.Popen[bytes]) -> None:
             app_module.rtlamr_process = None
         # Release SDR device
         if rtlamr_active_device is not None:
-            app_module.release_sdr_device(rtlamr_active_device)
+            app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
             rtlamr_active_device = None
 
 
 @rtlamr_bp.route('/start_rtlamr', methods=['POST'])
 def start_rtlamr() -> Response:
-    global rtl_tcp_process, rtlamr_active_device
+    global rtl_tcp_process, rtlamr_active_device, rtlamr_active_sdr_type
 
     with app_module.rtlamr_lock:
         if app_module.rtlamr_process:
             return jsonify({'status': 'error', 'message': 'RTLAMR already running'}), 409
 
         data = request.json or {}
+        sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
+        if sdr_type_str != 'rtlsdr':
+            return jsonify({
+                'status': 'error',
+                'message': f'{sdr_type_str.replace("_", " ").title()} is not yet supported for this mode. Please use an RTL-SDR device.'
+            }), 400
 
         # Validate inputs
         try:
@@ -116,7 +124,7 @@ def start_rtlamr() -> Response:
 
         # Check if device is available
         device_int = int(device)
-        error = app_module.claim_sdr_device(device_int, 'rtlamr')
+        error = app_module.claim_sdr_device(device_int, 'rtlamr', sdr_type_str)
         if error:
             return jsonify({
                 'status': 'error',
@@ -125,6 +133,7 @@ def start_rtlamr() -> Response:
             }), 409
 
         rtlamr_active_device = device_int
+        rtlamr_active_sdr_type = sdr_type_str
 
         # Clear queue
         while not app_module.rtlamr_queue.empty():
@@ -170,7 +179,7 @@ def start_rtlamr() -> Response:
                     logger.error(f"Failed to start rtl_tcp: {e}")
                     # Release SDR device on rtl_tcp failure
                     if rtlamr_active_device is not None:
-                        app_module.release_sdr_device(rtlamr_active_device)
+                        app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
                         rtlamr_active_device = None
                     return jsonify({'status': 'error', 'message': f'Failed to start rtl_tcp: {e}'}), 500
 
@@ -242,7 +251,7 @@ def start_rtlamr() -> Response:
                     rtl_tcp_process.wait(timeout=2)
                     rtl_tcp_process = None
             if rtlamr_active_device is not None:
-                app_module.release_sdr_device(rtlamr_active_device)
+                app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
                 rtlamr_active_device = None
             return jsonify({'status': 'error', 'message': 'rtlamr not found. Install from https://github.com/bemasher/rtlamr'})
         except Exception as e:
@@ -253,14 +262,14 @@ def start_rtlamr() -> Response:
                     rtl_tcp_process.wait(timeout=2)
                     rtl_tcp_process = None
             if rtlamr_active_device is not None:
-                app_module.release_sdr_device(rtlamr_active_device)
+                app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
                 rtlamr_active_device = None
             return jsonify({'status': 'error', 'message': str(e)})
 
 
 @rtlamr_bp.route('/stop_rtlamr', methods=['POST'])
 def stop_rtlamr() -> Response:
-    global rtl_tcp_process, rtlamr_active_device
+    global rtl_tcp_process, rtlamr_active_device, rtlamr_active_sdr_type
 
     # Grab process refs inside locks, clear state, then terminate outside
     rtlamr_proc = None
@@ -293,7 +302,7 @@ def stop_rtlamr() -> Response:
 
     # Release device from registry
     if rtlamr_active_device is not None:
-        app_module.release_sdr_device(rtlamr_active_device)
+        app_module.release_sdr_device(rtlamr_active_device, rtlamr_active_sdr_type)
         rtlamr_active_device = None
 
     return jsonify({'status': 'stopped'})

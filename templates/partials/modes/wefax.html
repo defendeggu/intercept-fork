@@ -52,20 +52,8 @@
             <input type="checkbox" id="wefaxAutoUsbAlign" checked>
             <label for="wefaxAutoUsbAlign" style="margin: 0; cursor: pointer;">Auto USB align listed carrier frequencies (-1.9 kHz)</label>
         </div>
-        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: -4px;">
-            Disable this if your source already provides USB dial frequencies.
-        </p>
-    </div>
-
-    <div class="section">
-        <h3>Auto Capture</h3>
-        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="wefaxSidebarAutoSchedule"
-                   onchange="WeFax.toggleScheduler(this)">
-            <label for="wefaxSidebarAutoSchedule" style="margin: 0; cursor: pointer;">Auto-capture scheduled broadcasts</label>
-        </div>
         <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
-            Automatically decode at scheduled broadcast times.
+            Disable this if your source already provides USB dial frequencies.
         </p>
     </div>
 
@@ -116,12 +104,24 @@
     </div>
 
     <div class="section">
+        <h3>Auto Capture</h3>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="wefaxSidebarAutoSchedule"
+                   onchange="WeFax.toggleScheduler(this)">
+            <label for="wefaxSidebarAutoSchedule" style="margin: 0; cursor: pointer;">Auto-capture scheduled broadcasts</label>
+        </div>
+        <p class="info-text" style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+            Automatically decode at scheduled broadcast times.
+        </p>
+    </div>
+
+    <div class="section">
         <h3>Resources</h3>
         <div style="display: flex; flex-direction: column; gap: 6px;">
             <a href="https://www.weather.gov/marine/radiofax_charts" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
                 NWS Radiofax Charts
             </a>
-            <a href="https://www.nws.noaa.gov/os/marine/rfax.pdf" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
+            <a href="https://www.weather.gov/media/marine/rfax.pdf" target="_blank" rel="noopener" class="preset-btn" style="text-decoration: none; text-align: center;">
                 NOAA Radiofax Schedule (PDF)
             </a>
         </div>

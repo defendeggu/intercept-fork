@@ -66,6 +66,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/function-strip.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/ux-platform.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/signal-waveform.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/core/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modes/waterfall.css') }}?v={{ version }}&r=wfdeck19">
     <script>
@@ -84,6 +85,7 @@
             wefax: "{{ url_for('static', filename='css/modes/wefax.css') }}",
             morse: "{{ url_for('static', filename='css/modes/morse.css') }}",
             radiosonde: "{{ url_for('static', filename='css/modes/radiosonde.css') }}",
+            meteor: "{{ url_for('static', filename='css/modes/meteor.css') }}",
             system: "{{ url_for('static', filename='css/modes/system.css') }}"
         };
         window.INTERCEPT_MODE_STYLE_LOADED = {};
@@ -713,6 +715,7 @@
 
                 {% include 'partials/modes/bt_locate.html' %}
                 {% include 'partials/modes/waterfall.html' %}
+                {% include 'partials/modes/meteor.html' %}
                 {% include 'partials/modes/system.html' %}
 
 
@@ -3136,8 +3139,100 @@
 
                 <!-- Radiosonde Visuals -->
                 <div id="radiosondeVisuals" class="radiosonde-visuals-container" style="display: none;">
+                    <div class="radiosonde-strip">
+                        <div class="radiosonde-strip-inner">
+                            <div class="strip-status">
+                                <div class="status-dot" id="radiosondeStripDot"></div>
+                                <span id="radiosondeStripStatus">STANDBY</span>
+                            </div>
+                            <div class="strip-divider"></div>
+                            <div class="strip-stat">
+                                <span class="strip-value" id="radiosondeStripBalloons">0</span>
+                                <span class="strip-label">BALLOONS</span>
+                            </div>
+                            <div class="strip-stat">
+                                <span class="strip-value" id="radiosondeStripUpdate">--:--:--</span>
+                                <span class="strip-label">LAST UPDATE</span>
+                            </div>
+                            <div class="strip-divider"></div>
+                            <div class="strip-waveform" id="radiosondeStripWaveform"></div>
+                        </div>
+                    </div>
                     <div id="radiosondeMapContainer" style="flex: 1; min-height: 300px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary);"></div>
                     <div id="radiosondeCardContainer" class="radiosonde-card-container"></div>
+                </div>
+
+                <!-- Meteor Scatter Visuals -->
+                <div id="meteorVisuals" class="meteor-visuals-container" style="display: none;">
+                    <div class="ms-headline">
+                        <div class="ms-headline-left">
+                            <span id="meteorStatusChip" class="ms-headline-tag idle">IDLE</span>
+                            <span class="ms-headline-sub" id="meteorFreqLabel">143.050 MHz</span>
+                        </div>
+                        <div class="ms-headline-right">
+                            <span id="meteorStateTag" class="ms-headline-tag idle">IDLE</span>
+                            <button id="meteorStartBtn" class="preset-btn" style="font-size: 10px; padding: 2px 10px;">Start</button>
+                            <button id="meteorStopBtn" class="preset-btn" style="font-size: 10px; padding: 2px 10px;" disabled>Stop</button>
+                        </div>
+                    </div>
+                    <div class="ms-stats-strip">
+                        <div class="ms-stat-cell">
+                            <span class="ms-stat-label">Total Pings</span>
+                            <span class="ms-stat-value highlight" id="meteorStatPingsTotal">0</span>
+                        </div>
+                        <div class="ms-stat-cell">
+                            <span class="ms-stat-label">Last 10 Min</span>
+                            <span class="ms-stat-value" id="meteorStatPings10min">0</span>
+                        </div>
+                        <div class="ms-stat-cell">
+                            <span class="ms-stat-label">Strongest SNR</span>
+                            <span class="ms-stat-value" id="meteorStatStrongest">0.0 dB</span>
+                        </div>
+                        <div class="ms-stat-cell">
+                            <span class="ms-stat-label">Noise Floor</span>
+                            <span class="ms-stat-value" id="meteorStatNoiseFloor">-100.0 dB</span>
+                        </div>
+                        <div class="ms-stat-cell">
+                            <span class="ms-stat-label">Uptime</span>
+                            <span class="ms-stat-value" id="meteorStatUptime">0:00</span>
+                        </div>
+                    </div>
+                    <div class="ms-spectrum-wrap">
+                        <canvas id="meteorSpectrumCanvas"></canvas>
+                    </div>
+                    <div class="ms-waterfall-wrap">
+                        <canvas id="meteorWaterfallCanvas"></canvas>
+                        <div class="ms-empty-state" id="meteorEmptyState">
+                            <div class="ms-empty-icon">&#9732;</div>
+                            <div class="ms-empty-text">
+                                Configure frequency and press Start to begin meteor scatter monitoring.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ms-timeline-wrap">
+                        <canvas id="meteorTimelineCanvas"></canvas>
+                    </div>
+                    <div class="ms-events-panel">
+                        <div class="ms-events-header">
+                            <span class="ms-events-title">Detected Pings</span>
+                            <span class="ms-events-count" id="meteorEventsCount">0 events</span>
+                        </div>
+                        <div class="ms-events-scroll">
+                            <table class="ms-events-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Duration</th>
+                                        <th>SNR</th>
+                                        <th>Offset</th>
+                                        <th>Conf</th>
+                                        <th>Tags</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="meteorEventsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- System Health Visuals -->
@@ -3245,6 +3340,7 @@
     <script src="{{ url_for('static', filename='js/components/device-card.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/proximity-radar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/timeline-heatmap.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/signal-waveform.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/bluetooth.js') }}?v={{ version }}&r=btlocate1"></script>
     <!-- WiFi v2 components -->
     <script src="{{ url_for('static', filename='js/components/channel-chart.js') }}"></script>
@@ -3262,6 +3358,7 @@
     <script src="{{ url_for('static', filename='js/modes/morse.js') }}?v={{ version }}&r=morse_iq12"></script>
     <script src="{{ url_for('static', filename='js/modes/space-weather.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/system.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modes/meteor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/voice-alerts.js') }}?v={{ version }}&r=voicefix2"></script>
     <script src="{{ url_for('static', filename='js/core/keyboard-shortcuts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/core/cheat-sheets.js') }}"></script>
@@ -3407,6 +3504,7 @@
             sstv_general: { label: 'HF SSTV', indicator: 'HF SSTV', outputTitle: 'HF SSTV Decoder', group: 'space' },
             wefax: { label: 'WeFax', indicator: 'WEFAX', outputTitle: 'Weather Fax Decoder', group: 'space' },
             spaceweather: { label: 'Space Weather', indicator: 'SPACE WX', outputTitle: 'Space Weather Monitor', group: 'space' },
+            meteor: { label: 'Meteor', indicator: 'METEOR', outputTitle: 'Meteor Scatter Monitor', group: 'space' },
             wifi: { label: 'WiFi', indicator: 'WIFI', outputTitle: 'WiFi Scanner', group: 'wireless' },
             bluetooth: { label: 'Bluetooth', indicator: 'BLUETOOTH', outputTitle: 'Bluetooth Scanner', group: 'wireless' },
             bt_locate: { label: 'BT Locate', indicator: 'BT LOCATE', outputTitle: 'BT Locate — SAR Tracker', group: 'wireless' },
@@ -3941,6 +4039,43 @@
             '/satellite/dashboard',
         ]);
 
+        // Shared module destroy map — closes SSE EventSources, timers, etc.
+        // Used by both switchMode() and dashboard navigation cleanup.
+        function getModuleDestroyFn(mode) {
+            const moduleDestroyMap = {
+                subghz: () => typeof SubGhz !== 'undefined' && SubGhz.destroy(),
+                morse: () => typeof MorseMode !== 'undefined' && MorseMode.destroy?.(),
+                spaceweather: () => typeof SpaceWeather !== 'undefined' && SpaceWeather.destroy?.(),
+                weathersat: () => typeof WeatherSat !== 'undefined' && WeatherSat.suspend?.(),
+                wefax: () => typeof WeFax !== 'undefined' && WeFax.destroy?.(),
+                system: () => typeof SystemHealth !== 'undefined' && SystemHealth.destroy?.(),
+                waterfall: () => typeof Waterfall !== 'undefined' && Waterfall.destroy?.(),
+                gps: () => typeof GPS !== 'undefined' && GPS.destroy?.(),
+                meshtastic: () => typeof Meshtastic !== 'undefined' && Meshtastic.destroy?.(),
+                bluetooth: () => typeof BluetoothMode !== 'undefined' && BluetoothMode.destroy?.(),
+                wifi: () => typeof WiFiMode !== 'undefined' && WiFiMode.destroy?.(),
+                bt_locate: () => typeof BtLocate !== 'undefined' && BtLocate.destroy?.(),
+                sstv: () => typeof SSTV !== 'undefined' && SSTV.destroy?.(),
+                sstv_general: () => typeof SSTVGeneral !== 'undefined' && SSTVGeneral.destroy?.(),
+                websdr: () => typeof WebSDR !== 'undefined' && WebSDR.destroy?.(),
+                spystations: () => typeof SpyStations !== 'undefined' && SpyStations.destroy?.(),
+                ais: () => { if (aisEventSource) { aisEventSource.close(); aisEventSource = null; } },
+                acars: () => { if (acarsMainEventSource) { acarsMainEventSource.close(); acarsMainEventSource = null; } },
+                vdl2: () => { if (vdl2MainEventSource) { vdl2MainEventSource.close(); vdl2MainEventSource = null; } },
+                radiosonde: () => { if (radiosondeEventSource) { radiosondeEventSource.close(); radiosondeEventSource = null; } },
+                meteor: () => typeof MeteorScatter !== 'undefined' && MeteorScatter.destroy?.(),
+            };
+            return moduleDestroyMap[mode] || null;
+        }
+
+        function destroyCurrentMode() {
+            if (!currentMode) return;
+            const destroyFn = getModuleDestroyFn(currentMode);
+            if (destroyFn) {
+                try { destroyFn(); } catch(e) { console.warn(`[destroyCurrentMode] destroy ${currentMode} failed:`, e); }
+            }
+        }
+
         function getActiveScanSummary() {
             return {
                 pager: Boolean(isRunning),
@@ -4002,6 +4137,29 @@
             if (typeof isTscmRunning !== 'undefined' && isTscmRunning && typeof stopTscmSweep === 'function') {
                 Promise.resolve(stopTscmSweep()).catch(() => { });
             }
+
+            // Additional modes with server-side processes that need stopping
+            if (typeof WeFax !== 'undefined' && typeof WeFax.stop === 'function') {
+                Promise.resolve(WeFax.stop()).catch(() => { });
+            }
+            if (typeof WeatherSat !== 'undefined' && typeof WeatherSat.stop === 'function') {
+                Promise.resolve(WeatherSat.stop()).catch(() => { });
+            }
+            if (typeof SSTV !== 'undefined' && typeof SSTV.stop === 'function') {
+                Promise.resolve(SSTV.stop()).catch(() => { });
+            }
+            if (typeof SSTVGeneral !== 'undefined' && typeof SSTVGeneral.stop === 'function') {
+                Promise.resolve(SSTVGeneral.stop()).catch(() => { });
+            }
+            if (typeof SubGhz !== 'undefined' && typeof SubGhz.stop === 'function') {
+                Promise.resolve(SubGhz.stop()).catch(() => { });
+            }
+            if (typeof Meshtastic !== 'undefined' && typeof Meshtastic.stop === 'function') {
+                Promise.resolve(Meshtastic.stop()).catch(() => { });
+            }
+            if (typeof GPS !== 'undefined' && typeof GPS.stop === 'function') {
+                Promise.resolve(GPS.stop()).catch(() => { });
+            }
         }
 
         if (!window._dashboardNavigationStopHookBound) {
@@ -4027,6 +4185,7 @@
                             activeScans: getActiveScanSummary(),
                         });
                     }
+                    destroyCurrentMode();
                     stopActiveLocalScansForNavigation();
                 } catch (_) {
                     // Ignore malformed hrefs.
@@ -4141,26 +4300,11 @@
             await styleReadyPromise;
 
             // Generic module cleanup — destroy previous mode's timers, SSE, etc.
-            const moduleDestroyMap = {
-                subghz: () => typeof SubGhz !== 'undefined' && SubGhz.destroy(),
-                morse: () => typeof MorseMode !== 'undefined' && MorseMode.destroy?.(),
-                spaceweather: () => typeof SpaceWeather !== 'undefined' && SpaceWeather.destroy?.(),
-                weathersat: () => typeof WeatherSat !== 'undefined' && WeatherSat.suspend?.(),
-                wefax: () => typeof WeFax !== 'undefined' && WeFax.destroy?.(),
-                system: () => typeof SystemHealth !== 'undefined' && SystemHealth.destroy?.(),
-                waterfall: () => typeof Waterfall !== 'undefined' && Waterfall.destroy?.(),
-                gps: () => typeof GPS !== 'undefined' && GPS.destroy?.(),
-                meshtastic: () => typeof Meshtastic !== 'undefined' && Meshtastic.destroy?.(),
-                bluetooth: () => typeof BluetoothMode !== 'undefined' && BluetoothMode.destroy?.(),
-                wifi: () => typeof WiFiMode !== 'undefined' && WiFiMode.destroy?.(),
-                bt_locate: () => typeof BtLocate !== 'undefined' && BtLocate.destroy?.(),
-                sstv: () => typeof SSTV !== 'undefined' && SSTV.destroy?.(),
-                sstv_general: () => typeof SSTVGeneral !== 'undefined' && SSTVGeneral.destroy?.(),
-                websdr: () => typeof WebSDR !== 'undefined' && WebSDR.destroy?.(),
-                spystations: () => typeof SpyStations !== 'undefined' && SpyStations.destroy?.(),
-            };
-            if (previousMode && previousMode !== mode && moduleDestroyMap[previousMode]) {
-                try { moduleDestroyMap[previousMode](); } catch(e) { console.warn(`[switchMode] destroy ${previousMode} failed:`, e); }
+            if (previousMode && previousMode !== mode) {
+                const destroyFn = getModuleDestroyFn(previousMode);
+                if (destroyFn) {
+                    try { destroyFn(); } catch(e) { console.warn(`[switchMode] destroy ${previousMode} failed:`, e); }
+                }
             }
 
             currentMode = mode;
@@ -4212,6 +4356,7 @@
             document.getElementById('spaceWeatherMode')?.classList.toggle('active', mode === 'spaceweather');
             document.getElementById('waterfallMode')?.classList.toggle('active', mode === 'waterfall');
             document.getElementById('morseMode')?.classList.toggle('active', mode === 'morse');
+            document.getElementById('meteorMode')?.classList.toggle('active', mode === 'meteor');
             document.getElementById('systemMode')?.classList.toggle('active', mode === 'system');
 
 
@@ -4255,10 +4400,15 @@
             const spaceWeatherVisuals = document.getElementById('spaceWeatherVisuals');
             const waterfallVisuals = document.getElementById('waterfallVisuals');
             const radiosondeVisuals = document.getElementById('radiosondeVisuals');
+            const meteorVisuals = document.getElementById('meteorVisuals');
             const systemVisuals = document.getElementById('systemVisuals');
             if (wifiLayoutContainer) wifiLayoutContainer.style.display = mode === 'wifi' ? 'flex' : 'none';
             if (btLayoutContainer) btLayoutContainer.style.display = mode === 'bluetooth' ? 'flex' : 'none';
             if (satelliteVisuals) satelliteVisuals.style.display = mode === 'satellite' ? 'block' : 'none';
+            const satFrame = document.getElementById('satelliteDashboardFrame');
+            if (satFrame && satFrame.contentWindow) {
+                satFrame.contentWindow.postMessage({type: 'satellite-visibility', visible: mode === 'satellite'}, '*');
+            }
             if (aprsVisuals) aprsVisuals.style.display = mode === 'aprs' ? 'flex' : 'none';
             if (tscmVisuals) tscmVisuals.style.display = mode === 'tscm' ? 'flex' : 'none';
             if (spyStationsVisuals) spyStationsVisuals.style.display = mode === 'spystations' ? 'flex' : 'none';
@@ -4274,6 +4424,7 @@
             if (spaceWeatherVisuals) spaceWeatherVisuals.style.display = mode === 'spaceweather' ? 'flex' : 'none';
             if (waterfallVisuals) waterfallVisuals.style.display = mode === 'waterfall' ? 'flex' : 'none';
             if (radiosondeVisuals) radiosondeVisuals.style.display = mode === 'radiosonde' ? 'flex' : 'none';
+            if (meteorVisuals) meteorVisuals.style.display = mode === 'meteor' ? 'flex' : 'none';
             if (systemVisuals) systemVisuals.style.display = mode === 'system' ? 'flex' : 'none';
 
             // Prevent Leaflet heatmap redraws on hidden BT Locate map containers.
@@ -4326,7 +4477,7 @@
             const reconBtn = document.getElementById('reconBtn');
             const intelBtn = document.querySelector('[onclick="exportDeviceDB()"]');
             const reconPanel = document.getElementById('reconPanel');
-            if (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'gps' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall' || mode === 'system') {
+            if (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'gps' || mode === 'aprs' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall' || mode === 'meteor' || mode === 'system') {
                 if (reconPanel) reconPanel.style.display = 'none';
                 if (reconBtn) reconBtn.style.display = 'none';
                 if (intelBtn) intelBtn.style.display = 'none';
@@ -4347,16 +4498,24 @@
             // Show RTL-SDR device section for modes that use it
             const rtlDeviceSection = document.getElementById('rtlDeviceSection');
             if (rtlDeviceSection) {
-                rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'morse' || mode === 'radiosonde') ? 'block' : 'none';
+                rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'morse' || mode === 'radiosonde' || mode === 'meteor') ? 'block' : 'none';
                 // Save original sidebar position of SDR device section (once)
                 if (!rtlDeviceSection._origParent) {
                     rtlDeviceSection._origParent = rtlDeviceSection.parentNode;
                     rtlDeviceSection._origNext = rtlDeviceSection.nextElementSibling;
                 }
-                // For morse mode, move SDR device section inside the morse panel after the title
+                // For morse/radiosonde/meteor modes, move SDR device section inside the panel after the title
                 const morsePanel = document.getElementById('morseMode');
+                const radiosondePanel = document.getElementById('radiosondeMode');
+                const meteorPanel = document.getElementById('meteorMode');
                 if (mode === 'morse' && morsePanel) {
                     const firstSection = morsePanel.querySelector('.section');
+                    if (firstSection) firstSection.after(rtlDeviceSection);
+                } else if (mode === 'radiosonde' && radiosondePanel) {
+                    const firstSection = radiosondePanel.querySelector('.section');
+                    if (firstSection) firstSection.after(rtlDeviceSection);
+                } else if (mode === 'meteor' && meteorPanel) {
+                    const firstSection = meteorPanel.querySelector('.section');
                     if (firstSection) firstSection.after(rtlDeviceSection);
                 } else if (rtlDeviceSection._origParent && rtlDeviceSection.parentNode !== rtlDeviceSection._origParent) {
                     // Restore to original sidebar position when leaving morse mode
@@ -4377,8 +4536,8 @@
             // Hide output console for modes with their own visualizations
             const outputEl = document.getElementById('output');
             const statusBar = document.querySelector('.status-bar');
-            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'bt_locate' || mode === 'waterfall' || mode === 'morse' || mode === 'system') ? 'none' : 'block';
-            if (statusBar) statusBar.style.display = (mode === 'satellite' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall' || mode === 'morse' || mode === 'system') ? 'none' : 'flex';
+            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'bt_locate' || mode === 'waterfall' || mode === 'morse' || mode === 'meteor' || mode === 'system') ? 'none' : 'block';
+            if (statusBar) statusBar.style.display = (mode === 'satellite' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall' || mode === 'morse' || mode === 'meteor' || mode === 'system') ? 'none' : 'flex';
 
             // Restore sidebar when leaving Meshtastic mode (user may have collapsed it)
             if (mode !== 'meshtastic') {
@@ -4453,10 +4612,13 @@
             } else if (mode === 'morse') {
                 MorseMode.init();
             } else if (mode === 'radiosonde') {
+                initRadiosondeWaveform();
                 initRadiosondeMap();
                 setTimeout(() => {
                     if (radiosondeMap) radiosondeMap.invalidateSize();
                 }, 100);
+            } else if (mode === 'meteor') {
+                MeteorScatter.init();
             } else if (mode === 'system') {
                 SystemHealth.init();
             }
@@ -5208,6 +5370,7 @@
                 gain: gain,
                 ppm: ppm,
                 device: device,
+                sdr_type: getSelectedSDRType(),
                 msgtype: msgtype,
                 filterid: filterid,
                 unique: unique,
@@ -11565,6 +11728,7 @@
                     tscmBaselineComparison = null;
                     tscmIdentityClusters = [];
                     tscmIdentitySummary = null;
+                    tscmHighInterestDevices = [];
                     updateTscmDisplays();
                     updateTscmThreatCounts();
 
@@ -12400,7 +12564,7 @@
             const exists = tscmWifiDevices.some(d => d.bssid === device.bssid);
             if (!exists) {
                 tscmWifiDevices.push(device);
-                updateTscmDisplays();
+                debouncedUpdateTscmDisplays();
                 updateTscmThreatCounts();
                 // Add to findings panel if score >= 3 (review level or higher)
                 if (device.score >= 3) {
@@ -12429,7 +12593,7 @@
                 if (!client.mac) client.mac = mac;
                 client.is_client = true;
                 tscmWifiClients.push(client);
-                updateTscmDisplays();
+                debouncedUpdateTscmDisplays();
                 updateTscmThreatCounts();
                 if (client.score >= 3) {
                     addHighInterestDevice(client, 'wifi');
@@ -12451,7 +12615,7 @@
             if (!exists) {
                 if (!device.mac && mac) device.mac = mac;
                 tscmBtDevices.push(device);
-                updateTscmDisplays();
+                debouncedUpdateTscmDisplays();
                 updateTscmThreatCounts();
                 // Add to threats panel if score >= 3 (review level or higher)
                 if (device.score >= 3) {
@@ -12485,7 +12649,7 @@
                 : 3;
             if (!exists) {
                 tscmRfSignals.push(signal);
-                updateTscmDisplays();
+                debouncedUpdateTscmDisplays();
                 updateTscmThreatCounts();
                 // Add to findings panel if score >= 3 (review level or higher)
                 if (signal.score >= 3) {
@@ -12527,6 +12691,18 @@
             // If there are signals, updateTscmDisplays() will handle the display
         }
 
+        // Debounced versions of expensive display updates to batch rapid-fire device additions
+        let _tscmDisplayTimer = null;
+        function debouncedUpdateTscmDisplays() {
+            if (_tscmDisplayTimer) clearTimeout(_tscmDisplayTimer);
+            _tscmDisplayTimer = setTimeout(() => { _tscmDisplayTimer = null; updateTscmDisplays(); }, 250);
+        }
+        let _tscmHighInterestTimer = null;
+        function debouncedUpdateHighInterestPanel() {
+            if (_tscmHighInterestTimer) clearTimeout(_tscmHighInterestTimer);
+            _tscmHighInterestTimer = setTimeout(() => { _tscmHighInterestTimer = null; updateHighInterestPanel(); }, 250);
+        }
+
         // Track high-interest devices for the threats panel
         let tscmHighInterestDevices = [];
         function addHighInterestDevice(device, protocol) {
@@ -12540,10 +12716,9 @@
                     score: device.score,
                     classification: device.classification,
                     indicators: device.indicators || [],
-                    recommended_action: device.recommended_action,
-                    device: device
+                    recommended_action: device.recommended_action
                 });
-                updateHighInterestPanel();
+                debouncedUpdateHighInterestPanel();
             }
         }
 
@@ -12608,7 +12783,7 @@
 
             // Update dashboard counts
             updateTscmThreatCounts();
-            updateTscmDisplays();
+            debouncedUpdateTscmDisplays();
         }
 
         function readTscmFilters() {

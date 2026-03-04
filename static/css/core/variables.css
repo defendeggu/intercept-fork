@@ -61,6 +61,18 @@
     --status-offline: #6f7f94;
     --status-info: #4aa3ff;
 
+    /* Severity colors */
+    --severity-critical: #ff3366;
+    --severity-high: #ff9933;
+    --severity-medium: #ffcc00;
+    --severity-low: #00ff88;
+
+    /* Data visualization neon colors */
+    --neon-green: #00ff88;
+    --neon-yellow: #ffcc00;
+    --neon-orange: #ff8800;
+    --neon-red: #ff3366;
+
     /* Subtle grid/pattern */
     --grid-line: rgba(74, 163, 255, 0.1);
     --grid-dot: rgba(255, 255, 255, 0.03);
@@ -184,6 +196,27 @@
     --accent-orange-dim: rgba(181, 134, 58, 0.12);
     --accent-amber: #b5863a;
     --accent-amber-dim: rgba(181, 134, 58, 0.12);
+    --accent-yellow: #9a8420;
+    --accent-purple: #6b5ba8;
+
+    /* Status colors - light theme */
+    --status-online: #1f8a57;
+    --status-warning: #b5863a;
+    --status-error: #c74444;
+    --status-offline: #6b7c93;
+    --status-info: #1f5fa8;
+
+    /* Severity colors */
+    --severity-critical: #c74444;
+    --severity-high: #b5863a;
+    --severity-medium: #9a8420;
+    --severity-low: #1f8a57;
+
+    /* Data visualization neon replacements */
+    --neon-green: #1a8a50;
+    --neon-yellow: #9a8420;
+    --neon-orange: #b5863a;
+    --neon-red: #c74444;
 
     --text-primary: #122034;
     --text-secondary: #3a4a5f;

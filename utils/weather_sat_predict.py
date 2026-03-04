@@ -13,6 +13,17 @@ from utils.weather_sat import WEATHER_SATELLITES
 
 logger = get_logger('intercept.weather_sat_predict')
 
+# Cache skyfield timescale to avoid re-downloading/re-parsing per request
+_cached_timescale = None
+
+
+def _get_timescale():
+    global _cached_timescale
+    if _cached_timescale is None:
+        from skyfield.api import load
+        _cached_timescale = load.timescale()
+    return _cached_timescale
+
 
 def _format_utc_iso(dt: datetime.datetime) -> str:
     """Return an ISO8601 UTC timestamp with a single timezone designator."""
@@ -48,7 +59,7 @@ def predict_passes(
         ImportError: If skyfield is not installed.
     """
     from skyfield.almanac import find_discrete
-    from skyfield.api import EarthSatellite, load, wgs84
+    from skyfield.api import EarthSatellite, wgs84
 
     from data.satellites import TLE_SATELLITES
 
@@ -61,7 +72,7 @@ def predict_passes(
     except ImportError:
         pass
 
-    ts = load.timescale()
+    ts = _get_timescale()
     observer = wgs84.latlon(lat, lon)
     t0 = ts.now()
     t1 = ts.utc(t0.utc_datetime() + datetime.timedelta(hours=hours))

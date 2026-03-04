@@ -382,6 +382,74 @@
     transform: rotate(90deg);
 }
 
+/* ---- Light theme overrides ---- */
+[data-theme="light"] .mode-nav {
+    background: linear-gradient(180deg, rgba(240, 244, 250, 0.97) 0%, rgba(232, 238, 247, 0.95) 100%);
+}
+
+[data-theme="light"] .mode-nav-btn:hover {
+    background: rgba(220, 230, 244, 0.8);
+}
+
+[data-theme="light"] .mode-nav-btn.active {
+    background: rgba(220, 230, 244, 0.9);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .mode-nav-dropdown-btn:hover,
+[data-theme="light"] .mode-nav-dropdown.open .mode-nav-dropdown-btn,
+[data-theme="light"] .mode-nav-dropdown.has-active .mode-nav-dropdown-btn {
+    background: rgba(220, 230, 244, 0.9);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .mode-nav-dropdown-menu {
+    background: rgba(248, 250, 253, 0.99);
+    box-shadow: 0 16px 36px rgba(18, 40, 66, 0.15);
+}
+
+[data-theme="light"] .mode-nav-dropdown-menu .mode-nav-btn:hover {
+    background: rgba(220, 230, 244, 0.85);
+}
+
+[data-theme="light"] .mode-nav-dropdown-menu .mode-nav-btn.active {
+    background: rgba(220, 230, 244, 0.95);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .nav-tool-btn {
+    background: rgba(235, 241, 250, 0.7);
+    border-color: rgba(31, 95, 168, 0.12);
+}
+
+[data-theme="light"] .nav-tool-btn:hover {
+    background: rgba(220, 230, 244, 0.9);
+    box-shadow: 0 4px 10px rgba(18, 40, 66, 0.1);
+}
+
+[data-theme="light"] .nav-action-btn {
+    background: rgba(235, 241, 250, 0.85);
+    border-color: rgba(31, 95, 168, 0.14);
+}
+
+[data-theme="light"] .nav-action-btn:hover {
+    background: rgba(220, 230, 244, 0.95);
+    box-shadow: 0 6px 14px rgba(18, 40, 66, 0.1);
+}
+
+[data-theme="light"] a.nav-dashboard-btn,
+[data-theme="light"] a.nav-dashboard-btn:link,
+[data-theme="light"] a.nav-dashboard-btn:visited {
+    background: rgba(235, 241, 250, 0.7) !important;
+    border-color: rgba(31, 95, 168, 0.12) !important;
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] a.nav-dashboard-btn:hover {
+    background: rgba(220, 230, 244, 0.9) !important;
+    box-shadow: 0 4px 10px rgba(18, 40, 66, 0.1);
+}
+
 /* Effects/animations toggle icon states */
 .nav-tool-btn .icon-effects-off {
     display: none;

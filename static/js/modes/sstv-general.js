@@ -108,7 +108,7 @@ const SSTVGeneral = (function() {
             const response = await fetch('/sstv-general/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ frequency, modulation, device })
+                body: JSON.stringify({ frequency, modulation, device, sdr_type: typeof getSelectedSDRType === 'function' ? getSelectedSDRType() : 'rtlsdr' })
             });
 
             const data = await response.json();

@@ -7,9 +7,10 @@ ISS SSTV events occur during special commemorations and typically transmit on 14
 from __future__ import annotations
 
 import queue
+import threading
 import time
 from pathlib import Path
-from typing import Generator
+from typing import Any
 
 from flask import Blueprint, jsonify, request, Response, send_file
 
@@ -36,8 +37,27 @@ ISS_SSTV_FREQ_TOLERANCE_MHZ = 0.05
 # Queue for SSE progress streaming
 _sstv_queue: queue.Queue = queue.Queue(maxsize=100)
 
+# ---------------------------------------------------------------------------
+# Caching — ISS position (external API) and schedule (skyfield computation)
+# ---------------------------------------------------------------------------
+_iss_position_cache: dict | None = None
+_iss_position_cache_time: float = 0
+_iss_position_lock = threading.Lock()
+ISS_POSITION_CACHE_TTL = 10  # seconds
+
+_iss_schedule_cache: dict | None = None
+_iss_schedule_cache_time: float = 0
+_iss_schedule_cache_key: str | None = None
+_iss_schedule_lock = threading.Lock()
+ISS_SCHEDULE_CACHE_TTL = 900  # 15 minutes
+
+# Reusable skyfield timescale (expensive to create)
+_timescale = None
+_timescale_lock = threading.Lock()
+
 # Track which device is being used
 sstv_active_device: int | None = None
+sstv_active_sdr_type: str = 'rtlsdr'
 
 
 def _progress_callback(data: dict) -> None:
@@ -135,6 +155,14 @@ def start_decoder():
 
     # Get parameters
     data = request.get_json(silent=True) or {}
+    sdr_type_str = data.get('sdr_type', 'rtlsdr')
+
+    if sdr_type_str != 'rtlsdr':
+        return jsonify({
+            'status': 'error',
+            'message': f'{sdr_type_str.replace("_", " ").title()} is not yet supported for this mode. Please use an RTL-SDR device.'
+        }), 400
+
     frequency = data.get('frequency', ISS_SSTV_FREQ)
     modulation = str(data.get('modulation', ISS_SSTV_MODULATION)).strip().lower()
     device_index = data.get('device', 0)
@@ -190,9 +218,9 @@ def start_decoder():
         longitude = None
 
     # Claim SDR device
-    global sstv_active_device
+    global sstv_active_device, sstv_active_sdr_type
     device_int = int(device_index)
-    error = app_module.claim_sdr_device(device_int, 'sstv')
+    error = app_module.claim_sdr_device(device_int, 'sstv', sdr_type_str)
     if error:
         return jsonify({
             'status': 'error',
@@ -212,6 +240,7 @@ def start_decoder():
 
     if success:
         sstv_active_device = device_int
+        sstv_active_sdr_type = sdr_type_str
 
         result = {
             'status': 'started',
@@ -228,7 +257,7 @@ def start_decoder():
         return jsonify(result)
     else:
         # Release device on failure
-        app_module.release_sdr_device(device_int)
+        app_module.release_sdr_device(device_int, sdr_type_str)
         return jsonify({
             'status': 'error',
             'message': 'Failed to start decoder'
@@ -243,13 +272,13 @@ def stop_decoder():
     Returns:
         JSON confirmation.
     """
-    global sstv_active_device
+    global sstv_active_device, sstv_active_sdr_type
     decoder = get_sstv_decoder()
     decoder.stop()
 
     # Release device from registry
     if sstv_active_device is not None:
-        app_module.release_sdr_device(sstv_active_device)
+        app_module.release_sdr_device(sstv_active_device, sstv_active_sdr_type)
         sstv_active_device = None
 
     return jsonify({'status': 'stopped'})
@@ -441,12 +470,23 @@ def stream_progress():
     return response
 
 
+def _get_timescale():
+    """Return a cached skyfield timescale (expensive to create)."""
+    global _timescale
+    with _timescale_lock:
+        if _timescale is None:
+            from skyfield.api import load
+            _timescale = load.timescale()
+        return _timescale
+
+
 @sstv_bp.route('/iss-schedule')
 def iss_schedule():
     """
     Get ISS pass schedule for SSTV reception.
 
     Calculates ISS passes directly using skyfield.
+    Results are cached for 15 minutes per rounded location.
 
     Query parameters:
         latitude: Observer latitude (required)
@@ -456,6 +496,8 @@ def iss_schedule():
     Returns:
         JSON with ISS pass schedule.
     """
+    global _iss_schedule_cache, _iss_schedule_cache_time, _iss_schedule_cache_key
+
     lat = request.args.get('latitude', type=float)
     lon = request.args.get('longitude', type=float)
     hours = request.args.get('hours', 48, type=int)
@@ -466,8 +508,18 @@ def iss_schedule():
             'message': 'latitude and longitude parameters required'
         }), 400
 
+    # Cache key: rounded lat/lon (1 decimal place) so nearby locations share cache
+    cache_key = f"{round(lat, 1)}:{round(lon, 1)}:{hours}"
+
+    with _iss_schedule_lock:
+        now = time.time()
+        if (_iss_schedule_cache is not None
+                and cache_key == _iss_schedule_cache_key
+                and (now - _iss_schedule_cache_time) < ISS_SCHEDULE_CACHE_TTL):
+            return jsonify(_iss_schedule_cache)
+
     try:
-        from skyfield.api import load, wgs84, EarthSatellite
+        from skyfield.api import wgs84, EarthSatellite
         from skyfield.almanac import find_discrete
         from datetime import timedelta
         from data.satellites import TLE_SATELLITES
@@ -480,7 +532,7 @@ def iss_schedule():
                 'message': 'ISS TLE data not available'
             }), 500
 
-        ts = load.timescale()
+        ts = _get_timescale()
         satellite = EarthSatellite(iss_tle[1], iss_tle[2], iss_tle[0], ts)
         observer = wgs84.latlon(lat, lon)
 
@@ -543,13 +595,21 @@ def iss_schedule():
 
             i += 1
 
-        return jsonify({
+        result = {
             'status': 'ok',
             'passes': passes,
             'count': len(passes),
             'sstv_frequency': ISS_SSTV_FREQ,
             'note': 'ISS SSTV events are not continuous. Check ARISS.org for scheduled events.'
-        })
+        }
+
+        # Update cache
+        with _iss_schedule_lock:
+            _iss_schedule_cache = result
+            _iss_schedule_cache_time = time.time()
+            _iss_schedule_cache_key = cache_key
+
+        return jsonify(result)
 
     except ImportError:
         return jsonify({
@@ -565,13 +625,65 @@ def iss_schedule():
         }), 500
 
 
+def _fetch_iss_position() -> dict | None:
+    """Fetch raw ISS lat/lon/altitude from external APIs, with 10s cache."""
+    global _iss_position_cache, _iss_position_cache_time
+
+    with _iss_position_lock:
+        now = time.time()
+        if _iss_position_cache is not None and (now - _iss_position_cache_time) < ISS_POSITION_CACHE_TTL:
+            return _iss_position_cache
+
+    import requests
+
+    cached = None
+
+    # Try primary API: Where The ISS At
+    try:
+        response = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            cached = {
+                'lat': float(data['latitude']),
+                'lon': float(data['longitude']),
+                'altitude': float(data.get('altitude', 420)),
+                'source': 'wheretheiss',
+            }
+    except Exception as e:
+        logger.warning(f"Where The ISS At API failed: {e}")
+
+    # Try fallback API: Open Notify
+    if cached is None:
+        try:
+            response = requests.get('http://api.open-notify.org/iss-now.json', timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('message') == 'success':
+                    cached = {
+                        'lat': float(data['iss_position']['latitude']),
+                        'lon': float(data['iss_position']['longitude']),
+                        'altitude': 420,
+                        'source': 'open-notify',
+                    }
+        except Exception as e:
+            logger.warning(f"Open Notify API failed: {e}")
+
+    if cached is not None:
+        with _iss_position_lock:
+            _iss_position_cache = cached
+            _iss_position_cache_time = time.time()
+
+    return cached
+
+
 @sstv_bp.route('/iss-position')
 def iss_position():
     """
     Get current ISS position from real-time API.
 
-    Uses the Open Notify API for accurate real-time position,
-    with fallback to "Where The ISS At" API.
+    Uses the "Where The ISS At" API for accurate real-time position,
+    with fallback to Open Notify API.  Raw position is cached for 10 seconds;
+    observer-relative data (elevation/azimuth) is computed per-request.
 
     Query parameters:
         latitude: Observer latitude (optional, for elevation calc)
@@ -580,68 +692,32 @@ def iss_position():
     Returns:
         JSON with ISS current position.
     """
-    import requests
     from datetime import datetime
 
     observer_lat = request.args.get('latitude', type=float)
     observer_lon = request.args.get('longitude', type=float)
 
-    # Try primary API: Where The ISS At
-    try:
-        response = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            iss_lat = float(data['latitude'])
-            iss_lon = float(data['longitude'])
+    pos = _fetch_iss_position()
+    if pos is None:
+        return jsonify({
+            'status': 'error',
+            'message': 'Unable to fetch ISS position from real-time APIs'
+        }), 503
 
-            result = {
-                'status': 'ok',
-                'lat': iss_lat,
-                'lon': iss_lon,
-                'altitude': float(data.get('altitude', 420)),
-                'timestamp': datetime.utcnow().isoformat(),
-                'source': 'wheretheiss'
-            }
+    result = {
+        'status': 'ok',
+        'lat': pos['lat'],
+        'lon': pos['lon'],
+        'altitude': pos['altitude'],
+        'timestamp': datetime.utcnow().isoformat(),
+        'source': pos['source'],
+    }
 
-            # Calculate observer-relative data if location provided
-            if observer_lat is not None and observer_lon is not None:
-                result.update(_calculate_observer_data(iss_lat, iss_lon, observer_lat, observer_lon))
+    # Calculate observer-relative data if location provided
+    if observer_lat is not None and observer_lon is not None:
+        result.update(_calculate_observer_data(pos['lat'], pos['lon'], observer_lat, observer_lon))
 
-            return jsonify(result)
-    except Exception as e:
-        logger.warning(f"Where The ISS At API failed: {e}")
-
-    # Try fallback API: Open Notify
-    try:
-        response = requests.get('http://api.open-notify.org/iss-now.json', timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('message') == 'success':
-                iss_lat = float(data['iss_position']['latitude'])
-                iss_lon = float(data['iss_position']['longitude'])
-
-                result = {
-                    'status': 'ok',
-                    'lat': iss_lat,
-                    'lon': iss_lon,
-                    'altitude': 420,  # Approximate ISS altitude in km
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'source': 'open-notify'
-                }
-
-                # Calculate observer-relative data if location provided
-                if observer_lat is not None and observer_lon is not None:
-                    result.update(_calculate_observer_data(iss_lat, iss_lon, observer_lat, observer_lon))
-
-                return jsonify(result)
-    except Exception as e:
-        logger.warning(f"Open Notify API failed: {e}")
-
-    # Both APIs failed
-    return jsonify({
-        'status': 'error',
-        'message': 'Unable to fetch ISS position from real-time APIs'
-    }), 503
+    return jsonify(result)
 
 
 def _calculate_observer_data(iss_lat: float, iss_lon: float, obs_lat: float, obs_lon: float) -> dict:

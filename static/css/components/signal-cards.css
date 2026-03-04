@@ -279,19 +279,19 @@
 
 .signal-proto-badge.aprs {
     background: rgba(6, 182, 212, 0.15);
-    color: #06b6d4;
+    color: var(--proto-aprs, #06b6d4);
     border-color: rgba(6, 182, 212, 0.25);
 }
 
 .signal-proto-badge.ais {
     background: rgba(139, 92, 246, 0.15);
-    color: #8b5cf6;
+    color: var(--proto-ais, #8b5cf6);
     border-color: rgba(139, 92, 246, 0.25);
 }
 
 .signal-proto-badge.acars {
     background: rgba(236, 72, 153, 0.15);
-    color: #ec4899;
+    color: var(--proto-acars, #ec4899);
     border-color: rgba(236, 72, 153, 0.25);
 }
 
@@ -976,25 +976,25 @@
 /* Meter protocol badges */
 .signal-proto-badge.meter {
     background: rgba(234, 179, 8, 0.15);
-    color: #eab308;
+    color: var(--accent-yellow, #eab308);
     border-color: rgba(234, 179, 8, 0.25);
 }
 
 .signal-proto-badge.meter.electric {
     background: rgba(234, 179, 8, 0.15);
-    color: #eab308;
+    color: var(--accent-yellow, #eab308);
     border-color: rgba(234, 179, 8, 0.25);
 }
 
 .signal-proto-badge.meter.gas {
     background: rgba(249, 115, 22, 0.15);
-    color: #f97316;
+    color: var(--accent-orange, #f97316);
     border-color: rgba(249, 115, 22, 0.25);
 }
 
 .signal-proto-badge.meter.water {
     background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
+    color: var(--signal-new, #3b82f6);
     border-color: rgba(59, 130, 246, 0.25);
 }
 
@@ -1060,12 +1060,12 @@
 
 .meter-delta.positive {
     background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    color: var(--accent-green);
 }
 
 .meter-delta.negative {
     background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    color: var(--accent-red);
 }
 
 /* Sparkline container */
@@ -1431,7 +1431,7 @@
 
 .signal-station-clickable:hover {
     background: var(--accent-purple);
-    color: #000;
+    color: var(--text-inverse);
     transform: scale(1.05);
     box-shadow: 0 0 8px rgba(138, 43, 226, 0.4);
 }
@@ -1587,14 +1587,14 @@
     background: var(--accent-purple, #8a2be2);
     border: none;
     border-radius: 4px;
-    color: #fff;
+    color: var(--text-inverse);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .station-raw-copy-btn:hover {
     background: var(--accent-cyan, #00d4ff);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 /* ============================================
@@ -1794,14 +1794,14 @@
     background: var(--accent-purple, #8a2be2);
     border: none;
     border-radius: 4px;
-    color: #fff;
+    color: var(--text-inverse);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .signal-details-copy-btn:hover {
     background: var(--accent-cyan, #00d4ff);
-    color: #000;
+    color: var(--text-inverse);
 }
 
 /* Signal Details Content Sections */

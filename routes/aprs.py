@@ -1870,9 +1870,11 @@ def start_aprs() -> Response:
                     stderr_output = remaining.decode('utf-8', errors='replace').strip()
             except Exception:
                 pass
+            if stderr_output:
+                logger.error(f"rtl_fm stderr:\n{stderr_output}")
             error_msg = f'rtl_fm failed to start (exit code {rtl_process.returncode})'
             if stderr_output:
-                error_msg += f': {stderr_output[:200]}'
+                error_msg += f': {stderr_output[:500]}'
             logger.error(error_msg)
             try:
                 os.close(master_fd)

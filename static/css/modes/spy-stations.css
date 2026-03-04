@@ -264,7 +264,7 @@
 
 .spy-freq-clickable:hover {
     background: var(--accent-cyan);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan);
 }
 
@@ -278,7 +278,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #000;
+    color: var(--text-inverse);
     background: var(--accent-green);
     border: none;
     padding: 8px 14px;

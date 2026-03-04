@@ -25,7 +25,7 @@
 }
 
 .subghz-device-dot.connected {
-    background: #00ff88;
+    background: var(--neon-green);
     box-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
 }
 
@@ -34,7 +34,7 @@
 }
 
 .subghz-device-dot.unknown {
-    background: #ffaa00;
+    background: var(--neon-orange);
 }
 
 .subghz-device-label {
@@ -62,7 +62,7 @@
 
 .subghz-tool-badge.available {
     border-color: rgba(0, 255, 136, 0.3);
-    color: #00ff88;
+    color: var(--neon-green);
     background: rgba(0, 255, 136, 0.05);
 }
 
@@ -94,7 +94,7 @@
 
 .subghz-preset-btn:hover {
     background: var(--accent-cyan, #00d4ff);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan, #00d4ff);
 }
 
@@ -220,7 +220,7 @@
 }
 
 .subghz-status-dot.rx {
-    background: #00ff88;
+    background: var(--neon-green);
     animation: subghz-pulse 1.5s ease-in-out infinite;
 }
 
@@ -235,7 +235,7 @@
 }
 
 .subghz-status-dot.sweep {
-    background: #ffaa00;
+    background: var(--neon-orange);
     animation: subghz-pulse 1s ease-in-out infinite;
 }
 
@@ -308,7 +308,7 @@
 .subghz-btn.start {
     background: var(--accent-green, #22c55e);
     border-color: var(--accent-green, #22c55e);
-    color: #fff;
+    color: var(--text-inverse);
     font-weight: 600;
 }
 
@@ -321,7 +321,7 @@
 .subghz-btn.stop {
     background: var(--accent-red, #ff4444);
     border-color: var(--accent-red, #ff4444);
-    color: #fff;
+    color: var(--text-inverse);
     font-weight: 600;
 }
 
@@ -405,7 +405,7 @@
     padding: 1px 6px;
     border-radius: 999px;
     border: 1px solid rgba(255, 170, 0, 0.55);
-    color: #ffaa00;
+    color: var(--neon-orange);
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
@@ -423,14 +423,14 @@
 }
 
 .subghz-capture-burst-flag {
-    color: #ffaa00;
+    color: var(--neon-orange);
 }
 
 .subghz-capture-burst-count {
     padding: 1px 6px;
     border-radius: 999px;
     border: 1px solid rgba(255, 170, 0, 0.55);
-    color: #ffaa00;
+    color: var(--neon-orange);
     background: rgba(255, 170, 0, 0.12);
 }
 
@@ -462,7 +462,7 @@
 
 .subghz-capture-tag.hint {
     border-color: rgba(0, 255, 136, 0.5);
-    color: #00ff88;
+    color: var(--neon-green);
     background: rgba(0, 255, 136, 0.12);
 }
 
@@ -892,7 +892,7 @@
 
 .subghz-tx-confirm-btn {
     background: var(--accent-red, #ff4444);
-    color: #fff;
+    color: var(--text-inverse);
     border-color: var(--accent-red, #ff4444) !important;
 }
 
@@ -956,7 +956,7 @@
 }
 
 .subghz-sweep-tooltip .tip-power {
-    color: #ffaa00;
+    color: var(--neon-orange);
 }
 
 /* Right-click context menu */
@@ -1038,8 +1038,8 @@
 
 .subghz-action-btn.tune:hover {
     background: rgba(0, 255, 136, 0.12);
-    border-color: #00ff88;
-    color: #00ff88;
+    border-color: var(--neon-green);
+    color: var(--neon-green);
 }
 
 .subghz-action-btn.decode:hover {
@@ -1050,8 +1050,8 @@
 
 .subghz-action-btn.capture:hover {
     background: rgba(255, 170, 0, 0.12);
-    border-color: #ffaa00;
-    color: #ffaa00;
+    border-color: var(--neon-orange);
+    color: var(--neon-orange);
 }
 
 /* Peak list in sidebar */
@@ -1088,7 +1088,7 @@
 }
 
 .subghz-peak-item:hover {
-    border-color: #ffaa00;
+    border-color: var(--neon-orange);
 }
 
 .subghz-peak-item .peak-freq {
@@ -1096,7 +1096,7 @@
 }
 
 .subghz-peak-item .peak-power {
-    color: #ffaa00;
+    color: var(--neon-orange);
 }
 
 /* ===== Stats Strip ===== */
@@ -1147,10 +1147,10 @@
     animation: subghz-pulse 1.5s ease-in-out infinite;
 }
 
-.subghz-strip-dot.rx { background: #00ff88; }
+.subghz-strip-dot.rx { background: var(--neon-green); }
 .subghz-strip-dot.decode { background: #00d4ff; }
 .subghz-strip-dot.tx { background: #ff4444; }
-.subghz-strip-dot.sweep { background: #ffaa00; }
+.subghz-strip-dot.sweep { background: var(--neon-orange); }
 
 .subghz-strip-status-text {
     color: var(--text-secondary, #999);
@@ -1170,8 +1170,8 @@
 }
 
 .subghz-strip-value.accent-cyan { color: var(--accent-cyan, #00d4ff); }
-.subghz-strip-value.accent-green { color: #00ff88; }
-.subghz-strip-value.accent-orange { color: #ffaa00; }
+.subghz-strip-value.accent-green { color: var(--neon-green); }
+.subghz-strip-value.accent-orange { color: var(--neon-orange); }
 
 .subghz-strip-label {
     color: var(--text-dim, #666);
@@ -1225,7 +1225,7 @@
 }
 
 .subghz-strip-device-dot.connected {
-    background: #00ff88;
+    background: var(--neon-green);
 }
 
 .subghz-strip-device-dot.disconnected {
@@ -1233,7 +1233,7 @@
 }
 
 .subghz-strip-device-dot.unknown {
-    background: #ffaa00;
+    background: var(--neon-orange);
 }
 
 /* ===== Signal Console ===== */
@@ -1279,7 +1279,7 @@
 }
 
 .subghz-phase-step.completed {
-    color: #00ff88;
+    color: var(--neon-green);
 }
 
 .subghz-phase-step.error {
@@ -1317,12 +1317,12 @@
 
 .subghz-burst-indicator.active {
     border-color: rgba(255, 170, 0, 0.6);
-    color: #ffaa00;
+    color: var(--neon-orange);
     background: rgba(255, 170, 0, 0.12);
 }
 
 .subghz-burst-indicator.active .subghz-burst-dot {
-    background: #ffaa00;
+    background: var(--neon-orange);
     box-shadow: 0 0 10px rgba(255, 170, 0, 0.7);
     animation: subghz-pulse 0.45s ease-in-out infinite;
 }
@@ -1383,8 +1383,8 @@
 
 .subghz-log-msg { color: var(--text-secondary, #999); }
 .subghz-log-msg.info { color: var(--accent-cyan, #00d4ff); }
-.subghz-log-msg.success { color: #00ff88; }
-.subghz-log-msg.warn { color: #ffaa00; }
+.subghz-log-msg.success { color: var(--neon-green); }
+.subghz-log-msg.warn { color: var(--neon-orange); }
 .subghz-log-msg.error { color: var(--accent-red, #ff4444); }
 
 /* ===== Action Hub ===== */
@@ -1450,12 +1450,12 @@
 .subghz-hub-card--cyan .subghz-hub-icon { color: var(--accent-cyan, #00d4ff); }
 
 .subghz-hub-card--green { border-color: rgba(0, 255, 136, 0.2); }
-.subghz-hub-card--green:hover { border-color: #00ff88; background: rgba(0, 255, 136, 0.05); }
-.subghz-hub-card--green .subghz-hub-icon { color: #00ff88; }
+.subghz-hub-card--green:hover { border-color: var(--neon-green); background: rgba(0, 255, 136, 0.05); }
+.subghz-hub-card--green .subghz-hub-icon { color: var(--neon-green); }
 
 .subghz-hub-card--orange { border-color: rgba(255, 170, 0, 0.2); }
-.subghz-hub-card--orange:hover { border-color: #ffaa00; background: rgba(255, 170, 0, 0.05); }
-.subghz-hub-card--orange .subghz-hub-icon { color: #ffaa00; }
+.subghz-hub-card--orange:hover { border-color: var(--neon-orange); background: rgba(255, 170, 0, 0.05); }
+.subghz-hub-card--orange .subghz-hub-icon { color: var(--neon-orange); }
 
 .subghz-hub-card--red { border-color: rgba(255, 68, 68, 0.25); }
 .subghz-hub-card--red:hover { border-color: #ff4444; background: rgba(255, 68, 68, 0.08); }
@@ -1707,7 +1707,7 @@
 
 .subghz-rx-hint-confidence {
     font-size: 10px;
-    color: #00ff88;
+    color: var(--neon-green);
     border: 1px solid rgba(0, 255, 136, 0.35);
     border-radius: 999px;
     padding: 1px 8px;
@@ -1729,7 +1729,7 @@
 }
 
 .subghz-rx-burst-pill.active {
-    color: #ffaa00;
+    color: var(--neon-orange);
     border-color: rgba(255, 170, 0, 0.7);
     background: rgba(255, 170, 0, 0.15);
 }
@@ -1866,7 +1866,7 @@
 }
 
 .subghz-wf-pause-btn.paused {
-    color: #ffaa00;
+    color: var(--neon-orange);
     border-color: rgba(255, 170, 0, 0.6);
 }
 

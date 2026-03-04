@@ -212,7 +212,9 @@
 
         vdl2MainEventSource.onerror = function() {
             setTimeout(() => {
-                if (document.getElementById('stopVdl2Btn').style.display === 'block') {
+                const panel = document.getElementById('vdl2Mode');
+                if (panel && panel.classList.contains('active') &&
+                    document.getElementById('stopVdl2Btn').style.display === 'block') {
                     startVdl2MainSSE();
                 }
             }, 2000);

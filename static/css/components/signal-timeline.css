@@ -103,7 +103,7 @@
 
 .signal-timeline-btn.active {
     background: var(--accent-cyan, #4a9eff);
-    color: #000;
+    color: var(--text-inverse);
     border-color: var(--accent-cyan, #4a9eff);
 }
 

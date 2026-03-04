@@ -128,7 +128,7 @@
 }
 
 .wxsat-schedule-toggle input:checked + .wxsat-toggle-label {
-    color: #00ff88;
+    color: var(--accent-green);
 }
 
 /* ===== Location inputs in strip ===== */
@@ -695,7 +695,7 @@
 
 .wxsat-image-actions button:hover {
     background: rgba(255, 68, 68, 0.9);
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .wxsat-image-preview {
@@ -901,7 +901,7 @@
 .wxsat-modal-btn.delete:hover {
     background: rgba(255, 68, 68, 0.9);
     border-color: #ff4444;
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 /* Gallery clear-all button */
@@ -1166,3 +1166,14 @@
 .wxsat-collapse-icon.collapsed {
     transform: rotate(-90deg);
 }
+
+/* Light theme overrides */
+[data-theme="light"] .wxsat-strip-dot.capturing { background: var(--accent-green); }
+[data-theme="light"] .wxsat-strip-dot.decoding { background: var(--accent-cyan); }
+[data-theme="light"] .wxsat-phase-step.active { color: var(--accent-green); border-color: var(--accent-green); }
+[data-theme="light"] .wxsat-console-entry.wxsat-log-signal { border-left-color: var(--accent-green); color: var(--accent-green); }
+[data-theme="light"] .wxsat-console-entry.wxsat-log-save { border-left-color: var(--accent-orange); color: var(--accent-orange); }
+[data-theme="light"] .wxsat-console-entry.wxsat-log-error { border-left-color: var(--accent-red); color: var(--accent-red); }
+[data-theme="light"] .wxsat-console-entry.wxsat-log-warning { border-left-color: var(--accent-orange); color: var(--accent-orange); }
+[data-theme="light"] .wxsat-pass-mode.lrpt { color: var(--accent-green); }
+[data-theme="light"] .wxsat-pass-quality.excellent { color: var(--accent-green); }

@@ -218,6 +218,46 @@ class TestEnvelopeMorseDecoder:
         assert metrics['detect_mode'] == 'goertzel'
 
 
+class TestDropoutTolerance:
+    def test_dah_with_mid_gap_produces_single_dah(self):
+        """A dah-length tone with a 1-block silence gap in the middle should
+        still be decoded as a single dah, not two dits."""
+        sample_rate = 8000
+        wpm = 15
+        tone_freq = 700.0
+        dit_dur = 1.2 / wpm
+        dah_dur = 3 * dit_dur
+
+        decoder = MorseDecoder(
+            sample_rate=sample_rate,
+            tone_freq=tone_freq,
+            wpm=wpm,
+        )
+        block_size = decoder._block_size
+        block_dur = block_size / sample_rate
+
+        # Number of blocks for a full dah.
+        dah_blocks = int(dah_dur / block_dur)
+        half = dah_blocks // 2
+
+        # Build audio: silence warmup, first half of dah, 1-block silence gap,
+        # second half of dah, trailing silence.
+        warmup = generate_silence(0.4, sample_rate)
+        first_half = generate_tone(tone_freq, half * block_dur, sample_rate)
+        gap = generate_silence(block_dur, sample_rate)
+        second_half = generate_tone(tone_freq, (dah_blocks - half) * block_dur, sample_rate)
+        tail = generate_silence(0.5, sample_rate)
+
+        audio = warmup + first_half + gap + second_half + tail
+
+        events = decoder.process_block(audio)
+        events.extend(decoder.flush())
+        elements = [e['element'] for e in events if e.get('type') == 'morse_element']
+
+        # Should produce a single dah, not two dits.
+        assert elements == ['-'], f'Expected single dah but got {elements}'
+
+
 class TestTimingAndWpmEstimator:
     def test_timing_classifier_distinguishes_dit_and_dah(self):
         decoder = MorseDecoder(sample_rate=8000, tone_freq=700.0, wpm=15)

@@ -18,10 +18,6 @@ pager_messages.log
 downloads/
 pgdata/
 
-# Local data
-downloads/
-pgdata/
-
 # IDE
 .idea/
 .vscode/
@@ -57,6 +53,9 @@ intercept_agent_*.cfg
 
 # Weather satellite runtime data (decoded images, samples, SatDump output)
 data/weather_sat/
+
+# Radiosonde runtime data (station config, logs)
+data/radiosonde/
 
 # SDR capture files (large IQ recordings)
 data/subghz/captures/

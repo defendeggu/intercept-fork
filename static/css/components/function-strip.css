@@ -185,7 +185,7 @@
 .function-strip .strip-btn.primary {
     background: linear-gradient(135deg, var(--accent-green) 0%, #10b981 100%);
     border: none;
-    color: #000;
+    color: var(--text-inverse);
 }
 
 .function-strip .strip-btn.primary:hover:not(:disabled) {
@@ -195,7 +195,7 @@
 .function-strip .strip-btn.stop {
     background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%);
     border: none;
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .function-strip .strip-btn.stop:hover:not(:disabled) {
@@ -304,7 +304,7 @@
     border-color: rgba(0, 122, 255, 0.3);
 }
 .function-strip.bt-strip .strip-value {
-    color: #0a84ff;
+    color: var(--accent-blue, #0a84ff);
 }
 
 .function-strip.wifi-strip .strip-stat {
@@ -332,24 +332,24 @@
     border-color: rgba(255, 59, 48, 0.6);
 }
 .function-strip.tscm-strip .strip-value {
-    color: #ef4444; /* Explicit red color */
+    color: var(--accent-red);
 }
 .function-strip.tscm-strip .strip-label {
-    color: #9ca3af; /* Explicit light gray */
+    color: var(--text-secondary);
 }
 .function-strip.tscm-strip .strip-select {
-    color: #e8eaed; /* Explicit white for selects */
+    color: var(--text-primary);
     background: rgba(0, 0, 0, 0.4);
 }
 .function-strip.tscm-strip .strip-btn {
-    color: #e8eaed; /* Explicit white for buttons */
+    color: var(--text-primary);
 }
 .function-strip.tscm-strip .strip-tool {
-    color: #e8eaed; /* Explicit white for tool indicators */
+    color: var(--text-primary);
 }
 .function-strip.tscm-strip .strip-time,
 .function-strip.tscm-strip .strip-status span {
-    color: #9ca3af; /* Explicit gray for status/time */
+    color: var(--text-secondary);
 }
 
 .function-strip.rtlamr-strip .strip-stat {
@@ -361,7 +361,7 @@
     border-color: rgba(175, 82, 222, 0.3);
 }
 .function-strip.rtlamr-strip .strip-value {
-    color: #af52de;
+    color: var(--accent-purple, #af52de);
 }
 
 .function-strip.listening-strip .strip-stat {

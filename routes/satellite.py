@@ -28,6 +28,17 @@ from utils.validation import validate_latitude, validate_longitude, validate_hou
 
 satellite_bp = Blueprint('satellite', __name__, url_prefix='/satellite')
 
+# Cache skyfield timescale to avoid re-downloading/re-parsing per request
+_cached_timescale = None
+
+
+def _get_timescale():
+    global _cached_timescale
+    if _cached_timescale is None:
+        from skyfield.api import load
+        _cached_timescale = load.timescale()
+    return _cached_timescale
+
 # Maximum response size for external requests (1MB)
 MAX_RESPONSE_SIZE = 1024 * 1024
 
@@ -178,7 +189,7 @@ def satellite_dashboard():
 def predict_passes():
     """Calculate satellite passes using skyfield."""
     try:
-        from skyfield.api import load, wgs84, EarthSatellite
+        from skyfield.api import wgs84, EarthSatellite
         from skyfield.almanac import find_discrete
     except ImportError:
         return jsonify({
@@ -219,7 +230,7 @@ def predict_passes():
     }
     name_to_norad = {v: k for k, v in norad_to_name.items()}
 
-    ts = load.timescale()
+    ts = _get_timescale()
     observer = wgs84.latlon(lat, lon)
 
     t0 = ts.now()
@@ -332,7 +343,7 @@ def predict_passes():
 def get_satellite_position():
     """Get real-time positions of satellites."""
     try:
-        from skyfield.api import load, wgs84, EarthSatellite
+        from skyfield.api import wgs84, EarthSatellite
     except ImportError:
         return jsonify({'status': 'error', 'message': 'skyfield not installed'}), 503
 
@@ -361,7 +372,7 @@ def get_satellite_position():
         else:
             satellites.append(sat)
 
-    ts = load.timescale()
+    ts = _get_timescale()
     observer = wgs84.latlon(lat, lon)
     now = ts.now()
     now_dt = now.utc_datetime()
@@ -468,7 +479,8 @@ def refresh_tle_data() -> list:
         'NOAA 20 (JPSS-1)': 'NOAA-20',
         'NOAA 21 (JPSS-2)': 'NOAA-21',
         'METEOR-M 2': 'METEOR-M2',
-        'METEOR-M2 3': 'METEOR-M2-3'
+        'METEOR-M2 3': 'METEOR-M2-3',
+        'METEOR-M2 4': 'METEOR-M2-4'
     }
 
     updated = []

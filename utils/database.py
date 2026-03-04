@@ -35,10 +35,18 @@ def get_connection() -> sqlite3.Connection:
     """Get a thread-local database connection."""
     if not hasattr(_local, 'connection') or _local.connection is None:
         db_path = get_db_path()
-        _local.connection = sqlite3.connect(str(db_path), check_same_thread=False)
-        _local.connection.row_factory = sqlite3.Row
-        # Enable foreign keys
-        _local.connection.execute('PRAGMA foreign_keys = ON')
+        try:
+            _local.connection = sqlite3.connect(str(db_path), check_same_thread=False)
+            _local.connection.row_factory = sqlite3.Row
+            # Enable foreign keys
+            _local.connection.execute('PRAGMA foreign_keys = ON')
+        except sqlite3.OperationalError as e:
+            logger.error(
+                f"Cannot open database at {db_path}: {e}. "
+                f"If the file is owned by root, fix with: "
+                f"sudo chown -R $(whoami) {DB_DIR}"
+            )
+            raise
     return _local.connection
 
 
@@ -54,10 +62,48 @@ def get_db():
         raise
 
 
+def _check_db_writable(db_path: Path) -> None:
+    """Verify the database file and directory are writable, raising a clear
+    error with fix instructions if they are not."""
+    import os
+
+    # Check directory writability (needed for SQLite journal/WAL files)
+    db_dir = db_path.parent
+    if db_dir.exists() and not os.access(db_dir, os.W_OK):
+        owner = _file_owner(db_dir)
+        msg = (
+            f"Database directory {db_dir} is not writable (owned by {owner}). "
+            f"Fix with: sudo chown -R $(whoami) {db_dir}"
+        )
+        logger.error(msg)
+        raise sqlite3.OperationalError(msg)
+
+    # Check file writability if it already exists
+    if db_path.exists() and not os.access(db_path, os.W_OK):
+        owner = _file_owner(db_path)
+        msg = (
+            f"Database {db_path} is not writable (owned by {owner}). "
+            f"Fix with: sudo chown -R $(whoami) {db_dir}"
+        )
+        logger.error(msg)
+        raise sqlite3.OperationalError(msg)
+
+
+def _file_owner(path: Path) -> str:
+    """Return the owner username of a file, or UID if lookup fails."""
+    try:
+        import pwd
+        return pwd.getpwuid(path.stat().st_uid).pw_name
+    except (ImportError, KeyError):
+        return str(path.stat().st_uid)
+
+
 def init_db() -> None:
     """Initialize the database schema."""
     db_path = get_db_path()
     logger.info(f"Initializing database at {db_path}")
+
+    _check_db_writable(db_path)
 
     with get_db() as conn:
         # Settings table for key-value storage

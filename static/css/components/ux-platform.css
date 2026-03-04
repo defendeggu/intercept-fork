@@ -323,7 +323,7 @@
 }
 
 .setup-btn.primary {
-    color: #fff;
+    color: var(--text-inverse);
     background: var(--accent-cyan, #4aa3ff);
     border-color: var(--accent-cyan, #4aa3ff);
 }
@@ -404,6 +404,29 @@
 .app-toast-actions button:hover {
     border-color: rgba(74, 163, 255, 0.5);
     color: var(--text-primary, #e6edf5);
+}
+
+/* ---- Light theme overrides ---- */
+[data-theme="light"] .run-state-chip {
+    background: linear-gradient(180deg, rgba(233, 238, 245, 0.9), rgba(225, 232, 242, 0.92));
+    border-color: rgba(31, 95, 168, 0.18);
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .run-state-chip.active {
+    border-color: rgba(31, 95, 168, 0.4);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .run-state-btn {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(241, 244, 249, 0.97));
+    color: var(--accent-cyan);
+    border-color: rgba(31, 95, 168, 0.25);
+}
+
+[data-theme="light"] .run-state-btn:hover {
+    background: rgba(31, 95, 168, 0.08);
+    border-color: rgba(31, 95, 168, 0.45);
 }
 
 @media (max-width: 920px) {

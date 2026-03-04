@@ -243,11 +243,38 @@ radius_temporary_block = False
 sonde_time_threshold = 3
 """
 
-    with open(cfg_path, 'w') as f:
-        f.write(cfg)
+    try:
+        with open(cfg_path, 'w') as f:
+            f.write(cfg)
+    except OSError as e:
+        logger.error(f"Cannot write station.cfg to {cfg_path}: {e}")
+        raise RuntimeError(
+            f"Cannot write radiosonde config to {cfg_path}: {e}. "
+            f"Fix permissions with: sudo chown -R $(whoami) {cfg_dir}"
+        ) from e
+
+    # When running as root via sudo, fix ownership so next non-root run
+    # can still read/write these files.
+    _fix_data_ownership(cfg_dir)
 
     logger.info(f"Generated station.cfg at {cfg_path}")
     return cfg_path
+
+
+def _fix_data_ownership(path: str) -> None:
+    """Recursively chown a path to the real (non-root) user when running via sudo."""
+    uid = os.environ.get('INTERCEPT_SUDO_UID')
+    gid = os.environ.get('INTERCEPT_SUDO_GID')
+    if uid is None or gid is None:
+        return
+    try:
+        uid_int, gid_int = int(uid), int(gid)
+        for dirpath, dirnames, filenames in os.walk(path):
+            os.chown(dirpath, uid_int, gid_int)
+            for fname in filenames:
+                os.chown(os.path.join(dirpath, fname), uid_int, gid_int)
+    except OSError as e:
+        logger.warning(f"Could not fix ownership of {path}: {e}")
 
 
 def parse_radiosonde_udp(udp_port: int) -> None:
@@ -313,11 +340,11 @@ def _process_telemetry(msg: dict) -> dict | None:
 
     balloon: dict[str, Any] = {'id': str(serial)}
 
-    # Sonde type (RS41, RS92, DFM, M10, etc.)
-    if 'type' in msg:
-        balloon['sonde_type'] = msg['type']
+    # Sonde type (RS41, RS92, DFM, M10, etc.) — prefer subtype if available
     if 'subtype' in msg:
         balloon['sonde_type'] = msg['subtype']
+    elif 'type' in msg:
+        balloon['sonde_type'] = msg['type']
 
     # Timestamp
     if 'datetime' in msg:
@@ -532,19 +559,24 @@ def start_radiosonde():
         }), 409
 
     # Generate config
-    cfg_path = generate_station_cfg(
-        freq_min=freq_min,
-        freq_max=freq_max,
-        gain=gain,
-        device_index=device_int,
-        ppm=ppm,
-        bias_t=bias_t,
-        latitude=latitude,
-        longitude=longitude,
-        gpsd_enabled=gpsd_enabled,
-    )
+    try:
+        cfg_path = generate_station_cfg(
+            freq_min=freq_min,
+            freq_max=freq_max,
+            gain=gain,
+            device_index=device_int,
+            ppm=ppm,
+            bias_t=bias_t,
+            latitude=latitude,
+            longitude=longitude,
+            gpsd_enabled=gpsd_enabled,
+        )
+    except (OSError, RuntimeError) as e:
+        app_module.release_sdr_device(device_int, sdr_type_str)
+        logger.error(f"Failed to generate radiosonde config: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-    # Build command - auto_rx -c expects a file path, not a directory
+    # Build command - auto_rx -c expects the path to station.cfg
     cfg_abs = os.path.abspath(cfg_path)
     if auto_rx_path.endswith('.py'):
         cmd = [sys.executable, auto_rx_path, '-c', cfg_abs]
@@ -553,6 +585,26 @@ def start_radiosonde():
 
     # Set cwd to the auto_rx directory so 'from autorx.scan import ...' works
     auto_rx_dir = os.path.dirname(os.path.abspath(auto_rx_path))
+
+    # Quick dependency check before launching the full process
+    if auto_rx_path.endswith('.py'):
+        dep_check = subprocess.run(
+            [sys.executable, '-c', 'import autorx.scan'],
+            cwd=auto_rx_dir,
+            capture_output=True,
+            timeout=10,
+        )
+        if dep_check.returncode != 0:
+            dep_error = dep_check.stderr.decode('utf-8', errors='ignore').strip()
+            logger.error(f"radiosonde_auto_rx dependency check failed:\n{dep_error}")
+            app_module.release_sdr_device(device_int, sdr_type_str)
+            return jsonify({
+                'status': 'error',
+                'message': (
+                    'radiosonde_auto_rx dependencies not satisfied. '
+                    f'Re-run setup.sh to install. Error: {dep_error[:500]}'
+                ),
+            }), 500
 
     try:
         logger.info(f"Starting radiosonde_auto_rx: {' '.join(cmd)}")
@@ -577,9 +629,23 @@ def start_radiosonde():
                     ).strip()
                 except Exception:
                     pass
-            error_msg = 'radiosonde_auto_rx failed to start. Check SDR device connection.'
             if stderr_output:
-                error_msg += f' Error: {stderr_output[:200]}'
+                logger.error(f"radiosonde_auto_rx stderr:\n{stderr_output}")
+            if stderr_output and (
+                'ImportError' in stderr_output
+                or 'ModuleNotFoundError' in stderr_output
+            ):
+                error_msg = (
+                    'radiosonde_auto_rx failed to start due to missing Python '
+                    'dependencies. Re-run setup.sh or reinstall radiosonde_auto_rx.'
+                )
+            else:
+                error_msg = (
+                    'radiosonde_auto_rx failed to start. '
+                    'Check SDR device connection.'
+                )
+            if stderr_output:
+                error_msg += f' Error: {stderr_output[:500]}'
             return jsonify({'status': 'error', 'message': error_msg}), 500
 
         radiosonde_running = True

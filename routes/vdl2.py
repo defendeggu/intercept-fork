@@ -306,9 +306,11 @@ def start_vdl2() -> Response:
             stderr = ''
             if process.stderr:
                 stderr = process.stderr.read().decode('utf-8', errors='replace')
+            if stderr:
+                logger.error(f"dumpvdl2 stderr:\n{stderr}")
             error_msg = 'dumpvdl2 failed to start'
             if stderr:
-                error_msg += f': {stderr[:200]}'
+                error_msg += f': {stderr[:500]}'
             logger.error(error_msg)
             return jsonify({'status': 'error', 'message': error_msg}), 500
 

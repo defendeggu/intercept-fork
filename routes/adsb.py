@@ -364,6 +364,7 @@ def parse_sbs_stream(service_addr):
     _sbs_error_logged = False
 
     while adsb_using_service:
+        sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(SBS_SOCKET_TIMEOUT)
@@ -586,7 +587,6 @@ def parse_sbs_stream(service_addr):
                     continue
 
             flush_pending_updates(force=True)
-            sock.close()
             adsb_connected = False
         except OSError as e:
             adsb_connected = False
@@ -594,6 +594,12 @@ def parse_sbs_stream(service_addr):
                 logger.warning(f"SBS connection error: {e}, reconnecting...")
                 _sbs_error_logged = True
             time.sleep(SBS_RECONNECT_DELAY)
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
 
     adsb_connected = False
     logger.info("SBS stream parser stopped")
@@ -885,6 +891,36 @@ def start_adsb():
                 'status': 'error',
                 'error_type': error_type,
                 'message': full_msg
+            })
+
+        # dump1090 is still running but SBS port never came up — device may be
+        # held by a stale process from a previous mode.  Kill it so the USB
+        # device is released and report a clear error to the frontend.
+        if not dump1090_ready:
+            logger.warning("dump1090 running but SBS port not available after %.1fs — killing", DUMP1090_START_WAIT)
+            try:
+                pgid = os.getpgid(app_module.adsb_process.pid)
+                os.killpg(pgid, 15)
+                app_module.adsb_process.wait(timeout=ADSB_TERMINATE_TIMEOUT)
+            except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
+                try:
+                    pgid = os.getpgid(app_module.adsb_process.pid)
+                    os.killpg(pgid, 9)
+                except (ProcessLookupError, OSError):
+                    pass
+            app_module.adsb_process = None
+            clear_dump1090_pid()
+            app_module.release_sdr_device(device_int, sdr_type_str)
+            adsb_active_device = None
+            adsb_active_sdr_type = None
+            return jsonify({
+                'status': 'error',
+                'error_type': 'DEVICE_BUSY',
+                'message': (
+                    'SDR device did not become ready in time. '
+                    'Another mode may still be releasing the device. '
+                    'Please wait a moment and try again.'
+                ),
             })
 
         adsb_using_service = True

@@ -19,6 +19,11 @@ const SpaceWeather = (function () {
     let _solarImageKey = 'sdo_193';
     let _drapFreq = 'drap_global';
 
+    /** Stable cache-bust key that rotates every 5 minutes (matches backend max-age). */
+    function _cacheBust() {
+        return 'v=' + Math.floor(Date.now() / 300000);
+    }
+
     // -------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------
@@ -27,6 +32,8 @@ const SpaceWeather = (function () {
         if (!_initialized) {
             _initialized = true;
         }
+        // Warm the backend image cache in parallel before rendering
+        fetch('/space-weather/prefetch-images').catch(function () {});
         refresh();
         _startAutoRefresh();
     }
@@ -50,7 +57,7 @@ const SpaceWeather = (function () {
             const img = new Image();
             img.onload = function () { frame.innerHTML = ''; frame.appendChild(img); };
             img.onerror = function () { frame.innerHTML = '<div class="sw-empty">Failed to load image</div>'; };
-            img.src = '/space-weather/image/' + key + '?t=' + Date.now();
+            img.src = '/space-weather/image/' + key + '?' + _cacheBust();
             img.alt = key;
         }
     }
@@ -64,7 +71,7 @@ const SpaceWeather = (function () {
             const img = new Image();
             img.onload = function () { frame.innerHTML = ''; frame.appendChild(img); };
             img.onerror = function () { frame.innerHTML = '<div class="sw-empty">Failed to load image</div>'; };
-            img.src = '/space-weather/image/' + key + '?t=' + Date.now();
+            img.src = '/space-weather/image/' + key + '?' + _cacheBust();
             img.alt = key;
         }
     }

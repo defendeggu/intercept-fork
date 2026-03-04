@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import time
 import urllib.error
@@ -259,22 +260,27 @@ IMAGE_WHITELIST: dict[str, dict[str, str]] = {
 @space_weather_bp.route('/data')
 def get_data():
     """Return aggregated space weather data from all sources."""
-    data = {
-        'kp_index': _fetch_kp_index(),
-        'kp_forecast': _fetch_kp_forecast(),
-        'scales': _fetch_scales(),
-        'flux': _fetch_flux(),
-        'alerts': _fetch_alerts(),
-        'solar_wind_plasma': _fetch_solar_wind_plasma(),
-        'solar_wind_mag': _fetch_solar_wind_mag(),
-        'xrays': _fetch_xrays(),
-        'xray_flares': _fetch_xray_flares(),
-        'flare_probability': _fetch_flare_probability(),
-        'solar_regions': _fetch_solar_regions(),
-        'sunspot_report': _fetch_sunspot_report(),
-        'band_conditions': _fetch_band_conditions(),
-        'timestamp': time.time(),
+    fetchers = {
+        'kp_index': _fetch_kp_index,
+        'kp_forecast': _fetch_kp_forecast,
+        'scales': _fetch_scales,
+        'flux': _fetch_flux,
+        'alerts': _fetch_alerts,
+        'solar_wind_plasma': _fetch_solar_wind_plasma,
+        'solar_wind_mag': _fetch_solar_wind_mag,
+        'xrays': _fetch_xrays,
+        'xray_flares': _fetch_xray_flares,
+        'flare_probability': _fetch_flare_probability,
+        'solar_regions': _fetch_solar_regions,
+        'sunspot_report': _fetch_sunspot_report,
+        'band_conditions': _fetch_band_conditions,
     }
+    data = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=13) as executor:
+        futures = {executor.submit(fn): key for key, fn in fetchers.items()}
+        for future in concurrent.futures.as_completed(futures):
+            data[futures[future]] = future.result()
+    data['timestamp'] = time.time()
     return jsonify(data)
 
 
@@ -298,3 +304,36 @@ def get_image(key: str):
     _cache_set(cache_key, img_data, TTL_IMAGE)
     return Response(img_data, content_type=entry['content_type'],
                     headers={'Cache-Control': 'public, max-age=300'})
+
+
+@space_weather_bp.route('/prefetch-images')
+def prefetch_images():
+    """Warm the image cache by fetching all whitelisted images in parallel."""
+    # Only fetch images not already cached
+    to_fetch = {}
+    for key, entry in IMAGE_WHITELIST.items():
+        cache_key = f'img_{key}'
+        if _cache_get(cache_key) is None:
+            to_fetch[key] = entry
+
+    if not to_fetch:
+        return jsonify({'status': 'all cached', 'count': 0})
+
+    def _fetch_and_cache(key: str, entry: dict) -> bool:
+        img_data = _fetch_bytes(entry['url'])
+        if img_data:
+            _cache_set(f'img_{key}', img_data, TTL_IMAGE)
+            return True
+        return False
+
+    fetched = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(_fetch_and_cache, k, e): k
+            for k, e in to_fetch.items()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            if future.result():
+                fetched += 1
+
+    return jsonify({'status': 'ok', 'fetched': fetched, 'cached': len(IMAGE_WHITELIST) - len(to_fetch)})

@@ -1,0 +1,39 @@
+/**
+ * Signal Waveform Component
+ * Animated SVG bar waveform for indicating live signal activity
+ */
+
+.signal-waveform {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.signal-waveform-svg {
+    display: block;
+}
+
+.signal-waveform-bar {
+    will-change: height, y;
+    transition: fill 0.3s ease;
+}
+
+/* Idle breathing animation */
+.signal-waveform.idle .signal-waveform-bar {
+    animation: signal-waveform-breathe 2.5s ease-in-out infinite;
+}
+
+.signal-waveform.idle .signal-waveform-bar:nth-child(even) {
+    animation-delay: -1.25s;
+}
+
+@keyframes signal-waveform-breathe {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+}
+
+/* Active state - disable CSS breathing, JS drives heights */
+.signal-waveform.active .signal-waveform-bar {
+    animation: none;
+    opacity: 1;
+}
