@@ -27,6 +27,21 @@ const CheatSheets = (function () {
         radiosonde:  { title: 'Radiosonde Tracker',       icon: '🎈', hardware: 'RTL-SDR dongle',                          description: 'Tracks weather balloons via radiosonde telemetry using radiosonde_auto_rx.', whatToExpect: 'Position, altitude, temperature, humidity, pressure from active sondes.', tips: ['Sondes transmit on 400–406 MHz', 'Set your region to narrow the scan range', 'Gain 40 dB is a good starting point'] },
         morse:       { title: 'CW/Morse Decoder',        icon: '📡', hardware: 'RTL-SDR + HF antenna (or upconverter)',    description: 'Decodes CW Morse code via Goertzel tone detection or OOK envelope detection.', whatToExpect: 'Decoded Morse characters, WPM estimate, signal level.', tips: ['CW Tone mode for HF amateur bands (e.g. 7.030, 14.060 MHz)', 'OOK Envelope mode for ISM/UHF signals', 'Use band presets for quick tuning to CW sub-bands'] },
         meteor:      { title: 'Meteor Scatter',           icon: '☄️', hardware: 'RTL-SDR + VHF antenna (143 MHz)',         description: 'Monitors VHF beacon reflections from meteor ionization trails.',             whatToExpect: 'Waterfall display with transient ping detections and event logging.', tips: ['GRAVES radar at 143.050 MHz is the primary target', 'Use a Yagi pointed south (from Europe) for best results', 'Peak activity during annual meteor showers (Perseids, Geminids)'] },
+        ook: {
+            title: 'OOK Signal Decoder',
+            icon: '📡',
+            hardware: 'RTL-SDR dongle',
+            description: 'Decodes raw On-Off Keying (OOK) signals via rtl_433 flex decoder. Captures frames with configurable pulse timing and displays raw bits, hex, and ASCII — useful for reverse-engineering unknown ISM-band protocols.',
+            whatToExpect: 'Decoded bit sequences, hex payloads, and ASCII interpretation. Each frame shows bit count, timestamp, and optional RSSI.',
+            tips: [
+                '<strong>Identifying modulation</strong> — <em>PWM</em>: pulse widths vary (short=1, long=0), gaps constant — most common for ISM remotes/sensors. <em>PPM</em>: pulses constant, gap widths encode data. <em>Manchester</em>: self-clocking, equal-width pulses, data in transitions.',
+                '<strong>Finding pulse timing</strong> — Run <code>rtl_433 -f 433.92M -A</code> in a terminal to auto-analyze signals. It prints detected pulse widths (short/long) and gap timings. Use those values in the Short/Long Pulse fields.',
+                '<strong>Common ISM timings</strong> — 300/600µs (weather stations, door sensors), 400/800µs (car keyfobs), 500/1500µs (garage doors, doorbells), 500µs Manchester (tire pressure monitors).',
+                '<strong>Frequencies to try</strong> — 315 MHz (North America keyfobs), 433.920 MHz (global ISM), 868 MHz (Europe ISM), 915 MHz (US ISM/meters).',
+                '<strong>Troubleshooting</strong> — Garbled output? Try halving or doubling pulse timings. No frames? Increase tolerance (±200–300µs). Too many frames? Enable deduplication. Wrong characters? Toggle MSB/LSB bit order.',
+                '<strong>Tolerance &amp; reset</strong> — Tolerance is how much timing can drift (±150µs default). Reset limit is the silence gap that ends a frame (8000µs). Lower gap limit if frames are merging together.',
+            ]
+        },
     };
 
     function show(mode) {
