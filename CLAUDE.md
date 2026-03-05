@@ -25,14 +25,25 @@ docker compose --profile basic up -d --build
 
 ### Local Setup (Alternative)
 ```bash
-# Initial setup (installs dependencies and configures SDR tools)
+# First-time setup (interactive wizard with install profiles)
 ./setup.sh
+
+# Or headless full install
+./setup.sh --non-interactive
+
+# Or install specific profiles
+./setup.sh --profile=core,weather
 
 # Run with production server (gunicorn + gevent, handles concurrent SSE/WebSocket)
 sudo ./start.sh
 
 # Or for quick local dev (Flask dev server)
 sudo -E venv/bin/python intercept.py
+
+# Other setup utilities
+./setup.sh --health-check      # Verify installation
+./setup.sh --postgres-setup    # Set up ADS-B history database
+./setup.sh --menu              # Force interactive menu
 ```
 
 ### Testing
@@ -68,7 +79,8 @@ mypy .
 ## Architecture
 
 ### Entry Points
-- `start.sh` - Production startup script (gunicorn + gevent auto-detection, CLI flags, HTTPS, fallback to Flask dev server)
+- `setup.sh` - Menu-driven installer with profile system (wizard, health check, PostgreSQL setup, env configurator, update, uninstall). Sources `.env` on startup via `start.sh`.
+- `start.sh` - Production startup script (gunicorn + gevent auto-detection, CLI flags, HTTPS, `.env` sourcing, fallback to Flask dev server)
 - `intercept.py` - Direct Flask dev server entry point (quick local development)
 - `app.py` - Flask application initialization, global state management, process lifecycle, SSE streaming infrastructure, conditional gevent monkey-patch
 

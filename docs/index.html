@@ -330,10 +330,10 @@
                     <div class="code-block">
                         <pre><code>git clone https://github.com/smittix/intercept.git
 cd intercept
-./setup.sh
+./setup.sh          # Interactive wizard with install profiles
 sudo ./start.sh</code></pre>
                     </div>
-                    <p class="install-note">Requires Python 3.9+ and RTL-SDR drivers</p>
+                    <p class="install-note">Menu-driven setup: choose Core, Maritime, Weather, Security, or Full SIGINT profiles. Headless mode: <code>./setup.sh --non-interactive</code></p>
                 </div>
 
                 <div class="install-card">
@@ -350,6 +350,7 @@ docker compose --profile basic up -d --build</code></pre>
             <div class="post-install">
                 <p>After starting, open <code>http://localhost:5050</code> in your browser.</p>
                 <p>Default credentials: <code>admin</code> / <code>admin</code></p>
+                <p>Run <code>./setup.sh --health-check</code> to verify your installation, or use menu option 2 for a full system health check.</p>
             </div>
         </div>
     </section>

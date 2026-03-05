@@ -23,6 +23,7 @@ from typing import BinaryIO, Callable
 
 import numpy as np
 
+from utils.dependencies import get_tool_path
 from utils.logging import get_logger
 from utils.process import register_process, safe_terminate, unregister_process
 from utils.constants import (
@@ -191,14 +192,18 @@ class SubGhzManager:
     # Tool detection
     # ------------------------------------------------------------------
 
+    def _resolve_tool(self, name: str) -> str | None:
+        """Resolve executable path via PATH first, then platform-aware fallbacks."""
+        return shutil.which(name) or get_tool_path(name)
+
     def check_hackrf(self) -> bool:
         if self._hackrf_available is None:
-            self._hackrf_available = shutil.which('hackrf_transfer') is not None
+            self._hackrf_available = self._resolve_tool('hackrf_transfer') is not None
         return self._hackrf_available
 
     def check_hackrf_info(self) -> bool:
         if self._hackrf_info_available is None:
-            self._hackrf_info_available = shutil.which('hackrf_info') is not None
+            self._hackrf_info_available = self._resolve_tool('hackrf_info') is not None
         return self._hackrf_info_available
 
     def check_hackrf_device(self) -> bool | None:
@@ -230,12 +235,12 @@ class SubGhzManager:
 
     def check_rtl433(self) -> bool:
         if self._rtl433_available is None:
-            self._rtl433_available = shutil.which('rtl_433') is not None
+            self._rtl433_available = self._resolve_tool('rtl_433') is not None
         return self._rtl433_available
 
     def check_sweep(self) -> bool:
         if self._sweep_available is None:
-            self._sweep_available = shutil.which('hackrf_sweep') is not None
+            self._sweep_available = self._resolve_tool('hackrf_sweep') is not None
         return self._sweep_available
 
     # ------------------------------------------------------------------
@@ -319,7 +324,8 @@ class SubGhzManager:
         device_serial: str | None = None,
     ) -> dict:
         # Pre-lock: tool availability & device detection (blocking I/O)
-        if not self.check_hackrf():
+        hackrf_transfer_path = self._resolve_tool('hackrf_transfer')
+        if not hackrf_transfer_path:
             return {'status': 'error', 'message': 'hackrf_transfer not found'}
         device_err = self._require_hackrf_device()
         if device_err:
@@ -340,7 +346,7 @@ class SubGhzManager:
             iq_file = self._captures_dir / f"{basename}.iq"
 
             cmd = [
-                'hackrf_transfer',
+                hackrf_transfer_path,
                 '-r', str(iq_file),
                 '-f', str(frequency_hz),
                 '-s', str(sample_rate),
@@ -1282,9 +1288,11 @@ class SubGhzManager:
         device_serial: str | None = None,
     ) -> dict:
         # Pre-lock: tool availability & device detection (blocking I/O)
-        if not self.check_hackrf():
+        hackrf_transfer_path = self._resolve_tool('hackrf_transfer')
+        if not hackrf_transfer_path:
             return {'status': 'error', 'message': 'hackrf_transfer not found'}
-        if not self.check_rtl433():
+        rtl433_path = self._resolve_tool('rtl_433')
+        if not rtl433_path:
             return {'status': 'error', 'message': 'rtl_433 not found'}
         device_err = self._require_hackrf_device()
         if device_err:
@@ -1301,7 +1309,7 @@ class SubGhzManager:
 
             # Build hackrf_transfer command (producer: raw IQ to stdout)
             hackrf_cmd = [
-                'hackrf_transfer',
+                hackrf_transfer_path,
                 '-r', '-',
                 '-f', str(frequency_hz),
                 '-s', str(stable_sample_rate),
@@ -1314,7 +1322,7 @@ class SubGhzManager:
             # Build rtl_433 command (consumer: reads IQ from stdin)
             # Feed signed 8-bit complex IQ directly from hackrf_transfer.
             rtl433_cmd = [
-                'rtl_433',
+                rtl433_path,
                 '-r', 'cs8:-',
                 '-s', str(stable_sample_rate),
                 '-f', str(frequency_hz),
@@ -1946,7 +1954,8 @@ class SubGhzManager:
         device_serial: str | None = None,
     ) -> dict:
         # Pre-lock: tool availability & device detection (blocking I/O)
-        if not self.check_hackrf():
+        hackrf_transfer_path = self._resolve_tool('hackrf_transfer')
+        if not hackrf_transfer_path:
             return {'status': 'error', 'message': 'hackrf_transfer not found'}
         device_err = self._require_hackrf_device()
         if device_err:
@@ -2050,7 +2059,7 @@ class SubGhzManager:
                 self._tx_temp_file = segment_path_for_cleanup
 
             cmd = [
-                'hackrf_transfer',
+                hackrf_transfer_path,
                 '-t', str(tx_path),
                 '-f', str(capture.frequency_hz),
                 '-s', str(capture.sample_rate),
@@ -2191,7 +2200,8 @@ class SubGhzManager:
         device_serial: str | None = None,
     ) -> dict:
         # Pre-lock: tool availability & device detection (blocking I/O)
-        if not self.check_sweep():
+        hackrf_sweep_path = self._resolve_tool('hackrf_sweep')
+        if not hackrf_sweep_path:
             return {'status': 'error', 'message': 'hackrf_sweep not found'}
         device_err = self._require_hackrf_device()
         if device_err:
@@ -2208,7 +2218,7 @@ class SubGhzManager:
                 return {'status': 'error', 'message': f'Already running: {self.active_mode}'}
 
             cmd = [
-                'hackrf_sweep',
+                hackrf_sweep_path,
                 '-f', f'{int(freq_start_mhz)}:{int(freq_end_mhz)}',
                 '-w', str(bin_width),
             ]

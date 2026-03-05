@@ -81,17 +81,60 @@ Troubleshooting (no decode / noisy decode):
 
 ---
 
-## Installation / Debian / Ubuntu / MacOS
+## Installation / Debian / Ubuntu / macOS
 
-**1. Clone and run:**
+### Quick Start
+
 ```bash
 git clone https://github.com/smittix/intercept.git
 cd intercept
-./setup.sh
+./setup.sh          # Interactive menu (first run launches setup wizard)
 sudo ./start.sh
 ```
 
+On first run, `setup.sh` launches a **guided wizard** that detects your OS, lets you choose install profiles, sets up the Python environment, and optionally configures environment variables and PostgreSQL.
+
+On subsequent runs, it opens an **interactive menu**:
+
+```
+INTERCEPT Setup Menu
+════════════════════════════════════════
+  1) Install / Add Modules
+  2) System Health Check
+  3) Database Setup (ADS-B History)
+  4) Update Tools
+  5) Environment Configurator
+  6) Uninstall / Cleanup
+  7) View Status
+  0) Exit
+```
+
 > **Production vs Dev server:** `start.sh` auto-detects gunicorn + gevent and runs a production server with cooperative greenlets — handles multiple SSE/WebSocket clients without blocking. Falls back to Flask dev server if gunicorn is not installed. For quick local development, you can still use `sudo -E venv/bin/python intercept.py` directly.
+
+### Install Profiles
+
+Choose what to install during the wizard or via menu option 1:
+
+| # | Profile | Tools |
+|---|---------|-------|
+| 1 | Core SIGINT | rtl_sdr, multimon-ng, rtl_433, dump1090, acarsdec, dumpvdl2, ffmpeg, gpsd |
+| 2 | Maritime & Radio | AIS-catcher, direwolf |
+| 3 | Weather & Space | SatDump, radiosonde_auto_rx |
+| 4 | RF Security | aircrack-ng, HackRF, BlueZ, hcxtools, Ubertooth, SoapySDR |
+| 5 | Full SIGINT | All of the above |
+| 6 | Custom | Per-tool checklist |
+
+Multiple profiles can be combined (e.g. enter `1 3` for Core + Weather).
+
+### CLI Flags
+
+```bash
+./setup.sh --non-interactive          # Headless full install (same as legacy behavior)
+./setup.sh --profile=core,weather     # Install specific profiles
+./setup.sh --health-check             # Check system health and exit
+./setup.sh --postgres-setup           # Run PostgreSQL setup and exit
+./setup.sh --menu                     # Force interactive menu
+```
 
 ### Docker
 
@@ -142,16 +185,40 @@ INTERCEPT_IMAGE=ghcr.io/youruser/intercept:latest
 docker compose --profile basic up -d
 ```
 
-### ADS-B History (Optional)
+### Environment Configuration
 
-The ADS-B history feature persists aircraft messages to Postgres for long-term analysis.
+Use the **Environment Configurator** (menu option 5) to interactively set any `INTERCEPT_*` variable. Settings are saved to a `.env` file that `start.sh` sources automatically on startup.
+
+You can also create or edit `.env` manually:
 
 ```bash
-# Start with ADS-B history and Postgres
+# .env (auto-loaded by start.sh)
+INTERCEPT_PORT=5050
+INTERCEPT_ADSB_AUTO_START=true
+INTERCEPT_DEFAULT_LAT=51.5074
+INTERCEPT_DEFAULT_LON=-0.1278
+```
+
+### ADS-B History (Optional)
+
+The ADS-B history feature persists aircraft messages to PostgreSQL for long-term analysis.
+
+**Automated setup (local install):**
+
+```bash
+./setup.sh --postgres-setup
+# Or use menu option 3: Database Setup
+```
+
+This will install PostgreSQL if needed, create the database/user/tables, and write the connection settings to `.env`.
+
+**Docker:**
+
+```bash
 docker compose --profile history up -d
 ```
 
-Set the following environment variables (for example in a `.env` file):
+Set the following environment variables (in `.env`):
 
 ```bash
 INTERCEPT_ADSB_HISTORY_ENABLED=true
@@ -162,30 +229,6 @@ INTERCEPT_ADSB_DB_USER=intercept
 INTERCEPT_ADSB_DB_PASSWORD=intercept
 ```
 
-### Other ADS-B Settings
-
-Set these as environment variables for either local installs or Docker:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `INTERCEPT_ADSB_AUTO_START` | `false` | Auto-start ADS-B tracking when the dashboard loads |
-| `INTERCEPT_SHARED_OBSERVER_LOCATION` | `true` | Share observer location across ADS-B/AIS/SSTV/Satellite modules |
-
-**Local install example**
-
-```bash
-INTERCEPT_ADSB_AUTO_START=true \
-INTERCEPT_SHARED_OBSERVER_LOCATION=false \
-sudo ./start.sh
-```
-
-**Docker example (.env)**
-
-```bash
-INTERCEPT_ADSB_AUTO_START=true
-INTERCEPT_SHARED_OBSERVER_LOCATION=false
-```
-
 To store Postgres data on external storage, set `PGDATA_PATH` (defaults to `./pgdata`):
 
 ```bash
@@ -194,9 +237,20 @@ PGDATA_PATH=/mnt/usbpi1/intercept/pgdata
 
 Then open **/adsb/history** for the reporting dashboard.
 
+### System Health Check
+
+Verify your installation is complete and working:
+
+```bash
+./setup.sh --health-check
+# Or use menu option 2
+```
+
+Checks installed tools, SDR devices, port availability, permissions, Python venv, `.env` configuration, and PostgreSQL connectivity.
+
 ### Open the Interface
 
-After starting, open **http://localhost:5050** in your browser. The username and password is <b>admin</b>:<b>admin</b> 
+After starting, open **http://localhost:5050** in your browser. The username and password is <b>admin</b>:<b>admin</b>
 
 The credentials can be changed in the ADMIN_USERNAME & ADMIN_PASSWORD variables in config.py
 

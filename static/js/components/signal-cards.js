@@ -1492,6 +1492,7 @@ const SignalCards = (function() {
             muted.push(address);
             localStorage.setItem('mutedAddresses', JSON.stringify(muted));
             showToast(`Source ${address} hidden from view`);
+            updateMutedIndicator();
 
             // Hide existing cards with this address
             document.querySelectorAll(`.signal-card[data-address="${address}"], .signal-card[data-callsign="${address}"], .signal-card[data-sensor-id="${address}"]`).forEach(card => {
@@ -1508,6 +1509,30 @@ const SignalCards = (function() {
     function isAddressMuted(address) {
         const muted = JSON.parse(localStorage.getItem('mutedAddresses') || '[]');
         return muted.includes(address);
+    }
+
+    /**
+     * Unmute all addresses and refresh display
+     */
+    function unmuteAll() {
+        localStorage.setItem('mutedAddresses', '[]');
+        updateMutedIndicator();
+        showToast('All sources unmuted');
+        // Reload to re-display previously muted messages
+        location.reload();
+    }
+
+    /**
+     * Update the muted address count indicator in the sidebar
+     */
+    function updateMutedIndicator() {
+        const muted = JSON.parse(localStorage.getItem('mutedAddresses') || '[]');
+        const info = document.getElementById('mutedAddressInfo');
+        const count = document.getElementById('mutedAddressCount');
+        if (info && count) {
+            count.textContent = muted.length;
+            info.style.display = muted.length > 0 ? 'block' : 'none';
+        }
     }
 
     /**
@@ -2262,6 +2287,8 @@ const SignalCards = (function() {
         copyMessage,
         muteAddress,
         isAddressMuted,
+        unmuteAll,
+        updateMutedIndicator,
         showOnMap,
         showStationRawData,
         showSignalDetails,

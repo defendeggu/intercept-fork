@@ -22,7 +22,7 @@ class HackRFCommandBuilder(CommandBuilder):
         freq_min_mhz=1.0,        # 1 MHz
         freq_max_mhz=6000.0,     # 6 GHz
         gain_min=0.0,
-        gain_max=62.0,           # LNA (0-40) + VGA (0-62)
+        gain_max=102.0,          # LNA (0-40) + VGA (0-62)
         sample_rates=[2000000, 4000000, 8000000, 10000000, 20000000],
         supports_bias_t=True,
         supports_ppm=False,

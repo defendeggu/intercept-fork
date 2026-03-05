@@ -1890,19 +1890,179 @@ def _parse_rtl_power_line(line: str) -> tuple[str | None, float | None, float | 
         return timestamp, None, None, []
 
 
+def _queue_waterfall_error(message: str) -> None:
+    """Push an error message onto the waterfall SSE queue."""
+    try:
+        waterfall_queue.put_nowait({
+            'type': 'waterfall_error',
+            'message': message,
+            'timestamp': datetime.now().isoformat(),
+        })
+    except queue.Full:
+        pass
+
+
 def _waterfall_loop():
-    """Continuous rtl_power sweep loop emitting waterfall data."""
+    """Continuous waterfall sweep loop emitting FFT data."""
     global waterfall_running, waterfall_process
 
-    def _queue_waterfall_error(message: str) -> None:
-        try:
-            waterfall_queue.put_nowait({
-                'type': 'waterfall_error',
-                'message': message,
+    sdr_type_str = waterfall_config.get('sdr_type', 'rtlsdr')
+    try:
+        sdr_type = SDRType(sdr_type_str)
+    except ValueError:
+        sdr_type = SDRType.RTL_SDR
+
+    if sdr_type == SDRType.RTL_SDR:
+        _waterfall_loop_rtl_power()
+    else:
+        _waterfall_loop_iq(sdr_type)
+
+
+def _waterfall_loop_iq(sdr_type: SDRType):
+    """Waterfall loop using rx_sdr IQ capture + FFT for HackRF/SoapySDR devices."""
+    global waterfall_running, waterfall_process
+
+    start_freq = waterfall_config['start_freq']
+    end_freq = waterfall_config['end_freq']
+    gain = waterfall_config['gain']
+    device = waterfall_config['device']
+    interval = float(waterfall_config.get('interval', 0.4))
+
+    # Use center frequency and sample rate to cover the requested span
+    center_mhz = (start_freq + end_freq) / 2.0
+    span_hz = (end_freq - start_freq) * 1e6
+    # Pick a sample rate that covers the span (minimum 2 MHz for HackRF)
+    sample_rate = max(2000000, int(span_hz))
+    # Cap to sensible maximum
+    sample_rate = min(sample_rate, 20000000)
+
+    sdr_device = SDRFactory.create_default_device(sdr_type, index=device)
+    builder = SDRFactory.get_builder(sdr_type)
+
+    cmd = builder.build_iq_capture_command(
+        device=sdr_device,
+        frequency_mhz=center_mhz,
+        sample_rate=sample_rate,
+        gain=float(gain),
+    )
+
+    fft_size = min(int(waterfall_config.get('max_bins') or 1024), 4096)
+
+    try:
+        waterfall_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Detect immediate startup failures
+        time.sleep(0.35)
+        if waterfall_process.poll() is not None:
+            stderr_text = ''
+            try:
+                if waterfall_process.stderr:
+                    stderr_text = waterfall_process.stderr.read().decode('utf-8', errors='ignore').strip()
+            except Exception:
+                stderr_text = ''
+            msg = stderr_text or f'IQ capture exited early (code {waterfall_process.returncode})'
+            logger.error(f"Waterfall startup failed: {msg}")
+            _queue_waterfall_error(msg)
+            return
+
+        if not waterfall_process.stdout:
+            _queue_waterfall_error('IQ capture stdout unavailable')
+            return
+
+        # Read IQ samples and compute FFT
+        # CU8 format: interleaved unsigned 8-bit I/Q pairs
+        bytes_per_sample = 2  # 1 byte I + 1 byte Q
+        chunk_bytes = fft_size * bytes_per_sample
+        received_any = False
+
+        while waterfall_running:
+            raw = waterfall_process.stdout.read(chunk_bytes)
+            if not raw or len(raw) < chunk_bytes:
+                if waterfall_process.poll() is not None:
+                    break
+                continue
+
+            received_any = True
+
+            # Convert CU8 to complex float: center at 127.5
+            iq = struct.unpack(f'{fft_size * 2}B', raw)
+            # Compute power spectrum via FFT
+            real_parts = [(iq[i * 2] - 127.5) / 127.5 for i in range(fft_size)]
+            imag_parts = [(iq[i * 2 + 1] - 127.5) / 127.5 for i in range(fft_size)]
+
+            bins: list[float] = []
+            try:
+                # Try numpy if available for efficient FFT
+                import numpy as np
+                samples = np.array(real_parts, dtype=np.float32) + 1j * np.array(imag_parts, dtype=np.float32)
+                # Apply Hann window
+                window = np.hanning(fft_size)
+                samples *= window
+                spectrum = np.fft.fftshift(np.fft.fft(samples))
+                power_db = 10.0 * np.log10(np.abs(spectrum) ** 2 + 1e-10)
+                bins = power_db.tolist()
+            except ImportError:
+                # Fallback: compute magnitude without full FFT
+                # Just report raw magnitudes per sample as approximate power
+                for i in range(fft_size):
+                    mag = math.sqrt(real_parts[i] ** 2 + imag_parts[i] ** 2)
+                    power = 10.0 * math.log10(mag ** 2 + 1e-10)
+                    bins.append(power)
+
+            max_bins = int(waterfall_config.get('max_bins') or 0)
+            if max_bins > 0 and len(bins) > max_bins:
+                bins = _downsample_bins(bins, max_bins)
+
+            msg = {
+                'type': 'waterfall_sweep',
+                'start_freq': start_freq,
+                'end_freq': end_freq,
+                'bins': bins,
                 'timestamp': datetime.now().isoformat(),
-            })
-        except queue.Full:
-            pass
+            }
+            try:
+                waterfall_queue.put_nowait(msg)
+            except queue.Full:
+                try:
+                    waterfall_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    waterfall_queue.put_nowait(msg)
+                except queue.Full:
+                    pass
+
+            # Throttle to respect interval
+            time.sleep(interval)
+
+        if waterfall_running and not received_any:
+            _queue_waterfall_error(f'No IQ data received from {sdr_type.value}')
+
+    except Exception as e:
+        logger.error(f"Waterfall IQ loop error: {e}")
+        _queue_waterfall_error(f"Waterfall loop error: {e}")
+    finally:
+        waterfall_running = False
+        if waterfall_process and waterfall_process.poll() is None:
+            try:
+                waterfall_process.terminate()
+                waterfall_process.wait(timeout=1)
+            except Exception:
+                try:
+                    waterfall_process.kill()
+                except Exception:
+                    pass
+        waterfall_process = None
+        logger.info("Waterfall IQ loop stopped")
+
+
+def _waterfall_loop_rtl_power():
+    """Continuous rtl_power sweep loop emitting waterfall data."""
+    global waterfall_running, waterfall_process
 
     rtl_power_path = find_rtl_power()
     if not rtl_power_path:
@@ -2081,10 +2241,20 @@ def start_waterfall() -> Response:
                 'config': waterfall_config,
             })
 
-    if not find_rtl_power():
-        return jsonify({'status': 'error', 'message': 'rtl_power not found'}), 503
-
     data = request.json or {}
+
+    # Determine SDR type
+    sdr_type_str = data.get('sdr_type', 'rtlsdr')
+    try:
+        sdr_type = SDRType(sdr_type_str)
+    except ValueError:
+        sdr_type = SDRType.RTL_SDR
+        sdr_type_str = sdr_type.value
+
+    # RTL-SDR uses rtl_power; other types use rx_sdr via IQ capture
+    if sdr_type == SDRType.RTL_SDR:
+        if not find_rtl_power():
+            return jsonify({'status': 'error', 'message': 'rtl_power not found'}), 503
 
     try:
         waterfall_config['start_freq'] = float(data.get('start_freq', 88.0))
@@ -2092,6 +2262,7 @@ def start_waterfall() -> Response:
         waterfall_config['bin_size'] = int(data.get('bin_size', 10000))
         waterfall_config['gain'] = int(data.get('gain', 40))
         waterfall_config['device'] = int(data.get('device', 0))
+        waterfall_config['sdr_type'] = sdr_type_str
         if data.get('interval') is not None:
             interval = float(data.get('interval', waterfall_config['interval']))
             if interval < 0.1 or interval > 5:
@@ -2116,12 +2287,12 @@ def start_waterfall() -> Response:
         pass
 
     # Claim SDR device
-    error = app_module.claim_sdr_device(waterfall_config['device'], 'waterfall', 'rtlsdr')
+    error = app_module.claim_sdr_device(waterfall_config['device'], 'waterfall', sdr_type_str)
     if error:
         return jsonify({'status': 'error', 'error_type': 'DEVICE_BUSY', 'message': error}), 409
 
     waterfall_active_device = waterfall_config['device']
-    waterfall_active_sdr_type = 'rtlsdr'
+    waterfall_active_sdr_type = sdr_type_str
     waterfall_running = True
     waterfall_thread = threading.Thread(target=_waterfall_loop, daemon=True)
     waterfall_thread.start()

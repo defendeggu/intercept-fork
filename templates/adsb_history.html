@@ -87,9 +87,9 @@
                 <label for="windowSelect">Window</label>
                 <select id="windowSelect">
                     <option value="15">15 minutes</option>
-                    <option value="60" selected>1 hour</option>
+                    <option value="60">1 hour</option>
                     <option value="360">6 hours</option>
-                    <option value="1440">24 hours</option>
+                    <option value="1440" selected>24 hours</option>
                     <option value="10080">7 days</option>
                 </select>
             </div>
@@ -105,6 +105,34 @@
                     <option value="500">500</option>
                     <option value="1000">1000</option>
                 </select>
+            </div>
+            <div class="control-group data-control-group">
+                <label for="pruneDateInput">Data Cleanup</label>
+                <div class="data-actions">
+                    <input type="date" id="pruneDateInput">
+                    <button class="primary-btn warn-btn" id="pruneDayBtn" type="button">Remove Day</button>
+                    <button class="primary-btn danger-btn" id="clearHistoryBtn" type="button">Clear All</button>
+                </div>
+            </div>
+            <div class="control-group data-control-group">
+                <label for="exportTypeSelect">Export</label>
+                <div class="data-actions">
+                    <select id="exportTypeSelect">
+                        <option value="all">All Data</option>
+                        <option value="snapshots">Snapshots</option>
+                        <option value="messages">Messages</option>
+                        <option value="sessions">Sessions</option>
+                    </select>
+                    <select id="exportFormatSelect">
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                    </select>
+                    <select id="exportScopeSelect">
+                        <option value="window">Current Window</option>
+                        <option value="all">Entire History</option>
+                    </select>
+                    <button class="primary-btn" id="exportBtn" type="button">Export</button>
+                </div>
             </div>
             <button class="primary-btn" id="refreshBtn">Refresh</button>
             <div class="status-pill" id="historyStatus">
@@ -285,6 +313,16 @@
         const windowSelect = document.getElementById('windowSelect');
         const searchInput = document.getElementById('searchInput');
         const limitSelect = document.getElementById('limitSelect');
+        const HISTORY_WINDOW_STORAGE_KEY = 'adsbHistoryWindowMinutes';
+        const VALID_HISTORY_WINDOWS = new Set(['15', '60', '360', '1440', '10080']);
+        const historyStatus = document.getElementById('historyStatus');
+        const pruneDateInput = document.getElementById('pruneDateInput');
+        const pruneDayBtn = document.getElementById('pruneDayBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const exportTypeSelect = document.getElementById('exportTypeSelect');
+        const exportFormatSelect = document.getElementById('exportFormatSelect');
+        const exportScopeSelect = document.getElementById('exportScopeSelect');
+        const exportBtn = document.getElementById('exportBtn');
 
         let selectedIcao = '';
         let sessionStartAt = null;
@@ -357,6 +395,193 @@
             const mins = Math.floor((seconds % 3600) / 60);
             const secs = Math.floor(seconds % 60);
             return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function toLocalDateInputValue(date) {
+            const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+            return localDate.toISOString().slice(0, 10);
+        }
+
+        function setDefaultPruneDate() {
+            if (!pruneDateInput) {
+                return;
+            }
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            pruneDateInput.value = toLocalDateInputValue(yesterday);
+        }
+
+        function setHistoryStatus(text, state = 'neutral') {
+            if (!historyStatus) {
+                return;
+            }
+            historyStatus.textContent = text;
+            historyStatus.classList.remove('ok', 'error');
+            if (state === 'ok') {
+                historyStatus.classList.add('ok');
+            } else if (state === 'error') {
+                historyStatus.classList.add('error');
+            }
+        }
+
+        function setHistoryActionsDisabled(disabled) {
+            if (pruneDateInput) {
+                pruneDateInput.disabled = disabled;
+            }
+            if (pruneDayBtn) {
+                pruneDayBtn.disabled = disabled;
+            }
+            if (clearHistoryBtn) {
+                clearHistoryBtn.disabled = disabled;
+            }
+            if (exportTypeSelect) {
+                exportTypeSelect.disabled = disabled;
+            }
+            if (exportFormatSelect) {
+                exportFormatSelect.disabled = disabled;
+            }
+            if (exportScopeSelect) {
+                exportScopeSelect.disabled = disabled;
+            }
+            if (exportBtn) {
+                exportBtn.disabled = disabled;
+            }
+        }
+
+        function getDownloadFilename(response, fallback) {
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+            if (utfMatch && utfMatch[1]) {
+                try {
+                    return decodeURIComponent(utfMatch[1]);
+                } catch {
+                    return utfMatch[1];
+                }
+            }
+            const plainMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+            if (plainMatch && plainMatch[1]) {
+                return plainMatch[1];
+            }
+            return fallback;
+        }
+
+        async function exportHistoryData() {
+            if (!historyEnabled) {
+                return;
+            }
+            const exportType = exportTypeSelect.value;
+            const exportFormat = exportFormatSelect.value;
+            const exportScope = exportScopeSelect.value;
+            const sinceMinutes = windowSelect.value;
+            const search = searchInput.value.trim();
+
+            const params = new URLSearchParams({
+                format: exportFormat,
+                type: exportType,
+                scope: exportScope,
+            });
+            if (exportScope === 'window') {
+                params.set('since_minutes', sinceMinutes);
+            }
+            if (search) {
+                params.set('search', search);
+            }
+
+            const fallbackName = `adsb_history_${exportType}.${exportFormat}`;
+            const exportUrl = `/adsb/history/export?${params.toString()}`;
+
+            setHistoryActionsDisabled(true);
+            try {
+                const resp = await fetch(exportUrl, { credentials: 'same-origin' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.error || 'Export failed');
+                }
+                const blob = await resp.blob();
+                const filename = getDownloadFilename(resp, fallbackName);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                setHistoryStatus(`Export ready: ${filename}`, 'ok');
+            } catch (error) {
+                setHistoryStatus(`Export failed: ${error.message || 'unknown error'}`, 'error');
+            } finally {
+                setHistoryActionsDisabled(false);
+            }
+        }
+
+        async function pruneHistory(payload, successPrefix) {
+            if (!historyEnabled) {
+                return;
+            }
+            setHistoryActionsDisabled(true);
+            try {
+                const resp = await fetch('/adsb/history/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    throw new Error(data.error || 'Failed to prune history');
+                }
+                const deleted = data.deleted || {};
+                const messagesDeleted = Number(deleted.messages || 0);
+                const snapshotsDeleted = Number(deleted.snapshots || 0);
+                const totalDeleted = Number(data.total_deleted || (messagesDeleted + snapshotsDeleted));
+                setHistoryStatus(
+                    `${successPrefix}: ${formatNumber(totalDeleted)} records removed`,
+                    'ok'
+                );
+                await refreshAll();
+                if (selectedIcao && !recentAircraft.some(row => row.icao === selectedIcao)) {
+                    await selectAircraft('');
+                }
+            } catch (error) {
+                setHistoryStatus(`Cleanup failed: ${error.message || 'unknown error'}`, 'error');
+            } finally {
+                setHistoryActionsDisabled(false);
+            }
+        }
+
+        async function removeSelectedDay() {
+            if (!pruneDateInput || !pruneDateInput.value) {
+                setHistoryStatus('Select a day first', 'error');
+                return;
+            }
+            const dayStartLocal = new Date(`${pruneDateInput.value}T00:00:00`);
+            if (Number.isNaN(dayStartLocal.getTime())) {
+                setHistoryStatus('Invalid day selected', 'error');
+                return;
+            }
+            const dayEndLocal = new Date(dayStartLocal.getTime() + (24 * 60 * 60 * 1000));
+            const dayLabel = dayStartLocal.toLocaleDateString();
+            const confirmed = window.confirm(`Delete ADS-B history for ${dayLabel}? This cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+            await pruneHistory(
+                {
+                    mode: 'range',
+                    start: dayStartLocal.toISOString(),
+                    end: dayEndLocal.toISOString(),
+                },
+                `Removed ${dayLabel}`
+            );
+        }
+
+        async function clearAllHistory() {
+            const confirmed = window.confirm('Delete ALL ADS-B history records? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+            await pruneHistory({ mode: 'all' }, 'All history cleared');
         }
 
         async function loadSummary() {
@@ -747,12 +972,30 @@
         }
 
         refreshBtn.addEventListener('click', refreshAll);
-        windowSelect.addEventListener('change', refreshAll);
+        windowSelect.addEventListener('change', () => {
+            const selectedWindow = windowSelect.value;
+            if (VALID_HISTORY_WINDOWS.has(selectedWindow)) {
+                localStorage.setItem(HISTORY_WINDOW_STORAGE_KEY, selectedWindow);
+            }
+            refreshAll();
+        });
         limitSelect.addEventListener('change', refreshAll);
         searchInput.addEventListener('input', () => {
             clearTimeout(searchInput._debounce);
             searchInput._debounce = setTimeout(refreshAll, 350);
         });
+        pruneDayBtn.addEventListener('click', removeSelectedDay);
+        clearHistoryBtn.addEventListener('click', clearAllHistory);
+        exportBtn.addEventListener('click', exportHistoryData);
+
+        const savedWindow = localStorage.getItem(HISTORY_WINDOW_STORAGE_KEY);
+        if (savedWindow && VALID_HISTORY_WINDOWS.has(savedWindow)) {
+            windowSelect.value = savedWindow;
+        }
+        setDefaultPruneDate();
+        if (!historyEnabled) {
+            setHistoryActionsDisabled(true);
+        }
 
         refreshAll();
         loadSessionDevices();

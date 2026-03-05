@@ -17,6 +17,14 @@ set -euo pipefail
 
 # ── Resolve Python from venv or system ───────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ── Load .env if present ──────────────────────────────────────────────────────
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+fi
+
 if [[ -x "$SCRIPT_DIR/venv/bin/python" ]]; then
     PYTHON="$SCRIPT_DIR/venv/bin/python"
 elif [[ -n "${VIRTUAL_ENV:-}" && -x "$VIRTUAL_ENV/bin/python" ]]; then

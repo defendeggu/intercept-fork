@@ -14,7 +14,39 @@ INTERCEPT automatically detects connected devices.
 
 ## Quick Install
 
-### macOS (Homebrew)
+### Recommended: Use the Setup Script
+
+The setup script provides an interactive menu with install profiles for selective installation:
+
+```bash
+git clone https://github.com/smittix/intercept.git
+cd intercept
+./setup.sh
+```
+
+On first run, a guided wizard walks you through profile selection:
+
+| Profile | What it installs |
+|---------|-----------------|
+| Core SIGINT | rtl_sdr, multimon-ng, rtl_433, dump1090, acarsdec, dumpvdl2, ffmpeg, gpsd |
+| Maritime & Radio | AIS-catcher, direwolf |
+| Weather & Space | SatDump, radiosonde_auto_rx |
+| RF Security | aircrack-ng, HackRF, BlueZ, hcxtools, Ubertooth, SoapySDR |
+| Full SIGINT | All of the above |
+
+For headless/CI installs:
+```bash
+./setup.sh --non-interactive                # Install everything
+./setup.sh --profile=core,maritime          # Install specific profiles
+```
+
+After installation, use the menu to manage your setup:
+```bash
+./setup.sh              # Opens interactive menu
+./setup.sh --health-check   # Verify installation
+```
+
+### Manual Install: macOS (Homebrew)
 
 ```bash
 # Install Homebrew if needed
@@ -36,7 +68,7 @@ brew install soapysdr limesuite soapylms7
 brew install hackrf soapyhackrf
 ```
 
-### Debian / Ubuntu / Raspberry Pi OS
+### Manual Install: Debian / Ubuntu / Raspberry Pi OS
 
 ```bash
 # Update package lists
@@ -239,11 +271,19 @@ SoapySDRUtil --find
 ./setup.sh
 ```
 
-This automatically:
-- Detects your OS
-- Creates a virtual environment if needed (for PEP 668 systems)
-- Installs Python dependencies
-- Checks for required tools
+The setup wizard automatically:
+- Detects your OS (macOS, Debian/Ubuntu, DragonOS)
+- Lets you choose install profiles (Core, Maritime, Weather, Security, Full, Custom)
+- Creates a virtual environment with system site-packages
+- Installs Python dependencies (core + optional)
+- Runs a health check to verify everything works
+
+After initial setup, use the menu to manage your environment:
+- **Install / Add Modules** — add tools you didn't install initially
+- **System Health Check** — verify all tools and dependencies
+- **Environment Configurator** — set `INTERCEPT_*` variables interactively
+- **Update Tools** — rebuild source-built tools (dump1090, SatDump, etc.)
+- **View Status** — see what's installed at a glance
 
 ### Manual setup
 ```bash

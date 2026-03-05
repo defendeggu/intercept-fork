@@ -66,12 +66,15 @@ sudo ./start.sh
 
 ### Alternative: Use the setup script
 
-The setup script handles all installation automatically, including apt packages:
+The setup script handles all installation automatically, including apt packages and source builds:
 
 ```bash
-chmod +x setup.sh
-./setup.sh
+./setup.sh                    # Interactive wizard (first run) or menu
+./setup.sh --non-interactive  # Headless full install
+./setup.sh --health-check     # Diagnose installation issues
 ```
+
+The setup menu also includes a **System Health Check** (option 2) that verifies all tools, SDR devices, ports, permissions, and Python packages — useful for diagnosing installation problems.
 
 ### "pip: command not found"
 
@@ -373,7 +376,14 @@ sudo usermod -a -G bluetooth $USER
 
 ### Cannot install dump1090 in Debian (ADS-B mode)
 
-On newer Debian versions, dump1090 may not be in repositories. The recommended action is to build from source or use the setup.sh script which will do it for you.
+On newer Debian versions, dump1090 may not be in repositories. Use the setup script which builds it from source automatically:
+
+```bash
+./setup.sh                        # Select Core SIGINT profile, or
+./setup.sh --profile=core         # Install core tools including dump1090
+```
+
+The setup menu's **Install / Add Modules** option also lets you install dump1090 individually via the Custom tool checklist.
 
 ### No aircraft appearing (ADS-B mode)
 

@@ -58,6 +58,20 @@ def parse_multimon_output(line: str) -> dict[str, str] | None:
             'message': pocsag_match.group(5).strip() or '[No Message]'
         }
 
+    # POCSAG parsing - other content types (catch-all for non-Alpha/Numeric labels)
+    pocsag_other_match = re.match(
+        r'(POCSAG\d+):\s*Address:\s*(\d+)\s+Function:\s*(\d+)\s+(\w+):\s*(.*)',
+        line
+    )
+    if pocsag_other_match:
+        return {
+            'protocol': pocsag_other_match.group(1),
+            'address': pocsag_other_match.group(2),
+            'function': pocsag_other_match.group(3),
+            'msg_type': pocsag_other_match.group(4),
+            'message': pocsag_other_match.group(5).strip() or '[No Message]'
+        }
+
     # POCSAG parsing - address only (no message content)
     pocsag_addr_match = re.match(
         r'(POCSAG\d+):\s*Address:\s*(\d+)\s+Function:\s*(\d+)\s*$',

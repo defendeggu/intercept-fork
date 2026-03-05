@@ -38,8 +38,8 @@ The controller is the main Intercept application:
 
 ```bash
 cd intercept
-python app.py
-# Runs on http://localhost:5050
+./setup.sh            # First-time setup (choose install profiles)
+sudo ./start.sh       # Production server on http://localhost:5050
 ```
 
 ### 2. Configure an Agent

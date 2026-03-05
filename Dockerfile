@@ -256,6 +256,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Strip Windows CRLF from shell scripts (git autocrlf can re-introduce them)
+RUN find . -name '*.sh' -exec sed -i 's/\r$//' {} +
+
 # Create data directory for persistence
 RUN mkdir -p /app/data /app/data/weather_sat /app/data/radiosonde/logs
 
