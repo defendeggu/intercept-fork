@@ -269,6 +269,21 @@ body {
     min-width: 160px;
 }
 
+.data-control-group {
+    min-width: 320px;
+}
+
+.data-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.data-actions input[type="date"] {
+    min-width: 150px;
+}
+
 .primary-btn {
     background: var(--accent-cyan);
     border: none;
@@ -285,6 +300,31 @@ body {
     box-shadow: 0 6px 14px rgba(74, 158, 255, 0.3);
 }
 
+.primary-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.warn-btn {
+    background: var(--accent-amber);
+    color: #0a0c10;
+}
+
+.warn-btn:hover {
+    box-shadow: 0 6px 14px rgba(214, 168, 94, 0.3);
+}
+
+.danger-btn {
+    background: #d84f63;
+    color: #f8fafc;
+}
+
+.danger-btn:hover {
+    box-shadow: 0 6px 14px rgba(216, 79, 99, 0.35);
+}
+
 .status-pill {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -294,6 +334,16 @@ body {
     color: var(--accent-amber);
     text-transform: uppercase;
     letter-spacing: 1px;
+}
+
+.status-pill.ok {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.status-pill.error {
+    border-color: #d84f63;
+    color: #d84f63;
 }
 
 .content-grid {
@@ -362,6 +412,37 @@ body {
 
 .aircraft-row:hover {
     background: rgba(74, 158, 255, 0.1);
+}
+
+.aircraft-row.military {
+    background: rgba(85, 107, 47, 0.12);
+}
+
+.aircraft-row.military:hover {
+    background: rgba(85, 107, 47, 0.22);
+}
+
+.mil-badge,
+.civ-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.mil-badge {
+    background: rgba(85, 107, 47, 0.35);
+    color: #a3b86c;
+    border: 1px solid rgba(85, 107, 47, 0.6);
+}
+
+.civ-badge {
+    background: rgba(74, 158, 255, 0.15);
+    color: var(--text-dim);
+    border: 1px solid rgba(74, 158, 255, 0.25);
 }
 
 .mono {
@@ -612,6 +693,15 @@ body {
     .control-group input,
     .control-group select {
         min-width: 100%;
+    }
+
+    .data-actions {
+        width: 100%;
+    }
+
+    .data-actions input[type="date"],
+    .data-actions .primary-btn {
+        width: 100%;
     }
 
     .panel {

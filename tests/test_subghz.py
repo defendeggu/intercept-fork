@@ -49,7 +49,8 @@ class TestToolDetection:
             assert manager.check_hackrf() is True
 
     def test_check_hackrf_not_found(self, manager):
-        with patch('shutil.which', return_value=None):
+        with patch('shutil.which', return_value=None), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._hackrf_available = None  # reset cache
             assert manager.check_hackrf() is False
 
@@ -64,7 +65,8 @@ class TestToolDetection:
 
 class TestReceive:
     def test_start_receive_no_hackrf(self, manager):
-        with patch('shutil.which', return_value=None):
+        with patch('shutil.which', return_value=None), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._hackrf_available = None
             result = manager.start_receive(frequency_hz=433920000)
             assert result['status'] == 'error'
@@ -165,7 +167,8 @@ class TestTxSafety:
         assert result is not None
 
     def test_transmit_no_hackrf(self, manager):
-        with patch('shutil.which', return_value=None):
+        with patch('shutil.which', return_value=None), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._hackrf_available = None
             result = manager.transmit(capture_id='abc123')
             assert result['status'] == 'error'
@@ -466,7 +469,8 @@ class TestCaptureLibrary:
 
 class TestSweep:
     def test_start_sweep_no_tool(self, manager):
-        with patch('shutil.which', return_value=None):
+        with patch('shutil.which', return_value=None), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._sweep_available = None
             result = manager.start_sweep()
             assert result['status'] == 'error'
@@ -496,7 +500,8 @@ class TestSweep:
 
 class TestDecode:
     def test_start_decode_no_hackrf(self, manager):
-        with patch('shutil.which', return_value=None):
+        with patch('shutil.which', return_value=None), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._hackrf_available = None
             manager._rtl433_available = None
             result = manager.start_decode(frequency_hz=433920000)
@@ -509,7 +514,8 @@ class TestDecode:
                 return '/usr/bin/hackrf_transfer'
             return None
 
-        with patch('shutil.which', side_effect=which_side_effect):
+        with patch('shutil.which', side_effect=which_side_effect), \
+             patch('utils.subghz.get_tool_path', return_value=None):
             manager._hackrf_available = None
             manager._rtl433_available = None
             result = manager.start_decode(frequency_hz=433920000)
@@ -537,7 +543,10 @@ class TestDecode:
                 return mock_hackrf_proc
             return mock_rtl433_proc
 
-        with patch('shutil.which', return_value='/usr/bin/tool'), \
+        def which_side_effect(name):
+            return f'/usr/bin/{name}'
+
+        with patch('shutil.which', side_effect=which_side_effect), \
              patch('subprocess.Popen', side_effect=popen_side_effect) as mock_popen, \
              patch('utils.subghz.register_process'):
             import time as _time
@@ -558,12 +567,12 @@ class TestDecode:
 
             # Verify hackrf_transfer command
             hackrf_cmd = mock_popen.call_args_list[0][0][0]
-            assert hackrf_cmd[0] == 'hackrf_transfer'
+            assert os.path.basename(hackrf_cmd[0]) == 'hackrf_transfer'
             assert '-r' in hackrf_cmd
 
             # Verify rtl_433 command
             rtl433_cmd = mock_popen.call_args_list[1][0][0]
-            assert rtl433_cmd[0] == 'rtl_433'
+            assert os.path.basename(rtl433_cmd[0]) == 'rtl_433'
             assert '-r' in rtl433_cmd
             assert 'cs8:-' in rtl433_cmd
 

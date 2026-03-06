@@ -87,15 +87,23 @@
                 <label for="windowSelect">Window</label>
                 <select id="windowSelect">
                     <option value="15">15 minutes</option>
-                    <option value="60" selected>1 hour</option>
+                    <option value="60">1 hour</option>
                     <option value="360">6 hours</option>
-                    <option value="1440">24 hours</option>
+                    <option value="1440" selected>24 hours</option>
                     <option value="10080">7 days</option>
                 </select>
             </div>
             <div class="control-group">
                 <label for="searchInput">Search</label>
                 <input type="text" id="searchInput" placeholder="ICAO / callsign / registration">
+            </div>
+            <div class="control-group">
+                <label for="classSelect">Classification</label>
+                <select id="classSelect">
+                    <option value="all">All Aircraft</option>
+                    <option value="military">Military</option>
+                    <option value="civilian">Civilian</option>
+                </select>
             </div>
             <div class="control-group">
                 <label for="limitSelect">Limit</label>
@@ -105,6 +113,34 @@
                     <option value="500">500</option>
                     <option value="1000">1000</option>
                 </select>
+            </div>
+            <div class="control-group data-control-group">
+                <label for="pruneDateInput">Data Cleanup</label>
+                <div class="data-actions">
+                    <input type="date" id="pruneDateInput">
+                    <button class="primary-btn warn-btn" id="pruneDayBtn" type="button">Remove Day</button>
+                    <button class="primary-btn danger-btn" id="clearHistoryBtn" type="button">Clear All</button>
+                </div>
+            </div>
+            <div class="control-group data-control-group">
+                <label for="exportTypeSelect">Export</label>
+                <div class="data-actions">
+                    <select id="exportTypeSelect">
+                        <option value="all">All Data</option>
+                        <option value="snapshots">Snapshots</option>
+                        <option value="messages">Messages</option>
+                        <option value="sessions">Sessions</option>
+                    </select>
+                    <select id="exportFormatSelect">
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                    </select>
+                    <select id="exportScopeSelect">
+                        <option value="window">Current Window</option>
+                        <option value="all">Entire History</option>
+                    </select>
+                    <button class="primary-btn" id="exportBtn" type="button">Export</button>
+                </div>
             </div>
             <button class="primary-btn" id="refreshBtn">Refresh</button>
             <div class="status-pill" id="historyStatus">
@@ -128,6 +164,7 @@
                             <tr>
                                 <th>ICAO</th>
                                 <th>Callsign</th>
+                                <th>Class</th>
                                 <th>Alt</th>
                                 <th>Speed</th>
                                 <th>Last Seen</th>
@@ -135,7 +172,7 @@
                         </thead>
                         <tbody id="aircraftTableBody">
                             <tr class="empty-row">
-                                <td colspan="5">No aircraft in this window</td>
+                                <td colspan="6">No aircraft in this window</td>
                             </tr>
                         </tbody>
                     </table>
@@ -285,6 +322,49 @@
         const windowSelect = document.getElementById('windowSelect');
         const searchInput = document.getElementById('searchInput');
         const limitSelect = document.getElementById('limitSelect');
+        const classSelect = document.getElementById('classSelect');
+
+        const MILITARY_RANGES = [
+            { start: 0xADF7C0, end: 0xADFFFF },
+            { start: 0xAE0000, end: 0xAEFFFF },
+            { start: 0x3F4000, end: 0x3F7FFF },
+            { start: 0x43C000, end: 0x43CFFF },
+            { start: 0x3D0000, end: 0x3DFFFF },
+            { start: 0x501C00, end: 0x501FFF },
+        ];
+
+        const MILITARY_PREFIXES = [
+            'REACH', 'JAKE', 'DOOM', 'IRON', 'HAWK', 'VIPER', 'COBRA', 'THUNDER',
+            'SHADOW', 'NIGHT', 'STEEL', 'GRIM', 'REAPER', 'BLADE', 'STRIKE',
+            'RCH', 'CNV', 'MCH', 'EVAC', 'TOPCAT', 'ASCOT', 'RRR', 'HRK',
+            'NAVY', 'ARMY', 'USAF', 'RAF', 'RCAF', 'RAAF', 'IAF', 'PAF'
+        ];
+
+        function isMilitaryAircraft(icao, callsign) {
+            if (icao) {
+                const hex = parseInt(icao, 16);
+                for (const range of MILITARY_RANGES) {
+                    if (hex >= range.start && hex <= range.end) return true;
+                }
+            }
+            if (callsign) {
+                const upper = callsign.toUpperCase().trim();
+                for (const prefix of MILITARY_PREFIXES) {
+                    if (upper.startsWith(prefix)) return true;
+                }
+            }
+            return false;
+        }
+        const HISTORY_WINDOW_STORAGE_KEY = 'adsbHistoryWindowMinutes';
+        const VALID_HISTORY_WINDOWS = new Set(['15', '60', '360', '1440', '10080']);
+        const historyStatus = document.getElementById('historyStatus');
+        const pruneDateInput = document.getElementById('pruneDateInput');
+        const pruneDayBtn = document.getElementById('pruneDayBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const exportTypeSelect = document.getElementById('exportTypeSelect');
+        const exportFormatSelect = document.getElementById('exportFormatSelect');
+        const exportScopeSelect = document.getElementById('exportScopeSelect');
+        const exportBtn = document.getElementById('exportBtn');
 
         let selectedIcao = '';
         let sessionStartAt = null;
@@ -359,6 +439,197 @@
             return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
 
+        function toLocalDateInputValue(date) {
+            const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+            return localDate.toISOString().slice(0, 10);
+        }
+
+        function setDefaultPruneDate() {
+            if (!pruneDateInput) {
+                return;
+            }
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            pruneDateInput.value = toLocalDateInputValue(yesterday);
+        }
+
+        function setHistoryStatus(text, state = 'neutral') {
+            if (!historyStatus) {
+                return;
+            }
+            historyStatus.textContent = text;
+            historyStatus.classList.remove('ok', 'error');
+            if (state === 'ok') {
+                historyStatus.classList.add('ok');
+            } else if (state === 'error') {
+                historyStatus.classList.add('error');
+            }
+        }
+
+        function setHistoryActionsDisabled(disabled) {
+            if (pruneDateInput) {
+                pruneDateInput.disabled = disabled;
+            }
+            if (pruneDayBtn) {
+                pruneDayBtn.disabled = disabled;
+            }
+            if (clearHistoryBtn) {
+                clearHistoryBtn.disabled = disabled;
+            }
+            if (exportTypeSelect) {
+                exportTypeSelect.disabled = disabled;
+            }
+            if (exportFormatSelect) {
+                exportFormatSelect.disabled = disabled;
+            }
+            if (exportScopeSelect) {
+                exportScopeSelect.disabled = disabled;
+            }
+            if (exportBtn) {
+                exportBtn.disabled = disabled;
+            }
+        }
+
+        function getDownloadFilename(response, fallback) {
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+            if (utfMatch && utfMatch[1]) {
+                try {
+                    return decodeURIComponent(utfMatch[1]);
+                } catch {
+                    return utfMatch[1];
+                }
+            }
+            const plainMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+            if (plainMatch && plainMatch[1]) {
+                return plainMatch[1];
+            }
+            return fallback;
+        }
+
+        async function exportHistoryData() {
+            if (!historyEnabled) {
+                return;
+            }
+            const exportType = exportTypeSelect.value;
+            const exportFormat = exportFormatSelect.value;
+            const exportScope = exportScopeSelect.value;
+            const sinceMinutes = windowSelect.value;
+            const search = searchInput.value.trim();
+
+            const classification = classSelect.value;
+            const params = new URLSearchParams({
+                format: exportFormat,
+                type: exportType,
+                scope: exportScope,
+            });
+            if (exportScope === 'window') {
+                params.set('since_minutes', sinceMinutes);
+            }
+            if (search) {
+                params.set('search', search);
+            }
+            if (classification !== 'all') {
+                params.set('classification', classification);
+            }
+
+            const fallbackName = `adsb_history_${exportType}.${exportFormat}`;
+            const exportUrl = `/adsb/history/export?${params.toString()}`;
+
+            setHistoryActionsDisabled(true);
+            try {
+                const resp = await fetch(exportUrl, { credentials: 'same-origin' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.error || 'Export failed');
+                }
+                const blob = await resp.blob();
+                const filename = getDownloadFilename(resp, fallbackName);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                setHistoryStatus(`Export ready: ${filename}`, 'ok');
+            } catch (error) {
+                setHistoryStatus(`Export failed: ${error.message || 'unknown error'}`, 'error');
+            } finally {
+                setHistoryActionsDisabled(false);
+            }
+        }
+
+        async function pruneHistory(payload, successPrefix) {
+            if (!historyEnabled) {
+                return;
+            }
+            setHistoryActionsDisabled(true);
+            try {
+                const resp = await fetch('/adsb/history/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    throw new Error(data.error || 'Failed to prune history');
+                }
+                const deleted = data.deleted || {};
+                const messagesDeleted = Number(deleted.messages || 0);
+                const snapshotsDeleted = Number(deleted.snapshots || 0);
+                const totalDeleted = Number(data.total_deleted || (messagesDeleted + snapshotsDeleted));
+                setHistoryStatus(
+                    `${successPrefix}: ${formatNumber(totalDeleted)} records removed`,
+                    'ok'
+                );
+                await refreshAll();
+                if (selectedIcao && !recentAircraft.some(row => row.icao === selectedIcao)) {
+                    await selectAircraft('');
+                }
+            } catch (error) {
+                setHistoryStatus(`Cleanup failed: ${error.message || 'unknown error'}`, 'error');
+            } finally {
+                setHistoryActionsDisabled(false);
+            }
+        }
+
+        async function removeSelectedDay() {
+            if (!pruneDateInput || !pruneDateInput.value) {
+                setHistoryStatus('Select a day first', 'error');
+                return;
+            }
+            const dayStartLocal = new Date(`${pruneDateInput.value}T00:00:00`);
+            if (Number.isNaN(dayStartLocal.getTime())) {
+                setHistoryStatus('Invalid day selected', 'error');
+                return;
+            }
+            const dayEndLocal = new Date(dayStartLocal.getTime() + (24 * 60 * 60 * 1000));
+            const dayLabel = dayStartLocal.toLocaleDateString();
+            const confirmed = window.confirm(`Delete ADS-B history for ${dayLabel}? This cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+            await pruneHistory(
+                {
+                    mode: 'range',
+                    start: dayStartLocal.toISOString(),
+                    end: dayEndLocal.toISOString(),
+                },
+                `Removed ${dayLabel}`
+            );
+        }
+
+        async function clearAllHistory() {
+            const confirmed = window.confirm('Delete ALL ADS-B history records? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+            await pruneHistory({ mode: 'all' }, 'All history cleared');
+        }
+
         async function loadSummary() {
             const sinceMinutes = windowSelect.value;
             const resp = await fetch(`/adsb/history/summary?since_minutes=${sinceMinutes}`);
@@ -379,26 +650,45 @@
             const search = encodeURIComponent(searchInput.value.trim());
             const resp = await fetch(`/adsb/history/aircraft?since_minutes=${sinceMinutes}&limit=${limit}&search=${search}`);
             if (!resp.ok) {
-                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">History database unavailable</td></tr>';
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="6">History database unavailable</td></tr>';
                 return;
             }
             const data = await resp.json();
-            const rows = data.aircraft || [];
+            let rows = data.aircraft || [];
+
+            // Tag each row with military classification
+            rows.forEach(row => {
+                row._military = isMilitaryAircraft(row.icao, row.callsign);
+            });
+
+            // Apply classification filter
+            const classFilter = classSelect.value;
+            if (classFilter === 'military') {
+                rows = rows.filter(r => r._military);
+            } else if (classFilter === 'civilian') {
+                rows = rows.filter(r => !r._military);
+            }
+
             recentAircraft = rows;
             aircraftCount.textContent = rows.length;
             if (!rows.length) {
-                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">No aircraft in this window</td></tr>';
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="6">No aircraft in this window</td></tr>';
                 return;
             }
-            aircraftTableBody.innerHTML = rows.map(row => `
-                <tr class="aircraft-row" data-icao="${row.icao}">
+            aircraftTableBody.innerHTML = rows.map(row => {
+                const badge = row._military
+                    ? '<span class="mil-badge">MIL</span>'
+                    : '<span class="civ-badge">CIV</span>';
+                return `
+                <tr class="aircraft-row${row._military ? ' military' : ''}" data-icao="${row.icao}">
                     <td class="mono">${row.icao}</td>
                     <td>${valueOrDash(row.callsign)}</td>
+                    <td>${badge}</td>
                     <td>${valueOrDash(row.altitude)}</td>
                     <td>${valueOrDash(row.speed)}</td>
                     <td>${formatTime(row.last_seen)}</td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
 
             document.querySelectorAll('.aircraft-row').forEach((row, index) => {
                 row.addEventListener('click', () => {
@@ -747,12 +1037,31 @@
         }
 
         refreshBtn.addEventListener('click', refreshAll);
-        windowSelect.addEventListener('change', refreshAll);
+        windowSelect.addEventListener('change', () => {
+            const selectedWindow = windowSelect.value;
+            if (VALID_HISTORY_WINDOWS.has(selectedWindow)) {
+                localStorage.setItem(HISTORY_WINDOW_STORAGE_KEY, selectedWindow);
+            }
+            refreshAll();
+        });
         limitSelect.addEventListener('change', refreshAll);
+        classSelect.addEventListener('change', refreshAll);
         searchInput.addEventListener('input', () => {
             clearTimeout(searchInput._debounce);
             searchInput._debounce = setTimeout(refreshAll, 350);
         });
+        pruneDayBtn.addEventListener('click', removeSelectedDay);
+        clearHistoryBtn.addEventListener('click', clearAllHistory);
+        exportBtn.addEventListener('click', exportHistoryData);
+
+        const savedWindow = localStorage.getItem(HISTORY_WINDOW_STORAGE_KEY);
+        if (savedWindow && VALID_HISTORY_WINDOWS.has(savedWindow)) {
+            windowSelect.value = savedWindow;
+        }
+        setDefaultPruneDate();
+        if (!historyEnabled) {
+            setHistoryActionsDisabled(true);
+        }
 
         refreshAll();
         loadSessionDevices();

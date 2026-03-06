@@ -957,7 +957,8 @@ install_satdump_from_source_debian() {
     ) &
     progress_pid=$!
 
-    if cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DCMAKE_INSTALL_LIBDIR=lib .. >"$build_log" 2>&1 \
+    if cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_CXX_FLAGS="-Wno-template-body" .. >"$build_log" 2>&1 \
         && make -j "$(nproc)" >>"$build_log" 2>&1; then
       kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null
       $SUDO make install >/dev/null 2>&1
@@ -1089,8 +1090,9 @@ install_radiosonde_auto_rx() {
 
 # --- dump1090 (Debian from source) ---
 install_dump1090_from_source_debian() {
-  info "dump1090 not available via APT. Building from source (required)..."
+  info "dump1090 not available via APT. Building from source (this may take a few minutes)..."
 
+  info "Installing build dependencies for dump1090..."
   apt_install build-essential git pkg-config \
     librtlsdr-dev libusb-1.0-0-dev \
     libncurses-dev tcl-dev python3-dev
@@ -1127,6 +1129,7 @@ install_dump1090_from_source_debian() {
     tail -20 "$build_log" | while IFS= read -r line; do warn "  $line"; done
 
     rm -rf "$tmp_dir/dump1090"
+    info "Cloning wiedehopf/readsb..."
     git clone --depth 1 https://github.com/wiedehopf/readsb.git "$tmp_dir/dump1090" >/dev/null 2>&1 \
       || { fail "Failed to clone wiedehopf/readsb"; exit 1; }
 
@@ -1461,6 +1464,7 @@ install_tool_dump1090() {
       $SUDO rm -f "$dump1090_path"
     fi
     if ! cmd_exists dump1090 && ! cmd_exists dump1090-mutability; then
+      info "Checking for dump1090 APT packages..."
       apt_try_install_any dump1090-fa dump1090-mutability dump1090 || true
     fi
     if ! cmd_exists dump1090; then
@@ -1573,7 +1577,18 @@ install_tool_satdump() {
       if [[ "$OS" == "macos" ]]; then
         install_satdump_macos || warn "SatDump installation failed. Weather satellite decoding will not be available."
       else
-        install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+        # Try system package first (available on Ubuntu 24.10+, Debian Trixie+)
+        if apt-cache show satdump >/dev/null 2>&1; then
+          info "SatDump is available as a system package — installing via apt..."
+          if apt_install satdump; then
+            ok "SatDump installed via apt."
+          else
+            warn "apt install failed — falling back to building from source..."
+            install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+          fi
+        else
+          install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+        fi
       fi
     else
       warn "Skipping SatDump installation. You can install it later if needed."

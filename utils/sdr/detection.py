@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
 import subprocess
 import time
 from typing import Optional
+
+from utils.dependencies import get_tool_path
 
 from .base import SDRCapabilities, SDRDevice, SDRType
 
@@ -41,11 +42,6 @@ def _hackrf_probe_blocked() -> bool:
         return get_subghz_manager().active_mode in {'rx', 'decode', 'tx', 'sweep'}
     except Exception:
         return False
-
-
-def _check_tool(name: str) -> bool:
-    """Check if a tool is available in PATH."""
-    return shutil.which(name) is not None
 
 
 def _get_capabilities_for_type(sdr_type: SDRType) -> SDRCapabilities:
@@ -109,7 +105,8 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
     """
     devices: list[SDRDevice] = []
 
-    if not _check_tool('rtl_test'):
+    rtl_test_path = get_tool_path('rtl_test')
+    if not rtl_test_path:
         logger.debug("rtl_test not found, skipping RTL-SDR detection")
         return devices
 
@@ -123,7 +120,7 @@ def detect_rtlsdr_devices() -> list[SDRDevice]:
             current_ld = env.get('DYLD_LIBRARY_PATH', '')
             env['DYLD_LIBRARY_PATH'] = ':'.join(lib_paths + [current_ld] if current_ld else lib_paths)
         result = subprocess.run(
-            ['rtl_test', '-t'],
+            [rtl_test_path, '-t'],
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -180,8 +177,9 @@ def _find_soapy_util() -> str | None:
     """Find SoapySDR utility command (name varies by distribution)."""
     # Try different command names used across distributions
     for cmd in ['SoapySDRUtil', 'soapy_sdr_util', 'soapysdr-util']:
-        if _check_tool(cmd):
-            return cmd
+        tool_path = get_tool_path(cmd)
+        if tool_path:
+            return tool_path
     return None
 
 
@@ -343,14 +341,15 @@ def detect_hackrf_devices() -> list[SDRDevice]:
 
     devices: list[SDRDevice] = []
 
-    if not _check_tool('hackrf_info'):
+    hackrf_info_path = get_tool_path('hackrf_info')
+    if not hackrf_info_path:
         _hackrf_cache = devices
         _hackrf_cache_ts = now
         return devices
 
     try:
         result = subprocess.run(
-            ['hackrf_info'],
+            [hackrf_info_path],
             capture_output=True,
             text=True,
             timeout=5
@@ -359,17 +358,29 @@ def detect_hackrf_devices() -> list[SDRDevice]:
         # Combine stdout + stderr: newer firmware may print to stderr,
         # and hackrf_info may exit non-zero when device is briefly busy
         # but still output valid info.
-        output = result.stdout + result.stderr
+        output = f"{result.stdout or ''}\n{result.stderr or ''}"
 
         # Parse hackrf_info output
         # Extract board name from "Board ID Number: X (Name)" and serial
         from .hackrf import HackRFCommandBuilder
 
-        serial_pattern = r'Serial number:\s*(\S+)'
-        board_pattern = r'Board ID Number:\s*\d+\s*\(([^)]+)\)'
+        serial_pattern = re.compile(
+            r'^\s*Serial\s+number:\s*(.+)$',
+            re.IGNORECASE | re.MULTILINE,
+        )
+        board_pattern = re.compile(
+            r'Board\s+ID\s+Number:\s*\d+\s*\(([^)]+)\)',
+            re.IGNORECASE,
+        )
 
-        serials_found = re.findall(serial_pattern, output)
-        boards_found = re.findall(board_pattern, output)
+        serials_found = []
+        for raw in serial_pattern.findall(output):
+            # Normalise legacy formats like "0x1234 5678" to plain hex.
+            serial = re.sub(r'0x', '', raw, flags=re.IGNORECASE)
+            serial = re.sub(r'[^0-9A-Fa-f]', '', serial)
+            if serial:
+                serials_found.append(serial)
+        boards_found = board_pattern.findall(output)
 
         for i, serial in enumerate(serials_found):
             board_name = boards_found[i] if i < len(boards_found) else 'HackRF'
@@ -383,8 +394,8 @@ def detect_hackrf_devices() -> list[SDRDevice]:
             ))
 
         # Fallback: check if any HackRF found without serial
-        if not devices and 'Found HackRF' in output:
-            board_match = re.search(board_pattern, output)
+        if not devices and re.search(r'Found\s+HackRF', output, re.IGNORECASE):
+            board_match = board_pattern.search(output)
             board_name = board_match.group(1) if board_match else 'HackRF'
             devices.append(SDRDevice(
                 sdr_type=SDRType.HACKRF,
@@ -417,7 +428,8 @@ def probe_rtlsdr_device(device_index: int) -> str | None:
         An error message string if the device cannot be opened,
         or ``None`` if the device is available.
     """
-    if not _check_tool('rtl_test'):
+    rtl_test_path = get_tool_path('rtl_test')
+    if not rtl_test_path:
         # Can't probe without rtl_test — let the caller proceed and
         # surface errors from the actual decoder process instead.
         return None
@@ -438,7 +450,7 @@ def probe_rtlsdr_device(device_index: int) -> str | None:
         # rtl_test prints device info to stderr quickly, then keeps running
         # its test loop. We kill it as soon as we see success or failure.
         proc = subprocess.Popen(
-            ['rtl_test', '-d', str(device_index), '-t'],
+            [rtl_test_path, '-d', str(device_index), '-t'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
