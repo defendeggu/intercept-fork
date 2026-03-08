@@ -3652,10 +3652,12 @@ sudo make install</code>
 
         async function startAirband() {
             const frequency = getAirbandFrequency();
-            const device = parseInt(document.getElementById('airbandDeviceSelect').value) || 0;
+            const compositeVal = document.getElementById('airbandDeviceSelect').value || 'rtlsdr:0';
+            const [sdr_type, deviceIdx] = compositeVal.includes(':') ? compositeVal.split(':') : ['rtlsdr', compositeVal];
+            const device = parseInt(deviceIdx) || 0;
             const squelch = parseInt(document.getElementById('airbandSquelch').value) || 0;
 
-            console.log('[AIRBAND] Starting with device:', device, 'freq:', frequency, 'squelch:', squelch);
+            console.log('[AIRBAND] Starting with device:', device, 'sdr_type:', sdr_type, 'freq:', frequency, 'squelch:', squelch);
 
             // Check if ADS-B tracking is using this device
             if (isTracking && adsbActiveDevice !== null && device === adsbActiveDevice) {
@@ -3682,7 +3684,8 @@ sudo make install</code>
                         modulation: 'am',  // Airband uses AM
                         squelch: squelch,
                         gain: 40,
-                        device: device
+                        device: device,
+                        sdr_type: sdr_type
                     })
                 });
 

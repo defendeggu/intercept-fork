@@ -86,7 +86,8 @@
             morse: "{{ url_for('static', filename='css/modes/morse.css') }}",
             radiosonde: "{{ url_for('static', filename='css/modes/radiosonde.css') }}",
             meteor: "{{ url_for('static', filename='css/modes/meteor.css') }}",
-            system: "{{ url_for('static', filename='css/modes/system.css') }}"
+            system: "{{ url_for('static', filename='css/modes/system.css') }}",
+            ook: "{{ url_for('static', filename='css/modes/ook.css') }}"
         };
         window.INTERCEPT_MODE_STYLE_LOADED = {};
         window.INTERCEPT_MODE_STYLE_PROMISES = {};
@@ -286,6 +287,10 @@
                             <button class="mode-card mode-card-sm" onclick="selectMode('morse')">
                                 <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="5" y2="12"/><line x1="7" y1="12" x2="13" y2="12"/><line x1="15" y1="12" x2="18" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg></span>
                                 <span class="mode-name">Morse</span>
+                            </button>
+                            <button class="mode-card mode-card-sm" onclick="selectMode('ook')">
+                                <span class="mode-icon icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3"/><path d="M19 12h3"/><rect x="5" y="8" width="4" height="8" rx="1"/><rect x="10" y="9" width="4" height="6" rx="1"/><rect x="15" y="7" width="4" height="10" rx="1"/></svg></span>
+                                <span class="mode-name">OOK Decoder</span>
                             </button>
                         </div>
                     </div>
@@ -696,6 +701,8 @@
                 {% include 'partials/modes/wefax.html' %}
 
                 {% include 'partials/modes/morse.html' %}
+
+                {% include 'partials/modes/ook.html' %}
 
                 {% include 'partials/modes/space-weather.html' %}
 
@@ -3285,6 +3292,36 @@
                     </div>
                 </div>
 
+                <!-- OOK Decoder Output Panel -->
+                <div id="ookOutputPanel" style="display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; padding: 10px;">
+                    <div style="background: #0a0a0a; border: 1px solid #1a2e1a; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; height: 100%; min-height: 0;">
+                        <!-- Toolbar row 1: bit order -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px;">
+                            <span>Decoded Frames <span id="ookStatusBarFrames" style="color: var(--text-dim);">0 frames</span></span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <span style="color: var(--text-dim); font-size: 10px;">Bit order:</span>
+                                <button class="btn btn-sm btn-ghost" id="ookBitMSB"
+                                        onclick="OokMode.setBitOrder('msb')"
+                                        style="background: var(--accent); color: #000;">MSB</button>
+                                <button class="btn btn-sm btn-ghost" id="ookBitLSB"
+                                        onclick="OokMode.setBitOrder('lsb')">LSB</button>
+                                <button class="btn btn-sm btn-ghost" onclick="OokMode.suggestBitOrder()"
+                                        title="Auto-detect best bit order from printable character count">
+                                    Suggest <span id="ookSuggestLabel" style="font-size:9px; margin-left:2px;"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Toolbar row 2: pattern filter -->
+                        <div style="margin-bottom: 6px;">
+                            <input type="text" id="ookPatternFilter"
+                                   placeholder="Filter hex or ASCII..."
+                                   oninput="OokMode.filterFrames(this.value)"
+                                   style="width: 100%; background: #111; border: 1px solid #222; border-radius: 3px; color: var(--text-dim); font-family: var(--font-mono); font-size: 10px; padding: 3px 6px; box-sizing: border-box;">
+                        </div>
+                        <div id="ookOutput" style="flex: 1; min-height: 0; overflow-y: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);"></div>
+                    </div>
+                </div>
+
                 <div class="output-content signal-feed" id="output">
                     <div class="placeholder signal-empty-state">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -3356,6 +3393,7 @@
     <script src="{{ url_for('static', filename='js/modes/bt_locate.js') }}?v={{ version }}&r=btlocate4"></script>
     <script src="{{ url_for('static', filename='js/modes/wefax.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/morse.js') }}?v={{ version }}&r=morse_iq12"></script>
+    <script src="{{ url_for('static', filename='js/modes/ook.js') }}?v={{ version }}&r=ook2"></script>
     <script src="{{ url_for('static', filename='js/modes/space-weather.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/system.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modes/meteor.js') }}"></script>
@@ -3515,6 +3553,7 @@
             waterfall: { label: 'Waterfall', indicator: 'WATERFALL', outputTitle: 'Spectrum Waterfall', group: 'signals' },
             morse: { label: 'Morse', indicator: 'MORSE', outputTitle: 'CW/Morse Decoder', group: 'signals' },
             system: { label: 'System', indicator: 'SYSTEM', outputTitle: 'System Health Monitor', group: 'system' },
+            ook: { label: 'OOK Decoder', indicator: 'OOK', outputTitle: 'OOK Signal Decoder', group: 'signals' },
         };
         const validModes = new Set(Object.keys(modeCatalog));
         window.interceptModeCatalog = Object.assign({}, modeCatalog);
@@ -4069,6 +4108,7 @@
                 vdl2: () => { if (vdl2MainEventSource) { vdl2MainEventSource.close(); vdl2MainEventSource = null; } },
                 radiosonde: () => { if (radiosondeEventSource) { radiosondeEventSource.close(); radiosondeEventSource = null; } },
                 meteor: () => typeof MeteorScatter !== 'undefined' && MeteorScatter.destroy?.(),
+                ook: () => typeof OokMode !== 'undefined' && OokMode.destroy?.(),
             };
             return moduleDestroyMap[mode] || null;
         }
@@ -4363,6 +4403,7 @@
             document.getElementById('morseMode')?.classList.toggle('active', mode === 'morse');
             document.getElementById('meteorMode')?.classList.toggle('active', mode === 'meteor');
             document.getElementById('systemMode')?.classList.toggle('active', mode === 'system');
+            document.getElementById('ookMode')?.classList.toggle('active', mode === 'ook');
 
 
             const pagerStats = document.getElementById('pagerStats');
@@ -4462,6 +4503,8 @@
             if (morseOutputPanel && mode !== 'morse') morseOutputPanel.style.display = 'none';
             const morseDiagLog = document.getElementById('morseDiagLog');
             if (morseDiagLog && mode !== 'morse') morseDiagLog.style.display = 'none';
+            const ookOutputPanel = document.getElementById('ookOutputPanel');
+            if (ookOutputPanel && mode !== 'ook') ookOutputPanel.style.display = 'none';
 
             // Update output panel title based on mode
             const outputTitle = document.getElementById('outputTitle');
@@ -4503,16 +4546,17 @@
             // Show RTL-SDR device section for modes that use it
             const rtlDeviceSection = document.getElementById('rtlDeviceSection');
             if (rtlDeviceSection) {
-                rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'morse' || mode === 'radiosonde' || mode === 'meteor') ? 'block' : 'none';
+                rtlDeviceSection.style.display = (mode === 'pager' || mode === 'sensor' || mode === 'rtlamr' || mode === 'aprs' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'morse' || mode === 'radiosonde' || mode === 'meteor' || mode === 'ook') ? 'block' : 'none';
                 // Save original sidebar position of SDR device section (once)
                 if (!rtlDeviceSection._origParent) {
                     rtlDeviceSection._origParent = rtlDeviceSection.parentNode;
                     rtlDeviceSection._origNext = rtlDeviceSection.nextElementSibling;
                 }
-                // For morse/radiosonde/meteor modes, move SDR device section inside the panel after the title
+                // For morse/radiosonde/meteor/ook modes, move SDR device section inside the panel after the title
                 const morsePanel = document.getElementById('morseMode');
                 const radiosondePanel = document.getElementById('radiosondeMode');
                 const meteorPanel = document.getElementById('meteorMode');
+                const ookPanel = document.getElementById('ookMode');
                 if (mode === 'morse' && morsePanel) {
                     const firstSection = morsePanel.querySelector('.section');
                     if (firstSection) firstSection.after(rtlDeviceSection);
@@ -4521,6 +4565,9 @@
                     if (firstSection) firstSection.after(rtlDeviceSection);
                 } else if (mode === 'meteor' && meteorPanel) {
                     const firstSection = meteorPanel.querySelector('.section');
+                    if (firstSection) firstSection.after(rtlDeviceSection);
+                } else if (mode === 'ook' && ookPanel) {
+                    const firstSection = ookPanel.querySelector('.section');
                     if (firstSection) firstSection.after(rtlDeviceSection);
                 } else if (rtlDeviceSection._origParent && rtlDeviceSection.parentNode !== rtlDeviceSection._origParent) {
                     // Restore to original sidebar position when leaving morse mode
@@ -4541,7 +4588,7 @@
             // Hide output console for modes with their own visualizations
             const outputEl = document.getElementById('output');
             const statusBar = document.querySelector('.status-bar');
-            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'bt_locate' || mode === 'waterfall' || mode === 'morse' || mode === 'meteor' || mode === 'system') ? 'none' : 'block';
+            if (outputEl) outputEl.style.display = (mode === 'satellite' || mode === 'sstv' || mode === 'weathersat' || mode === 'sstv_general' || mode === 'wefax' || mode === 'aprs' || mode === 'wifi' || mode === 'bluetooth' || mode === 'tscm' || mode === 'spystations' || mode === 'meshtastic' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'bt_locate' || mode === 'waterfall' || mode === 'morse' || mode === 'meteor' || mode === 'system' || mode === 'ook') ? 'none' : 'block';
             if (statusBar) statusBar.style.display = (mode === 'satellite' || mode === 'websdr' || mode === 'subghz' || mode === 'spaceweather' || mode === 'waterfall' || mode === 'morse' || mode === 'meteor' || mode === 'system') ? 'none' : 'flex';
 
             // Restore sidebar when leaving Meshtastic mode (user may have collapsed it)
@@ -4626,6 +4673,8 @@
                 MeteorScatter.init();
             } else if (mode === 'system') {
                 SystemHealth.init();
+            } else if (mode === 'ook') {
+                OokMode.init();
             }
 
             // Waterfall destroy is now handled by moduleDestroyMap above.
@@ -5639,6 +5688,7 @@
         let allMessages = [];
 
         function exportCSV() {
+            if (currentMode === 'ook') { OokMode.exportLog(); return; }
             if (allMessages.length === 0) {
                 alert('No messages to export');
                 return;
@@ -5660,6 +5710,7 @@
         }
 
         function exportJSON() {
+            if (currentMode === 'ook') { OokMode.exportJSON(); return; }
             if (allMessages.length === 0) {
                 alert('No messages to export');
                 return;
@@ -6845,6 +6896,7 @@
         }
 
         function clearMessages() {
+            if (currentMode === 'ook') { OokMode.clearOutput(); return; }
             document.getElementById('output').innerHTML = `
                 <div class="placeholder" style="color: #888; text-align: center; padding: 50px;">
                     Messages cleared. ${isRunning || isSensorRunning ? 'Waiting for new messages...' : 'Start decoding to receive messages.'}
@@ -13051,7 +13103,7 @@
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             `;
 
-            // Add "Listen" button for RF signals
+            // Add "Listen" and "Decode (OOK)" buttons for RF signals
             if (protocol === 'rf' && device.frequency) {
                 const freq = device.frequency;
                 html += `
@@ -13060,6 +13112,10 @@
                         </button>
                         <button class="tscm-action-btn" onclick="listenToRfSignal(${freq}, 'am')">
                             Listen (AM)
+                        </button>
+                        <button class="tscm-action-btn" onclick="decodeWithOok(${freq})"
+                                title="Open OOK decoder tuned to this frequency">
+                            Decode (OOK)
                         </button>
                 `;
             }
@@ -13074,7 +13130,7 @@
                         </button>
                     </div>
                     <div style="font-size: 10px; color: var(--text-secondary); margin-top: 8px;">
-                        ${protocol === 'rf' ? 'Listen buttons open Spectrum Waterfall. ' : ''}Known devices are excluded from threat scoring in future sweeps.
+                        ${protocol === 'rf' ? 'Listen opens Spectrum Waterfall. Decode (OOK) opens the OOK decoder tuned to this frequency. ' : ''}Known devices are excluded from threat scoring in future sweeps.
                     </div>
                 </div>
             `;
@@ -13866,6 +13922,17 @@
                         freqInput.value = frequency.toFixed(4);
                     }
                     alert(`Tune to ${frequency.toFixed(3)} MHz (${modulation.toUpperCase()}) to listen`);
+                }
+            }, 300);
+        }
+
+        function decodeWithOok(frequency) {
+            // Close the TSCM modal and switch to OOK decoder with the detected frequency pre-filled
+            closeTscmDeviceModal();
+            switchMode('ook');
+            setTimeout(function () {
+                if (typeof OokMode !== 'undefined' && typeof OokMode.setFreq === 'function') {
+                    OokMode.setFreq(parseFloat(frequency).toFixed(3));
                 }
             }, 300);
         }

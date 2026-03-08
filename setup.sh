@@ -1577,7 +1577,18 @@ install_tool_satdump() {
       if [[ "$OS" == "macos" ]]; then
         install_satdump_macos || warn "SatDump installation failed. Weather satellite decoding will not be available."
       else
-        install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+        # Try system package first (available on Ubuntu 24.10+, Debian Trixie+)
+        if apt-cache show satdump >/dev/null 2>&1; then
+          info "SatDump is available as a system package — installing via apt..."
+          if apt_install satdump; then
+            ok "SatDump installed via apt."
+          else
+            warn "apt install failed — falling back to building from source..."
+            install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+          fi
+        else
+          install_satdump_from_source_debian || warn "SatDump build failed. Weather satellite decoding will not be available."
+        fi
       fi
     else
       warn "Skipping SatDump installation. You can install it later if needed."

@@ -18,6 +18,7 @@ def register_blueprints(app):
     from .meshtastic import meshtastic_bp
     from .meteor_websocket import meteor_bp
     from .morse import morse_bp
+    from .ook import ook_bp
     from .offline import offline_bp
     from .pager import pager_bp
     from .radiosonde import radiosonde_bp
@@ -81,6 +82,7 @@ def register_blueprints(app):
     app.register_blueprint(morse_bp)  # CW/Morse code decoder
     app.register_blueprint(radiosonde_bp)  # Radiosonde weather balloon tracking
     app.register_blueprint(system_bp)  # System health monitoring
+    app.register_blueprint(ook_bp)  # Generic OOK signal decoder
 
     # Initialize TSCM state with queue and lock from app
     import app as app_module

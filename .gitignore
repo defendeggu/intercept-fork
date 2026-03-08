@@ -64,3 +64,6 @@ data/subghz/captures/
 .env
 .env.*
 !.env.example
+
+# Local utility scripts
+reset-sdr.*

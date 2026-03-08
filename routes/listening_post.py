@@ -1311,9 +1311,9 @@ def start_audio() -> Response:
     try:
         frequency = float(data.get('frequency', 0))
         modulation = normalize_modulation(data.get('modulation', 'wfm'))
-        squelch = int(data.get('squelch') or 0)
-        gain = int(data.get('gain') or 40)
-        device = int(data.get('device') or 0)
+        squelch = int(data['squelch']) if data.get('squelch') is not None else 0
+        gain = int(data['gain']) if data.get('gain') is not None else 40
+        device = int(data['device']) if data.get('device') is not None else 0
         sdr_type = str(data.get('sdr_type', 'rtlsdr')).lower()
         request_token_raw = data.get('request_token')
         request_token = int(request_token_raw) if request_token_raw is not None else None

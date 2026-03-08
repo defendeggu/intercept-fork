@@ -1,0 +1,110 @@
+/* OOK Signal Decoder Styles */
+
+.ook-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.ook-preset-add {
+    margin-top: 6px;
+    display: flex;
+    gap: 4px;
+}
+
+.ook-preset-add input {
+    width: 80px;
+    background: var(--bg-tertiary, #111);
+    border: 1px solid var(--border-color, #222);
+    border-radius: 3px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 3px 6px;
+}
+
+.ook-preset-hint {
+    font-size: 9px;
+    color: var(--text-muted, #555);
+}
+
+.ook-encoding-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.ook-encoding-btns .preset-btn {
+    flex: 1;
+}
+
+.ook-timing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.ook-timing-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ook-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.ook-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+}
+
+.ook-warning {
+    font-size: 11px;
+    color: #ffaa00;
+    line-height: 1.5;
+}
+
+.ook-command-display {
+    display: none;
+    margin-top: 8px;
+}
+
+.ook-command-label {
+    font-size: 10px;
+    color: var(--text-muted, #555);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.ook-command-text {
+    margin: 0;
+    padding: 6px 8px;
+    background: var(--bg-deep, #0a0a0a);
+    border: 1px solid var(--border-color, #1a2e1a);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.ook-dedup-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.ook-dedup-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}

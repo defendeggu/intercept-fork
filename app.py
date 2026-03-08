@@ -213,6 +213,11 @@ meteor_process = None
 meteor_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 meteor_lock = threading.Lock()
 
+# Generic OOK signal decoder
+ook_process = None
+ook_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+ook_lock = threading.Lock()
+
 # Deauth Attack Detection
 deauth_detector = None
 deauth_detector_queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
@@ -827,7 +832,7 @@ def health_check() -> Response:
 def kill_all() -> Response:
     """Kill all decoder, WiFi, and Bluetooth processes."""
     global current_process, sensor_process, wifi_process, adsb_process, ais_process, acars_process
-    global vdl2_process, morse_process, radiosonde_process
+    global vdl2_process, morse_process, radiosonde_process, ook_process
     global aprs_process, aprs_rtl_process, dsc_process, dsc_rtl_process, bt_process
 
     # Import modules to reset their state
@@ -890,6 +895,17 @@ def kill_all() -> Response:
     # Reset Morse state
     with morse_lock:
         morse_process = None
+
+    # Reset OOK state (full cleanup: parser thread, pipes, SDR release)
+    with ook_lock:
+        try:
+            from routes.ook import cleanup_ook
+            cleanup_ook(emit_status=False)
+        except Exception:
+            if ook_process:
+                safe_terminate(ook_process)
+                unregister_process(ook_process)
+            ook_process = None
 
     # Reset APRS state
     with aprs_lock:

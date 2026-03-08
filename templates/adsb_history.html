@@ -98,6 +98,14 @@
                 <input type="text" id="searchInput" placeholder="ICAO / callsign / registration">
             </div>
             <div class="control-group">
+                <label for="classSelect">Classification</label>
+                <select id="classSelect">
+                    <option value="all">All Aircraft</option>
+                    <option value="military">Military</option>
+                    <option value="civilian">Civilian</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <label for="limitSelect">Limit</label>
                 <select id="limitSelect">
                     <option value="100">100</option>
@@ -156,6 +164,7 @@
                             <tr>
                                 <th>ICAO</th>
                                 <th>Callsign</th>
+                                <th>Class</th>
                                 <th>Alt</th>
                                 <th>Speed</th>
                                 <th>Last Seen</th>
@@ -163,7 +172,7 @@
                         </thead>
                         <tbody id="aircraftTableBody">
                             <tr class="empty-row">
-                                <td colspan="5">No aircraft in this window</td>
+                                <td colspan="6">No aircraft in this window</td>
                             </tr>
                         </tbody>
                     </table>
@@ -313,6 +322,39 @@
         const windowSelect = document.getElementById('windowSelect');
         const searchInput = document.getElementById('searchInput');
         const limitSelect = document.getElementById('limitSelect');
+        const classSelect = document.getElementById('classSelect');
+
+        const MILITARY_RANGES = [
+            { start: 0xADF7C0, end: 0xADFFFF },
+            { start: 0xAE0000, end: 0xAEFFFF },
+            { start: 0x3F4000, end: 0x3F7FFF },
+            { start: 0x43C000, end: 0x43CFFF },
+            { start: 0x3D0000, end: 0x3DFFFF },
+            { start: 0x501C00, end: 0x501FFF },
+        ];
+
+        const MILITARY_PREFIXES = [
+            'REACH', 'JAKE', 'DOOM', 'IRON', 'HAWK', 'VIPER', 'COBRA', 'THUNDER',
+            'SHADOW', 'NIGHT', 'STEEL', 'GRIM', 'REAPER', 'BLADE', 'STRIKE',
+            'RCH', 'CNV', 'MCH', 'EVAC', 'TOPCAT', 'ASCOT', 'RRR', 'HRK',
+            'NAVY', 'ARMY', 'USAF', 'RAF', 'RCAF', 'RAAF', 'IAF', 'PAF'
+        ];
+
+        function isMilitaryAircraft(icao, callsign) {
+            if (icao) {
+                const hex = parseInt(icao, 16);
+                for (const range of MILITARY_RANGES) {
+                    if (hex >= range.start && hex <= range.end) return true;
+                }
+            }
+            if (callsign) {
+                const upper = callsign.toUpperCase().trim();
+                for (const prefix of MILITARY_PREFIXES) {
+                    if (upper.startsWith(prefix)) return true;
+                }
+            }
+            return false;
+        }
         const HISTORY_WINDOW_STORAGE_KEY = 'adsbHistoryWindowMinutes';
         const VALID_HISTORY_WINDOWS = new Set(['15', '60', '360', '1440', '10080']);
         const historyStatus = document.getElementById('historyStatus');
@@ -475,6 +517,7 @@
             const sinceMinutes = windowSelect.value;
             const search = searchInput.value.trim();
 
+            const classification = classSelect.value;
             const params = new URLSearchParams({
                 format: exportFormat,
                 type: exportType,
@@ -485,6 +528,9 @@
             }
             if (search) {
                 params.set('search', search);
+            }
+            if (classification !== 'all') {
+                params.set('classification', classification);
             }
 
             const fallbackName = `adsb_history_${exportType}.${exportFormat}`;
@@ -604,26 +650,45 @@
             const search = encodeURIComponent(searchInput.value.trim());
             const resp = await fetch(`/adsb/history/aircraft?since_minutes=${sinceMinutes}&limit=${limit}&search=${search}`);
             if (!resp.ok) {
-                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">History database unavailable</td></tr>';
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="6">History database unavailable</td></tr>';
                 return;
             }
             const data = await resp.json();
-            const rows = data.aircraft || [];
+            let rows = data.aircraft || [];
+
+            // Tag each row with military classification
+            rows.forEach(row => {
+                row._military = isMilitaryAircraft(row.icao, row.callsign);
+            });
+
+            // Apply classification filter
+            const classFilter = classSelect.value;
+            if (classFilter === 'military') {
+                rows = rows.filter(r => r._military);
+            } else if (classFilter === 'civilian') {
+                rows = rows.filter(r => !r._military);
+            }
+
             recentAircraft = rows;
             aircraftCount.textContent = rows.length;
             if (!rows.length) {
-                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">No aircraft in this window</td></tr>';
+                aircraftTableBody.innerHTML = '<tr class="empty-row"><td colspan="6">No aircraft in this window</td></tr>';
                 return;
             }
-            aircraftTableBody.innerHTML = rows.map(row => `
-                <tr class="aircraft-row" data-icao="${row.icao}">
+            aircraftTableBody.innerHTML = rows.map(row => {
+                const badge = row._military
+                    ? '<span class="mil-badge">MIL</span>'
+                    : '<span class="civ-badge">CIV</span>';
+                return `
+                <tr class="aircraft-row${row._military ? ' military' : ''}" data-icao="${row.icao}">
                     <td class="mono">${row.icao}</td>
                     <td>${valueOrDash(row.callsign)}</td>
+                    <td>${badge}</td>
                     <td>${valueOrDash(row.altitude)}</td>
                     <td>${valueOrDash(row.speed)}</td>
                     <td>${formatTime(row.last_seen)}</td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
 
             document.querySelectorAll('.aircraft-row').forEach((row, index) => {
                 row.addEventListener('click', () => {
@@ -980,6 +1045,7 @@
             refreshAll();
         });
         limitSelect.addEventListener('change', refreshAll);
+        classSelect.addEventListener('change', refreshAll);
         searchInput.addEventListener('input', () => {
             clearTimeout(searchInput._debounce);
             searchInput._debounce = setTimeout(refreshAll, 350);

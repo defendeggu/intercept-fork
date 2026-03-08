@@ -197,6 +197,40 @@ def _ensure_history_schema() -> None:
         logger.warning("ADS-B schema check failed: %s", exc)
 
 
+MILITARY_ICAO_RANGES = [
+    (0xADF7C0, 0xADFFFF),  # US
+    (0xAE0000, 0xAEFFFF),  # US
+    (0x3F4000, 0x3F7FFF),  # FR
+    (0x43C000, 0x43CFFF),  # UK
+    (0x3D0000, 0x3DFFFF),  # DE
+    (0x501C00, 0x501FFF),  # NATO
+]
+
+MILITARY_CALLSIGN_PREFIXES = (
+    'REACH', 'JAKE', 'DOOM', 'IRON', 'HAWK', 'VIPER', 'COBRA', 'THUNDER',
+    'SHADOW', 'NIGHT', 'STEEL', 'GRIM', 'REAPER', 'BLADE', 'STRIKE',
+    'RCH', 'CNV', 'MCH', 'EVAC', 'TOPCAT', 'ASCOT', 'RRR', 'HRK',
+    'NAVY', 'ARMY', 'USAF', 'RAF', 'RCAF', 'RAAF', 'IAF', 'PAF',
+)
+
+
+def _is_military_aircraft(icao: str, callsign: str | None) -> bool:
+    """Return True if the ICAO hex or callsign indicates a military aircraft."""
+    try:
+        hex_val = int(icao, 16)
+        for start, end in MILITARY_ICAO_RANGES:
+            if start <= hex_val <= end:
+                return True
+    except (ValueError, TypeError):
+        pass
+    if callsign:
+        upper = callsign.upper().strip()
+        for prefix in MILITARY_CALLSIGN_PREFIXES:
+            if upper.startswith(prefix):
+                return True
+    return False
+
+
 def _parse_int_param(value: str | None, default: int, min_value: int | None = None, max_value: int | None = None) -> int:
     try:
         parsed = int(value) if value is not None else default
@@ -277,6 +311,7 @@ def _build_export_csv(
     since_minutes: int | None,
     icao: str,
     search: str,
+    classification: str,
     messages: list[dict[str, Any]],
     snapshots: list[dict[str, Any]],
     sessions: list[dict[str, Any]],
@@ -293,6 +328,8 @@ def _build_export_csv(
         writer.writerow(['ICAO Filter', icao])
     if search:
         writer.writerow(['Search Filter', search])
+    if classification != 'all':
+        writer.writerow(['Classification', classification])
     writer.writerow([])
 
     def write_section(title: str, rows: list[dict[str, Any]], columns: list[str]) -> None:
@@ -1356,11 +1393,27 @@ def adsb_history_export():
     scope, since_minutes, start, end = _parse_export_scope(request.args)
     icao = (request.args.get('icao') or '').strip().upper()
     search = (request.args.get('search') or '').strip()
+    classification = str(request.args.get('classification') or 'all').strip().lower()
+    if classification not in {'all', 'military', 'civilian'}:
+        classification = 'all'
     pattern = f'%{search}%'
 
     snapshots: list[dict[str, Any]] = []
     messages: list[dict[str, Any]] = []
     sessions: list[dict[str, Any]] = []
+
+    def _filter_by_classification(
+        rows: list[dict[str, Any]],
+        icao_key: str = 'icao',
+        callsign_key: str = 'callsign',
+    ) -> list[dict[str, Any]]:
+        if classification == 'all':
+            return rows
+        want_military = classification == 'military'
+        return [
+            r for r in rows
+            if _is_military_aircraft(r.get(icao_key, ''), r.get(callsign_key)) == want_military
+        ]
 
     try:
         with _get_history_connection() as conn:
@@ -1393,7 +1446,7 @@ def adsb_history_export():
                         snapshot_sql += " WHERE " + " AND ".join(snapshot_where)
                     snapshot_sql += " ORDER BY captured_at DESC"
                     cur.execute(snapshot_sql, tuple(snapshot_params))
-                    snapshots = cur.fetchall()
+                    snapshots = _filter_by_classification(cur.fetchall())
 
                 if export_type in {'messages', 'all'}:
                     message_where: list[str] = []
@@ -1424,7 +1477,7 @@ def adsb_history_export():
                         message_sql += " WHERE " + " AND ".join(message_where)
                     message_sql += " ORDER BY received_at DESC"
                     cur.execute(message_sql, tuple(message_params))
-                    messages = cur.fetchall()
+                    messages = _filter_by_classification(cur.fetchall())
 
                 if export_type in {'sessions', 'all'}:
                     session_where: list[str] = []
@@ -1465,6 +1518,7 @@ def adsb_history_export():
             'filters': {
                 'icao': icao or None,
                 'search': search or None,
+                'classification': classification,
                 'start': start.isoformat() if start else None,
                 'end': end.isoformat() if end else None,
             },
@@ -1490,6 +1544,7 @@ def adsb_history_export():
         since_minutes=since_minutes if scope == 'window' else None,
         icao=icao,
         search=search,
+        classification=classification,
         messages=messages,
         snapshots=snapshots,
         sessions=sessions,
