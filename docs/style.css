@@ -86,6 +86,21 @@ body {
     letter-spacing: 2px;
 }
 
+/* Branded "i" — inline SVG glyph matching the app logo */
+.brand-i {
+    display: inline-block;
+    width: 0.55em;
+    height: 0.9em;
+    vertical-align: baseline;
+    position: relative;
+    top: 0.05em;
+}
+.brand-i svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .nav-links {
     display: flex;
     align-items: center;
