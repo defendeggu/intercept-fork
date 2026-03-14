@@ -7,15 +7,15 @@ import os
 import sys
 
 # Application version
-VERSION = "2.26.10"
+VERSION = "2.26.11"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
     {
-        "version": "2.26.10",
+        "version": "2.26.11",
         "date": "March 2026",
         "highlights": [
-            "Fix APRS stop timeout and inverted SDR device status",
+            "APRS map now centres on configured observer position from .env",
         ]
     },
     {

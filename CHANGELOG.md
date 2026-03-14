@@ -2,6 +2,13 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.26.11] - 2026-03-14
+
+### Fixed
+- **APRS map ignores configured observer position** — The APRS map always fell back to the centre of the US (39.8°N, 98.6°W) when no live GPS fix was available, ignoring the observer position configured in `.env` (`INTERCEPT_DEFAULT_LAT` / `INTERCEPT_DEFAULT_LON`). Now seeds the APRS user location from the shared observer location on page load, so the map centres correctly and distance calculations work. (#193)
+
+---
+
 ## [2.26.10] - 2026-03-14
 
 ### Fixed

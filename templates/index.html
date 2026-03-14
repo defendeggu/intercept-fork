@@ -9849,8 +9849,28 @@
         let aprsMeterCheckInterval = null;
         const APRS_METER_TIMEOUT = 5000; // 5 seconds for "no signal" state
 
-        // APRS user location (from GPS)
+        // APRS user location (from GPS or shared observer location)
         let aprsUserLocation = { lat: null, lon: null };
+
+        // Seed from configured observer location so the map centres on the
+        // user's position even without a live GPS fix.
+        (function _seedAprsLocation() {
+            if (typeof ObserverLocation !== 'undefined' && ObserverLocation.getShared) {
+                const shared = ObserverLocation.getShared();
+                if (shared && shared.lat && shared.lon) {
+                    aprsUserLocation.lat = shared.lat;
+                    aprsUserLocation.lon = shared.lon;
+                    return;
+                }
+            }
+            // Fallback: read the Jinja-injected defaults directly
+            const lat = window.INTERCEPT_DEFAULT_LAT;
+            const lon = window.INTERCEPT_DEFAULT_LON;
+            if (lat && lon && Number.isFinite(lat) && Number.isFinite(lon)) {
+                aprsUserLocation.lat = lat;
+                aprsUserLocation.lon = lon;
+            }
+        })();
         let aprsUserMarker = null;
 
         // Calculate distance in miles using Haversine formula
