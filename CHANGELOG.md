@@ -2,6 +2,13 @@
 
 All notable changes to iNTERCEPT will be documented in this file.
 
+## [2.26.3] - 2026-03-13
+
+### Fixed
+- **SatDump AVX2 crash** — SatDump now compiles with `-march=x86-64` on x86_64 platforms (Docker and `setup.sh`), preventing "Illegal instruction" crashes on CPUs without AVX2. SIMD plugins still use runtime detection for acceleration on capable hardware. (#185)
+
+---
+
 ## [2.26.2] - 2026-03-13
 
 ### Fixed

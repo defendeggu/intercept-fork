@@ -7,10 +7,17 @@ import os
 import sys
 
 # Application version
-VERSION = "2.26.2"
+VERSION = "2.26.3"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.26.3",
+        "date": "March 2026",
+        "highlights": [
+            "Fix SatDump AVX2 crash on older CPUs — build now targets baseline x86-64",
+        ]
+    },
     {
         "version": "2.26.2",
         "date": "March 2026",
