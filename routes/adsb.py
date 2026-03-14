@@ -40,6 +40,8 @@ from config import (
     ADSB_DB_PORT,
     ADSB_DB_USER,
     ADSB_HISTORY_ENABLED,
+    DEFAULT_LATITUDE,
+    DEFAULT_LONGITUDE,
     SHARED_OBSERVER_LOCATION_ENABLED,
 )
 from utils import aircraft_db
@@ -1197,6 +1199,8 @@ def adsb_dashboard():
         'adsb_dashboard.html',
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
         adsb_auto_start=ADSB_AUTO_START,
+        default_latitude=DEFAULT_LATITUDE,
+        default_longitude=DEFAULT_LONGITUDE,
         embedded=embedded,
     )
 

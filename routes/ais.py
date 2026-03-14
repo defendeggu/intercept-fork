@@ -15,7 +15,7 @@ import time
 from flask import Blueprint, Response, jsonify, render_template, request
 
 import app as app_module
-from config import SHARED_OBSERVER_LOCATION_ENABLED
+from config import DEFAULT_LATITUDE, DEFAULT_LONGITUDE, SHARED_OBSERVER_LOCATION_ENABLED
 from utils.constants import (
     AIS_RECONNECT_DELAY,
     AIS_SOCKET_TIMEOUT,
@@ -542,5 +542,7 @@ def ais_dashboard():
     return render_template(
         'ais_dashboard.html',
         shared_observer_location=SHARED_OBSERVER_LOCATION_ENABLED,
+        default_latitude=DEFAULT_LATITUDE,
+        default_longitude=DEFAULT_LONGITUDE,
         embedded=embedded,
     )

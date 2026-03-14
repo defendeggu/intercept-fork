@@ -7,10 +7,17 @@ import os
 import sys
 
 # Application version
-VERSION = "2.26.11"
+VERSION = "2.26.12"
 
 # Changelog - latest release notes (shown on welcome screen)
 CHANGELOG = [
+    {
+        "version": "2.26.12",
+        "date": "March 2026",
+        "highlights": [
+            "AIS and ADS-B dashboards now use configured observer position from .env",
+        ]
+    },
     {
         "version": "2.26.11",
         "date": "March 2026",

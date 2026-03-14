@@ -36,6 +36,8 @@
     <script>
         window.INTERCEPT_SHARED_OBSERVER_LOCATION = {{ shared_observer_location | tojson }};
         window.INTERCEPT_ADSB_AUTO_START = {{ adsb_auto_start | tojson }};
+        window.INTERCEPT_DEFAULT_LAT = {{ default_latitude | tojson }};
+        window.INTERCEPT_DEFAULT_LON = {{ default_longitude | tojson }};
     </script>
     {% if offline_settings.assets_source == 'local' %}
     <script defer src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
@@ -340,8 +342,8 @@
             <div class="control-group">
                 <span class="control-group-label">LOCATION</span>
                 <div class="control-group-items">
-                    <input type="text" id="obsLat" value="51.5074" onchange="updateObserverLoc()" style="width: 70px;" title="Latitude" placeholder="Lat">
-                    <input type="text" id="obsLon" value="-0.1278" onchange="updateObserverLoc()" style="width: 70px;" title="Longitude" placeholder="Lon">
+                    <input type="text" id="obsLat" value="{{ default_latitude }}" onchange="updateObserverLoc()" style="width: 70px;" title="Latitude" placeholder="Lat">
+                    <input type="text" id="obsLon" value="{{ default_longitude }}" onchange="updateObserverLoc()" style="width: 70px;" title="Longitude" placeholder="Lon">
                     <span id="gpsIndicator" class="gps-indicator" style="display: none;" title="GPS connected via gpsd"><span class="gps-dot"></span> GPS</span>
                 </div>
             </div>
@@ -643,7 +645,9 @@
                     if (parsed.lat !== undefined && parsed.lat !== null && parsed.lon !== undefined && parsed.lon !== null) return parsed;
                 } catch (e) {}
             }
-            return { lat: 51.5074, lon: -0.1278 };
+            const defaultLat = window.INTERCEPT_DEFAULT_LAT || 51.5074;
+            const defaultLon = window.INTERCEPT_DEFAULT_LON || -0.1278;
+            return { lat: defaultLat, lon: defaultLon };
         })();
         let rangeRingsLayer = null;
         let observerMarker = null;
