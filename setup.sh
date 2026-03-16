@@ -605,7 +605,25 @@ apt_install() {
   fi
 }
 
+wait_for_apt_lock() {
+  local max_wait=120
+  local waited=0
+  while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+    if [[ $waited -eq 0 ]]; then
+      info "Waiting for apt lock (another package manager is running)..."
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    if [[ $waited -ge $max_wait ]]; then
+      warn "apt lock held for over ${max_wait}s. Continuing anyway (may fail)."
+      return 1
+    fi
+  done
+  return 0
+}
+
 apt_try_install_any() {
+  wait_for_apt_lock
   local p
   for p in "$@"; do
     if $SUDO apt-get install -y --no-install-recommends "$p" >/dev/null 2>&1; then
@@ -1722,6 +1740,7 @@ install_profiles() {
       export NEEDRESTART_MODE=a
     fi
 
+    wait_for_apt_lock
     info "Updating APT package lists..."
     if ! $SUDO apt-get update -y >/dev/null 2>&1; then
       warn "apt-get update reported errors. Continuing anyway."
