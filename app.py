@@ -481,7 +481,7 @@ def login():
 @app.route('/')
 def index() -> str:
     if request.args.get('mode') == 'satellite':
-        return redirect(url_for('satellite.dashboard'))
+        return redirect(url_for('satellite.satellite_dashboard'))
 
     tools = {
         'rtl_fm': check_tool('rtl_fm'),
