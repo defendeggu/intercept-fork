@@ -208,7 +208,7 @@
                 </div>
                 <div class="panel-content" id="packetList">
                     <div style="text-align:center;color:var(--text-secondary);padding:15px;font-size:11px;">
-                        No packets received.<br>Packet decoding requires an AFSK/FSK decoder (coming soon).
+                        No packets received yet.<br>Run a ground-station observation with telemetry tasks enabled to populate this panel.
                     </div>
                 </div>
             </div>
@@ -599,6 +599,8 @@
         let selectedSatellite = 25544;
         let currentLocationSource = 'local';
         let agents = [];
+        let _txRequestId = 0;
+        let _telemetryPollTimer = null;
 
         let satellites = {
             25544: { name: 'ISS (ZARYA)', color: '#00ffff' },
@@ -666,6 +668,7 @@
 
             loadTransmitters(selectedSatellite);
             calculatePasses();
+            fetchCurrentTelemetry();
             gsLoadOutputs();
             if (window.gsOnSatelliteChange) gsOnSatelliteChange();
         }
@@ -731,7 +734,7 @@
             // Find the selected satellite by name or norad_id
             const satName = satellites[selectedSatellite]?.name;
             const pos = positions.find(p =>
-                p.norad_id === selectedSatellite ||
+                parseInt(p.norad_id) === selectedSatellite ||
                 p.satellite === satName ||
                 p.satellite === satellites[selectedSatellite]?.name
             );
@@ -785,6 +788,34 @@
             }
         }
 
+        async function fetchCurrentTelemetry() {
+            const lat = parseFloat(document.getElementById('obsLat')?.value);
+            const lon = parseFloat(document.getElementById('obsLon')?.value);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon) || !selectedSatellite) return;
+
+            try {
+                const response = await fetch('/satellite/position', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: lat,
+                        longitude: lon,
+                        satellites: [selectedSatellite],
+                        includeTrack: false
+                    })
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.status !== 'success' || !Array.isArray(data.positions)) return;
+                handleLivePositions(data.positions);
+            } catch (_) {}
+        }
+
+        function startTelemetryPolling() {
+            if (_telemetryPollTimer) return;
+            _telemetryPollTimer = setInterval(fetchCurrentTelemetry, 10000);
+        }
+
         function splitAtAntimeridian(track) {
             const segments = [];
             let current = [];
@@ -830,8 +861,10 @@
             if (!isEmbedded) {
                 startSSETracking();
             }
+            startTelemetryPolling();
             loadAgents();
             loadTransmitters(selectedSatellite);
+            fetchCurrentTelemetry();
             if (!usedShared) {
                 getLocation();
             }
@@ -1530,6 +1563,7 @@
             const container = document.getElementById('transmittersList');
             const countEl = document.getElementById('txCount');
             if (!container) return;
+            const requestId = ++_txRequestId;
             if (!noradId) {
                 container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:15px;font-size:11px;">Select a satellite</div>';
                 if (countEl) countEl.textContent = '';
@@ -1537,11 +1571,19 @@
             }
             container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:15px;font-size:11px;">Loading...</div>';
             try {
-                const r = await fetch(`/satellite/transmitters/${noradId}`);
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 7000);
+                const r = await fetch(`/satellite/transmitters/${noradId}`, { signal: controller.signal });
+                clearTimeout(timeout);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const data = await r.json();
+                if (requestId !== _txRequestId) return;
+                if (data.status !== 'success') throw new Error('Unexpected response');
                 renderTransmitters(data.transmitters || []);
             } catch (e) {
-                container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:15px;font-size:11px;">Failed to load</div>';
+                if (requestId !== _txRequestId) return;
+                const timedOut = e && (e.name === 'AbortError' || String(e).includes('AbortError'));
+                container.innerHTML = `<div style="text-align:center;color:var(--text-secondary);padding:15px;font-size:11px;">${timedOut ? 'Timed out loading transmitter data' : 'Failed to load transmitter data'}</div>`;
                 if (countEl) countEl.textContent = '';
             }
         }

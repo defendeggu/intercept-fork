@@ -26,7 +26,7 @@ _fetch_lock = threading.Lock()
 _prefetch_started = False
 
 _SATNOGS_URL = "https://db.satnogs.org/api/transmitters/?format=json"
-_REQUEST_TIMEOUT = 15  # seconds
+_REQUEST_TIMEOUT = 6  # seconds
 
 
 # ---------------------------------------------------------------------------
