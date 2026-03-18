@@ -152,6 +152,10 @@ def sse_stream_fanout(
     )
     last_keepalive = time.time()
 
+    # Send an immediate keepalive so the browser receives response headers
+    # right away (Werkzeug dev server buffers headers until first body byte).
+    yield format_sse({'type': 'keepalive'})
+
     try:
         while True:
             if stop_check and stop_check():
