@@ -5,6 +5,11 @@
  */
 
 const WeatherSat = (function() {
+    const METEOR_NORAD_IDS = {
+        'METEOR-M2-3': 57166,
+        'METEOR-M2-4': 59051,
+    };
+
     // State
     let isRunning = false;
     let eventSource = null;
@@ -29,6 +34,7 @@ const WeatherSat = (function() {
     let locationListenersAttached = false;
     let initialized = false;
     let imageRefreshInterval = null;
+    let lastDecodeJobSignature = null;
 
     /**
      * Initialize the Weather Satellite mode
@@ -42,6 +48,7 @@ const WeatherSat = (function() {
             startCountdownTimer();
             checkSchedulerStatus();
             initGroundMap();
+            loadLatestDecodeJob();
             return;
         }
         initialized = true;
@@ -54,6 +61,7 @@ const WeatherSat = (function() {
         checkSchedulerStatus();
         initGroundMap();
         ensureImageRefresh();
+        loadLatestDecodeJob();
     }
 
     /**
@@ -143,6 +151,7 @@ const WeatherSat = (function() {
                 satSelect.addEventListener('change', () => {
                     applyPassFilter();
                     loadImages();
+                    loadLatestDecodeJob();
                 });
             }
             locationListenersAttached = true;
@@ -1786,7 +1795,71 @@ const WeatherSat = (function() {
             const mode = document.getElementById('weatherSatMode');
             if (!mode || !mode.classList.contains('active')) return;
             loadImages();
+            loadLatestDecodeJob();
         }, 30000);
+    }
+
+    function getSelectedMeteorNorad() {
+        const satSelect = document.getElementById('weatherSatSelect');
+        const satellite = satSelect?.value || '';
+        return METEOR_NORAD_IDS[satellite] || null;
+    }
+
+    async function loadLatestDecodeJob() {
+        const norad = getSelectedMeteorNorad();
+        if (!norad) return;
+
+        try {
+            const response = await fetch(`/ground_station/decode-jobs?norad_id=${encodeURIComponent(norad)}&backend=meteor_lrpt&limit=1`);
+            const jobs = await response.json();
+            if (!Array.isArray(jobs) || !jobs.length) return;
+
+            const job = jobs[0];
+            const details = job.details || {};
+            const signature = `${job.id}:${job.status}:${job.error_message || ''}`;
+            const captureStatus = document.getElementById('wxsatCaptureStatus');
+            const captureMsg = document.getElementById('wxsatCaptureMsg');
+            const captureElapsed = document.getElementById('wxsatCaptureElapsed');
+
+            if (!isRunning) {
+                if (job.status === 'queued') {
+                    updateStatusUI('idle', 'Decode queued');
+                    if (captureMsg) captureMsg.textContent = 'Ground-station decode queued';
+                    if (captureElapsed) captureElapsed.textContent = '--';
+                    if (captureStatus) captureStatus.classList.add('active');
+                } else if (job.status === 'decoding') {
+                    updateStatusUI('decoding', 'Ground-station decode running');
+                    if (captureMsg) captureMsg.textContent = details.message || 'Ground-station decode in progress';
+                    if (captureStatus) captureStatus.classList.add('active');
+                } else if (job.status === 'failed') {
+                    updateStatusUI('idle', 'Last decode failed');
+                    if (captureMsg) captureMsg.textContent = job.error_message || details.message || 'Decode failed';
+                    if (captureElapsed) captureElapsed.textContent = '--';
+                    if (captureStatus) captureStatus.classList.remove('active');
+                    if (signature !== lastDecodeJobSignature) {
+                        showConsole(true);
+                        addConsoleEntry(job.error_message || details.message || 'Last decode failed', 'error');
+                    }
+                } else if (job.status === 'complete') {
+                    const count = details.output_count;
+                    updateStatusUI('idle', count ? `Last decode: ${count} image${count === 1 ? '' : 's'}` : 'Last decode complete');
+                    if (captureMsg) captureMsg.textContent = details.message || 'Ground-station decode complete';
+                    if (captureElapsed) captureElapsed.textContent = '--';
+                    if (captureStatus) captureStatus.classList.remove('active');
+                    if (signature !== lastDecodeJobSignature) {
+                        addConsoleEntry(
+                            count ? `Ground-station decode complete: ${count} image${count === 1 ? '' : 's'} produced`
+                                  : 'Ground-station decode complete',
+                            'signal'
+                        );
+                    }
+                }
+            }
+
+            lastDecodeJobSignature = signature;
+        } catch (err) {
+            console.error('Failed to load latest decode job:', err);
+        }
     }
 
     /**
