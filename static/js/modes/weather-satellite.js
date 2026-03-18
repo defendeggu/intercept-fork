@@ -35,6 +35,7 @@ const WeatherSat = (function() {
     let initialized = false;
     let imageRefreshInterval = null;
     let lastDecodeJobSignature = null;
+    let lastDecodeSatellite = null;
 
     /**
      * Initialize the Weather Satellite mode
@@ -149,6 +150,7 @@ const WeatherSat = (function() {
             const satSelect = document.getElementById('weatherSatSelect');
             if (satSelect) {
                 satSelect.addEventListener('change', () => {
+                    resetDecodeJobDisplay();
                     applyPassFilter();
                     loadImages();
                     loadLatestDecodeJob();
@@ -1808,11 +1810,21 @@ const WeatherSat = (function() {
     async function loadLatestDecodeJob() {
         const norad = getSelectedMeteorNorad();
         if (!norad) return;
+        const satSelect = document.getElementById('weatherSatSelect');
+        const satellite = satSelect?.value || null;
+
+        if (satellite !== lastDecodeSatellite) {
+            lastDecodeSatellite = satellite;
+            lastDecodeJobSignature = null;
+        }
 
         try {
             const response = await fetch(`/ground_station/decode-jobs?norad_id=${encodeURIComponent(norad)}&backend=meteor_lrpt&limit=1`);
             const jobs = await response.json();
-            if (!Array.isArray(jobs) || !jobs.length) return;
+            if (!Array.isArray(jobs) || !jobs.length) {
+                resetDecodeJobDisplay();
+                return;
+            }
 
             const job = jobs[0];
             const details = job.details || {};
@@ -1863,6 +1875,17 @@ const WeatherSat = (function() {
         } catch (err) {
             console.error('Failed to load latest decode job:', err);
         }
+    }
+
+    function resetDecodeJobDisplay() {
+        if (isRunning) return;
+        const captureStatus = document.getElementById('wxsatCaptureStatus');
+        const captureMsg = document.getElementById('wxsatCaptureMsg');
+        const captureElapsed = document.getElementById('wxsatCaptureElapsed');
+        if (captureStatus) captureStatus.classList.remove('active');
+        if (captureMsg) captureMsg.textContent = '--';
+        if (captureElapsed) captureElapsed.textContent = '--';
+        updateStatusUI('idle', 'Idle');
     }
 
     function formatDecodeJobSummary(job, details) {
