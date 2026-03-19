@@ -121,6 +121,25 @@ def test_tracker_position_has_no_observer_fields():
         assert required in pos, f"SSE tracker must emit '{required}'"
 
 
+def test_predict_passes_currentpos_has_full_fields(client):
+    """currentPos in pass results must include altitude, elevation, azimuth, distance."""
+    payload = {
+        'latitude': 51.5074,
+        'longitude': -0.1278,
+        'hours': 48,
+        'minEl': 5,
+        'satellites': ['ISS'],
+    }
+    response = client.post('/satellite/predict', json=payload)
+    assert response.status_code == 200
+    data = response.json
+    assert data['status'] == 'success'
+    if data['passes']:
+        cp = data['passes'][0].get('currentPos', {})
+        for field in ('lat', 'lon', 'altitude', 'elevation', 'azimuth', 'distance'):
+            assert field in cp, f"currentPos missing field: {field}"
+
+
 @patch('routes.satellite.refresh_tle_data', return_value=['ISS'])
 @patch('routes.satellite._load_db_satellites_into_cache')
 def test_tle_auto_refresh_schedules_daily_repeat(mock_load_db, mock_refresh):

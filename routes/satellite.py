@@ -513,7 +513,19 @@ def predict_passes():
                 current_pos = {
                     'lat': float(sp.latitude.degrees),
                     'lon': float(sp.longitude.degrees),
+                    'altitude': float(sp.elevation.km),
                 }
+                # Add observer-relative data using the request's observer location
+                try:
+                    diff = satellite - observer
+                    topo = diff.at(t0)
+                    alt_deg, az_deg, dist_km = topo.altaz()
+                    current_pos['elevation'] = round(float(alt_deg.degrees), 1)
+                    current_pos['azimuth'] = round(float(az_deg.degrees), 1)
+                    current_pos['distance'] = round(float(dist_km.km), 1)
+                    current_pos['visible'] = bool(alt_deg.degrees > 0)
+                except Exception:
+                    pass
             except Exception:
                 pass
 

@@ -2404,21 +2404,9 @@
                 clearTelemetry();
                 return;
             }
-
-            const pos = pass.currentPos;
-            const telLat = document.getElementById('telLat');
-            const telLon = document.getElementById('telLon');
-            const telAlt = document.getElementById('telAlt');
-            const telEl = document.getElementById('telEl');
-            const telAz = document.getElementById('telAz');
-            const telDist = document.getElementById('telDist');
-
-            if (telLat) telLat.textContent = Number.isFinite(pos.lat) ? pos.lat.toFixed(4) + '°' : '---.----';
-            if (telLon) telLon.textContent = Number.isFinite(pos.lon) ? pos.lon.toFixed(4) + '°' : '---.----';
-            if (telAlt && Number.isFinite(pos.alt)) telAlt.textContent = pos.alt.toFixed(0) + ' km';
-            if (telEl && Number.isFinite(pos.el)) telEl.textContent = pos.el.toFixed(1) + '°';
-            if (telAz && Number.isFinite(pos.az)) telAz.textContent = pos.az.toFixed(1) + '°';
-            if (telDist && Number.isFinite(pos.dist)) telDist.textContent = pos.dist.toFixed(0) + ' km';
+            // currentPos now contains full position data (lat, lon, altitude,
+            // elevation, azimuth, distance, visible) from the predict endpoint.
+            applyTelemetryPosition(pass.currentPos);
         }
 
         function updateCountdown() {
