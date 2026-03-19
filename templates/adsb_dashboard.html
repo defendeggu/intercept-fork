@@ -1735,27 +1735,54 @@ ACARS: ${r.statistics.acarsMessages} messages`;
             if (delayedAircraftDbTimer) { clearTimeout(delayedAircraftDbTimer); delayedAircraftDbTimer = null; }
         });
 
+        function ensureAdsbMapBootstrapped() {
+            if (radarMap) return;
+            try {
+                initMap();
+            } catch (e) {
+                console.error('ADS-B map bootstrap failed:', e);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize observer location input fields from saved location
-            const obsLatInput = document.getElementById('obsLat');
-            const obsLonInput = document.getElementById('obsLon');
-            if (obsLatInput) obsLatInput.value = observerLocation.lat.toFixed(4);
-            if (obsLonInput) obsLonInput.value = observerLocation.lon.toFixed(4);
+            // Bring the map up first so a later startup error cannot leave the
+            // dashboard in a half-rendered "shell only" state.
+            ensureAdsbMapBootstrapped();
 
-            // Initialize detection sound toggle from localStorage
-            const detectionToggle = document.getElementById('detectionSoundToggle');
-            if (detectionToggle) detectionToggle.checked = detectionSoundEnabled;
+            try {
+                // Initialize observer location input fields from saved location
+                const obsLatInput = document.getElementById('obsLat');
+                const obsLonInput = document.getElementById('obsLon');
+                if (obsLatInput) obsLatInput.value = observerLocation.lat.toFixed(4);
+                if (obsLonInput) obsLonInput.value = observerLocation.lon.toFixed(4);
 
-            // Load Bias-T setting from localStorage
-            loadAdsbBiasTSetting();
+                // Initialize detection sound toggle from localStorage
+                const detectionToggle = document.getElementById('detectionSoundToggle');
+                if (detectionToggle) detectionToggle.checked = detectionSoundEnabled;
+            } catch (e) {
+                console.error('ADS-B UI bootstrap warning:', e);
+            }
 
-            initMap();
+            try {
+                loadAdsbBiasTSetting();
+            } catch (e) {
+                console.error('ADS-B Bias-T bootstrap warning:', e);
+            }
+
             initDeviceSelectors()
                 .then((devices) => checkAdsbTools(devices))
-                .catch(() => checkAdsbTools([]));
-            updateClock();
-            clockInterval = setInterval(updateClock, 1000);
-            cleanupInterval = setInterval(cleanupOldAircraft, 10000);
+                .catch((e) => {
+                    console.error('ADS-B device selector bootstrap warning:', e);
+                    checkAdsbTools([]);
+                });
+
+            try {
+                updateClock();
+                clockInterval = setInterval(updateClock, 1000);
+                cleanupInterval = setInterval(cleanupOldAircraft, 10000);
+            } catch (e) {
+                console.error('ADS-B timer bootstrap warning:', e);
+            }
 
             // Defer nonessential startup probes so the page can paint and
             // return navigation remains snappy if the user leaves quickly.
@@ -1774,8 +1801,16 @@ ACARS: ${r.statistics.acarsMessages} messages`;
                 autoConnectGps();
             }, 2500);
 
-            // Sync tracking state if ADS-B already running
-            syncTrackingStatus();
+            syncTrackingStatus().catch((e) => {
+                console.error('ADS-B tracking status bootstrap warning:', e);
+            });
+        });
+
+        window.addEventListener('load', () => {
+            if (!radarMap) {
+                console.warn('ADS-B map was not initialized during DOMContentLoaded, retrying on window load');
+                ensureAdsbMapBootstrapped();
+            }
         });
 
         // Track which device is being used for ADS-B tracking
