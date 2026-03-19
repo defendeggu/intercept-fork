@@ -71,107 +71,127 @@
     {% endif %}
 
     <main class="dashboard">
-        <!-- Polar Plot -->
-        <div class="panel polar-container">
-            <div class="panel-header">
-                <span>SKY VIEW // POLAR PLOT</span>
-                <div class="panel-indicator"></div>
+        <section class="primary-layout">
+            <!-- Ground Track Map -->
+            <div class="panel map-container">
+                <div class="panel-header">
+                    <span>GROUND TRACK // WORLD VIEW</span>
+                    <div class="map-header-tools">
+                        <button class="map-mode-btn active" id="mapModeBothBtn" onclick="setMapViewMode('both')">BOTH</button>
+                        <button class="map-mode-btn" id="mapModePassBtn" onclick="setMapViewMode('pass')">PASS</button>
+                        <button class="map-mode-btn" id="mapModeLiveBtn" onclick="setMapViewMode('live')">LIVE</button>
+                        <button class="map-action-btn" onclick="fitMapToActiveTrack()">FIT</button>
+                        <button class="map-action-btn" id="mapFollowBtn" onclick="toggleMapFollow()">FOLLOW</button>
+                    </div>
+                </div>
+                <div class="panel-content map-panel-content">
+                    <div id="groundMap"></div>
+                    <div class="map-overlay-card">
+                        <div class="map-overlay-kicker">TRACK VIEW</div>
+                        <div class="map-overlay-primary" id="mapTrackPrimary">Loading active orbit and pass corridor...</div>
+                        <div class="map-overlay-secondary" id="mapTrackSecondary">Use PASS, LIVE, or BOTH to switch the overlay view.</div>
+                        <div class="map-overlay-legend">
+                            <span class="map-legend-chip pass">PASS CORRIDOR</span>
+                            <span class="map-legend-chip live">LIVE ORBIT</span>
+                            <span class="map-legend-chip current">CURRENT SUBPOINT</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="panel-content">
-                <canvas id="polarPlot"></canvas>
-            </div>
-        </div>
 
-        <!-- Ground Track Map -->
-        <div class="panel map-container">
-            <div class="panel-header">
-                <span>GROUND TRACK // WORLD VIEW</span>
-                <div class="panel-indicator"></div>
-            </div>
-            <div class="panel-content" style="padding: 0;">
-                <div id="groundMap"></div>
-            </div>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="sidebar">
+            <!-- Command Rail -->
+            <aside class="command-rail">
             <!-- Satellite Selector -->
-            <div class="satellite-selector">
-                <label>TARGET:</label>
-                <select id="satSelect" onchange="onSatelliteChange()">
-                    <option value="25544">ISS (ZARYA)</option>
-                    <option value="57166">METEOR-M2-3</option>
-                    <option value="59051">METEOR-M2-4</option>
-                </select>
-                <button id="satRefreshBtn" onclick="loadDashboardSatellites()" title="Refresh satellite list">↺</button>
-            </div>
-
-            <!-- Countdown -->
-            <div class="panel countdown-panel">
-                <div class="panel-header">
-                    <span>NEXT PASS</span>
-                    <div class="panel-indicator"></div>
+                <div class="satellite-selector">
+                    <label>TARGET:</label>
+                    <select id="satSelect" onchange="onSatelliteChange()">
+                        <option value="25544">ISS (ZARYA)</option>
+                        <option value="57166">METEOR-M2-3</option>
+                        <option value="59051">METEOR-M2-4</option>
+                    </select>
+                    <button id="satRefreshBtn" onclick="loadDashboardSatellites()" title="Refresh satellite list">↺</button>
                 </div>
-                <div class="countdown-display">
-                    <div class="next-pass-label">Incoming Signal</div>
-                    <div class="satellite-name" id="countdownSat">AWAITING DATA</div>
-                    <div class="countdown-grid">
-                        <div class="countdown-block">
-                            <div class="countdown-value" id="countDays">--</div>
-                            <div class="countdown-label">Days</div>
-                        </div>
-                        <div class="countdown-block">
-                            <div class="countdown-value" id="countHours">--</div>
-                            <div class="countdown-label">Hours</div>
-                        </div>
-                        <div class="countdown-block">
-                            <div class="countdown-value" id="countMins">--</div>
-                            <div class="countdown-label">Mins</div>
-                        </div>
-                        <div class="countdown-block">
-                            <div class="countdown-value" id="countSecs">--</div>
-                            <div class="countdown-label">Secs</div>
+
+                <!-- Countdown -->
+                <div class="panel countdown-panel">
+                    <div class="panel-header">
+                        <span>NEXT PASS</span>
+                        <div class="panel-indicator"></div>
+                    </div>
+                    <div class="countdown-display">
+                        <div class="next-pass-label">Incoming Signal</div>
+                        <div class="satellite-name" id="countdownSat">AWAITING DATA</div>
+                        <div class="countdown-grid">
+                            <div class="countdown-block">
+                                <div class="countdown-value" id="countDays">--</div>
+                                <div class="countdown-label">Days</div>
+                            </div>
+                            <div class="countdown-block">
+                                <div class="countdown-value" id="countHours">--</div>
+                                <div class="countdown-label">Hours</div>
+                            </div>
+                            <div class="countdown-block">
+                                <div class="countdown-value" id="countMins">--</div>
+                                <div class="countdown-label">Mins</div>
+                            </div>
+                            <div class="countdown-block">
+                                <div class="countdown-value" id="countSecs">--</div>
+                                <div class="countdown-label">Secs</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Telemetry -->
-            <div class="panel telemetry-panel">
-                <div class="panel-header">
-                    <span>LIVE TELEMETRY</span>
-                    <div class="panel-indicator"></div>
-                </div>
-                <div class="panel-content">
-                    <div class="telemetry-rows">
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Latitude</div>
-                            <div class="telemetry-value" id="telLat">---.----</div>
-                        </div>
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Longitude</div>
-                            <div class="telemetry-value" id="telLon">---.----</div>
-                        </div>
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Altitude</div>
-                            <div class="telemetry-value" id="telAlt">--- km</div>
-                        </div>
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Elevation</div>
-                            <div class="telemetry-value" id="telEl">--.-</div>
-                        </div>
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Azimuth</div>
-                            <div class="telemetry-value" id="telAz">---.-</div>
-                        </div>
-                        <div class="telemetry-item">
-                            <div class="telemetry-label">Distance</div>
-                            <div class="telemetry-value" id="telDist">---- km</div>
+                <!-- Telemetry -->
+                <div class="panel telemetry-panel">
+                    <div class="panel-header">
+                        <span>LIVE TELEMETRY</span>
+                        <div class="panel-indicator"></div>
+                    </div>
+                    <div class="panel-content">
+                        <div class="telemetry-rows">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Latitude</div>
+                                <div class="telemetry-value" id="telLat">---.----</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Longitude</div>
+                                <div class="telemetry-value" id="telLon">---.----</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Altitude</div>
+                                <div class="telemetry-value" id="telAlt">--- km</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Elevation</div>
+                                <div class="telemetry-value" id="telEl">--.-</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Azimuth</div>
+                                <div class="telemetry-value" id="telAz">---.-</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Distance</div>
+                                <div class="telemetry-value" id="telDist">---- km</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
+                <!-- Compact Polar Plot -->
+                <div class="panel polar-container">
+                    <div class="panel-header">
+                        <span>SKY VIEW // PASS GEOMETRY</span>
+                        <div class="panel-indicator"></div>
+                    </div>
+                    <div class="panel-content">
+                        <canvas id="polarPlot"></canvas>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="data-grid">
             <!-- Pass List -->
             <div class="panel pass-list">
                 <div class="panel-header">
@@ -352,7 +372,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Controls Bar -->
         <div class="controls-bar">
@@ -441,7 +461,7 @@
 
         /* Transmitters panel */
         .transmitters-panel, .packets-panel {
-            margin-top: 10px;
+            margin-top: 0;
         }
         .tx-item {
             display: flex;
@@ -482,7 +502,7 @@
         }
 
         /* Ground Station panel */
-        .gs-panel { margin-top: 10px; }
+        .gs-panel { margin-top: 0; }
         .gs-status-row {
             display: flex;
             justify-content: space-between;
@@ -596,6 +616,9 @@
         let trackLine = null;
         let observerMarker = null;
         let orbitTrack = null;
+        let latestLivePosition = null;
+        let mapViewMode = 'both';
+        let mapFollowMode = false;
         let selectedSatellite = 25544;
         let currentLocationSource = 'local';
         let agents = [];
@@ -691,6 +714,7 @@
 
             selectedPass = null;
             passes = [];
+            latestLivePosition = null;
 
             if (groundMap) {
                 if (trackLine) { groundMap.removeLayer(trackLine); trackLine = null; }
@@ -699,6 +723,7 @@
             }
 
             clearTelemetry();
+            updateMapTrackSummary();
             loadTransmitters(selectedSatellite);
             calculatePasses();
             fetchCurrentTelemetry();
@@ -776,6 +801,8 @@
                 return;
             }
 
+            latestLivePosition = pos;
+
             // Update telemetry panel
             const telLat = document.getElementById('telLat');
             const telLon = document.getElementById('telLon');
@@ -789,33 +816,15 @@
             if (telEl) telEl.textContent = (pos.elevation ?? 0).toFixed(1) + '°';
             if (telAz) telAz.textContent = (pos.azimuth ?? 0).toFixed(1) + '°';
             if (telDist) telDist.textContent = (pos.distance ?? 0).toFixed(0) + ' km';
-
-            // Update live marker on map
-            if (groundMap && pos.lat != null && pos.lon != null) {
-                const satColor = satellites[selectedSatellite]?.color || '#00d4ff';
-                if (satMarker) groundMap.removeLayer(satMarker);
-                const satIcon = L.divIcon({
-                    className: 'sat-marker-live',
-                    html: `<div style="width:20px;height:20px;background:${satColor};border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px ${satColor},0 0 40px ${satColor};"></div>`,
-                    iconSize: [20, 20], iconAnchor: [10, 10]
-                });
-                satMarker = L.marker([pos.lat, pos.lon], { icon: satIcon }).addTo(groundMap);
+            if (selectedPass == null && pos.azimuth != null && pos.elevation != null) {
+                drawPolarPlotWithPosition(
+                    pos.azimuth,
+                    pos.elevation,
+                    satellites[selectedSatellite]?.color || '#00d4ff'
+                );
             }
-
-            // Update orbit track from groundTrack if available
-            if (groundMap && pos.groundTrack && pos.groundTrack.length > 1) {
-                if (orbitTrack) { groundMap.removeLayer(orbitTrack); orbitTrack = null; }
-                const satColor = satellites[selectedSatellite]?.color || '#00d4ff';
-                const segments = splitAtAntimeridian(pos.groundTrack);
-                orbitTrack = L.layerGroup();
-                segments.forEach(seg => {
-                    const past = seg.filter(p => p.past);
-                    const future = seg.filter(p => !p.past);
-                    if (past.length > 1) L.polyline(past.map(p => [p.lat, p.lon]), { color: satColor, weight: 2, opacity: 0.4 }).addTo(orbitTrack);
-                    if (future.length > 1) L.polyline(future.map(p => [p.lat, p.lon]), { color: satColor, weight: 2, opacity: 0.7, dashArray: '5, 5' }).addTo(orbitTrack);
-                });
-                orbitTrack.addTo(groundMap);
-            }
+            renderMapTrackOverlays();
+            updateMapTrackSummary();
         }
 
         function findSelectedPosition(positions) {
@@ -870,7 +879,10 @@
                 const data = await response.json();
                 if (data.status !== 'success' || !Array.isArray(data.positions)) return;
                 if (!findSelectedPosition(data.positions)) {
+                    latestLivePosition = null;
                     clearTelemetry();
+                    renderMapTrackOverlays();
+                    updateMapTrackSummary();
                     return;
                 }
                 handleLivePositions(data.positions);
@@ -898,6 +910,233 @@
             }
             if (current.length >= 2) segments.push(current);
             return segments;
+        }
+
+        function getSelectedPass() {
+            return Number.isInteger(selectedPass) && passes[selectedPass] ? passes[selectedPass] : null;
+        }
+
+        function setMapViewMode(mode) {
+            mapViewMode = mode;
+            updateMapModeButtons();
+            renderMapTrackOverlays();
+            updateMapTrackSummary();
+        }
+
+        function toggleMapFollow() {
+            mapFollowMode = !mapFollowMode;
+            const btn = document.getElementById('mapFollowBtn');
+            if (btn) btn.classList.toggle('active', mapFollowMode);
+            if (mapFollowMode) {
+                fitMapToActiveTrack();
+            }
+        }
+
+        function updateMapModeButtons() {
+            const ids = {
+                both: 'mapModeBothBtn',
+                pass: 'mapModePassBtn',
+                live: 'mapModeLiveBtn'
+            };
+            Object.entries(ids).forEach(([mode, id]) => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('active', mapViewMode === mode);
+            });
+        }
+
+        function createTrackWaypoint(layer, latlng, label, color, tooltipClass) {
+            return L.circleMarker(latlng, {
+                radius: 5,
+                color: '#f4fbff',
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 1,
+                opacity: 0.95
+            })
+                .bindTooltip(label, {
+                    permanent: true,
+                    direction: 'top',
+                    className: `map-track-tooltip ${tooltipClass}`
+                })
+                .addTo(layer);
+        }
+
+        function addSegmentSeries(layer, segment, styles) {
+            if (!Array.isArray(segment) || segment.length < 2) return;
+            styles.forEach(style => {
+                L.polyline(segment, style).addTo(layer);
+            });
+        }
+
+        function renderPassTrackLayer(pass) {
+            const track = Array.isArray(pass?.groundTrack) ? pass.groundTrack : [];
+            if (!track.length) return null;
+
+            const color = pass.color || satellites[selectedSatellite]?.color || '#00d4ff';
+            const layer = L.layerGroup();
+            const segments = splitAtAntimeridian(track);
+            const bounds = [];
+
+            segments.forEach(segObj => {
+                const seg = segObj.map(p => [p.lat, p.lon]);
+                if (seg.length < 2) return;
+                addSegmentSeries(layer, seg, [
+                    { color, weight: 16, opacity: 0.06, lineCap: 'round' },
+                    { color, weight: 8, opacity: 0.18, lineCap: 'round' },
+                    { color, weight: 3.5, opacity: 0.95, lineCap: 'round' }
+                ]);
+                bounds.push(...seg);
+            });
+
+            const first = track[0];
+            const mid = track[Math.floor(track.length / 2)];
+            const last = track[track.length - 1];
+            if (first) createTrackWaypoint(layer, [first.lat, first.lon], 'AOS', '#38c180', 'aos');
+            if (mid) createTrackWaypoint(layer, [mid.lat, mid.lon], 'TCA', color, 'tca');
+            if (last) createTrackWaypoint(layer, [last.lat, last.lon], 'LOS', '#d6a85e', 'los');
+
+            return { layer, bounds };
+        }
+
+        function renderLiveOrbitLayer(position) {
+            const track = Array.isArray(position?.groundTrack) ? position.groundTrack : [];
+            if (!track.length) return null;
+
+            const color = '#38c180';
+            const layer = L.layerGroup();
+            const bounds = [];
+            const segments = splitAtAntimeridian(track);
+
+            segments.forEach(segObj => {
+                const past = segObj.filter(p => p.past).map(p => [p.lat, p.lon]);
+                const future = segObj.filter(p => !p.past).map(p => [p.lat, p.lon]);
+                if (past.length > 1) {
+                    addSegmentSeries(layer, past, [
+                        { color, weight: 10, opacity: 0.05, lineCap: 'round' },
+                        { color, weight: 2.5, opacity: 0.3, lineCap: 'round' }
+                    ]);
+                    bounds.push(...past);
+                }
+                if (future.length > 1) {
+                    addSegmentSeries(layer, future, [
+                        { color, weight: 12, opacity: 0.08, lineCap: 'round' },
+                        { color, weight: 3, opacity: 0.85, dashArray: '10 8', lineCap: 'round' }
+                    ]);
+                    bounds.push(...future);
+                }
+            });
+
+            if (position.lat != null && position.lon != null) {
+                createTrackWaypoint(layer, [position.lat, position.lon], 'NOW', '#d6a85e', 'now');
+            }
+
+            return { layer, bounds };
+        }
+
+        function updateMapTrackSummary() {
+            const primary = document.getElementById('mapTrackPrimary');
+            const secondary = document.getElementById('mapTrackSecondary');
+            if (!primary || !secondary) return;
+
+            const pass = getSelectedPass();
+            const live = latestLivePosition;
+            const nextTime = pass?.aosTime ? new Date(pass.aosTime).toISOString().substring(11, 16) + ' UTC' : null;
+
+            if (mapViewMode === 'both' && pass && live) {
+                primary.textContent = `${pass.satellite} pass corridor plus live orbit context`;
+                secondary.textContent = `Next rise ${nextTime || '--:-- UTC'} · peak ${pass.maxEl ?? '--'}° · current elevation ${(live.elevation ?? 0).toFixed(1)}°`;
+                return;
+            }
+            if (mapViewMode === 'pass' && pass) {
+                primary.textContent = `${pass.satellite} pass corridor`;
+                secondary.textContent = `AOS ${nextTime || '--:-- UTC'} · peak ${pass.maxEl ?? '--'}° · duration ${pass.duration ?? '--'} min`;
+                return;
+            }
+            if (mapViewMode === 'live' && live) {
+                primary.textContent = `${satellites[selectedSatellite]?.name || 'Selected satellite'} live orbit track`;
+                secondary.textContent = `Subpoint ${(live.lat ?? 0).toFixed(2)}°, ${(live.lon ?? 0).toFixed(2)}° · elevation ${(live.elevation ?? 0).toFixed(1)}°`;
+                return;
+            }
+            if (pass) {
+                primary.textContent = `${pass.satellite} pass corridor ready`;
+                secondary.textContent = `Select FIT to frame the path, or switch to LIVE for the current orbit track.`;
+                return;
+            }
+            if (live) {
+                primary.textContent = `${satellites[selectedSatellite]?.name || 'Selected satellite'} live subpoint available`;
+                secondary.textContent = 'Awaiting pass prediction data. You can still inspect the current orbit track.';
+                return;
+            }
+            primary.textContent = 'Awaiting orbit and pass geometry';
+            secondary.textContent = 'Choose a satellite and calculate passes to populate the corridor view.';
+        }
+
+        function renderMapTrackOverlays(options = {}) {
+            if (!groundMap) return;
+            const { fit = false } = options;
+
+            if (trackLine) { groundMap.removeLayer(trackLine); trackLine = null; }
+            if (orbitTrack) { groundMap.removeLayer(orbitTrack); orbitTrack = null; }
+            if (satMarker) { groundMap.removeLayer(satMarker); satMarker = null; }
+
+            const bounds = [];
+            const pass = getSelectedPass();
+            const showPass = mapViewMode !== 'live';
+            const showLive = mapViewMode !== 'pass';
+
+            if (showPass && pass) {
+                const renderedPass = renderPassTrackLayer(pass);
+                if (renderedPass) {
+                    trackLine = renderedPass.layer;
+                    trackLine.addTo(groundMap);
+                    bounds.push(...renderedPass.bounds);
+                }
+            }
+
+            if (showLive && latestLivePosition) {
+                const renderedLive = renderLiveOrbitLayer(latestLivePosition);
+                if (renderedLive) {
+                    orbitTrack = renderedLive.layer;
+                    orbitTrack.addTo(groundMap);
+                    bounds.push(...renderedLive.bounds);
+                }
+            }
+
+            const satColor = satellites[selectedSatellite]?.color || '#00d4ff';
+            const currentPos = latestLivePosition?.lat != null && latestLivePosition?.lon != null
+                ? { lat: latestLivePosition.lat, lon: latestLivePosition.lon }
+                : (pass?.currentPos?.lat != null && pass?.currentPos?.lon != null
+                    ? { lat: pass.currentPos.lat, lon: pass.currentPos.lon }
+                    : null);
+
+            if (currentPos) {
+                const satIcon = L.divIcon({
+                    className: 'sat-marker-live',
+                    html: `<div style="width:20px;height:20px;background:${satColor};border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px ${satColor},0 0 40px ${satColor};"></div>`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+                satMarker = L.marker([currentPos.lat, currentPos.lon], { icon: satIcon })
+                    .addTo(groundMap)
+                    .bindTooltip('CURRENT SUBPOINT', {
+                        permanent: false,
+                        direction: 'top',
+                        className: 'map-track-tooltip now'
+                    });
+            }
+
+            if (fit && bounds.length) {
+                groundMap.fitBounds(L.latLngBounds(bounds), {
+                    padding: [40, 40],
+                    maxZoom: 5
+                });
+            } else if (mapFollowMode && currentPos) {
+                groundMap.panTo([currentPos.lat, currentPos.lon], { animate: true, duration: 0.6 });
+            }
+        }
+
+        function fitMapToActiveTrack() {
+            renderMapTrackOverlays({ fit: true });
         }
 
         // Listen for visibility messages from parent page (embedded mode)
@@ -1108,6 +1347,8 @@
             if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
                 groundMap.setView([lat, lon], 3);
             }
+            updateMapModeButtons();
+            updateMapTrackSummary();
         }
 
         function getLocation() {
@@ -1190,7 +1431,15 @@
                     if (passes.length > 0) {
                         selectPass(0);
                     } else {
-                        clearTelemetry();
+                        renderMapTrackOverlays();
+                        updateMapTrackSummary();
+                        if (latestLivePosition?.azimuth != null && latestLivePosition?.elevation != null) {
+                            drawPolarPlotWithPosition(
+                                latestLivePosition.azimuth,
+                                latestLivePosition.elevation,
+                                satellites[selectedSatellite]?.color || '#00d4ff'
+                            );
+                        }
                     }
                     updateObserverMarker(lat, lon);
 
@@ -1247,6 +1496,7 @@
             if (passes.length === 0) {
                 container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">No passes found</div>';
                 if (countEl) countEl.textContent = '';
+                updateMapTrackSummary();
                 return;
             }
 
@@ -1315,6 +1565,7 @@
             drawPolarPlot(pass);
             updateGroundTrack(pass);
             updateTelemetry(pass);
+            updateMapTrackSummary();
         }
 
         function drawPolarPlot(pass) {
@@ -1428,58 +1679,7 @@
 
         function updateGroundTrack(pass) {
             if (!groundMap) return;
-
-            if (trackLine) { groundMap.removeLayer(trackLine); trackLine = null; }
-            if (satMarker) { groundMap.removeLayer(satMarker); satMarker = null; }
-            if (orbitTrack) { groundMap.removeLayer(orbitTrack); orbitTrack = null; }
-
-            if (pass && pass.groundTrack) {
-                const segments = [];
-                let currentSegment = [];
-
-                for (let i = 0; i < pass.groundTrack.length; i++) {
-                    const p = pass.groundTrack[i];
-                    if (currentSegment.length > 0) {
-                        const prevLon = currentSegment[currentSegment.length - 1][1];
-                        const crossesAntimeridian = (prevLon > 90 && p.lon < -90) || (prevLon < -90 && p.lon > 90);
-                        if (crossesAntimeridian) {
-                            if (currentSegment.length >= 1) segments.push(currentSegment);
-                            currentSegment = [];
-                        }
-                    }
-                    currentSegment.push([p.lat, p.lon]);
-                }
-                if (currentSegment.length >= 1) segments.push(currentSegment);
-
-                trackLine = L.layerGroup();
-                const allCoords = [];
-                segments.forEach(seg => {
-                    L.polyline(seg, {
-                        color: pass.color || '#00d4ff',
-                        weight: 4,
-                        opacity: 1.0
-                    }).addTo(trackLine);
-                    allCoords.push(...seg);
-                });
-                trackLine.addTo(groundMap);
-
-                if (pass.currentPos) {
-                    const satIcon = L.divIcon({
-                        className: 'sat-marker',
-                        html: `<div style="width: 16px; height: 16px; background: ${pass.color || '#00d4ff'}; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 20px ${pass.color || '#00d4ff'};"></div>`,
-                        iconSize: [16, 16],
-                        iconAnchor: [8, 8]
-                    });
-
-                    satMarker = L.marker([pass.currentPos.lat, pass.currentPos.lon], { icon: satIcon })
-                        .addTo(groundMap)
-                        .bindPopup(`<b>${pass.name}</b><br>Alt: ${pass.currentPos.alt?.toFixed(0)} km`);
-                }
-
-                if (allCoords.length > 0) {
-                    groundMap.fitBounds(L.latLngBounds(allCoords), { padding: [30, 30] });
-                }
-            }
+            renderMapTrackOverlays({ fit: true });
         }
 
         function updateObserverMarker(lat, lon) {
