@@ -332,7 +332,10 @@ const WeatherSat = (function() {
      */
     function preSelect(satellite) {
         const satSelect = document.getElementById('weatherSatSelect');
-        if (satSelect) satSelect.value = satellite;
+        if (satSelect) {
+            satSelect.value = satellite;
+            satSelect.dispatchEvent(new Event('change'));
+        }
     }
 
     /**
@@ -342,6 +345,7 @@ const WeatherSat = (function() {
         const satSelect = document.getElementById('weatherSatSelect');
         if (satSelect) {
             satSelect.value = satellite;
+            satSelect.dispatchEvent(new Event('change'));
         }
         start();
     }
