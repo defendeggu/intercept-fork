@@ -11,6 +11,7 @@ import contextlib
 import json
 import os
 import queue
+import shlex
 import shutil
 import socket
 import subprocess
@@ -83,19 +84,63 @@ def find_auto_rx() -> str | None:
     return None
 
 
+def _resolve_shebang_interpreter(script_path: str) -> str | None:
+    """Resolve a Python interpreter from a script shebang if possible."""
+    try:
+        with open(script_path, 'r', encoding='utf-8', errors='ignore') as handle:
+            first_line = handle.readline().strip()
+    except OSError:
+        return None
+
+    if not first_line.startswith('#!'):
+        return None
+
+    parts = shlex.split(first_line[2:].strip())
+    if not parts:
+        return None
+
+    if os.path.basename(parts[0]) == 'env' and len(parts) > 1:
+        return shutil.which(parts[1])
+
+    return parts[0]
+
+
+def _resolve_pip_python(pip_bin: str | None) -> str | None:
+    """Resolve the Python interpreter used by a pip executable."""
+    if not pip_bin:
+        return None
+    return _resolve_shebang_interpreter(pip_bin)
+
+
 def _iter_auto_rx_python_candidates(auto_rx_path: str):
     """Yield plausible Python interpreters for radiosonde_auto_rx."""
     auto_rx_abs = os.path.abspath(auto_rx_path)
     auto_rx_dir = os.path.dirname(auto_rx_abs)
     install_root = os.path.dirname(auto_rx_dir)
+    install_parent = os.path.dirname(install_root)
 
     candidates = [
+        _resolve_shebang_interpreter(auto_rx_abs),
         sys.executable,
         os.path.join(install_root, 'venv', 'bin', 'python'),
+        os.path.join(install_root, 'venv', 'bin', 'python3'),
         os.path.join(install_root, '.venv', 'bin', 'python'),
+        os.path.join(install_root, '.venv', 'bin', 'python3'),
         os.path.join(auto_rx_dir, 'venv', 'bin', 'python'),
+        os.path.join(auto_rx_dir, 'venv', 'bin', 'python3'),
         os.path.join(auto_rx_dir, '.venv', 'bin', 'python'),
+        os.path.join(auto_rx_dir, '.venv', 'bin', 'python3'),
+        os.path.join(install_parent, 'venv', 'bin', 'python'),
+        os.path.join(install_parent, 'venv', 'bin', 'python3'),
+        os.path.join(install_parent, '.venv', 'bin', 'python'),
+        os.path.join(install_parent, '.venv', 'bin', 'python3'),
+        _resolve_pip_python(shutil.which('pip3')),
+        _resolve_pip_python(shutil.which('pip')),
         shutil.which('python3'),
+        shutil.which('python'),
+        '/usr/local/bin/python3',
+        '/usr/local/bin/python',
+        '/usr/bin/python3',
     ]
 
     seen: set[str] = set()
