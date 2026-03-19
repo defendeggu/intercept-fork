@@ -20,7 +20,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     {% endif %}
-    <link rel="preconnect" href="https://cartodb-basemaps-a.global.ssl.fastly.net" crossorigin>
     <!-- Disclaimer gate - must accept before seeing welcome page -->
     <script>
         // Check BEFORE page renders - if disclaimer not accepted, hide welcome page
@@ -162,28 +161,9 @@
             if (!mode) return;
             window.ensureModeStyles(mode).catch(() => {});
         })();
-        // Warm remaining lazy mode styles in the background to avoid first-switch FOUC.
-        (function warmModeStylesInBackground() {
-            const modeMap = window.INTERCEPT_MODE_STYLE_MAP || {};
-            const queryMode = new URLSearchParams(window.location.search).get('mode');
-            const selectedMode = queryMode === 'listening' ? 'waterfall' : queryMode;
-            const modes = Object.keys(modeMap).filter((mode) => mode !== selectedMode);
-            if (!modes.length) return;
-
-            const warm = function () {
-                modes.forEach(function (mode, index) {
-                    setTimeout(function () {
-                        window.ensureModeStyles(mode).catch(() => {});
-                    }, index * 40);
-                });
-            };
-
-            if (typeof window.requestIdleCallback === 'function') {
-                window.requestIdleCallback(warm, { timeout: 2000 });
-            } else {
-                setTimeout(warm, 600);
-            }
-        })();
+        // Do not warm every mode stylesheet on the welcome page. The eager
+        // background fetch storm was adding substantial cross-mode load and
+        // delaying dedicated dashboards like ADS-B.
     </script>
     <script>
         window.INTERCEPT_MODE_SCRIPT_MAP = {
@@ -1416,8 +1396,9 @@
 
                 <!-- Satellite Dashboard (Embedded) -->
                 <div id="satelliteVisuals" class="satellite-dashboard-embed" style="display: none;">
-                    <iframe id="satelliteDashboardFrame" src="/satellite/dashboard?embedded=true&v={{ version }}" frameborder="0"
+                    <iframe id="satelliteDashboardFrame" data-src="/satellite/dashboard?embedded=true&v={{ version }}" frameborder="0"
                         style="width: 100%; height: 100%; min-height: 700px; border: none; border-radius: 8px;"
+                        loading="lazy"
                         allowfullscreen>
                     </iframe>
                 </div>
@@ -4596,10 +4577,18 @@
             if (satelliteVisuals) satelliteVisuals.style.display = mode === 'satellite' ? 'block' : 'none';
             const satFrame = document.getElementById('satelliteDashboardFrame');
             if (satFrame && mode === 'satellite') {
-                const baseSrc = '/satellite/dashboard?embedded=true&v={{ version }}';
-                satFrame.src = `${baseSrc}&ts=${Date.now()}`;
+                const baseSrc = satFrame.dataset.src || '/satellite/dashboard?embedded=true&v={{ version }}';
+                const currentSrc = satFrame.getAttribute('src') || '';
+                if (!currentSrc || currentSrc === 'about:blank') {
+                    satFrame.src = `${baseSrc}&ts=${Date.now()}`;
+                }
+            } else if (satFrame) {
+                const currentSrc = satFrame.getAttribute('src') || '';
+                if (currentSrc && currentSrc !== 'about:blank') {
+                    satFrame.src = 'about:blank';
+                }
             }
-            if (satFrame && satFrame.contentWindow) {
+            if (satFrame && satFrame.contentWindow && satFrame.getAttribute('src') && satFrame.getAttribute('src') !== 'about:blank') {
                 satFrame.contentWindow.postMessage({type: 'satellite-visibility', visible: mode === 'satellite'}, '*');
             }
 
