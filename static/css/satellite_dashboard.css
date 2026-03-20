@@ -374,8 +374,8 @@ body {
 
 .drawer-actions {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
 }
 
 .drawer-action-btn {
@@ -449,7 +449,7 @@ body {
 
 .drawer-list {
     min-height: 0;
-    max-height: 240px;
+    max-height: 180px;
     overflow-y: auto;
 }
 
@@ -552,8 +552,8 @@ body {
 
 .drawer-info-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
 }
 
 .drawer-info-card {
