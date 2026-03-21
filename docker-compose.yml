@@ -28,8 +28,11 @@ services:
     devices:
       - /dev/bus/usb:/dev/bus/usb
     volumes:
-      # Persist decoded images and database across container rebuilds
-      - ./data:/app/data
+      # Persist runtime output directories across container rebuilds.
+      # Mount subdirectories individually so Python modules in /app/data are not shadowed.
+      - ./data/weather_sat:/app/data/weather_sat
+      - ./data/radiosonde:/app/data/radiosonde
+      - ./data/subghz:/app/data/subghz
       # Optional: mount logs directory
       # - ./logs:/app/logs
     environment:
@@ -86,7 +89,9 @@ services:
     devices:
       - /dev/bus/usb:/dev/bus/usb
     volumes:
-      - ./data:/app/data
+      - ./data/weather_sat:/app/data/weather_sat
+      - ./data/radiosonde:/app/data/radiosonde
+      - ./data/subghz:/app/data/subghz
     environment:
       - TZ=${TZ:-UTC}
       - INTERCEPT_HOST=0.0.0.0
